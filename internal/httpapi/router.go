@@ -2,13 +2,13 @@ package httpapi
 
 import (
 	"net/http"
+
+	v1 "raid-website/internal/httpapi/v1"
 )
 
 func New() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
-	})
+	mux.HandleFunc("/health", v1.Health)
+	mux.HandleFunc("/api/v1/raids", v1.RaidListStub)
 	return mux
 }

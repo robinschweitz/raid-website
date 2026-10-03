@@ -32,6 +32,20 @@ func (r *Repo) Get(ctx context.Context, id int64) (*Character, error) {
 	return c, nil
 }
 
+func (r *Repo) FindByName(ctx context.Context, name string) (*Character, error) {
+	c := new(Character)
+	err := r.db.NewSelect().Model(c).Where("name = ?", name).Order("id ASC").Limit(1).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (r *Repo) Update(ctx context.Context, c *Character) error {
+	_, err := r.db.NewUpdate().Model(c).WherePK().Exec(ctx)
+	return err
+}
+
 func (r *Repo) ListByPlayer(ctx context.Context, playerID int64) ([]Character, error) {
 	var cs []Character
 	err := r.db.NewSelect().Model(&cs).

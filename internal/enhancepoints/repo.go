@@ -50,6 +50,17 @@ func (r *Repo) Balance(ctx context.Context, playerID int64) (int, error) {
 	return sum, nil
 }
 
+func (r *Repo) HasTransactionType(ctx context.Context, playerID int64, txnType string) (bool, error) {
+	count, err := r.db.NewSelect().Model((*Transaction)(nil)).
+		Where("player_id = ?", playerID).
+		Where("type = ?", txnType).
+		Count(ctx)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (r *Repo) HasNoMainSpecAward(ctx context.Context, raidID, playerID int64) (bool, error) {
 	count, err := r.db.NewSelect().Model((*Transaction)(nil)).
 		Where("raid_id = ?", raidID).

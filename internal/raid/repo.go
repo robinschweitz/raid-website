@@ -49,3 +49,12 @@ func (r *Repo) Update(ctx context.Context, rd *Raid) error {
 	_, err := r.db.NewUpdate().Model(rd).WherePK().Exec(ctx)
 	return err
 }
+
+func (r *Repo) FindByName(ctx context.Context, name string) (*Raid, error) {
+	rd := new(Raid)
+	err := r.db.NewSelect().Model(rd).Where("name = ?", name).Order("id ASC").Limit(1).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return rd, nil
+}

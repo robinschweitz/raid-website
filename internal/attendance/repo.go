@@ -23,6 +23,18 @@ func (r *Repo) Create(ctx context.Context, a *Attendance) error {
 	return err
 }
 
+func (r *Repo) Exists(ctx context.Context, raidID, playerID, characterID int64) (bool, error) {
+	count, err := r.db.NewSelect().Model((*Attendance)(nil)).
+		Where("raid_id = ?", raidID).
+		Where("player_id = ?", playerID).
+		Where("character_id = ?", characterID).
+		Count(ctx)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (r *Repo) ListByRaid(ctx context.Context, raidID int64) ([]Attendance, error) {
 	var as []Attendance
 	err := r.db.NewSelect().Model(&as).

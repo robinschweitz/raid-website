@@ -10,6 +10,7 @@ import (
 
 	"raid-website/internal/attendance"
 	"raid-website/internal/enhancepoints"
+	"raid-website/internal/legacyimport"
 	"raid-website/internal/loot"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
@@ -28,6 +29,7 @@ type API struct {
 	Points     *enhancepoints.Repo
 	Tokens     *tokens.Repo
 	Completion *raidcompletion.Service
+	Imports    *legacyimport.Service
 }
 
 func NewAPI(
@@ -40,6 +42,7 @@ func NewAPI(
 	points *enhancepoints.Repo,
 	tokenRepo *tokens.Repo,
 	completion *raidcompletion.Service,
+	imports *legacyimport.Service,
 ) *API {
 	return &API{
 		DB:         db,
@@ -51,6 +54,7 @@ func NewAPI(
 		Points:     points,
 		Tokens:     tokenRepo,
 		Completion: completion,
+		Imports:    imports,
 	}
 }
 
@@ -81,6 +85,10 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/players/{id}/locks", a.listLocks)
 	mux.HandleFunc("POST /api/v1/players/{id}/locks", a.createLock)
 	mux.HandleFunc("POST /api/v1/players/{id}/locks/{lockID}/cancel", a.cancelLock)
+
+	mux.HandleFunc("GET /api/v1/imports", a.listImports)
+	mux.HandleFunc("POST /api/v1/imports/dry-run", a.dryRunImport)
+	mux.HandleFunc("POST /api/v1/imports", a.mergeImport)
 }
 
 func pathID(r *http.Request, name string) (int64, bool) {

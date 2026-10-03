@@ -41,6 +41,20 @@ func (r *Repo) FindByName(ctx context.Context, name string) (*Player, error) {
 	return p, nil
 }
 
+func (r *Repo) FindByUsername(ctx context.Context, username string) (*Player, error) {
+	p := new(Player)
+	err := r.db.NewSelect().Model(p).Where("username = ?", username).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (r *Repo) Update(ctx context.Context, p *Player) error {
+	_, err := r.db.NewUpdate().Model(p).WherePK().Exec(ctx)
+	return err
+}
+
 func (r *Repo) List(ctx context.Context) ([]Player, error) {
 	var ps []Player
 	err := r.db.NewSelect().Model(&ps).Order("name ASC").Scan(ctx)

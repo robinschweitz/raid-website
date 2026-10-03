@@ -8,16 +8,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
-	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/auth"
 	"raid-website/internal/character"
 	"raid-website/internal/db"
 	"raid-website/internal/httpapi"
 	"raid-website/internal/migrations"
+	"raid-website/internal/player"
+	"raid-website/internal/validation"
 )
 
 func setupServer(t *testing.T) (*httptest.Server, *bun.DB) {
@@ -36,12 +39,60 @@ func setupServer(t *testing.T) (*httptest.Server, *bun.DB) {
 	if _, err := m.Migrate(ctx); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	srv := httptest.NewServer(httpapi.New(bdb.DB))
+	srv := httptest.NewServer(httpapi.New(bdb.DB, httpapi.Options{}))
 	t.Cleanup(srv.Close)
 	return srv, bdb.DB
 }
 
-func do(t *testing.T, client *http.Client, method, url, actor string, body any) (int, []byte) {
+func seedAccount(t *testing.T, bdb *bun.DB, username, password string, role validation.Role) int64 {
+	t.Helper()
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	now := time.Now().UTC()
+	uname := strings.ToLower(username)
+	p := &player.Player{
+		Name:         username,
+		Username:     &uname,
+		PasswordHash: hash,
+		Role:         role,
+		Active:       true,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := player.NewRepo(bdb).Create(context.Background(), p); err != nil {
+		t.Fatalf("seed account %s: %v", username, err)
+	}
+	return p.ID
+}
+
+func login(t *testing.T, client *http.Client, srv *httptest.Server, username, password string) string {
+	t.Helper()
+	body, _ := json.Marshal(map[string]any{"username": username, "password": password})
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/auth/login", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("new login request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("login %s: status %d", username, resp.StatusCode)
+	}
+	for _, c := range resp.Cookies() {
+		if c.Name == auth.CookieName {
+			return c.Value
+		}
+	}
+	t.Fatalf("login %s: no session cookie", username)
+	return ""
+}
+
+func do(t *testing.T, client *http.Client, method, url, token string, body any) (int, []byte) {
 	t.Helper()
 	var reader *bytes.Reader
 	if body != nil {
@@ -60,8 +111,8 @@ func do(t *testing.T, client *http.Client, method, url, actor string, body any) 
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if actor != "" {
-		req.Header.Set("X-Actor-ID", actor)
+	if token != "" {
+		req.Header.Set("Cookie", auth.CookieName+"="+token)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -75,9 +126,9 @@ func do(t *testing.T, client *http.Client, method, url, actor string, body any) 
 	return resp.StatusCode, buf.Bytes()
 }
 
-func createPlayer(t *testing.T, client *http.Client, srv *httptest.Server, actor, name string) int64 {
+func createPlayer(t *testing.T, client *http.Client, srv *httptest.Server, token, name string) int64 {
 	t.Helper()
-	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/players", actor, map[string]any{"name": name})
+	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/players", token, map[string]any{"name": name})
 	if status != http.StatusCreated {
 		t.Fatalf("create player %s: status %d body %s", name, status, body)
 	}
@@ -97,9 +148,12 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	client := srv.Client()
 	ctx := context.Background()
 
-	leader := createPlayer(t, client, srv, "1", "Leader")
-	plain := createPlayer(t, client, srv, "1", "Plain")
-	rewarded := createPlayer(t, client, srv, "1", "Rewarded")
+	seedAccount(t, bdb, "admin", "admin-pw", validation.RoleAdmin)
+	token := login(t, client, srv, "admin", "admin-pw")
+
+	leader := createPlayer(t, client, srv, token, "Leader")
+	plain := createPlayer(t, client, srv, token, "Plain")
+	rewarded := createPlayer(t, client, srv, token, "Rewarded")
 
 	now := time.Now().UTC()
 	chars := character.NewRepo(bdb)
@@ -111,9 +165,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		}
 	}
 
-	actor := strconv.FormatInt(leader, 10)
-
-	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/raids", actor, map[string]any{
+	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/raids", token, map[string]any{
 		"name":           "ICC",
 		"raid_leader_id": leader,
 	})
@@ -131,7 +183,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	raidID := raidOut.Data.ID
 
 	for _, entry := range []struct{ player, char int64 }{{plain, plainChar.ID}, {rewarded, rewardedChar.ID}} {
-		status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/attendance", srv.URL, raidID), actor, map[string]any{
+		status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/attendance", srv.URL, raidID), token, map[string]any{
 			"player_id":    entry.player,
 			"character_id": entry.char,
 			"role":         "DD",
@@ -141,7 +193,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		}
 	}
 
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), actor, map[string]any{
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
 		"boss":                 "Saurfang",
 		"item_id":              "50001",
 		"item_name":            "Testitem",
@@ -152,12 +204,16 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("create loot: status %d body %s", status, body)
 	}
 
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/complete", srv.URL, raidID), actor, nil)
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/complete", srv.URL, raidID), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("complete raid: status %d body %s", status, body)
 	}
 
 	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/points", srv.URL, plain), "", nil)
+	if status != http.StatusUnauthorized {
+		t.Fatalf("get points unauthenticated: want 401 got %d", status)
+	}
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/points", srv.URL, plain), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("get points: status %d body %s", status, body)
 	}
@@ -173,7 +229,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("plain balance: want 10 got %d", pointsOut.Data.Balance)
 	}
 
-	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/points", srv.URL, rewarded), "", nil)
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/points", srv.URL, rewarded), token, nil)
 	if err := json.Unmarshal(body, &pointsOut); err != nil {
 		t.Fatalf("decode rewarded points: %v", err)
 	}
@@ -182,7 +238,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	}
 
 	// Token award derives a token transaction.
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), actor, map[string]any{
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
 		"item_name":            "Weiheabzeichen des Eroberers",
 		"awarded_to_player_id": plain,
 	})
@@ -199,7 +255,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("expected token_award true, body %s", body)
 	}
 
-	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/tokens", srv.URL, plain), "", nil)
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/tokens", srv.URL, plain), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("get tokens: status %d body %s", status, body)
 	}
@@ -216,7 +272,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	}
 
 	// Roll consumes min(balance,50) = 10 and returns a roll in [1,110].
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/points/roll", srv.URL, plain), actor, nil)
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/points/roll", srv.URL, plain), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("roll: status %d body %s", status, body)
 	}
@@ -243,16 +299,68 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	}
 
 	// Lock requires balance >= 150; now 0.
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/locks", srv.URL, plain), actor, map[string]any{"raid_id": raidID})
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/locks", srv.URL, plain), token, map[string]any{"raid_id": raidID})
 	if status != http.StatusUnprocessableEntity {
 		t.Fatalf("lock: want 422 got %d body %s", status, body)
 	}
 }
 
-func TestMissingActorRejected(t *testing.T) {
+func TestMissingSessionRejected(t *testing.T) {
 	srv, _ := setupServer(t)
 	status, _ := do(t, srv.Client(), http.MethodPost, srv.URL+"/api/v1/players", "", map[string]any{"name": "X"})
 	if status != http.StatusUnauthorized {
 		t.Fatalf("want 401 got %d", status)
+	}
+}
+
+func TestRoleEnforcement(t *testing.T) {
+	srv, bdb := setupServer(t)
+	client := srv.Client()
+
+	adminID := seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	memberID := seedAccount(t, bdb, "member", "pw", validation.RoleMember)
+	seedAccount(t, bdb, "guest", "pw", validation.RoleGuest)
+	_ = adminID
+	_ = memberID
+
+	adminToken := login(t, client, srv, "admin", "pw")
+	memberToken := login(t, client, srv, "member", "pw")
+	guestToken := login(t, client, srv, "guest", "pw")
+
+	// Config endpoints require Admin.
+	status, _ := do(t, client, http.MethodPost, srv.URL+"/api/v1/guild-ranks", memberToken, map[string]any{"name": "X"})
+	if status != http.StatusForbidden {
+		t.Fatalf("member create guild rank: want 403 got %d", status)
+	}
+	// Raid operations require Raidassistent or higher; member is refused.
+	status, _ = do(t, client, http.MethodPost, srv.URL+"/api/v1/raids", memberToken, map[string]any{"name": "ICC", "raid_leader_id": 1})
+	if status != http.StatusForbidden {
+		t.Fatalf("member create raid: want 403 got %d", status)
+	}
+	// Guest cannot vote (Member+ required).
+	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/polls", adminToken, map[string]any{"title": "t"})
+	if status != http.StatusCreated {
+		t.Fatalf("admin create poll: status %d body %s", status, body)
+	}
+	var pollOut struct {
+		Data struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &pollOut); err != nil {
+		t.Fatalf("decode poll: %v", err)
+	}
+	status, _ = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/vote", srv.URL, pollOut.Data.ID), guestToken, map[string]any{"choice": "yes"})
+	if status != http.StatusForbidden {
+		t.Fatalf("guest vote: want 403 got %d", status)
+	}
+	status, _ = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/vote", srv.URL, pollOut.Data.ID), memberToken, map[string]any{"choice": "yes"})
+	if status != http.StatusOK {
+		t.Fatalf("member vote: want 200 got %d", status)
+	}
+	// Admin can manage config.
+	status, _ = do(t, client, http.MethodPost, srv.URL+"/api/v1/guild-ranks", adminToken, map[string]any{"name": "Raidleader"})
+	if status != http.StatusCreated {
+		t.Fatalf("admin create guild rank: want 201 got %d", status)
 	}
 }

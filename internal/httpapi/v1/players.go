@@ -5,11 +5,13 @@ import (
 	"time"
 
 	"raid-website/internal/player"
+	"raid-website/internal/validation"
 )
 
 type createPlayerRequest struct {
 	Name        string `json:"name"`
 	GuildRankID *int64 `json:"guild_rank_id"`
+	Role        string `json:"role"`
 	Active      *bool  `json:"active"`
 }
 
@@ -40,10 +42,19 @@ func (a *API) createPlayer(w http.ResponseWriter, r *http.Request) {
 	if req.Active != nil {
 		active = *req.Active
 	}
+	role := validation.RoleGuest
+	if req.Role != "" {
+		role = validation.Role(req.Role)
+		if !role.Valid() {
+			BadRequest(w, "invalid role")
+			return
+		}
+	}
 	now := time.Now().UTC()
 	p := &player.Player{
 		Name:        req.Name,
 		GuildRankID: req.GuildRankID,
+		Role:        role,
 		Active:      active,
 		CreatedAt:   now,
 		UpdatedAt:   now,

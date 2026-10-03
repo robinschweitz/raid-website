@@ -30,7 +30,11 @@ func main() {
 	if _, err := m.Migrate(ctx); err != nil {
 		log.Printf("migrate: %v", err)
 	}
-	h := httpapi.New(bdb.DB)
+	h := httpapi.New(bdb.DB, httpapi.Options{
+		CookieSecure:  cfg.CookieSecure,
+		AdminUsername: cfg.AdminUsername,
+		AdminPassword: cfg.AdminPassword,
+	})
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("listening on %s", addr)
 	if err := http.ListenAndServe(addr, h); err != nil && err != http.ErrServerClosed {

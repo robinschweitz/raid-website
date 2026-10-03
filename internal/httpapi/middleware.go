@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
+	"raid-website/internal/auth"
 	v1 "raid-website/internal/httpapi/v1"
 )
 
@@ -21,17 +21,20 @@ func requestID(next http.Handler) http.Handler {
 	})
 }
 
-// actor parses the temporary X-Actor-ID header and stores it on the context.
-// This is a placeholder for real authentication and will be replaced.
-func actor(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if raw := r.Header.Get("X-Actor-ID"); raw != "" {
-			if id, err := strconv.ParseInt(raw, 10, 64); err == nil {
-				r = r.WithContext(v1.WithActor(r.Context(), id))
+// authenticate resolves the session cookie (if any) into the current player and
+// stores it on the request context. Missing/invalid sessions are left unset;
+// route guards decide whether authentication is required.
+func authenticate(svc *auth.Service) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if c, err := r.Cookie(auth.CookieName); err == nil && c.Value != "" {
+				if p, err := svc.Authenticate(r.Context(), c.Value); err == nil {
+					r = r.WithContext(v1.WithActor(r.Context(), p))
+				}
 			}
-		}
-		next.ServeHTTP(w, r)
-	})
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func logging(next http.Handler) http.Handler {

@@ -4,19 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"testing"
 	"time"
+
+	"raid-website/internal/validation"
 )
 
 func TestCharacterCRUDAndRename(t *testing.T) {
-	srv, _ := setupServer(t)
+	srv, bdb := setupServer(t)
 	client := srv.Client()
+	seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	token := login(t, client, srv, "admin", "pw")
 
-	playerID := createPlayer(t, client, srv, "1", "Owner")
-	actor := strconv.FormatInt(playerID, 10)
+	playerID := createPlayer(t, client, srv, token, "Owner")
 
-	status, body := do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/characters", srv.URL, playerID), actor, map[string]any{
+	status, body := do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/characters", srv.URL, playerID), token, map[string]any{
 		"name":      "Altchar",
 		"class":     "krieger",
 		"main_spec": "Waffen",
@@ -39,12 +41,12 @@ func TestCharacterCRUDAndRename(t *testing.T) {
 	}
 	charID := charOut.Data.ID
 
-	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/characters", srv.URL, playerID), "", nil)
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/characters", srv.URL, playerID), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("list characters: status %d body %s", status, body)
 	}
 
-	status, body = do(t, client, http.MethodPatch, fmt.Sprintf("%s/api/v1/characters/%d", srv.URL, charID), actor, map[string]any{
+	status, body = do(t, client, http.MethodPatch, fmt.Sprintf("%s/api/v1/characters/%d", srv.URL, charID), token, map[string]any{
 		"name":   "Newname",
 		"reason": "rename token",
 	})
@@ -52,7 +54,7 @@ func TestCharacterCRUDAndRename(t *testing.T) {
 		t.Fatalf("rename character: status %d body %s", status, body)
 	}
 
-	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/characters/%d/name-history", srv.URL, charID), "", nil)
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/characters/%d/name-history", srv.URL, charID), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("name history: status %d body %s", status, body)
 	}
@@ -69,19 +71,19 @@ func TestCharacterCRUDAndRename(t *testing.T) {
 		t.Fatalf("unexpected history: %s", body)
 	}
 
-	status, _ = do(t, client, http.MethodPatch, fmt.Sprintf("%s/api/v1/characters/%d", srv.URL, charID), actor, map[string]any{"class": "Barbar"})
+	status, _ = do(t, client, http.MethodPatch, fmt.Sprintf("%s/api/v1/characters/%d", srv.URL, charID), token, map[string]any{"class": "Barbar"})
 	if status != http.StatusBadRequest {
 		t.Fatalf("unknown class: want 400 got %d", status)
 	}
 }
 
 func TestRosterCRUD(t *testing.T) {
-	srv, _ := setupServer(t)
+	srv, bdb := setupServer(t)
 	client := srv.Client()
-	actor := createPlayer(t, client, srv, "1", "Admin")
-	actorStr := strconv.FormatInt(actor, 10)
+	seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	token := login(t, client, srv, "admin", "pw")
 
-	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/guild-ranks", actorStr, map[string]any{"name": "Raidleader", "sort_order": 1})
+	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/guild-ranks", token, map[string]any{"name": "Raidleader", "sort_order": 1})
 	if status != http.StatusCreated {
 		t.Fatalf("create guild rank: status %d body %s", status, body)
 	}
@@ -94,12 +96,12 @@ func TestRosterCRUD(t *testing.T) {
 	if err := json.Unmarshal(body, &rankOut); err != nil {
 		t.Fatalf("decode rank: %v", err)
 	}
-	status, body = do(t, client, http.MethodPatch, fmt.Sprintf("%s/api/v1/guild-ranks/%d", srv.URL, rankOut.Data.ID), actorStr, map[string]any{"name": "Raid Lead"})
+	status, body = do(t, client, http.MethodPatch, fmt.Sprintf("%s/api/v1/guild-ranks/%d", srv.URL, rankOut.Data.ID), token, map[string]any{"name": "Raid Lead"})
 	if status != http.StatusOK {
 		t.Fatalf("update guild rank: status %d body %s", status, body)
 	}
 
-	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/raid-groups", actorStr, map[string]any{"name": "Gruppe 1", "color": "#ff0000"})
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/raid-groups", token, map[string]any{"name": "Gruppe 1", "color": "#ff0000"})
 	if status != http.StatusCreated {
 		t.Fatalf("create raid group: status %d body %s", status, body)
 	}
@@ -112,29 +114,29 @@ func TestRosterCRUD(t *testing.T) {
 	if err := json.Unmarshal(body, &groupOut); err != nil {
 		t.Fatalf("decode group: %v", err)
 	}
-	status, body = do(t, client, http.MethodPatch, fmt.Sprintf("%s/api/v1/raid-groups/%d", srv.URL, groupOut.Data.ID), actorStr, map[string]any{"color": "#00ff00"})
+	status, body = do(t, client, http.MethodPatch, fmt.Sprintf("%s/api/v1/raid-groups/%d", srv.URL, groupOut.Data.ID), token, map[string]any{"color": "#00ff00"})
 	if status != http.StatusOK {
 		t.Fatalf("update raid group: status %d body %s", status, body)
 	}
 
-	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/guild-ranks", "", nil)
+	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/guild-ranks", token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("list guild ranks: status %d body %s", status, body)
 	}
-	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/raid-groups", "", nil)
+	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/raid-groups", token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("list raid groups: status %d body %s", status, body)
 	}
 }
 
 func TestPollLifecycle(t *testing.T) {
-	srv, _ := setupServer(t)
+	srv, bdb := setupServer(t)
 	client := srv.Client()
-	actorID := createPlayer(t, client, srv, "1", "Voter")
-	actor := strconv.FormatInt(actorID, 10)
+	seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	token := login(t, client, srv, "admin", "pw")
 
 	closes := time.Now().UTC().Add(time.Hour).Format(time.RFC3339)
-	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/polls", actor, map[string]any{
+	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/polls", token, map[string]any{
 		"title":     "Raid am Sonntag?",
 		"closes_at": closes,
 	})
@@ -155,15 +157,15 @@ func TestPollLifecycle(t *testing.T) {
 	}
 	pollID := pollOut.Data.ID
 
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/vote", srv.URL, pollID), actor, map[string]any{"choice": "yes"})
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/vote", srv.URL, pollID), token, map[string]any{"choice": "yes"})
 	if status != http.StatusOK {
 		t.Fatalf("vote: status %d body %s", status, body)
 	}
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/vote", srv.URL, pollID), actor, map[string]any{"choice": "no"})
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/vote", srv.URL, pollID), token, map[string]any{"choice": "no"})
 	if status != http.StatusOK {
 		t.Fatalf("revote: status %d body %s", status, body)
 	}
-	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/polls/%d/votes", srv.URL, pollID), "", nil)
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/polls/%d/votes", srv.URL, pollID), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("list votes: status %d body %s", status, body)
 	}
@@ -179,12 +181,53 @@ func TestPollLifecycle(t *testing.T) {
 		t.Fatalf("expected single updated vote 'no', body %s", body)
 	}
 
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/close", srv.URL, pollID), actor, nil)
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/close", srv.URL, pollID), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("close: status %d body %s", status, body)
 	}
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/vote", srv.URL, pollID), actor, map[string]any{"choice": "maybe"})
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/vote", srv.URL, pollID), token, map[string]any{"choice": "maybe"})
 	if status != http.StatusConflict {
 		t.Fatalf("vote after close: want 409 got %d body %s", status, body)
+	}
+}
+
+func TestAccountProvisioning(t *testing.T) {
+	srv, bdb := setupServer(t)
+	client := srv.Client()
+	seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	adminToken := login(t, client, srv, "admin", "pw")
+
+	memberID := createPlayer(t, client, srv, adminToken, "Newbie")
+
+	status, body := do(t, client, http.MethodPut, fmt.Sprintf("%s/api/v1/players/%d/account", srv.URL, memberID), adminToken, map[string]any{
+		"username": "newbie",
+		"password": "secret",
+		"role":     "MEMBER",
+	})
+	if status != http.StatusOK {
+		t.Fatalf("set account: status %d body %s", status, body)
+	}
+
+	memberToken := login(t, client, srv, "newbie", "secret")
+	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/auth/me", memberToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("me: status %d body %s", status, body)
+	}
+	var meOut struct {
+		Data struct {
+			ID   int64  `json:"id"`
+			Role string `json:"role"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &meOut); err != nil {
+		t.Fatalf("decode me: %v", err)
+	}
+	if meOut.Data.ID != memberID || meOut.Data.Role != "MEMBER" {
+		t.Fatalf("unexpected me: %s", body)
+	}
+
+	status, _ = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/logout", memberToken, nil)
+	if status != http.StatusNoContent {
+		t.Fatalf("logout: want 204 got %d", status)
 	}
 }

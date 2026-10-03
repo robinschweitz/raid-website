@@ -268,7 +268,7 @@ func mergePlayers(ctx context.Context, players *player.Repo, points *enhancepoin
 		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("find player %q: %w", pl.Name, err)
 		}
-		prow := &player.Player{Name: pl.Name, Active: pl.Active, CreatedAt: now, UpdatedAt: now}
+		prow := &player.Player{Name: pl.Name, Active: pl.Active, Role: validation.RoleGuest, CreatedAt: now, UpdatedAt: now}
 		if err := players.Create(ctx, prow); err != nil {
 			return nil, fmt.Errorf("create player %q: %w", pl.Name, err)
 		}

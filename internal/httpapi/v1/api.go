@@ -10,6 +10,7 @@ import (
 
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
+	"raid-website/internal/auth"
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/legacyimport"
@@ -20,24 +21,27 @@ import (
 	"raid-website/internal/raidcompletion"
 	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
+	"raid-website/internal/validation"
 )
 
 // Deps holds the dependencies shared by the v1 HTTP handlers.
 type Deps struct {
-	DB         *bun.DB
-	Players    *player.Repo
-	Characters *character.Repo
-	Raids      *raid.Repo
-	Attendance *attendance.Repo
-	Loot       *loot.Service
-	LootRepo   *loot.Repo
-	Points     *enhancepoints.Repo
-	Tokens     *tokens.Repo
-	Polls      *poll.Repo
-	Roster     *roster.Repo
-	Audit      *audit.Repo
-	Completion *raidcompletion.Service
-	Imports    *legacyimport.Service
+	DB           *bun.DB
+	Auth         *auth.Service
+	CookieSecure bool
+	Players      *player.Repo
+	Characters   *character.Repo
+	Raids        *raid.Repo
+	Attendance   *attendance.Repo
+	Loot         *loot.Service
+	LootRepo     *loot.Repo
+	Points       *enhancepoints.Repo
+	Tokens       *tokens.Repo
+	Polls        *poll.Repo
+	Roster       *roster.Repo
+	Audit        *audit.Repo
+	Completion   *raidcompletion.Service
+	Imports      *legacyimport.Service
 }
 
 // API holds the dependencies shared by the v1 HTTP handlers.
@@ -51,56 +55,60 @@ func NewAPI(d Deps) *API {
 
 func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/health", Health)
+	mux.HandleFunc("POST /api/v1/auth/login", a.login)
+	mux.HandleFunc("POST /api/v1/auth/logout", RequireAuth(a.logout))
+	mux.HandleFunc("GET /api/v1/auth/me", RequireAuth(a.me))
 
-	mux.HandleFunc("GET /api/v1/players", a.listPlayers)
-	mux.HandleFunc("POST /api/v1/players", a.createPlayer)
-	mux.HandleFunc("GET /api/v1/players/{id}", a.getPlayer)
-	mux.HandleFunc("GET /api/v1/players/{id}/characters", a.listPlayerCharacters)
-	mux.HandleFunc("POST /api/v1/players/{id}/characters", a.createCharacter)
+	mux.HandleFunc("GET /api/v1/players", RequireAuth(a.listPlayers))
+	mux.HandleFunc("POST /api/v1/players", RequireRole(validation.RoleAdmin, a.createPlayer))
+	mux.HandleFunc("GET /api/v1/players/{id}", RequireAuth(a.getPlayer))
+	mux.HandleFunc("PUT /api/v1/players/{id}/account", RequireRole(validation.RoleAdmin, a.setAccount))
+	mux.HandleFunc("GET /api/v1/players/{id}/characters", RequireAuth(a.listPlayerCharacters))
+	mux.HandleFunc("POST /api/v1/players/{id}/characters", RequireRole(validation.RoleAdmin, a.createCharacter))
 
-	mux.HandleFunc("GET /api/v1/characters/{id}", a.getCharacter)
-	mux.HandleFunc("PATCH /api/v1/characters/{id}", a.updateCharacter)
-	mux.HandleFunc("GET /api/v1/characters/{id}/name-history", a.listCharacterNameHistory)
+	mux.HandleFunc("GET /api/v1/characters/{id}", RequireAuth(a.getCharacter))
+	mux.HandleFunc("PATCH /api/v1/characters/{id}", RequireRole(validation.RoleAdmin, a.updateCharacter))
+	mux.HandleFunc("GET /api/v1/characters/{id}/name-history", RequireAuth(a.listCharacterNameHistory))
 
-	mux.HandleFunc("GET /api/v1/raids", a.listRaids)
-	mux.HandleFunc("POST /api/v1/raids", a.createRaid)
-	mux.HandleFunc("GET /api/v1/raids/{id}", a.getRaid)
-	mux.HandleFunc("POST /api/v1/raids/{id}/complete", a.completeRaid)
-	mux.HandleFunc("POST /api/v1/raids/{id}/cancel", a.cancelRaid)
-	mux.HandleFunc("POST /api/v1/raids/{id}/archive", a.archiveRaid)
+	mux.HandleFunc("GET /api/v1/raids", RequireAuth(a.listRaids))
+	mux.HandleFunc("POST /api/v1/raids", RequireRole(validation.RoleRaidassistent, a.createRaid))
+	mux.HandleFunc("GET /api/v1/raids/{id}", RequireAuth(a.getRaid))
+	mux.HandleFunc("POST /api/v1/raids/{id}/complete", RequireRole(validation.RoleRaidassistent, a.completeRaid))
+	mux.HandleFunc("POST /api/v1/raids/{id}/cancel", RequireRole(validation.RoleRaidassistent, a.cancelRaid))
+	mux.HandleFunc("POST /api/v1/raids/{id}/archive", RequireRole(validation.RoleRaidassistent, a.archiveRaid))
 
-	mux.HandleFunc("GET /api/v1/raids/{id}/attendance", a.listAttendance)
-	mux.HandleFunc("POST /api/v1/raids/{id}/attendance", a.createAttendance)
+	mux.HandleFunc("GET /api/v1/raids/{id}/attendance", RequireAuth(a.listAttendance))
+	mux.HandleFunc("POST /api/v1/raids/{id}/attendance", RequireRole(validation.RoleRaidassistent, a.createAttendance))
 
-	mux.HandleFunc("GET /api/v1/raids/{id}/loot", a.listLoot)
-	mux.HandleFunc("POST /api/v1/raids/{id}/loot", a.createLoot)
+	mux.HandleFunc("GET /api/v1/raids/{id}/loot", RequireAuth(a.listLoot))
+	mux.HandleFunc("POST /api/v1/raids/{id}/loot", RequireRole(validation.RoleRaidassistent, a.createLoot))
 
-	mux.HandleFunc("GET /api/v1/players/{id}/points", a.getPoints)
-	mux.HandleFunc("POST /api/v1/players/{id}/points/roll", a.rollPoints)
-	mux.HandleFunc("GET /api/v1/players/{id}/tokens", a.getTokens)
+	mux.HandleFunc("GET /api/v1/players/{id}/points", RequireAuth(a.getPoints))
+	mux.HandleFunc("POST /api/v1/players/{id}/points/roll", RequireRole(validation.RoleMember, a.rollPoints))
+	mux.HandleFunc("GET /api/v1/players/{id}/tokens", RequireAuth(a.getTokens))
 
-	mux.HandleFunc("GET /api/v1/players/{id}/locks", a.listLocks)
-	mux.HandleFunc("POST /api/v1/players/{id}/locks", a.createLock)
-	mux.HandleFunc("POST /api/v1/players/{id}/locks/{lockID}/cancel", a.cancelLock)
+	mux.HandleFunc("GET /api/v1/players/{id}/locks", RequireAuth(a.listLocks))
+	mux.HandleFunc("POST /api/v1/players/{id}/locks", RequireRole(validation.RoleMember, a.createLock))
+	mux.HandleFunc("POST /api/v1/players/{id}/locks/{lockID}/cancel", RequireRole(validation.RoleMember, a.cancelLock))
 
-	mux.HandleFunc("GET /api/v1/guild-ranks", a.listGuildRanks)
-	mux.HandleFunc("POST /api/v1/guild-ranks", a.createGuildRank)
-	mux.HandleFunc("PATCH /api/v1/guild-ranks/{id}", a.updateGuildRank)
+	mux.HandleFunc("GET /api/v1/guild-ranks", RequireAuth(a.listGuildRanks))
+	mux.HandleFunc("POST /api/v1/guild-ranks", RequireRole(validation.RoleAdmin, a.createGuildRank))
+	mux.HandleFunc("PATCH /api/v1/guild-ranks/{id}", RequireRole(validation.RoleAdmin, a.updateGuildRank))
 
-	mux.HandleFunc("GET /api/v1/raid-groups", a.listRaidGroups)
-	mux.HandleFunc("POST /api/v1/raid-groups", a.createRaidGroup)
-	mux.HandleFunc("PATCH /api/v1/raid-groups/{id}", a.updateRaidGroup)
+	mux.HandleFunc("GET /api/v1/raid-groups", RequireAuth(a.listRaidGroups))
+	mux.HandleFunc("POST /api/v1/raid-groups", RequireRole(validation.RoleAdmin, a.createRaidGroup))
+	mux.HandleFunc("PATCH /api/v1/raid-groups/{id}", RequireRole(validation.RoleAdmin, a.updateRaidGroup))
 
-	mux.HandleFunc("GET /api/v1/polls", a.listPolls)
-	mux.HandleFunc("POST /api/v1/polls", a.createPoll)
-	mux.HandleFunc("GET /api/v1/polls/{id}", a.getPoll)
-	mux.HandleFunc("POST /api/v1/polls/{id}/vote", a.votePoll)
-	mux.HandleFunc("GET /api/v1/polls/{id}/votes", a.listPollVotes)
-	mux.HandleFunc("POST /api/v1/polls/{id}/close", a.closePoll)
+	mux.HandleFunc("GET /api/v1/polls", RequireAuth(a.listPolls))
+	mux.HandleFunc("POST /api/v1/polls", RequireRole(validation.RoleRaidassistent, a.createPoll))
+	mux.HandleFunc("GET /api/v1/polls/{id}", RequireAuth(a.getPoll))
+	mux.HandleFunc("POST /api/v1/polls/{id}/vote", RequireRole(validation.RoleMember, a.votePoll))
+	mux.HandleFunc("GET /api/v1/polls/{id}/votes", RequireAuth(a.listPollVotes))
+	mux.HandleFunc("POST /api/v1/polls/{id}/close", RequireRole(validation.RoleRaidassistent, a.closePoll))
 
-	mux.HandleFunc("GET /api/v1/imports", a.listImports)
-	mux.HandleFunc("POST /api/v1/imports/dry-run", a.dryRunImport)
-	mux.HandleFunc("POST /api/v1/imports", a.mergeImport)
+	mux.HandleFunc("GET /api/v1/imports", RequireRole(validation.RoleAdmin, a.listImports))
+	mux.HandleFunc("POST /api/v1/imports/dry-run", RequireRole(validation.RoleAdmin, a.dryRunImport))
+	mux.HandleFunc("POST /api/v1/imports", RequireRole(validation.RoleAdmin, a.mergeImport))
 }
 
 func pathID(r *http.Request, name string) (int64, bool) {

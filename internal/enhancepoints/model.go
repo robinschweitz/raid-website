@@ -9,14 +9,14 @@ import (
 type Transaction struct {
 	bun.BaseModel `bun:"table:enhance_point_transactions"`
 
-	ID        int64     `bun:"id,pk,autoincrement"`
-	PlayerID  int64     `bun:"player_id,notnull"`
-	RaidID    *int64    `bun:"raid_id,nullzero"`
-	Amount    int       `bun:"amount,notnull"`
-	Type      string    `bun:"type,notnull"`
-	Reason    string    `bun:"reason,notnull"`
-	RefType   string    `bun:"ref_type,notnull,default:''"`
-	RefID     string    `bun:"ref_id,notnull,default:''"`
-	ActorID   int64     `bun:"actor_id,notnull"`
-	CreatedAt time.Time `bun:"created_at,notnull"`
+	ID        int64     `bun:"id,pk,autoincrement" json:"id"`
+	PlayerID  int64     `bun:"player_id,notnull" json:"player_id"`
+	RaidID    *int64    `bun:"raid_id,nullzero" json:"raid_id"`
+	Amount    int       `bun:"amount,notnull" json:"amount"`
+	Type      string    `bun:"type,notnull" json:"type"`
+	Reason    string    `bun:"reason,notnull" json:"reason"`
+	RefType   string    `bun:"ref_type,notnull,default:''" json:"ref_type"`
+	RefID     string    `bun:"ref_id,notnull,default:''" json:"ref_id"`
+	ActorID   int64     `bun:"actor_id,notnull" json:"actor_id"`
+	CreatedAt time.Time `bun:"created_at,notnull" json:"created_at"`
 }

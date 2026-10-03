@@ -9,53 +9,44 @@ import (
 	"github.com/uptrace/bun"
 
 	"raid-website/internal/attendance"
+	"raid-website/internal/audit"
+	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/legacyimport"
 	"raid-website/internal/loot"
 	"raid-website/internal/player"
+	"raid-website/internal/poll"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcompletion"
+	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
 )
 
-// API holds the dependencies shared by the v1 HTTP handlers.
-type API struct {
+// Deps holds the dependencies shared by the v1 HTTP handlers.
+type Deps struct {
 	DB         *bun.DB
 	Players    *player.Repo
+	Characters *character.Repo
 	Raids      *raid.Repo
 	Attendance *attendance.Repo
 	Loot       *loot.Service
 	LootRepo   *loot.Repo
 	Points     *enhancepoints.Repo
 	Tokens     *tokens.Repo
+	Polls      *poll.Repo
+	Roster     *roster.Repo
+	Audit      *audit.Repo
 	Completion *raidcompletion.Service
 	Imports    *legacyimport.Service
 }
 
-func NewAPI(
-	db *bun.DB,
-	players *player.Repo,
-	raids *raid.Repo,
-	att *attendance.Repo,
-	lootSvc *loot.Service,
-	lootRepo *loot.Repo,
-	points *enhancepoints.Repo,
-	tokenRepo *tokens.Repo,
-	completion *raidcompletion.Service,
-	imports *legacyimport.Service,
-) *API {
-	return &API{
-		DB:         db,
-		Players:    players,
-		Raids:      raids,
-		Attendance: att,
-		Loot:       lootSvc,
-		LootRepo:   lootRepo,
-		Points:     points,
-		Tokens:     tokenRepo,
-		Completion: completion,
-		Imports:    imports,
-	}
+// API holds the dependencies shared by the v1 HTTP handlers.
+type API struct {
+	Deps
+}
+
+func NewAPI(d Deps) *API {
+	return &API{Deps: d}
 }
 
 func (a *API) Register(mux *http.ServeMux) {
@@ -64,6 +55,12 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/players", a.listPlayers)
 	mux.HandleFunc("POST /api/v1/players", a.createPlayer)
 	mux.HandleFunc("GET /api/v1/players/{id}", a.getPlayer)
+	mux.HandleFunc("GET /api/v1/players/{id}/characters", a.listPlayerCharacters)
+	mux.HandleFunc("POST /api/v1/players/{id}/characters", a.createCharacter)
+
+	mux.HandleFunc("GET /api/v1/characters/{id}", a.getCharacter)
+	mux.HandleFunc("PATCH /api/v1/characters/{id}", a.updateCharacter)
+	mux.HandleFunc("GET /api/v1/characters/{id}/name-history", a.listCharacterNameHistory)
 
 	mux.HandleFunc("GET /api/v1/raids", a.listRaids)
 	mux.HandleFunc("POST /api/v1/raids", a.createRaid)
@@ -85,6 +82,21 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/players/{id}/locks", a.listLocks)
 	mux.HandleFunc("POST /api/v1/players/{id}/locks", a.createLock)
 	mux.HandleFunc("POST /api/v1/players/{id}/locks/{lockID}/cancel", a.cancelLock)
+
+	mux.HandleFunc("GET /api/v1/guild-ranks", a.listGuildRanks)
+	mux.HandleFunc("POST /api/v1/guild-ranks", a.createGuildRank)
+	mux.HandleFunc("PATCH /api/v1/guild-ranks/{id}", a.updateGuildRank)
+
+	mux.HandleFunc("GET /api/v1/raid-groups", a.listRaidGroups)
+	mux.HandleFunc("POST /api/v1/raid-groups", a.createRaidGroup)
+	mux.HandleFunc("PATCH /api/v1/raid-groups/{id}", a.updateRaidGroup)
+
+	mux.HandleFunc("GET /api/v1/polls", a.listPolls)
+	mux.HandleFunc("POST /api/v1/polls", a.createPoll)
+	mux.HandleFunc("GET /api/v1/polls/{id}", a.getPoll)
+	mux.HandleFunc("POST /api/v1/polls/{id}/vote", a.votePoll)
+	mux.HandleFunc("GET /api/v1/polls/{id}/votes", a.listPollVotes)
+	mux.HandleFunc("POST /api/v1/polls/{id}/close", a.closePoll)
 
 	mux.HandleFunc("GET /api/v1/imports", a.listImports)
 	mux.HandleFunc("POST /api/v1/imports/dry-run", a.dryRunImport)

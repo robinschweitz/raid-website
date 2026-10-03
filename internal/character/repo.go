@@ -57,3 +57,20 @@ func (r *Repo) ListByPlayer(ctx context.Context, playerID int64) ([]Character, e
 	}
 	return cs, nil
 }
+
+func (r *Repo) InsertNameHistory(ctx context.Context, h *NameHistory) error {
+	_, err := r.db.NewInsert().Model(h).Exec(ctx)
+	return err
+}
+
+func (r *Repo) ListNameHistory(ctx context.Context, characterID int64) ([]NameHistory, error) {
+	var hs []NameHistory
+	err := r.db.NewSelect().Model(&hs).
+		Where("character_id = ?", characterID).
+		Order("id ASC").
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return hs, nil
+}

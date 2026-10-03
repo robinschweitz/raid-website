@@ -1,4 +1,4 @@
-﻿package legacyimport
+package legacyimport
 
 import "testing"
 

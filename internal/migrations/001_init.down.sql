@@ -1,0 +1,15 @@
+DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS legacy_imports;
+DROP TABLE IF EXISTS poll_votes;
+DROP TABLE IF EXISTS polls;
+DROP TABLE IF EXISTS item_locks;
+DROP TABLE IF EXISTS token_transactions;
+DROP TABLE IF EXISTS enhance_point_transactions;
+DROP TABLE IF EXISTS loot_awards;
+DROP TABLE IF EXISTS raid_attendance;
+DROP TABLE IF EXISTS raids;
+DROP TABLE IF EXISTS character_name_history;
+DROP TABLE IF EXISTS characters;
+DROP TABLE IF EXISTS players;
+DROP TABLE IF EXISTS raid_groups;
+DROP TABLE IF EXISTS guild_ranks;

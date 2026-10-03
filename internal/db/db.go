@@ -2,23 +2,14 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	"time"
 
 	"raid-website/internal/config"
 )
 
-// Bun not yet wired; placeholder for later. Keep minimal.
-type DB struct {
-	// placeholder
-}
-
-func Connect(ctx context.Context, cfg *config.Config) (*sql.DB, error) {
+// keep for later if needed
+func Connect(ctx context.Context, cfg *config.Config) (*BunDB, error) {
+	_ = ctx
 	_ = cfg
-	return nil, errors.New("db: connect not implemented yet")
-}
-
-func NowUTC() time.Time {
-	return time.Now().UTC()
+	return nil, errors.New("db: Connect deprecated; use Open")
 }

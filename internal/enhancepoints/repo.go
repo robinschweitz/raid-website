@@ -78,3 +78,29 @@ func (r *Repo) UpdateLock(ctx context.Context, l *ItemLock) error {
 	_, err := r.db.NewUpdate().Model(l).WherePK().Exec(ctx)
 	return err
 }
+
+func (r *Repo) CreateLock(ctx context.Context, l *ItemLock) error {
+	_, err := r.db.NewInsert().Model(l).Exec(ctx)
+	return err
+}
+
+func (r *Repo) GetLock(ctx context.Context, id int64) (*ItemLock, error) {
+	l := new(ItemLock)
+	err := r.db.NewSelect().Model(l).Where("id = ?", id).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return l, nil
+}
+
+func (r *Repo) ListLocksByPlayer(ctx context.Context, playerID int64) ([]ItemLock, error) {
+	var locks []ItemLock
+	err := r.db.NewSelect().Model(&locks).
+		Where("player_id = ?", playerID).
+		Order("id ASC").
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return locks, nil
+}

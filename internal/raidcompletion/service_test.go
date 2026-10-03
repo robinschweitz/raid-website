@@ -3,6 +3,7 @@ package raidcompletion
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -22,7 +23,8 @@ import (
 func setupDB(t *testing.T) *bun.DB {
 	t.Helper()
 	ctx := context.Background()
-	bdb, err := db.Open(ctx, "file::memory:?cache=shared&_pragma=foreign_keys(1)")
+	dsn := "file:" + filepath.Join(t.TempDir(), "test.db") + "?_pragma=foreign_keys(1)"
+	bdb, err := db.Open(ctx, dsn)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -183,5 +185,55 @@ func TestCompleteRaidCancelledAwardsNoPoints(t *testing.T) {
 	}
 	if balance != 0 {
 		t.Fatalf("cancelled raid must not award, got %d", balance)
+	}
+}
+
+func TestCompleteRaidExpiresActiveLocks(t *testing.T) {
+	ctx := context.Background()
+	bdb := setupDB(t)
+
+	players := player.NewRepo(bdb)
+	raids := raid.NewRepo(bdb)
+	attendanceRepo := attendance.NewRepo(bdb)
+	lootRepo := loot.NewRepo(bdb)
+	pointsRepo := enhancepoints.NewRepo(bdb)
+
+	leaderID := seedPlayer(t, ctx, players, "Leader")
+	lockerID := seedPlayer(t, ctx, players, "Locker")
+
+	now := time.Now().UTC()
+	rd := &raid.Raid{Name: "Lockraid", RaidLeaderID: leaderID, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
+	if err := raids.Create(ctx, rd); err != nil {
+		t.Fatalf("create raid: %v", err)
+	}
+
+	lock := &enhancepoints.ItemLock{
+		PlayerID:  lockerID,
+		RaidID:    rd.ID,
+		ItemName:  "Testitem",
+		Status:    validation.LockStatusActive,
+		LockedAt:  now,
+		ActorID:   lockerID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if _, err := bdb.NewInsert().Model(lock).Exec(ctx); err != nil {
+		t.Fatalf("create lock: %v", err)
+	}
+
+	svc := New(bdb, raids, attendanceRepo, lootRepo, pointsRepo)
+	if err := svc.CompleteRaid(ctx, rd.ID, leaderID); err != nil {
+		t.Fatalf("complete raid: %v", err)
+	}
+
+	stored := new(enhancepoints.ItemLock)
+	if err := bdb.NewSelect().Model(stored).Where("id = ?", lock.ID).Scan(ctx); err != nil {
+		t.Fatalf("load lock: %v", err)
+	}
+	if stored.Status != validation.LockStatusExpired {
+		t.Fatalf("want expiration, got %s", stored.Status)
+	}
+	if stored.ExpiredAt == nil {
+		t.Fatal("expired_at must be set")
 	}
 }

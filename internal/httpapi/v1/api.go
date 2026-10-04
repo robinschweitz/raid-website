@@ -94,7 +94,6 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/raids/{id}/loot/{recordID}", RequireRole(validation.RoleRaidassistent, a.correctLoot))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/points", RequireAuth(a.getPoints))
-	mux.HandleFunc("POST /api/v1/players/{id}/points/roll", RequireRole(validation.RoleMember, a.rollPoints))
 	mux.HandleFunc("GET /api/v1/players/{id}/tokens", RequireAuth(a.getTokens))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/locks", RequireAuth(a.listLocks))

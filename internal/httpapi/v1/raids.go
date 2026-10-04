@@ -12,18 +12,22 @@ import (
 )
 
 type createRaidRequest struct {
-	Name           string  `json:"name"`
-	RaidLeaderID   int64   `json:"raid_leader_id"`
-	Status         string  `json:"status"`
-	ScheduledStart *string `json:"scheduled_start"`
-	ScheduledEnd   *string `json:"scheduled_end"`
-	Notes          string  `json:"notes"`
-	SeriesID       *int64  `json:"series_id"`
+	CatalogInstanceID *string `json:"catalog_instance_id"`
+	RaidSize          *int    `json:"raid_size"`
+	Name              string  `json:"name"`
+	RaidLeaderID      int64   `json:"raid_leader_id"`
+	Status            string  `json:"status"`
+	ScheduledStart    *string `json:"scheduled_start"`
+	ScheduledEnd      *string `json:"scheduled_end"`
+	Notes             string  `json:"notes"`
+	SeriesID          *int64  `json:"series_id"`
 }
 
 type configureRaidScheduleRequest struct {
-	SeriesID       *int64          `json:"series_id"`
-	ScheduledStart json.RawMessage `json:"scheduled_start"`
+	CatalogInstanceID *string         `json:"catalog_instance_id"`
+	RaidSize          *int            `json:"raid_size"`
+	SeriesID          *int64          `json:"series_id"`
+	ScheduledStart    json.RawMessage `json:"scheduled_start"`
 }
 
 func (a *API) listRaids(w http.ResponseWriter, r *http.Request) {
@@ -76,15 +80,17 @@ func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UTC()
 	rd := &raid.Raid{
-		Name:           req.Name,
-		RaidLeaderID:   req.RaidLeaderID,
-		Status:         status,
-		ScheduledStart: start,
-		ScheduledEnd:   end,
-		Notes:          req.Notes,
-		SeriesID:       req.SeriesID,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		CatalogInstanceID: req.CatalogInstanceID,
+		RaidSize:          req.RaidSize,
+		Name:              req.Name,
+		RaidLeaderID:      req.RaidLeaderID,
+		Status:            status,
+		ScheduledStart:    start,
+		ScheduledEnd:      end,
+		Notes:             req.Notes,
+		SeriesID:          req.SeriesID,
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}
 	if err := raid.NewService(a.Raids).CreateRaid(r.Context(), rd); err != nil {
 		if writeSeriesError(w, err) {
@@ -193,7 +199,7 @@ func (a *API) configureRaidSchedule(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	changes := raid.ScheduleChanges{SeriesID: req.SeriesID}
+	changes := raid.ScheduleChanges{SeriesID: req.SeriesID, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize}
 	if req.ScheduledStart != nil {
 		var raw string
 		if err := json.Unmarshal(req.ScheduledStart, &raw); err != nil {

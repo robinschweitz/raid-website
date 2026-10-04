@@ -9,7 +9,7 @@ future agents do not re-litigate them or silently change them.
 Authoritative sources, in order of precedence:
 
 1. This file (owner-level requirements and constraints)
-2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-022)
+2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-026)
 3. `ARCHITECTURE.md` (module map and principles)
 4. `CODING_RULES.md` (defines the coding rules)
 5. `README.md` (commands)
@@ -115,11 +115,21 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - One award per (player, raid) — idempotent.
 - Balance is `SUM(amount)` over the append-only `enhance_point_transactions` (ADR 004).
 
-### 4.4 Enhance roll
-- Cost `X = min(balance, 50)`. The player may **not** choose the amount and may **not** split it
-  (ADR 011).
-- `X` must be `>= 1`, otherwise the roll is rejected.
-- Roll range is `1` to `100 + X`; the cost `X` is then debited.
+### 4.4 Recorded enhanced loot (ADR 023-024)
+- The website tracks EP and outside raid outcomes; it never generates a roll or exposes a
+  player spend button, amount selector, or standalone EP-use action.
+- The actual outside roll is a shifted 1-100 roll: `1 + X` through `100 + X`, with
+  `X = min(balance, 50)`. Only an enhanced winner pays; losing rolls cost nothing.
+- Raid staff records winning loot as `MAIN`, `SECOND`, `ENHANCED`, or `BOE`. An enhanced
+  award atomically debits `X`, requires `X >= 1`, and counts as main-spec loot. The amount
+  cannot be selected or split. A player BoE award does not affect main-spec EP eligibility.
+- Loot recipients are characters in that raid's roster. Ordinary main/second awards and
+  token derivation retain their rules. Active locks still award main-spec for zero EP.
+- Coupled corrections preserve the historical cost for the same enhanced winner on
+  unrelated edits. Changing away from enhanced refunds that cost; changing the enhanced
+  recipient refunds the old winner and charges `min(new winner's current balance, 50)`.
+  All corrections are actor/reason audited and append compensating transactions atomically.
+- Existing ledger history is retained, not recalculated under the revised rules.
 
 ### 4.5 Item locks
 - A lock requires `balance >= 150` but **costs 0 EP** (ADR 012).
@@ -202,7 +212,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
     guild ranks; raid groups; recurring raid series; list/import legacy data.
   - **Raid operations (`RAIDASSISTENT` and up, i.e. RA + RL)** — create raid; configure its
     series/start; cancel; archive/finalize; attendance; loot; create and close polls.
-  - **Self-service (`MEMBER` and up)** — roll Enhance Points; create and cancel **own** item locks;
+  - **Self-service (`MEMBER` and up)** — create and cancel **own** item locks;
     vote on polls.
 - The first admin is bootstrapped from `ADMIN_USERNAME` / `ADMIN_PASSWORD` at startup.
 
@@ -235,6 +245,10 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   frontend must be built **before** the Go binary. `web/go.mod` exists only to keep `node_modules`
   out of the root Go module.
 - User-facing text is German.
+- Visual identity: "Bratwurst des Schicksals", dark premium ICC-inspired navy/black panels,
+  icy blue/cyan/silver accents, original SVG/CSS crest and atmosphere, class-colored details,
+  restrained frost borders/glow, readable typography, desktop sidebar and mobile companion
+  navigation. No fake statistics, notifications, progression, or unsupported controls (ADR 026).
 
 ---
 

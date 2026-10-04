@@ -10,10 +10,12 @@ import {
   type NameHistory,
   type Player,
   type PointsResponse,
+  type GuildRank,
   type Role,
-  type RollResult,
   type TokensResponse,
 } from '../types'
+import { EnhancePointsCard } from '../components/EnhancePointsCard'
+import { characterClassName } from '../characterTheme'
 
 const CLASSES = [
   'Todesritter',
@@ -50,7 +52,9 @@ function PlayerDetail({ playerID }: Props) {
   const [locks, setLocks] = useState<ItemLock[]>([])
   const [history, setHistory] = useState<NameHistory[] | null>(null)
   const [historyChar, setHistoryChar] = useState<number | null>(null)
-  const [roll, setRoll] = useState<RollResult | null>(null)
+  const [ranks, setRanks] = useState<GuildRank[]>([])
+  const [rankError, setRankError] = useState('')
+  const [rankLoading, setRankLoading] = useState(true)
   const [error, setError] = useState('')
 
   const [charName, setCharName] = useState('')
@@ -99,6 +103,18 @@ function PlayerDetail({ playerID }: Props) {
   }, [playerID, isActive])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    let active = true
+    api.get<GuildRank[]>('/api/v1/guild-ranks').then((rows) => { if (active) setRanks(rows) })
+      .catch(() => { if (active) setRankError('Gildenrang konnte nicht geladen werden.') })
+      .finally(() => { if (active) setRankLoading(false) })
+    return () => { active = false }
+  }, [])
+
+  const ownedCharacters = characters.filter((c) => c.player_id === playerID)
+    .sort((a, b) => Number(b.is_main) - Number(a.is_main) || a.name.localeCompare(b.name, 'de') || a.id - b.id)
+  const preferredCharacter = ownedCharacters[0]
 
   const createCharacter = async (event: FormEvent) => {
     event.preventDefault()
@@ -170,21 +186,6 @@ function PlayerDetail({ playerID }: Props) {
     } catch (err) {
       if (isActive() && version === historyVersion.current) setError(err instanceof ApiError ? err.message : 'Historie fehlgeschlagen')
     }
-  }
-
-  const doRoll = async () => {
-    if (!isOwnMember || (points?.balance ?? 0) < 1) return
-    await submit(async () => {
-      setError('')
-      try {
-        const result = await api.post<RollResult>(`/api/v1/players/${playerID}/points/roll`)
-        if (!isActive()) return
-        setRoll(result)
-        await load()
-      } catch (err) {
-        if (isActive()) setError(err instanceof ApiError ? err.message : 'Würfeln fehlgeschlagen')
-      }
-    })
   }
 
   const createLock = async (event: FormEvent) => {
@@ -260,58 +261,41 @@ function PlayerDetail({ playerID }: Props) {
       <p>
         <Link to="/players">← Spieler</Link>
       </p>
-      <h1>
-        {player.name} <span className="badge">{player.role}</span>
-      </h1>
+      <header className={`card profile-header ${characterClassName(preferredCharacter?.class ?? '')}`}>
+        <div className="profile-sigil" aria-hidden="true">{preferredCharacter?.name.slice(0, 1) ?? player.name.slice(0, 1)}</div>
+        <div><p className="eyebrow">Spielerprofil</p><h1>{player.name} <span className="badge">{player.role}</span></h1>
+          {preferredCharacter ? <p><strong className="character-name">{preferredCharacter.name}</strong> · {preferredCharacter.class}{preferredCharacter.main_spec && ` · ${preferredCharacter.main_spec}`} {preferredCharacter.is_main && <span className="badge">Main</span>}</p> : <p className="muted">Noch keine eigenen Charaktere.</p>}
+          {player.guild_rank_id != null && <p className="muted">Gildenrang: {ranks.find((r) => r.id === player.guild_rank_id)?.name ?? (rankError || (rankLoading ? 'Wird geladen…' : 'Nicht verfügbar'))}</p>}
+        </div>
+      </header>
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
       <div className="grid">
-        <section className="card">
-          <h2>Punkte</h2>
-          <p className="stat">{points?.balance ?? '—'}</p>
-          {isOwnMember && (
-            <button onClick={doRoll} disabled={pending || (points?.balance ?? 0) < 1}>
-              Enhance würfeln
-            </button>
-          )}
-          {roll && (
-            <p className="muted">
-              Kosten {roll.cost} · Wurf {roll.roll} ({roll.min}–{roll.max}) · neu {roll.balance_after}
-            </p>
-          )}
-          <table className="table small">
-            <tbody>
-              {points?.transactions.map((t) => (
-                <tr key={t.id}>
-                  <td>{t.amount > 0 ? `+${t.amount}` : t.amount}</td>
-                  <td>{t.reason || t.type}</td>
-                  <td>{new Date(t.created_at).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+        <EnhancePointsCard points={points} showHistory />
 
         <section className="card">
-          <h2>Tokens</h2>
+          <h2>Armor Tokens</h2>
           <p className="stat">{tokens?.total ?? '—'}</p>
-          <table className="table small">
+          <div className="table-scroll"><table className="table small">
+            <thead><tr><th>Tokens</th><th>Buchung / Begründung</th><th>Raid</th></tr></thead>
             <tbody>
               {tokens?.transactions.map((t) => (
                 <tr key={t.id}>
-                  <td>{t.amount > 0 ? `+${t.amount}` : t.amount}</td>
-                  <td>{t.reason || t.type}</td>
+                  <td className={t.amount > 0 ? 'positive' : t.amount < 0 ? 'negative' : 'muted'}>{t.amount > 0 ? `+${t.amount}` : t.amount}</td>
+                  <td><strong>{t.amount < 0 ? 'Tokenkorrektur' : 'Tokenbuchung'}</strong><div className="muted">{t.reason}</div><small className="muted">Akteur #{t.actor_id} · {new Date(t.created_at).toLocaleString('de-DE')}</small></td>
+                  <td>{t.raid_id && <Link to={`/raids/${t.raid_id}`}>Raid #{t.raid_id}</Link>}</td>
                 </tr>
               ))}
+              {tokens && tokens.transactions.length === 0 && <tr><td colSpan={3} className="muted">Noch keine Tokenbuchungen.</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </section>
       </div>
 
       <section className="card">
         <h2>Charaktere</h2>
-        <table className="table">
+        <div className="table-scroll"><table className="table">
           <thead>
             <tr>
               <th>Name</th>
@@ -322,9 +306,9 @@ function PlayerDetail({ playerID }: Props) {
             </tr>
           </thead>
           <tbody>
-            {characters.map((c) => (
-              <tr key={c.id}>
-                <td>{c.name}</td>
+            {ownedCharacters.map((c) => (
+              <tr key={c.id} className={characterClassName(c.class)}>
+                <td className="character-name">{c.name}</td>
                 <td>{c.class}</td>
                 <td>{c.main_spec || '—'}</td>
                 <td>{c.is_main ? '★' : ''}</td>
@@ -339,7 +323,7 @@ function PlayerDetail({ playerID }: Props) {
                 </td>
               </tr>
             ))}
-            {characters.length === 0 && (
+            {ownedCharacters.length === 0 && (
               <tr>
                 <td colSpan={5} className="muted">
                   Keine Charaktere.
@@ -347,7 +331,7 @@ function PlayerDetail({ playerID }: Props) {
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
         {history && (
           <div className="subcard">
             <h3>Namenshistorie #{historyChar}</h3>
@@ -363,15 +347,15 @@ function PlayerDetail({ playerID }: Props) {
         )}
         {isAdmin && (
           <form className="inline-form" onSubmit={createCharacter}>
-            <input placeholder="Name" value={charName} onChange={(e) => setCharName(e.target.value)} required />
-            <select value={charClass} onChange={(e) => setCharClass(e.target.value)}>
+            <input aria-label="Charaktername" placeholder="Name" value={charName} onChange={(e) => setCharName(e.target.value)} required />
+            <select aria-label="Charakterklasse" value={charClass} onChange={(e) => setCharClass(e.target.value)}>
               {CLASSES.map((cl) => (
                 <option key={cl} value={cl}>
                   {cl}
                 </option>
               ))}
             </select>
-            <input placeholder="Main-Spec" value={charMainSpec} onChange={(e) => setCharMainSpec(e.target.value)} />
+            <input aria-label="Main-Spec" placeholder="Main-Spec" value={charMainSpec} onChange={(e) => setCharMainSpec(e.target.value)} />
             <label className="check">
               <input type="checkbox" checked={charIsMain} onChange={(e) => setCharIsMain(e.target.checked)} /> Main
             </label>
@@ -382,7 +366,7 @@ function PlayerDetail({ playerID }: Props) {
 
       <section className="card">
         <h2>Item-Locks</h2>
-        <table className="table">
+        <div className="table-scroll"><table className="table">
           <thead>
             <tr>
               <th>Item</th>
@@ -397,7 +381,7 @@ function PlayerDetail({ playerID }: Props) {
               <tr key={l.id}>
                 <td>{l.item_name || l.item_id}</td>
                 <td>{l.boss || '—'}</td>
-                <td>#{l.raid_id}</td>
+                <td><Link to={`/raids/${l.raid_id}`}>Raid #{l.raid_id}</Link></td>
                 <td>{l.status}</td>
                 <td>
                   {isOwnMember && l.status === 'ACTIVE' && <button disabled={pending} onClick={() => cancelLock(l)}>Stornieren</button>}
@@ -412,13 +396,13 @@ function PlayerDetail({ playerID }: Props) {
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
         {isOwnMember && (
           <form className="inline-form" onSubmit={createLock}>
-            <input placeholder="Raid-ID" value={lockRaid} onChange={(e) => setLockRaid(e.target.value)} required />
-            <input placeholder="Item" value={lockItem} onChange={(e) => setLockItem(e.target.value)} required />
-            <input placeholder="Item-ID" value={lockItemID} onChange={(e) => setLockItemID(e.target.value)} />
-            <input placeholder="Boss" value={lockBoss} onChange={(e) => setLockBoss(e.target.value)} />
+            <input aria-label="Raid-ID" placeholder="Raid-ID" value={lockRaid} onChange={(e) => setLockRaid(e.target.value)} required />
+            <input aria-label="Item" placeholder="Item" value={lockItem} onChange={(e) => setLockItem(e.target.value)} required />
+            <input aria-label="Item-ID" placeholder="Item-ID" value={lockItemID} onChange={(e) => setLockItemID(e.target.value)} />
+            <input aria-label="Boss" placeholder="Boss" value={lockBoss} onChange={(e) => setLockBoss(e.target.value)} />
             <button type="submit" disabled={pending}>Lock anlegen</button>
           </form>
         )}
@@ -428,14 +412,15 @@ function PlayerDetail({ playerID }: Props) {
         <section className="card">
           <h2>Konto</h2>
           <form className="inline-form" onSubmit={setAccount}>
-            <input placeholder="Benutzername" value={accUser} onChange={(e) => setAccUser(e.target.value)} required />
+            <input aria-label="Benutzername" placeholder="Benutzername" value={accUser} onChange={(e) => setAccUser(e.target.value)} required />
             <input
               type="password"
+              aria-label="Passwort (leer = unverändert)"
               placeholder="Passwort (leer = unverändert)"
               value={accPass}
               onChange={(e) => setAccPass(e.target.value)}
             />
-            <select value={accRole} onChange={(e) => setAccRole(e.target.value as Role)}>
+            <select aria-label="Kontorolle" value={accRole} onChange={(e) => setAccRole(e.target.value as Role)}>
               {ROLES.map((r) => (
                 <option key={r} value={r}>
                   {r}

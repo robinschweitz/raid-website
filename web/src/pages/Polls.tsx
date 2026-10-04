@@ -87,7 +87,7 @@ export function PollsPage() {
 
   return (
     <div>
-      <h1>Umfragen</h1>
+      <div className="page-heading"><div><p className="eyebrow">Gemeinsam entscheiden</p><h1>Umfragen</h1></div></div>
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
@@ -102,6 +102,7 @@ export function PollsPage() {
               <>
                 <input
                   placeholder="Antwort"
+                  aria-label={`Antwort auf ${p.title}`}
                   value={choice[p.id] ?? ''}
                   onChange={(e) => setChoice((prev) => ({ ...prev, [p.id]: e.target.value }))}
                 />

@@ -51,12 +51,13 @@ func TestSeriesMigrationPreservesLegacyHistoryWithoutDefaults(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	opening := &enhancepoints.Transaction{PlayerID: actor.ID, Amount: 91, Type: "import_opening", Reason: "Opening balance", ActorID: actor.ID, CreatedAt: now}
-	if err := enhancepoints.NewRepo(database.DB).InsertTransaction(ctx, opening); err != nil {
+	// This fixture intentionally predates award-linked ledger columns.
+	if _, err := database.DB.ExecContext(ctx, "INSERT INTO enhance_point_transactions (player_id, amount, type, reason, actor_id, created_at) VALUES (?, ?, ?, ?, ?, ?)", actor.ID, 91, "import_opening", "Opening balance", actor.ID, now); err != nil {
 		t.Fatal(err)
 	}
 	for pass := 0; pass < 2; pass++ {
 		apply("004_raid_series.up.sql")
+		apply("007_loot_catalog.up.sql")
 		series, err := raidseries.NewRepo(database.DB).List(ctx)
 		if err != nil || len(series) != 0 {
 			t.Fatalf("migration seeded guild defaults: %+v %v", series, err)
@@ -81,6 +82,7 @@ func TestSeriesMigrationPreservesLegacyHistoryWithoutDefaults(t *testing.T) {
 			t.Fatalf("migration wrote rewards: %d %v", balance, err)
 		}
 		if pass == 0 {
+			apply("007_loot_catalog.down.sql")
 			apply("004_raid_series.down.sql")
 		}
 	}

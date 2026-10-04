@@ -15,6 +15,7 @@ import (
 	v1 "raid-website/internal/httpapi/v1"
 	"raid-website/internal/legacyimport"
 	"raid-website/internal/loot"
+	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
 	"raid-website/internal/poll"
 	"raid-website/internal/raid"
@@ -87,6 +88,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 
 	mux := http.NewServeMux()
 	api.Register(mux)
+	v1.CatalogHandlers{Catalog: lootcatalog.NewService(lootcatalog.NewRepo(db))}.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)
 	if spa, err := webui.Handler(); err == nil {
 		mux.Handle("/", spa)

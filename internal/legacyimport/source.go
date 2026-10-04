@@ -4,12 +4,16 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
 )
+
+// ErrSourceTooLarge indicates a source tab exceeds the 8 MiB CSV limit.
+var ErrSourceTooLarge = errors.New("import source tab exceeds 8 MiB limit")
 
 // SheetData holds the raw CSV bytes for each imported tab plus a stable hash.
 type SheetData struct {
@@ -78,7 +82,15 @@ func (g GoogleFetcher) Fetch(ctx context.Context, sheetID string) (SheetData, er
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("fetch %q: unexpected status %d", name, resp.StatusCode)
 		}
-		return io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+		const limit = 8 << 20
+		data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+		if err != nil {
+			return nil, fmt.Errorf("fetch %q: %w", name, err)
+		}
+		if len(data) > limit {
+			return nil, fmt.Errorf("fetch %q: %w", name, ErrSourceTooLarge)
+		}
+		return data, nil
 	}
 
 	raid, err := fetch(names.Raid)

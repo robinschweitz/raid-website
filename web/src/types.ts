@@ -62,6 +62,8 @@ export interface Raid {
   archived_at: string | null
   series_id?: number | null
   previous_raid_id?: number | null
+  catalog_instance_id?: string | null
+  raid_size?: number | null
   notes: string
   created_at: string
   updated_at: string
@@ -95,6 +97,54 @@ export interface RaidSeries {
   interval_weeks: number
   start_time: string
   timezone: string
+  catalog_instance_id?: string | null
+  raid_size?: number | null
+}
+
+export interface CatalogSource {
+  id: string
+  revision: string
+  url: string
+  license: string
+  attribution: string
+}
+
+export interface CatalogInstance { id: string; name: string }
+export interface CatalogBoss { id: string; instance_id: string; name: string }
+export interface CatalogItem { item_id: string; name: string; binding?: number; quality?: number }
+export interface CatalogDrop { boss_id: string; item_id: string; raid_size: number; difficulty: string; loot_mode: number }
+export interface CatalogItemDrop extends CatalogItem, CatalogDrop {}
+export interface CatalogDataset {
+  source: CatalogSource
+  notices: string[]
+  instances: CatalogInstance[]
+  bosses: CatalogBoss[]
+  items: CatalogItem[]
+  drops: CatalogDrop[]
+}
+export interface CatalogProvenance { source: CatalogSource; raw_hash: string; notices: string[] }
+export interface LootCatalog {
+  sources: CatalogProvenance[]
+  instances: CatalogInstance[]
+  bosses: CatalogBoss[]
+  items: CatalogItem[]
+  drops: CatalogDrop[]
+}
+export interface CatalogReport {
+  source: CatalogSource
+  raw_hash: string
+  notices: string[]
+  errors: string[]
+  conflicts: string[]
+  inserted: number
+  skipped: number
+  merged: boolean
+}
+
+export function catalogRaidSizes(catalog: LootCatalog | null, instanceID: string): number[] {
+  if (!catalog) return []
+  const bosses = new Set(catalog.bosses.filter((boss) => boss.instance_id === instanceID).map((boss) => boss.id))
+  return [...new Set(catalog.drops.filter((drop) => bosses.has(drop.boss_id)).map((drop) => drop.raid_size))].sort((a, b) => a - b)
 }
 
 export interface ArchiveResponse {
@@ -264,13 +314,4 @@ export interface ImportRecord {
   started_at: string | null
   completed_at: string | null
   notes: string
-}
-
-export interface RollResult {
-  player_id: number
-  cost: number
-  roll: number
-  min: number
-  max: number
-  balance_after: number
 }

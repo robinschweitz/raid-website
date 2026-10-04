@@ -12,6 +12,10 @@ import { RosterPage } from './pages/Roster'
 import { PollsPage } from './pages/Polls'
 import { ImportsPage } from './pages/Imports'
 import { RaidSeriesPage } from './pages/RaidSeries'
+import { RaidsPage } from './pages/Raids'
+import { GuildCrest } from './components/GuildCrest'
+import { NavIcon } from './components/NavIcon'
+import { LootCatalogPage } from './pages/LootCatalog'
 
 function Routes() {
   const path = useRoute()
@@ -22,6 +26,7 @@ function Routes() {
   if (parts[0] === 'raids' && parts[1]) {
     return <RaidDetailPage raidID={Number(parts[1])} />
   }
+  if (parts[0] === 'raids') return <RaidsPage />
   if (parts[0] === 'players' && parts[1]) {
     return <PlayerDetailPage playerID={Number(parts[1])} />
   }
@@ -32,6 +37,7 @@ function Routes() {
     return <RosterPage />
   }
   if (parts[0] === 'raid-series') return <RaidSeriesPage />
+  if (parts[0] === 'loot-catalog') return <LootCatalogPage />
   if (parts[0] === 'polls') {
     return <PollsPage />
   }
@@ -42,6 +48,7 @@ function Routes() {
 }
 
 function Layout() {
+  const path = useRoute()
   const { player, logout } = useAuth()
   const { pending, submit, isActive } = useSubmission()
   const [error, setError] = useState('')
@@ -58,25 +65,46 @@ function Layout() {
   }
   return (
     <div className="app">
-      <header className="topbar">
-        <nav>
-          <Link to="/">Raids</Link>
-          <Link to="/players">Spieler</Link>
-          <Link to="/polls">Umfragen</Link>
-          {atLeast(player.role, 'ADMIN') && <Link to="/roster">Roster</Link>}
-          {atLeast(player.role, 'ADMIN') && <Link to="/imports">Importe</Link>}
+      <a className="skip-link" href="#main-content" onClick={(event) => {
+        event.preventDefault()
+        document.getElementById('main-content')?.focus()
+      }}>Zum Inhalt</a>
+      <aside className="sidebar">
+        <Link className="guild-brand" to="/"><GuildCrest /><span>Bratwurst<small>des Schicksals</small></span></Link>
+        <p className="sidebar-caption">Gildenverwaltung</p>
+        <nav aria-label="Hauptnavigation">
+          <Link className={path === '/' ? 'nav-link active' : 'nav-link'} to="/"><NavIcon name="home" />Übersicht</Link>
+          <Link className={path.startsWith('/raids') ? 'nav-link active' : 'nav-link'} to="/raids"><NavIcon name="raids" />Raids</Link>
+          <Link className={path.startsWith('/players') ? 'nav-link active' : 'nav-link'} to="/players"><NavIcon name="players" />Spieler</Link>
+          <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
+          {atLeast(player.role, 'ADMIN') && <><p className="sidebar-caption">Administration</p>
+            <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
+            <Link className={path === '/raid-series' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/raid-series"><NavIcon name="series" />Raidserien</Link>
+            <Link className={path === '/imports' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/imports"><NavIcon name="import" />Importe</Link>
+            <Link className={path === '/loot-catalog' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/loot-catalog"><NavIcon name="settings" />Beutekatalog</Link>
+          </>}
         </nav>
-        <div className="user">
-          <span>
-            {player.name} · <span className="badge">{player.role}</span>
-          </span>
+        <div className="sidebar-footer"><p>Gemeinsam durch die Kälte.</p><span>Raids · Loot · Gemeinschaft</span></div>
+      </aside>
+      <div className="main-shell">
+      <header className="topbar">
+        <span className="topbar-brand">Bratwurst des Schicksals <span className="muted">/ Raidverwaltung</span></span>
+        <div className="user"><Link to={`/players/${player.id}`}><NavIcon name="profile" />{player.name}</Link><span className="badge">{player.role}</span>
           <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button>
         </div>
       </header>
-      <main>
+      <main id="main-content" tabIndex={-1}>
         {error && <p className="error" role="alert">{error}</p>}
         <Routes />
       </main>
+      <footer className="page-footer">Bratwurst des Schicksals <span>Raidplanung & gemeinsame Geschichte</span></footer>
+      </div>
+      <nav className="mobile-nav" aria-label="Mobile Hauptnavigation">
+        <Link className={path === '/' ? 'active' : ''} to="/"><NavIcon name="home" />Übersicht</Link>
+        <Link className={path.startsWith('/raids') ? 'active' : ''} to="/raids"><NavIcon name="raids" />Raids</Link>
+        <Link className={path.startsWith('/players') ? 'active' : ''} to="/players"><NavIcon name="players" />Spieler</Link>
+        <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>
+      </nav>
     </div>
   )
 }

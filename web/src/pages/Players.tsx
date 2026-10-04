@@ -45,9 +45,9 @@ export function PlayersPage() {
 
   return (
     <div>
-      <h1>Spieler</h1>
+      <div className="page-heading"><div><p className="eyebrow">Unsere Gemeinschaft</p><h1>Spieler</h1></div>{isAdmin && <Link to="/roster">Gildenkonfiguration →</Link>}</div>
       {error && <p className="error">{error}</p>}
-      <table className="table">
+      <div className="card table-scroll"><table className="table">
         <thead>
           <tr>
             <th>Name</th>
@@ -69,8 +69,9 @@ export function PlayersPage() {
               <td>{p.active ? 'aktiv' : 'inaktiv'}</td>
             </tr>
           ))}
+          {players.length === 0 && <tr><td colSpan={4} className="muted">Keine Spieler geladen.</td></tr>}
         </tbody>
-      </table>
+      </table></div>
 
       {isAdmin && (
         <form className="card inline-form" onSubmit={onCreate}>

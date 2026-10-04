@@ -1,12 +1,14 @@
 export class ApiError extends Error {
   status: number
   code: string
+  data?: unknown
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, data?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.data = data
   }
 }
 
@@ -30,8 +32,8 @@ async function request<T>(method: string, path: string, body?: unknown, envelope
     }
   }
   if (!res.ok) {
-    const env = json as { error?: { code?: string; message?: string } } | undefined
-    throw new ApiError(res.status, env?.error?.code ?? 'error', env?.error?.message ?? res.statusText)
+    const env = json as { error?: { code?: string; message?: string }; data?: unknown } | undefined
+    throw new ApiError(res.status, env?.error?.code ?? 'error', env?.error?.message ?? res.statusText, env?.data)
   }
   if (!envelope && json && typeof json === 'object' && 'data' in json) {
     return (json as { data: T }).data

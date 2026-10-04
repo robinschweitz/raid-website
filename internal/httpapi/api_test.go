@@ -208,11 +208,12 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	}
 
 	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
-		"boss":                 "Saurfang",
-		"item_id":              "50001",
-		"item_name":            "Testitem",
-		"awarded_to_player_id": rewarded,
-		"is_main_spec":         true,
+		"boss":                    "Saurfang",
+		"item_id":                 "50001",
+		"item_name":               "Testitem",
+		"awarded_to_player_id":    rewarded,
+		"award_method":            "MAIN",
+		"awarded_to_character_id": rewardedChar.ID,
 	})
 	if status != http.StatusCreated {
 		t.Fatalf("create loot: status %d body %s", status, body)
@@ -220,8 +221,10 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 
 	// Process all loot before final archiving. An off-spec token does not change EP eligibility.
 	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
-		"item_name":            "Weiheabzeichen des Eroberers",
-		"awarded_to_player_id": plain,
+		"item_name":               "Weiheabzeichen des Eroberers",
+		"awarded_to_player_id":    plain,
+		"awarded_to_character_id": plainChar.ID,
+		"award_method":            "SECOND",
 	})
 	if status != http.StatusCreated || !bytes.Contains(body, []byte(`"token_award":true`)) {
 		t.Fatalf("create token loot: status %d body %s", status, body)
@@ -289,38 +292,17 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("token total: want 1 got %d", tokensOut.Data.Total)
 	}
 
-	// Roll consumes min(balance,50) = 10 and returns a roll in [1,110].
+	// The removed roll endpoint must not debit the existing balance.
 	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/points/roll", srv.URL, plain), plainToken, nil)
-	if status != http.StatusOK {
-		t.Fatalf("roll: status %d body %s", status, body)
+	if status != http.StatusNotFound {
+		t.Fatalf("removed roll endpoint: want 404 got %d %s", status, body)
 	}
-	var rollOut struct {
-		Data struct {
-			Cost         int `json:"cost"`
-			Roll         int `json:"roll"`
-			Min          int `json:"min"`
-			Max          int `json:"max"`
-			BalanceAfter int `json:"balance_after"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(body, &rollOut); err != nil {
-		t.Fatalf("decode roll: %v", err)
-	}
-	if rollOut.Data.Cost != 10 {
-		t.Fatalf("roll cost: want 10 got %d", rollOut.Data.Cost)
-	}
-	if rollOut.Data.Roll < rollOut.Data.Min || rollOut.Data.Roll > rollOut.Data.Max {
-		t.Fatalf("roll %d out of range [%d,%d]", rollOut.Data.Roll, rollOut.Data.Min, rollOut.Data.Max)
-	}
-	if rollOut.Data.BalanceAfter != 0 {
-		t.Fatalf("balance after roll: want 0 got %d", rollOut.Data.BalanceAfter)
-	}
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/points/roll", srv.URL, plain), plainToken, nil)
-	if status != http.StatusUnprocessableEntity || !bytes.Contains(body, []byte(`"code":"insufficient_balance"`)) {
-		t.Fatalf("roll with zero balance: want 422/insufficient_balance, got %d %s", status, body)
+	balanceAfter, err := enhancepoints.NewRepo(bdb).Balance(ctx, plain)
+	if err != nil || balanceAfter != 10 {
+		t.Fatalf("removed roll changed balance: %d %v", balanceAfter, err)
 	}
 
-	// Lock requires balance >= 150; now 0.
+	// Lock still requires balance >= 150.
 	upcoming := &raid.Raid{Name: "Upcoming ICC", RaidLeaderID: leader, Status: validation.RaidStatusPlanned, CreatedAt: now, UpdatedAt: now}
 	if err := raid.NewRepo(bdb).Create(ctx, upcoming); err != nil {
 		t.Fatal(err)
@@ -366,7 +348,11 @@ func TestPointsAndLocksSelfServiceOwnership(t *testing.T) {
 		id    int64
 		token string
 	}{{"other member", otherID, otherToken}, {"admin", adminID, adminToken}, {"guest", guestID, guestToken}, {"unauthenticated", ownerID, ""}} {
-		for _, action := range []string{"points/roll", "locks", fmt.Sprintf("locks/%d/cancel", lock.ID)} {
+		status, body := do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/points/roll", srv.URL, ownerID), caller.token, nil)
+		if status != http.StatusNotFound {
+			t.Fatalf("removed roll: %d %s", status, body)
+		}
+		for _, action := range []string{"locks", fmt.Sprintf("locks/%d/cancel", lock.ID)} {
 			t.Run(caller.name+"/"+action, func(t *testing.T) {
 				var requestBody any
 				if action == "locks" {
@@ -400,7 +386,7 @@ func TestPointsAndLocksSelfServiceOwnership(t *testing.T) {
 			}
 		}
 	}
-	for _, action := range []string{"points/roll", "locks", fmt.Sprintf("locks/%d/cancel", guestLock.ID)} {
+	for _, action := range []string{"locks", fmt.Sprintf("locks/%d/cancel", guestLock.ID)} {
 		status, body := do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/%s", srv.URL, guestID, action), guestToken, map[string]any{"raid_id": raidRecord.ID})
 		if status != http.StatusForbidden {
 			t.Fatalf("guest own %s: want 403, got %d %s", action, status, body)

@@ -36,9 +36,18 @@ func (r *Repo) WithTx(tx bun.Tx) *Repo { return NewRepo(tx) }
 
 func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
 	if _, isBound := r.db.(bun.Tx); isBound {
+		if err := r.loot.ReserveWriter(ctx); err != nil {
+			return err
+		}
 		return fn(r)
 	}
-	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error { return fn(r.WithTx(tx)) })
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		repo := r.WithTx(tx)
+		if err := repo.loot.ReserveWriter(ctx); err != nil {
+			return err
+		}
+		return fn(repo)
+	})
 }
 
 func (r *Repo) tokenNets(ctx context.Context, awardID int64) (map[int64]int, error) {

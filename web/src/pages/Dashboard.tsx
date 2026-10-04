@@ -1,132 +1,97 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
-import { Link, navigate } from '../router'
-import { atLeast, type Player, type Raid, type RaidSeries } from '../types'
-import { useSubmission } from '../useSubmission'
-
-function statusClass(status: Raid['status']): string {
-  switch (status) {
-    case 'COMPLETED':
-      return 'badge ok'
-    case 'CANCELLED':
-      return 'badge bad'
-    case 'OPEN':
-      return 'badge info'
-    default:
-      return 'badge'
-  }
-}
+import { Link } from '../router'
+import type { Attendance, Player, PointsResponse, Poll, Raid, Vote } from '../types'
+import { Citadel } from '../components/Citadel'
+import { EnhancePointsCard } from '../components/EnhancePointsCard'
 
 export function DashboardPage() {
-  const { pending, submit, isActive } = useSubmission()
   const { player } = useAuth()
   const [raids, setRaids] = useState<Raid[]>([])
-  const [error, setError] = useState('')
-  const [name, setName] = useState('')
-  const [scheduled, setScheduled] = useState('')
-  const [series, setSeries] = useState<RaidSeries[]>([])
-  const [seriesID, setSeriesID] = useState('')
   const [players, setPlayers] = useState<Player[]>([])
-  const [leaderID, setLeaderID] = useState('')
-  const [filter, setFilter] = useState('all')
-  const selectedSeries = series.find((s) => s.id === Number(seriesID))
-  const visibleRaids = raids.filter((r) => filter === 'all' || (filter === 'upcoming'
-    ? !r.archived_at && (r.status === 'PLANNED' || r.status === 'OPEN')
-    : !!r.archived_at || r.status === 'COMPLETED' || r.status === 'CANCELLED'))
-
-  const canManage = player ? atLeast(player.role, 'RAIDASSISTENT') : false
+  const [polls, setPolls] = useState<Poll[]>([])
+  const [votes, setVotes] = useState<Record<number, Vote[]>>({})
+  const [points, setPoints] = useState<PointsResponse | null>(null)
+  const [attendance, setAttendance] = useState<Attendance[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [attendanceError, setAttendanceError] = useState('')
+  const [pointsError, setPointsError] = useState('')
+  const [votesError, setVotesError] = useState('')
+  const [now] = useState(() => Date.now())
+  const upcoming = raids.filter((r) => !r.archived_at && (r.status === 'PLANNED' || r.status === 'OPEN') && r.scheduled_start && Date.parse(r.scheduled_start) > now)
+    .sort((a, b) => Date.parse(a.scheduled_start!) - Date.parse(b.scheduled_start!) || a.id - b.id)
+  const nextRaid = upcoming[0]
+  const history = raids.filter((r) => r.archived_at).sort((a, b) => Date.parse(b.archived_at!) - Date.parse(a.archived_at!) || b.id - a.id).slice(0, 5)
 
   useEffect(() => {
-    Promise.all([api.get<Raid[]>('/api/v1/raids?include_archived=true'), api.get<RaidSeries[]>('/api/v1/raid-series'), api.get<Player[]>('/api/v1/players')])
-      .then(([r, s, p]) => { if (isActive()) { setRaids(r); setSeries(s); setPlayers(p) } })
-      .catch((err) => { if (isActive()) setError(err instanceof ApiError ? err.message : 'Laden fehlgeschlagen') })
-  }, [isActive])
+    let active = true
+    Promise.all([api.get<Raid[]>('/api/v1/raids?include_archived=true'), api.get<Player[]>('/api/v1/players'), api.get<Poll[]>('/api/v1/polls')])
+      .then(([rs, ps, polls]) => { if (active) { setRaids(rs); setPlayers(ps); setPolls(polls.filter((p) => p.status === 'OPEN')) } })
+      .catch((err) => { if (active) setError(err instanceof ApiError ? err.message : 'Übersicht konnte nicht geladen werden.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [])
 
-  const onCreate = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!player || !canManage || !name.trim() || !leaderID || !scheduled || !selectedSeries) return
-    await submit(async () => {
-      setError('')
-      try {
-        const created = await api.post<Raid>('/api/v1/raids', {
-          name,
-          raid_leader_id: Number(leaderID),
-          series_id: selectedSeries.id,
-          scheduled_start: new Date(scheduled).toISOString(),
-        })
-        if (!isActive()) return
-        setName('')
-        setScheduled('')
-        navigate(`/raids/${created.id}`)
-      } catch (err) {
-        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
-      }
-    })
-  }
+  useEffect(() => {
+    let active = true
+    if (player) api.get<PointsResponse>(`/api/v1/players/${player.id}/points`)
+      .then((pts) => { if (active) setPoints(pts) })
+      .catch((err) => { if (active) setPointsError(err instanceof ApiError ? err.message : 'EP konnten nicht geladen werden.') })
+    return () => { active = false }
+  }, [player])
 
-  return (
-    <div>
-      <h1>Raids</h1>
-      {error && <p className="error">{error}</p>}
-      <label>Ansicht <select aria-label="Raid-Ansicht" value={filter} onChange={(e) => setFilter(e.target.value)}>
-        <option value="all">Alle Raids</option><option value="upcoming">Anstehend</option><option value="history">Historie</option>
-      </select></label>
-      <div className="table-scroll"><table className="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Start</th>
-            <th>Notizen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {visibleRaids.map((raid) => (
-            <tr key={raid.id}>
-              <td>
-                <Link to={`/raids/${raid.id}`}>{raid.name}</Link>
-              </td>
-              <td>
-                <span className={statusClass(raid.status)}>{raid.archived_at ? 'ARCHIVIERT' : raid.status}</span>
-              </td>
-              <td>{raid.scheduled_start ? new Date(raid.scheduled_start).toLocaleString() : '—'}</td>
-              <td>{raid.notes}</td>
-            </tr>
-          ))}
-          {visibleRaids.length === 0 && (
-            <tr>
-              <td colSpan={4} className="muted">
-                Noch keine Raids.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table></div>
+  useEffect(() => {
+    let active = true
+    setAttendance(null)
+    setAttendanceError('')
+    if (nextRaid) api.get<Attendance[]>(`/api/v1/raids/${nextRaid.id}/attendance`)
+      .then((rows) => { if (active) setAttendance(rows) })
+      .catch((err) => { if (active) setAttendanceError(err instanceof ApiError ? err.message : 'Aufstellung konnte nicht geladen werden.') })
+    return () => { active = false }
+  }, [nextRaid])
 
-      {canManage && (
-        <form className="card inline-form" onSubmit={onCreate}>
-          <h2>Neuer Raid</h2>
-          <label>Raidserie<select aria-label="Neue Raidserie" disabled={pending} value={seriesID} required onChange={(e) => {
-            setSeriesID(e.target.value)
-            const selected = series.find((s) => s.id === Number(e.target.value))
-            setName(selected?.name ?? '')
-            setLeaderID(selected ? String(selected.raid_leader_id) : '')
-          }}><option value="">Serie auswählen</option>{series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-          <p className="muted">Bei Serienauswahl werden der gespeicherte Serienname und Raidleiter übernommen. {selectedSeries && `Wiederholung: ${selectedSeries.start_time}, ${selectedSeries.timezone}, alle ${selectedSeries.interval_weeks} Wochen.`}</p>
-          {series.length === 0 && <p className="muted">Ein Admin muss zuerst eine Raidserie konfigurieren.</p>}
-          <label>Raidleiter<select aria-label="Neuer Raidleiter" disabled={pending} required value={leaderID} onChange={(e) => setLeaderID(e.target.value)}><option value="">Raidleiter auswählen</option>{players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-          <label>
-            Name
-            <input value={name} onChange={(e) => setName(e.target.value)} required />
-          </label>
-          <label>
-            Start ({Intl.DateTimeFormat().resolvedOptions().timeZone}, wird als UTC gespeichert)
-            <input disabled={pending} required type="datetime-local" value={scheduled} onChange={(e) => setScheduled(e.target.value)} />
-          </label>
-          <button type="submit" disabled={pending}>{pending ? 'Anlegen…' : 'Anlegen'}</button>
-        </form>
-      )}
+  useEffect(() => {
+    let active = true
+    Promise.all(polls.map(async (poll) => [poll.id, await api.get<Vote[]>(`/api/v1/polls/${poll.id}/votes`)] as const))
+      .then((rows) => { if (active) setVotes(Object.fromEntries(rows)) })
+      .catch((err) => { if (active) setVotesError(err instanceof ApiError ? err.message : 'Stimmen konnten nicht geladen werden.') })
+    return () => { active = false }
+  }, [polls])
+
+  return <div className="dashboard">
+    <div className="page-heading"><div><p className="eyebrow">Bratwurst des Schicksals</p><h1>Gildenübersicht</h1></div><Link className="text-link" to="/raids">Alle Raids ansehen →</Link></div>
+    {error && <p className="error" role="alert">{error}</p>}
+    <section className="raid-banner">
+      <Citadel />
+      <div className="raid-banner-content"><p className="eyebrow">Nächster geplanter Raid</p>
+        {loading ? <p role="status" className="muted">Raidplanung wird geladen…</p> : nextRaid ? <>
+          <div className="actions"><span className="badge info">{nextRaid.status === 'OPEN' ? 'Offen' : 'Geplant'}</span>{nextRaid.raid_size && <span className="badge">{nextRaid.raid_size} Spieler</span>}<span className="muted">{new Date(nextRaid.scheduled_start!).toLocaleString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}</span></div>
+          <h2>{nextRaid.name}</h2><p className="muted">Raidleitung: {players.find((p) => p.id === nextRaid.raid_leader_id)?.name ?? `Spieler #${nextRaid.raid_leader_id}`}</p>
+          {attendanceError ? <p className="error" role="alert">{attendanceError}</p> : attendance ? <div className="composition" aria-label="Gespeicherte Raidaufstellung"><span><strong>{attendance.length}</strong> Aufgestellt</span><span><strong>{attendance.filter((a) => a.role === 'TANK').length}</strong> Tanks</span><span><strong>{attendance.filter((a) => a.role === 'HEAL').length}</strong> Heiler</span><span><strong>{attendance.filter((a) => a.role === 'DD').length}</strong> DD</span></div> : <p className="muted" role="status">Aufstellung wird geladen…</p>}
+          <Link className="button-link primary" to={`/raids/${nextRaid.id}`}>Raid öffnen →</Link>
+        </> : <><h2>{error ? 'Raidplanung nicht verfügbar' : 'Kein zukünftiger Raid geplant'}</h2><p className="muted">{error ? 'Bitte lade die Seite erneut.' : 'Hier erscheint der nächste gespeicherte Termin. Offene Raids und die Historie findest du in der Raidübersicht.'}</p><Link className="button-link" to="/raids">Zur Raidplanung →</Link></>}
+      </div>
+    </section>
+    <div className="dashboard-columns">
+      <div className="dashboard-points">
+        {pointsError && <p className="error" role="alert">{pointsError}</p>}<EnhancePointsCard points={points} />
+        {player && <p className="profile-link"><Link to={`/players/${player.id}`}>Mein Profil & EP-Historie →</Link></p>}
+      </div>
+      <section className="card dashboard-agenda"><div className="section-heading"><h2>Raidagenda</h2><span className="eyebrow">Gespeicherte Termine</span></div>
+        {upcoming.slice(0, 5).map((r) => <div className="agenda-row" key={r.id}><time dateTime={r.scheduled_start!}><strong>{new Date(r.scheduled_start!).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</strong><span>{new Date(r.scheduled_start!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></time><Link to={`/raids/${r.id}`}>{r.name}</Link><span className="badge">{r.status === 'OPEN' ? 'Offen' : 'Geplant'}</span></div>)}
+        {!loading && !error && upcoming.length === 0 && <p className="muted">Keine zukünftigen Termine gespeichert.</p>}
+      </section>
+      <section className="card dashboard-polls"><div className="section-heading"><h2>Offene Umfragen</h2><Link to="/polls">Alle →</Link></div>
+        {votesError && <p className="error" role="alert">{votesError}</p>}
+        {polls.map((p) => <div className="poll-preview" key={p.id}><h3>{p.title}</h3>{p.description && <p className="muted">{p.description}</p>}<div className="section-heading"><span className="muted">{votes[p.id] ? `${votes[p.id].length} abgegebene Stimmen` : 'Stimmen werden geladen…'}</span><Link to="/polls">Zur Abstimmung →</Link></div></div>)}
+        {!loading && !error && polls.length === 0 && <p className="muted">Aktuell keine offenen Umfragen.</p>}
+      </section>
+      <section className="card dashboard-history"><div className="section-heading"><h2>Zuletzt archiviert</h2><Link to="/raids">Historie →</Link></div>
+        {history.map((r) => <div className="archive-row" key={r.id}><Link to={`/raids/${r.id}`}>{r.name}</Link><time dateTime={r.archived_at!}>{new Date(r.archived_at!).toLocaleDateString('de-DE')}</time><span className="badge ok">Archiviert</span></div>)}
+        {!loading && !error && history.length === 0 && <p className="muted">Noch keine archivierten Raids.</p>}
+      </section>
     </div>
-  )
+  </div>
 }

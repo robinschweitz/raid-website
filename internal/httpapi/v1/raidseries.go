@@ -4,17 +4,20 @@ import (
 	"errors"
 	"net/http"
 
+	"raid-website/internal/lootcatalog"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
 )
 
 type seriesRequest struct {
-	Name          *string `json:"name"`
-	RaidLeaderID  *int64  `json:"raid_leader_id"`
-	Weekdays      *[]int  `json:"weekdays"`
-	IntervalWeeks *int64  `json:"interval_weeks"`
-	StartTime     *string `json:"start_time"`
-	Timezone      *string `json:"timezone"`
+	CatalogInstanceID *string `json:"catalog_instance_id"`
+	RaidSize          *int    `json:"raid_size"`
+	Name              *string `json:"name"`
+	RaidLeaderID      *int64  `json:"raid_leader_id"`
+	Weekdays          *[]int  `json:"weekdays"`
+	IntervalWeeks     *int64  `json:"interval_weeks"`
+	StartTime         *string `json:"start_time"`
+	Timezone          *string `json:"timezone"`
 }
 
 func (a *API) listRaidSeries(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +45,7 @@ func (a *API) saveRaidSeries(w http.ResponseWriter, r *http.Request, update bool
 		BadRequest(w, "malformed json body")
 		return
 	}
-	series, err := raidseries.NewService(a.RaidSeries).Configure(r.Context(), id, raidseries.Changes{Name: req.Name, RaidLeaderID: req.RaidLeaderID, Weekdays: req.Weekdays, IntervalWeeks: req.IntervalWeeks, StartTime: req.StartTime, Timezone: req.Timezone})
+	series, err := raidseries.NewService(a.RaidSeries).Configure(r.Context(), id, raidseries.Changes{Name: req.Name, RaidLeaderID: req.RaidLeaderID, Weekdays: req.Weekdays, IntervalWeeks: req.IntervalWeeks, StartTime: req.StartTime, Timezone: req.Timezone, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize})
 	if err != nil {
 		if !writeSeriesError(w, err) {
 			WriteError(w, http.StatusInternalServerError, "internal", "could not save series")
@@ -60,6 +63,9 @@ func writeSeriesError(w http.ResponseWriter, err error) bool {
 	code := ""
 	status := http.StatusUnprocessableEntity
 	switch {
+	case errors.Is(err, lootcatalog.ErrInvalid):
+		code = "catalog_invalid"
+		status = http.StatusBadRequest
 	case errors.Is(err, raid.ErrOccurrenceConflict):
 		code = "occurrence_conflict"
 		status = http.StatusConflict

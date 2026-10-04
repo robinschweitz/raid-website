@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"raid-website/internal/attendance"
+	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
+	"raid-website/internal/lootcatalog"
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/validation"
 )
@@ -159,6 +161,20 @@ func (a *API) createAttendance(w http.ResponseWriter, r *http.Request) {
 
 func writeCorrectionError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, lootcatalog.ErrInvalid):
+		WriteError(w, http.StatusBadRequest, "catalog_item_invalid", "Bitte einen Katalogboss und einen passenden Gegenstand fuer die Raidinstanz und Raidgroesse auswaehlen")
+	case errors.Is(err, enhancepoints.ErrInsufficientBalance):
+		WriteError(w, http.StatusUnprocessableEntity, "insufficient_balance", "Spieler hat keine EP fuer Enhanced-Loot")
+	case errors.Is(err, loot.ErrInvalidMethod):
+		WriteError(w, http.StatusBadRequest, "invalid_award_method", "award_method muss MAIN, SECOND, ENHANCED oder BOE sein")
+	case errors.Is(err, loot.ErrItemName):
+		WriteError(w, http.StatusBadRequest, "item_name_required", "item_name ist erforderlich")
+	case errors.Is(err, loot.ErrRoster):
+		WriteError(w, http.StatusBadRequest, "recipient_not_in_roster", "Empfaengercharakter muss im Raidkader stehen")
+	case errors.Is(err, loot.ErrRequestConflict):
+		WriteError(w, http.StatusConflict, "request_conflict", "request_id wurde mit anderem Inhalt verwendet")
+	case errors.Is(err, loot.ErrRequestRequired):
+		WriteError(w, http.StatusBadRequest, "request_id_required", "Neues Enhanced-Loot erfordert eine nichtleere request_id")
 	case errors.Is(err, raidcorrection.ErrNotFound), errors.Is(err, loot.ErrNotFound):
 		WriteError(w, http.StatusNotFound, "not_found", "Referenzierter Datensatz nicht gefunden")
 	case errors.Is(err, raidcorrection.ErrOwnership), errors.Is(err, loot.ErrOwnership):

@@ -26,6 +26,10 @@ func (r *Repo) WithTx(tx bun.Tx) *Repo {
 // must use that repository, not the connection pool, which has one connection.
 func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
 	if err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// Reserve the SQLite writer before lock eligibility reads, including across handles.
+		if _, err := tx.ExecContext(ctx, "UPDATE raids SET id = id WHERE id = -1"); err != nil {
+			return err
+		}
 		return fn(r.WithTx(tx))
 	}); err != nil {
 		return fmt.Errorf("enhance points transaction: %w", err)

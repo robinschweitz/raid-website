@@ -120,20 +120,20 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 			}
 			assertBalance(players[0].ID, baseline)
 			assertCorrectionAmounts(players[0].ID)
-			award := &loot.Award{RaidID: rd.ID, ItemName: "new historical offspec loot", AwardedToPlayerID: players[0].ID}
+			award := &loot.Award{RaidID: rd.ID, ItemName: "new historical offspec loot", AwardedToPlayerID: players[0].ID, AwardedToCharacterID: &chars[0].ID, AwardMethod: loot.Second}
 			if err := s.SaveLoot(ctx, award, players[0].ID, "missing offspec loot"); err != nil {
 				t.Fatal(err)
 			}
 			assertCorrectionAmounts(players[0].ID)
 			for i := 0; i < 2; i++ {
-				if _, err := s.CorrectLoot(ctx, rd.ID, award.ID, players[0].ID, "main spec correction", func(a *loot.Award) { a.IsMainSpec = true }); err != nil {
+				if _, err := s.CorrectLoot(ctx, rd.ID, award.ID, players[0].ID, "main spec correction", func(a *loot.Award) { a.AwardMethod = loot.Main }); err != nil {
 					t.Fatal(err)
 				}
 				assertBalance(players[0].ID, baseline-10)
 				if _, err := s.CorrectLoot(ctx, rd.ID, award.ID, players[0].ID, "unchanged correction", func(a *loot.Award) { a.Notes = "same eligibility" }); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := s.CorrectLoot(ctx, rd.ID, award.ID, players[0].ID, "undo main spec correction", func(a *loot.Award) { a.IsMainSpec = false }); err != nil {
+				if _, err := s.CorrectLoot(ctx, rd.ID, award.ID, players[0].ID, "undo main spec correction", func(a *loot.Award) { a.AwardMethod = loot.Second }); err != nil {
 					t.Fatal(err)
 				}
 				assertBalance(players[0].ID, baseline)

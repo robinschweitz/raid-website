@@ -9,6 +9,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
 )
 
@@ -22,6 +23,11 @@ func NewRepo(db bun.IDB) *Repo {
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
+}
+
+// Catalog binds catalog validation to the lifecycle transaction.
+func (r *Repo) Catalog() *lootcatalog.Service {
+	return lootcatalog.NewService(lootcatalog.NewRepo(r.db))
 }
 
 func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {

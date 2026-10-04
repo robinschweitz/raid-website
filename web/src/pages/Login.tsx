@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
 import { ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
+import { GuildCrest } from '../components/GuildCrest'
+import { Citadel } from '../components/Citadel'
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -24,16 +26,19 @@ export function LoginPage() {
 
   return (
     <div className="login-wrap">
+      <Citadel />
       <form className="card login-card" onSubmit={onSubmit}>
-        <h1>Raidverwaltung</h1>
-        <p className="muted">Bitte anmelden</p>
+        <GuildCrest />
+        <p className="eyebrow">Bratwurst des Schicksals</p>
+        <h1>Gemeinsam durch die Kälte.</h1>
+        <p className="muted">Melde dich für Raidplanung, Loot und deine Gildenhistorie an.</p>
         <label>
           Benutzername
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
+          <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus />
         </label>
         <label>
           Passwort
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
         </label>
         {error && <p className="error">{error}</p>}
         <button type="submit" disabled={busy}>

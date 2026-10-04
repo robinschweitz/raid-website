@@ -52,7 +52,7 @@ type Service struct{ repo *Repo }
 
 func NewService(repo *Repo) *Service { return &Service{repo: repo} }
 func (s *Service) Save(ctx context.Context, series *Series) error {
-	result, err := s.Configure(ctx, series.ID, Changes{Name: &series.Name, RaidLeaderID: &series.RaidLeaderID, Weekdays: &series.Weekdays, IntervalWeeks: &series.IntervalWeeks, StartTime: &series.StartTime, Timezone: &series.Timezone})
+	result, err := s.Configure(ctx, series.ID, Changes{Name: &series.Name, RaidLeaderID: &series.RaidLeaderID, Weekdays: &series.Weekdays, IntervalWeeks: &series.IntervalWeeks, StartTime: &series.StartTime, Timezone: &series.Timezone, CatalogInstanceID: series.CatalogInstanceID, RaidSize: series.RaidSize})
 	if err == nil {
 		*series = *result
 	}
@@ -61,12 +61,14 @@ func (s *Service) Save(ctx context.Context, series *Series) error {
 
 // Changes contains only explicitly supplied configuration fields.
 type Changes struct {
-	Name          *string
-	RaidLeaderID  *int64
-	Weekdays      *[]int
-	IntervalWeeks *int64
-	StartTime     *string
-	Timezone      *string
+	CatalogInstanceID *string
+	RaidSize          *int
+	Name              *string
+	RaidLeaderID      *int64
+	Weekdays          *[]int
+	IntervalWeeks     *int64
+	StartTime         *string
+	Timezone          *string
 }
 
 // Configure creates or patches configuration under the same writer reservation as archival.
@@ -100,6 +102,15 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 			series.Timezone = *changes.Timezone
 		}
 		if err := Validate(series); err != nil {
+			return err
+		}
+		if changes.CatalogInstanceID != nil {
+			series.CatalogInstanceID = changes.CatalogInstanceID
+		}
+		if changes.RaidSize != nil {
+			series.RaidSize = changes.RaidSize
+		}
+		if err := repo.Catalog().ValidateAssociation(ctx, series.CatalogInstanceID, series.RaidSize); err != nil {
 			return err
 		}
 		if err := repo.RequireLeader(ctx, series.RaidLeaderID); err != nil {

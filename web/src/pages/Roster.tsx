@@ -91,8 +91,8 @@ export function RosterPage() {
 
   return (
     <div>
-      <h1>Roster</h1>
-      {isAdmin && <p><Link to="/raid-series">Raidserien konfigurieren</Link></p>}
+      <p className="eyebrow">Administration</p><h1>Gildenkonfiguration</h1>
+      {isAdmin && <div className="actions"><Link to="/raid-series">Raidserien konfigurieren</Link><Link to="/loot-catalog">Beutekatalog verwalten</Link></div>}
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
@@ -111,7 +111,7 @@ export function RosterPage() {
         </ul>
         {isAdmin && (
           <form className="inline-form" onSubmit={createRank}>
-            <input placeholder="Rangname" value={rankName} onChange={(e) => setRankName(e.target.value)} required />
+            <input aria-label="Rangname" placeholder="Rangname" value={rankName} onChange={(e) => setRankName(e.target.value)} required />
             <button type="submit" disabled={pending}>Anlegen</button>
           </form>
         )}
@@ -133,8 +133,8 @@ export function RosterPage() {
         </ul>
         {isAdmin && (
           <form className="inline-form" onSubmit={createGroup}>
-            <input placeholder="Gruppenname" value={groupName} onChange={(e) => setGroupName(e.target.value)} required />
-            <input type="color" value={groupColor} onChange={(e) => setGroupColor(e.target.value)} />
+            <input aria-label="Gruppenname" placeholder="Gruppenname" value={groupName} onChange={(e) => setGroupName(e.target.value)} required />
+            <input aria-label="Gruppenfarbe" type="color" value={groupColor} onChange={(e) => setGroupColor(e.target.value)} />
             <button type="submit" disabled={pending}>Anlegen</button>
           </form>
         )}

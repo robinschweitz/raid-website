@@ -2,6 +2,10 @@
 
 WotLK Raid management (Armor Tokens, Enhance Points, Loot, Attendance). Modular monolith: Go backend (Bun + SQLite) + React/TypeScript frontend.
 
+The UI is branded for **Bratwurst des Schicksals**: an original icy crest/citadel atmosphere,
+navy/cyan panels, desktop sidebar, mobile navigation, saved class-colored roster details,
+and a real-data dashboard. No external artwork, fake progression, or new UI dependencies.
+
 ## Quick Start (dev)
 
 - Backend: `go run ./cmd/server` (after setup)
@@ -36,6 +40,53 @@ WotLK Raid management (Armor Tokens, Enhance Points, Loot, Attendance). Modular 
   not guessed from current characters. Final archive requires a complete active roster.
 - Incremental Loot Archive rows should have a unique, permanent `Import ID` column.
   Changed or ambiguous source rows produce a conflict report, never an overwrite.
+- EP is tracking-only: there is no website roll or standalone spend action. The shifted
+  outside range is `1 + X` to `100 + X`, where `X = min(balance, 50)`. Only an enhanced
+  loot winner pays, as part of staff recording that outside outcome.
+- Migrations 006-008 add award methods, linked EP costs, request identities, and catalog
+  associations. Existing ledgers and historical free-text loot are preserved.
+
+## Loot Workspace
+
+Raid staff uses the raid's Loot section to choose the boss, dropped item, roster character,
+and `MAIN`, `SECOND`, `ENHANCED`, or `BOE`. Main and Enhanced prevent the +10 archive reward;
+Second and player BoE do not. Enhanced costs are computed server-side, with no amount selector.
+
+Corrections preserve a same-winner enhanced cost on unrelated edits. Changing away from
+Enhanced refunds it; changing the enhanced recipient refunds the old winner and charges
+the new winner's current capped balance. The award, compensating entries, tokens, and
+audit commit together. Archived/cancelled raids remain read-only.
+
+New enhanced POSTs require a stable, nonblank `request_id`; identical retries return the
+same award instead of charging again. Loot DTOs use `award_method`, not a caller-controlled
+`is_main_spec`. New manual recipients must identify a character in that raid's roster.
+
+## Local Beutekatalog
+
+Admins open **Beutekatalog** to select a normalized JSON dataset, review its preview,
+and explicitly confirm the import. Runtime loot recording uses local tables, not remote
+scraping. Imports reject conflicts and never silently replace catalog records.
+
+`scripts/data/catalog-wotlk335.json` is an opt-in, **partial, source-checked** AzerothCore
+3.3.5 dataset for the six requested raids. It contains 2,596 distinct items and 4,330
+drop relationships; it is not a complete or human-reviewed catalog. Read
+`scripts/data/SOURCE.md` and the coverage JSON before importing. Missing scripted chest,
+collective encounter, and hardmode relationships are explicitly documented. The dataset
+has its own upstream GPL v2 license and attribution; it is not automatically seeded.
+
+Optional `catalog_instance_id` and `raid_size` associations can be configured on series
+and active raids. Available sizes come from imported drop records. Associated loot must
+use valid local `catalog_boss_id` and `item_id`; canonical names are derived server-side.
+Unassociated raids retain explicit manual recording. Unchanged historical identities are
+preserved by unrelated corrections, not guessed from current catalog data.
+
+Catalog reads: `/api/v1/loot-catalog`, `/instances`, `/bosses`, and `/items` beneath that
+prefix. Admin writes: `/api/v1/loot-catalog/preview` with `{"catalog": ...}`, then
+`/api/v1/loot-catalog/merge` with the same dataset and preview `raw_hash`.
+
+`go run ./cmd/catalogexport -help` describes the standalone pinned-source exporter.
+It lexically parses source data, never executes fetched SQL, and retains provenance
+and license artifacts. See `scripts/data/SOURCE.md` for reproducible extraction details.
 
 ## Correction API
 

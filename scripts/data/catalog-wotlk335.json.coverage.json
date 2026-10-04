@@ -1,0 +1,304 @@
+{
+  "raw_hash": "5eb7c086ba61d5c27c79c6da925fbc85292b6e866509a8f2e91b98a4bf36bb26",
+  "partial": true,
+  "coverage": [
+    {
+      "instance_id": "533",
+      "instance_name": "Naxxramas",
+      "boss_metadata": 18,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:0",
+      "bosses_with_drops": 14,
+      "items": 139,
+      "drops": 270,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "533",
+      "instance_name": "Naxxramas",
+      "boss_metadata": 18,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:1",
+      "bosses_with_drops": 14,
+      "items": 232,
+      "drops": 481,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "603",
+      "instance_name": "Ulduar",
+      "boss_metadata": 19,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:0",
+      "bosses_with_drops": 13,
+      "items": 159,
+      "drops": 238,
+      "loot_modes": [
+        1,
+        2,
+        4,
+        8,
+        16
+      ]
+    },
+    {
+      "instance_id": "603",
+      "instance_name": "Ulduar",
+      "boss_metadata": 19,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:0/hardmode:false",
+      "bosses_with_drops": 2,
+      "items": 17,
+      "drops": 18,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "603",
+      "instance_name": "Ulduar",
+      "boss_metadata": 19,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:0/hardmode:true",
+      "bosses_with_drops": 2,
+      "items": 29,
+      "drops": 30,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "603",
+      "instance_name": "Ulduar",
+      "boss_metadata": 19,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:1",
+      "bosses_with_drops": 13,
+      "items": 202,
+      "drops": 532,
+      "loot_modes": [
+        1,
+        2,
+        8,
+        16,
+        32
+      ]
+    },
+    {
+      "instance_id": "603",
+      "instance_name": "Ulduar",
+      "boss_metadata": 19,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:1/hardmode:false",
+      "bosses_with_drops": 2,
+      "items": 39,
+      "drops": 62,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "603",
+      "instance_name": "Ulduar",
+      "boss_metadata": 19,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:1/hardmode:true",
+      "bosses_with_drops": 2,
+      "items": 53,
+      "drops": 76,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "624",
+      "instance_name": "Vault of Archavon",
+      "boss_metadata": 4,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:0",
+      "bosses_with_drops": 4,
+      "items": 492,
+      "drops": 498,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "624",
+      "instance_name": "Vault of Archavon",
+      "boss_metadata": 4,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:1",
+      "bosses_with_drops": 4,
+      "items": 496,
+      "drops": 504,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "631",
+      "instance_name": "Icecrown Citadel",
+      "boss_metadata": 16,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:0",
+      "bosses_with_drops": 11,
+      "items": 122,
+      "drops": 132,
+      "loot_modes": [
+        1,
+        2
+      ]
+    },
+    {
+      "instance_id": "631",
+      "instance_name": "Icecrown Citadel",
+      "boss_metadata": 16,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:2",
+      "bosses_with_drops": 10,
+      "items": 124,
+      "drops": 154,
+      "loot_modes": [
+        1,
+        2
+      ]
+    },
+    {
+      "instance_id": "631",
+      "instance_name": "Icecrown Citadel",
+      "boss_metadata": 16,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:1",
+      "bosses_with_drops": 11,
+      "items": 118,
+      "drops": 158,
+      "loot_modes": [
+        1,
+        2
+      ]
+    },
+    {
+      "instance_id": "631",
+      "instance_name": "Icecrown Citadel",
+      "boss_metadata": 16,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:3",
+      "bosses_with_drops": 10,
+      "items": 120,
+      "drops": 171,
+      "loot_modes": [
+        1,
+        2
+      ]
+    },
+    {
+      "instance_id": "649",
+      "instance_name": "Trial of the Crusader",
+      "boss_metadata": 36,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:0",
+      "bosses_with_drops": 5,
+      "items": 113,
+      "drops": 116,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "649",
+      "instance_name": "Trial of the Crusader",
+      "boss_metadata": 36,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:2",
+      "bosses_with_drops": 5,
+      "items": 126,
+      "drops": 180,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "649",
+      "instance_name": "Trial of the Crusader",
+      "boss_metadata": 36,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:1",
+      "bosses_with_drops": 5,
+      "items": 169,
+      "drops": 322,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "649",
+      "instance_name": "Trial of the Crusader",
+      "boss_metadata": 36,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:3",
+      "bosses_with_drops": 5,
+      "items": 169,
+      "drops": 322,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "724",
+      "instance_name": "Ruby Sanctum",
+      "boss_metadata": 4,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:0",
+      "bosses_with_drops": 4,
+      "items": 13,
+      "drops": 16,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "724",
+      "instance_name": "Ruby Sanctum",
+      "boss_metadata": 4,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:2",
+      "bosses_with_drops": 1,
+      "items": 13,
+      "drops": 13,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "724",
+      "instance_name": "Ruby Sanctum",
+      "boss_metadata": 4,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:1",
+      "bosses_with_drops": 4,
+      "items": 17,
+      "drops": 20,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "724",
+      "instance_name": "Ruby Sanctum",
+      "boss_metadata": 4,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:3",
+      "bosses_with_drops": 1,
+      "items": 17,
+      "drops": 17,
+      "loot_modes": [
+        1
+      ]
+    }
+  ]
+}

@@ -106,7 +106,11 @@ func (s *Service) ArchiveRaid(ctx context.Context, raidID, actorID int64) (*raid
 			return fmt.Errorf("find successor occurrence: %w", err)
 		}
 		if next == nil {
+			if err := raids.Catalog().ValidateAssociation(ctx, series.CatalogInstanceID, series.RaidSize); err != nil {
+				return err
+			}
 			next = &raid.Raid{Name: series.Name, RaidLeaderID: series.RaidLeaderID, SeriesID: rd.SeriesID, PreviousRaidID: &rd.ID, Status: validation.RaidStatusPlanned, ScheduledStart: &scheduled, CreatedAt: now, UpdatedAt: now}
+			next.CatalogInstanceID, next.RaidSize = series.CatalogInstanceID, series.RaidSize
 			if err := raids.Create(ctx, next); err != nil {
 				return fmt.Errorf("create successor: %w", err)
 			}

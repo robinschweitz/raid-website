@@ -264,6 +264,13 @@ func (s *Service) CorrectLoot(ctx context.Context, raidID, id, actor int64, reas
 
 func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, reason string, patch func(*loot.Award), imported bool) error {
 	return s.repo.InTransaction(ctx, func(r *Repo) error {
+		if row.ID == 0 && !imported {
+			row.AwardedByPlayerID = actor
+			retried, err := loot.ResolveRequest(ctx, r.loot, row, reason)
+			if err != nil || retried {
+				return err
+			}
+		}
 		var before any
 		if row.ID != 0 {
 			old, err := r.loot.Get(ctx, row.ID)
@@ -284,6 +291,8 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 			row.AwardedAt = old.AwardedAt
 			row.AwardedByPlayerID = old.AwardedByPlayerID
 			row.Source = old.Source
+			row.RequestID = old.RequestID
+			row.RequestHash = old.RequestHash
 			// Corrections preserve historical lock consumption, never reapply it.
 			if row.ItemLockID != nil && (old.ItemLockID == nil || *row.ItemLockID != *old.ItemLockID) {
 				return ErrInvalid
@@ -294,8 +303,34 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		if err != nil {
 			return err
 		}
+		if !completed && row.ID == 0 && !imported {
+			row.UpdatedAt = time.Now().UTC()
+			row.CreatedAt = row.UpdatedAt
+			row.AwardedAt = row.UpdatedAt
+			row.AwardedByPlayerID = actor
+			row.Source = "manual"
+			return loot.AwardInTransaction(ctx, r.loot, row, reason)
+		}
+		oldAward, _ := before.(*loot.Award)
+		if !imported {
+			if err := loot.ValidateCatalog(ctx, r.loot, row, oldAward); err != nil {
+				return err
+			}
+		}
 		if strings.TrimSpace(row.ItemName) == "" {
 			return ErrInvalid
+		}
+		if imported && row.AwardMethod == "" {
+			row.AwardMethod = loot.Second
+			if row.IsMainSpec {
+				row.AwardMethod = loot.Main
+			}
+		}
+		if imported && row.AwardMethod == loot.Enhanced {
+			return ErrInvalid
+		}
+		if err := row.DeriveMainSpec(); err != nil {
+			return err
 		}
 		if err := s.ownership(ctx, r, row.AwardedToPlayerID, row.AwardedToCharacterID); err != nil {
 			return err
@@ -308,13 +343,20 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 			}
 		}
 		row.UpdatedAt = time.Now().UTC()
-		if !completed && row.ID == 0 && !imported {
-			row.CreatedAt = row.UpdatedAt
-			row.AwardedAt = row.UpdatedAt
-			row.AwardedByPlayerID = actor
-			row.Source = "manual"
-			return loot.AwardInTransaction(ctx, r.loot, row)
+		old, _ := before.(*loot.Award)
+		recipientChanged := old != nil && (old.AwardedToPlayerID != row.AwardedToPlayerID || !sameCharacter(old.AwardedToCharacterID, row.AwardedToCharacterID))
+		enteringEnhanced := old != nil && old.AwardMethod != loot.Enhanced && row.AwardMethod == loot.Enhanced
+		if !imported && (old == nil || recipientChanged || enteringEnhanced) {
+			if err := loot.ValidateRecipient(ctx, r.loot, row); err != nil {
+				return err
+			}
 		}
+		if !imported && old == nil {
+			if err := loot.ValidateEnhancedRequest(row); err != nil {
+				return err
+			}
+		}
+		row.EnhancedCost = 0
 		if row.ID == 0 && row.ItemLockID != nil {
 			return ErrInvalid
 		}
@@ -327,9 +369,17 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 			}
 			err = r.loot.CreateAward(ctx, row)
 		} else {
-			err = r.loot.Update(ctx, row)
+			err = nil
 		}
 		if err != nil {
+			return err
+		}
+		if !imported {
+			if err := loot.ReconcileEnhanced(ctx, r.loot, row, old, actor, reason); err != nil {
+				return err
+			}
+		}
+		if err := r.loot.Update(ctx, row); err != nil {
 			return err
 		}
 		if err := s.reconcileTokens(ctx, r, row, actor, reason); err != nil {
@@ -342,6 +392,13 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		}
 		return s.log(ctx, r, "loot_award", row.ID, actor, reason, before, row)
 	})
+}
+
+func sameCharacter(a, b *int64) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }
 
 func (s *Service) pointEligibility(ctx context.Context, r *Repo, raidID int64) (map[int64]int, error) {

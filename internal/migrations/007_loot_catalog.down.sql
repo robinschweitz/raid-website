@@ -1,0 +1,10 @@
+ALTER TABLE raid_series DROP COLUMN raid_size;
+ALTER TABLE raid_series DROP COLUMN catalog_instance_id;
+ALTER TABLE raids DROP COLUMN raid_size;
+ALTER TABLE raids DROP COLUMN catalog_instance_id;
+DROP TABLE loot_catalog_previews;
+DROP TABLE loot_catalog_drops;
+DROP TABLE loot_catalog_items;
+DROP TABLE loot_catalog_bosses;
+DROP TABLE loot_catalog_instances;
+DROP TABLE loot_catalog_sources;

@@ -50,8 +50,10 @@ func (s *Service) CancelRaid(ctx context.Context, raidID, actorID int64) (*Raid,
 
 // ScheduleChanges contains only explicitly supplied scheduling prerequisites.
 type ScheduleChanges struct {
-	SeriesID       *int64
-	ScheduledStart *time.Time
+	CatalogInstanceID *string
+	RaidSize          *int
+	SeriesID          *int64
+	ScheduledStart    *time.Time
 }
 
 // ConfigureSchedule changes active scheduling prerequisites without rewriting raid history.
@@ -90,7 +92,16 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 			start := changes.ScheduledStart.UTC()
 			rd.ScheduledStart = &start
 		}
-		if changes.SeriesID == nil && changes.ScheduledStart == nil {
+		if changes.CatalogInstanceID != nil {
+			rd.CatalogInstanceID = changes.CatalogInstanceID
+		}
+		if changes.RaidSize != nil {
+			rd.RaidSize = changes.RaidSize
+		}
+		if err := repo.Catalog().ValidateAssociation(ctx, rd.CatalogInstanceID, rd.RaidSize); err != nil {
+			return err
+		}
+		if changes.SeriesID == nil && changes.ScheduledStart == nil && changes.CatalogInstanceID == nil && changes.RaidSize == nil {
 			return nil
 		}
 		now := time.Now().UTC()
@@ -118,6 +129,15 @@ func (s *Service) CreateRaid(ctx context.Context, rd *Raid) error {
 			if err := seriesRepo.RequireLeader(ctx, series.RaidLeaderID); err != nil {
 				return err
 			}
+			if rd.CatalogInstanceID == nil {
+				rd.CatalogInstanceID = series.CatalogInstanceID
+			}
+			if rd.RaidSize == nil {
+				rd.RaidSize = series.RaidSize
+			}
+		}
+		if err := repo.Catalog().ValidateAssociation(ctx, rd.CatalogInstanceID, rd.RaidSize); err != nil {
+			return err
 		}
 		return repo.Create(ctx, rd)
 	})

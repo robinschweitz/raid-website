@@ -30,11 +30,12 @@ interface LinkProps {
 
 export function Link({ to, children, className }: LinkProps) {
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
     navigate(to)
   }
   return (
-    <a href={`#${to}`} className={className} onClick={onClick}>
+    <a href={`#${to}`} className={className} aria-current={className?.split(' ').includes('active') ? 'page' : undefined} onClick={onClick}>
       {children}
     </a>
   )

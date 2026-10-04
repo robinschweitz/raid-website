@@ -1,0 +1,25 @@
+interface AttendanceRingProps {
+  confirmed: number
+  total: number
+  size?: number
+}
+
+export function AttendanceRing({ confirmed, total, size = 100 }: AttendanceRingProps) {
+  const percentage = total > 0 ? Math.round((confirmed / total) * 100) : 0
+  const radius = 40
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (percentage / 100) * circumference
+
+  return <div className="attendance-ring" style={{ width: size, height: size }}>
+    <svg width={size} height={size} viewBox="0 0 100 100">
+      <circle className="ring-bg" cx="50" cy="50" r={radius} />
+      <circle className="ring-fill" cx="50" cy="50" r={radius}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset} />
+    </svg>
+    <div className="ring-text">
+      <strong>{percentage}%</strong>
+      <span>Besucht</span>
+    </div>
+  </div>
+}

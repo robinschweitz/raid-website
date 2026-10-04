@@ -73,7 +73,7 @@ function Layout() {
         <Link className="guild-brand" to="/"><GuildCrest /><span>Bratwurst<small>des Schicksals</small></span></Link>
         <p className="sidebar-caption">Gildenverwaltung</p>
         <nav aria-label="Hauptnavigation">
-          <Link className={path === '/' ? 'nav-link active' : 'nav-link'} to="/"><NavIcon name="home" />Übersicht</Link>
+          <Link className={path === '/' ? 'nav-link active' : 'nav-link'} to="/"><NavIcon name="home" />&Uuml;bersicht</Link>
           <Link className={path.startsWith('/raids') ? 'nav-link active' : 'nav-link'} to="/raids"><NavIcon name="raids" />Raids</Link>
           <Link className={path.startsWith('/players') ? 'nav-link active' : 'nav-link'} to="/players"><NavIcon name="players" />Spieler</Link>
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
@@ -84,23 +84,22 @@ function Layout() {
             <Link className={path === '/loot-catalog' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/loot-catalog"><NavIcon name="settings" />Beutekatalog</Link>
           </>}
         </nav>
-        {/* <div className="sidebar-footer"><p>Gemeinsam durch die Kälte.</p><span>Raids · Loot · Gemeinschaft</span></div> */}
+        <div className="sidebar-footer"><p>Gemeinsam durch die K&auml;lte.</p><span>Raids &middot; Loot &middot; Gemeinschaft</span></div>
       </aside>
       <div className="main-shell">
       <header className="topbar">
         <span className="topbar-brand">Bratwurst des Schicksals <span className="muted">/ Raidverwaltung</span></span>
         <div className="user"><Link to={`/players/${player.id}`}><NavIcon name="profile" />{player.name}</Link><span className="badge">{player.role}</span>
-          <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button>
+          <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden&hellip;' : 'Abmelden'}</button>
         </div>
       </header>
       <main id="main-content" tabIndex={-1}>
         {error && <p className="error" role="alert">{error}</p>}
         <Routes />
       </main>
-      {/* <footer className="page-footer">Bratwurst des Schicksals <span></span></footer> */}
       </div>
       <nav className="mobile-nav" aria-label="Mobile Hauptnavigation">
-        <Link className={path === '/' ? 'active' : ''} to="/"><NavIcon name="home" />Übersicht</Link>
+        <Link className={path === '/' ? 'active' : ''} to="/"><NavIcon name="home" />&Uuml;bersicht</Link>
         <Link className={path.startsWith('/raids') ? 'active' : ''} to="/raids"><NavIcon name="raids" />Raids</Link>
         <Link className={path.startsWith('/players') ? 'active' : ''} to="/players"><NavIcon name="players" />Spieler</Link>
         <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>
@@ -114,7 +113,7 @@ function Gate() {
   if (loading) {
     return (
       <div className="login-wrap">
-        <p className="muted">Lade…</p>
+        <p className="muted">Lade&hellip;</p>
       </div>
     )
   }

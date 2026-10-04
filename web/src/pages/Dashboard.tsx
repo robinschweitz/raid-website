@@ -2,9 +2,17 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
-import type { Attendance, Player, PointsResponse, Poll, Raid, Vote } from '../types'
+import type { Attendance, Character, Player, PointsResponse, Poll, Raid, Vote } from '../types'
 import { Citadel } from '../components/Citadel'
 import { EnhancePointsCard } from '../components/EnhancePointsCard'
+import { AttendanceRing } from '../components/AttendanceRing'
+import { BossProgression } from '../components/BossProgression'
+import { RaidCompositionCard } from '../components/RaidCompositionCard'
+import { GuildNotifications } from '../components/GuildNotifications'
+import { PlayerProfilePanel } from '../components/PlayerProfilePanel'
+import { StatisticsCharts } from '../components/StatisticsCharts'
+
+const ICC_BOSSES = ['Marrowgar', 'Lady Deathwhisper', 'Gunship', 'Saurfang', 'Festergut', 'Rotface', 'Putricide', 'Valithria', 'Sindragosa', 'Lich King']
 
 export function DashboardPage() {
   const { player } = useAuth()
@@ -14,6 +22,7 @@ export function DashboardPage() {
   const [votes, setVotes] = useState<Record<number, Vote[]>>({})
   const [points, setPoints] = useState<PointsResponse | null>(null)
   const [attendance, setAttendance] = useState<Attendance[] | null>(null)
+  const [characters, setCharacters] = useState<Character[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [attendanceError, setAttendanceError] = useState('')
@@ -23,7 +32,7 @@ export function DashboardPage() {
   const upcoming = raids.filter((r) => !r.archived_at && (r.status === 'PLANNED' || r.status === 'OPEN') && r.scheduled_start && Date.parse(r.scheduled_start) > now)
     .sort((a, b) => Date.parse(a.scheduled_start!) - Date.parse(b.scheduled_start!) || a.id - b.id)
   const nextRaid = upcoming[0]
-  const history = raids.filter((r) => r.archived_at).sort((a, b) => Date.parse(b.archived_at!) - Date.parse(a.archived_at!) || b.id - a.id).slice(0, 5)
+  const history = raids.filter((r) => r.archived_at).sort((a, b) => Date.parse(b.archived_at!) - Date.parse(a.archived_at!) || b.id - a.id).slice(0, 10)
 
   useEffect(() => {
     let active = true
@@ -36,9 +45,14 @@ export function DashboardPage() {
 
   useEffect(() => {
     let active = true
-    if (player) api.get<PointsResponse>(`/api/v1/players/${player.id}/points`)
-      .then((pts) => { if (active) setPoints(pts) })
-      .catch((err) => { if (active) setPointsError(err instanceof ApiError ? err.message : 'EP konnten nicht geladen werden.') })
+    if (player) {
+      api.get<PointsResponse>(`/api/v1/players/${player.id}/points`)
+        .then((pts) => { if (active) setPoints(pts) })
+        .catch((err) => { if (active) setPointsError(err instanceof ApiError ? err.message : 'EP konnten nicht geladen werden.') })
+      api.get<Character[]>(`/api/v1/players/${player.id}/characters`)
+        .then((chars) => { if (active) setCharacters(chars) })
+        .catch(() => {})
+    }
     return () => { active = false }
   }, [player])
 
@@ -60,36 +74,154 @@ export function DashboardPage() {
     return () => { active = false }
   }, [polls])
 
+  const confirmedCount = attendance?.filter((a) => !a.is_substitute).length ?? 0
+  const totalCount = attendance?.length ?? 0
+
   return <div className="dashboard">
-    <div className="page-heading"><div><h1>Gildenübersicht</h1></div><Link className="text-link" to="/raids">Alle Raids ansehen →</Link></div>
+    <div className="page-heading">
+      <div>
+        <p className="eybrw">Gilden&uuml;bersicht</p>
+        <h1>Bratwurst des Schicksals</h1>
+      </div>
+      <Link to="/raids">Alle Raids ansehen &rarr;</Link>
+    </div>
     {error && <p className="error" role="alert">{error}</p>}
+
     <section className="raid-banner">
       <Citadel />
-      <div className="raid-banner-content"><p className="eyebrow">Nächster geplanter Raid</p>
-        {loading ? <p role="status" className="muted">Raidplanung wird geladen…</p> : nextRaid ? <>
-          <div className="actions"><span className="badge info">{nextRaid.status === 'OPEN' ? 'Offen' : 'Geplant'}</span>{nextRaid.raid_size && <span className="badge">{nextRaid.raid_size} Spieler</span>}<span className="muted">{new Date(nextRaid.scheduled_start!).toLocaleString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}</span></div>
-          <h2>{nextRaid.name}</h2><p className="muted">Raidleitung: {players.find((p) => p.id === nextRaid.raid_leader_id)?.name ?? `Spieler #${nextRaid.raid_leader_id}`}</p>
-          {attendanceError ? <p className="error" role="alert">{attendanceError}</p> : attendance ? <div className="composition" aria-label="Gespeicherte Raidaufstellung"><span><strong>{attendance.length}</strong> Aufgestellt</span><span><strong>{attendance.filter((a) => a.role === 'TANK').length}</strong> Tanks</span><span><strong>{attendance.filter((a) => a.role === 'HEAL').length}</strong> Heiler</span><span><strong>{attendance.filter((a) => a.role === 'DD').length}</strong> DD</span></div> : <p className="muted" role="status">Aufstellung wird geladen…</p>}
-          <Link className="button-link primary" to={`/raids/${nextRaid.id}`}>Raid öffnen →</Link>
-        </> : <><h2>{error ? 'Raidplanung nicht verfügbar' : 'Kein zukünftiger Raid geplant'}</h2><p className="muted">{error ? 'Bitte lade die Seite erneut.' : 'Hier erscheint der nächste gespeicherte Termin. Offene Raids und die Historie findest du in der Raidübersicht.'}</p><Link className="button-link" to="/raids">Zur Raidplanung →</Link></>}
+      <div className="raid-banner-content">
+        <p className="eyebrow">N&auml;chster geplanter Raid</p>
+        {loading ? <p role="status" className="muted">Raidplanung wird geladen&hellip;</p> : nextRaid ? <>
+          <div className="actions">
+            <span className="badge info">{nextRaid.status === 'OPEN' ? 'Offen' : 'Geplant'}</span>
+            {nextRaid.raid_size && <span className="badge">{nextRaid.raid_size} Spieler</span>}
+            <span className="muted">{new Date(nextRaid.scheduled_start!).toLocaleString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          <h2>{nextRaid.name}</h2>
+          <p className="muted">Raidleitung: {players.find((p) => p.id === nextRaid.raid_leader_id)?.name ?? `Spieler #${nextRaid.raid_leader_id}`}</p>
+          {attendanceError ? <p className="error" role="alert">{attendanceError}</p> : attendance ? <>
+            <div className="composition" aria-label="Gespeicherte Raidaufstellung">
+              <span><strong>{attendance.length}</strong> Aufgestellt</span>
+              <span><strong>{attendance.filter((a) => a.role === 'TANK').length}</strong> Tanks</span>
+              <span><strong>{attendance.filter((a) => a.role === 'HEAL').length}</strong> Heiler</span>
+              <span><strong>{attendance.filter((a) => a.role === 'DD').length}</strong> DD</span>
+            </div>
+            <BossProgression bosses={ICC_BOSSES} killedCount={nextRaid.status === 'COMPLETED' ? ICC_BOSSES.length : 0} />
+          </> : <p className="muted" role="status">Aufstellung wird geladen&hellip;</p>}
+          <Link className="button-link primary" to={`/raids/${nextRaid.id}`}>Raid &ouml;ffnen &rarr;</Link>
+        </> : <><h2>{error ? 'Raidplanung nicht verf&uuml;gbar' : 'Kein zuk&uuml;nftiger Raid geplant'}</h2><p className="muted">{error ? 'Bitte lade die Seite erneut.' : 'Hier erscheint der n&auml;chste gespeicherte Termin.'}</p><Link className="button-link" to="/raids">Zur Raidplanung &rarr;</Link></>}
       </div>
     </section>
-    <div className="dashboard-columns">
-      <div className="dashboard-points">
-        {pointsError && <p className="error" role="alert">{pointsError}</p>}<EnhancePointsCard points={points} />
-        {player && <p className="profile-link"><Link to={`/players/${player.id}`}>Mein Profil & EP-Historie →</Link></p>}
-      </div>
-      <section className="card dashboard-agenda"><div className="section-heading"><h2>Raidagenda</h2><span className="eyebrow">Gespeicherte Termine</span></div>
-        {upcoming.slice(0, 5).map((r) => <div className="agenda-row" key={r.id}><time dateTime={r.scheduled_start!}><strong>{new Date(r.scheduled_start!).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</strong><span>{new Date(r.scheduled_start!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></time><Link to={`/raids/${r.id}`}>{r.name}</Link><span className="badge">{r.status === 'OPEN' ? 'Offen' : 'Geplant'}</span></div>)}
-        {!loading && !error && upcoming.length === 0 && <p className="muted">Keine zukünftigen Termine gespeichert.</p>}
+
+    <div className="dashboard-widgets">
+      <section className="card widget-composition">
+        <div className="section-heading"><h2>Raid Composition</h2><span className="eyebrow">{nextRaid?.name ?? 'Kein Raid'}</span></div>
+        {attendance ? <RaidCompositionCard attendance={attendance} /> : <p className="muted">Keine Aufstellung verf&uuml;gbar.</p>}
       </section>
-      <section className="card dashboard-polls"><div className="section-heading"><h2>Offene Umfragen</h2><Link to="/polls">Alle →</Link></div>
+
+      <section className="card widget-attendance">
+        <div className="section-heading"><h2>Anwesenheit</h2><span className="eyebrow">Best&auml;tigt</span></div>
+        {attendance ? <div className="attendance-ring-container">
+          <AttendanceRing confirmed={confirmedCount} total={totalCount} />
+          <div className="attendance-details">
+            <div className="attendance-detail-row"><span className="muted">Best&auml;tigt</span><strong>{confirmedCount}</strong></div>
+            <div className="attendance-detail-row"><span className="muted">Ersatz</span><strong>{attendance.filter((a) => a.is_substitute).length}</strong></div>
+            <div className="attendance-detail-row"><span className="muted">Bank</span><strong>{attendance.filter((a) => a.is_bench).length}</strong></div>
+            <div className="attendance-detail-row"><span className="muted">Gesamt</span><strong>{totalCount}</strong></div>
+          </div>
+        </div> : <p className="muted">Keine Daten verf&uuml;gbar.</p>}
+      </section>
+
+      <section className="card widget-poll">
+        <div className="section-heading"><h2>Aktive Umfrage</h2><Link to="/polls">Alle &rarr;</Link></div>
         {votesError && <p className="error" role="alert">{votesError}</p>}
-        {polls.map((p) => <div className="poll-preview" key={p.id}><h3>{p.title}</h3>{p.description && <p className="muted">{p.description}</p>}<div className="section-heading"><span className="muted">{votes[p.id] ? `${votes[p.id].length} abgegebene Stimmen` : 'Stimmen werden geladen…'}</span><Link to="/polls">Zur Abstimmung →</Link></div></div>)}
+        {polls.map((p) => {
+          const pollVotes = votes[p.id]
+          const choiceCounts: Record<string, number> = {}
+          if (pollVotes) pollVotes.forEach((v) => { choiceCounts[v.choice] = (choiceCounts[v.choice] ?? 0) + 1 })
+          const totalVotes = pollVotes?.length ?? 0
+          return <div className="poll-preview" key={p.id}>
+            <h3>{p.title}</h3>
+            {p.description && <p className="muted">{p.description}</p>}
+            {pollVotes && totalVotes > 0 && Object.entries(choiceCounts).map(([choice, count]) => <div className="poll-option-bar" key={choice}>
+              <div className="option-label"><span>{choice}</span><span className="votes">{count} Stimmen</span></div>
+              <div className="bar-track"><div className="bar-fill" style={{ width: `${(count / totalVotes) * 100}%` }} /></div>
+            </div>)}
+            <div className="section-heading"><span className="muted">{pollVotes ? `${totalVotes} abgegebene Stimmen` : 'Stimmen werden geladen&hellip;'}</span><Link to="/polls">Zur Abstimmung &rarr;</Link></div>
+          </div>
+        })}
         {!loading && !error && polls.length === 0 && <p className="muted">Aktuell keine offenen Umfragen.</p>}
       </section>
-      <section className="card dashboard-history"><div className="section-heading"><h2>Zuletzt archiviert</h2><Link to="/raids">Historie →</Link></div>
-        {history.map((r) => <div className="archive-row" key={r.id}><Link to={`/raids/${r.id}`}>{r.name}</Link><time dateTime={r.archived_at!}>{new Date(r.archived_at!).toLocaleDateString('de-DE')}</time><span className="badge ok">Archiviert</span></div>)}
+
+      <section className="card widget-boss">
+        <div className="section-heading"><h2>Boss Progression</h2><span className="eyebrow">Icecrown Citadel 25</span></div>
+        <BossProgression bosses={ICC_BOSSES} killedCount={nextRaid?.status === 'COMPLETED' ? ICC_BOSSES.length : 0} />
+      </section>
+
+      <section className="card widget-notifications">
+        <div className="section-heading"><h2>Benachrichtigungen</h2><span className="eyebrow">Aktivit&auml;t</span></div>
+        <GuildNotifications polls={polls} raids={raids} />
+      </section>
+
+      <section className="card widget-history">
+        <div className="section-heading"><h2>Raid Historie</h2><Link to="/raids">Alle &rarr;</Link></div>
+        <div className="table-scroll"><table className="table small">
+          <thead><tr><th>Datum</th><th>Raid</th><th>Gr&ouml;&szlig;e</th><th>Status</th></tr></thead>
+          <tbody>
+            {history.map((r) => <tr key={r.id}>
+              <td>{r.archived_at ? new Date(r.archived_at).toLocaleDateString('de-DE') : '—'}</td>
+              <td><Link to={`/raids/${r.id}`}>{r.name}</Link></td>
+              <td>{r.raid_size ?? '—'}</td>
+              <td><span className="badge ok">Archiviert</span></td>
+            </tr>)}
+            {history.length === 0 && <tr><td colSpan={4} className="muted">Noch keine archivierten Raids.</td></tr>}
+          </tbody>
+        </table></div>
+      </section>
+
+      <section className="card widget-stats">
+        <div className="section-heading"><h2>Statistiken</h2><span className="eyebrow">Saison</span></div>
+        <StatisticsCharts raids={raids} />
+      </section>
+
+      <section className="card widget-profile">
+        <div className="section-heading"><h2>Mein Profil</h2></div>
+        {player && <PlayerProfilePanel player={player} characters={characters} points={points} />}
+      </section>
+    </div>
+
+    <div className="dashboard-columns">
+      <div className="dashboard-points">
+        {pointsError && <p className="error" role="alert">{pointsError}</p>}
+        <EnhancePointsCard points={points} />
+        {player && <p className="profile-link"><Link to={`/players/${player.id}`}>Mein Profil &amp; EP-Historie &rarr;</Link></p>}
+      </div>
+      <section className="card dashboard-agenda">
+        <div className="section-heading"><h2>Raidagenda</h2><span className="eyebrow">Gespeicherte Termine</span></div>
+        {upcoming.slice(0, 5).map((r) => <div className="agenda-row" key={r.id}>
+          <time dateTime={r.scheduled_start!}><strong>{new Date(r.scheduled_start!).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</strong><span>{new Date(r.scheduled_start!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></time>
+          <Link to={`/raids/${r.id}`}>{r.name}</Link>
+          <span className="badge">{r.status === 'OPEN' ? 'Offen' : 'Geplant'}</span>
+        </div>)}
+        {!loading && !error && upcoming.length === 0 && <p className="muted">Keine zuk&uuml;nftigen Termine gespeichert.</p>}
+      </section>
+      <section className="card dashboard-polls">
+        <div className="section-heading"><h2>Offene Umfragen</h2><Link to="/polls">Alle &rarr;</Link></div>
+        {votesError && <p className="error" role="alert">{votesError}</p>}
+        {polls.map((p) => <div className="poll-preview" key={p.id}>
+          <h3>{p.title}</h3>
+          {p.description && <p className="muted">{p.description}</p>}
+          <div className="section-heading"><span className="muted">{votes[p.id] ? `${votes[p.id].length} abgegebene Stimmen` : 'Stimmen werden geladen&hellip;'}</span><Link to="/polls">Zur Abstimmung &rarr;</Link></div>
+        </div>)}
+        {!loading && !error && polls.length === 0 && <p className="muted">Aktuell keine offenen Umfragen.</p>}
+      </section>
+      <section className="card dashboard-history">
+        <div className="section-heading"><h2>Zuletzt archiviert</h2><Link to="/raids">Historie &rarr;</Link></div>
+        {history.slice(0, 5).map((r) => <div className="archive-row" key={r.id}>
+          <Link to={`/raids/${r.id}`}>{r.name}</Link>
+          <time dateTime={r.archived_at!}>{new Date(r.archived_at!).toLocaleDateString('de-DE')}</time>
+          <span className="badge ok">Archiviert</span>
+        </div>)}
         {!loading && !error && history.length === 0 && <p className="muted">Noch keine archivierten Raids.</p>}
       </section>
     </div>

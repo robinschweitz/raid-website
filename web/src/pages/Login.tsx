@@ -3,7 +3,6 @@ import { useAuth } from '../auth'
 import { ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
 import { GuildCrest } from '../components/GuildCrest'
-import { Citadel } from '../components/Citadel'
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -26,12 +25,11 @@ export function LoginPage() {
 
   return (
     <div className="login-wrap">
-      <Citadel />
       <form className="card login-card" onSubmit={onSubmit}>
         <GuildCrest />
         <p className="eyebrow">Bratwurst des Schicksals</p>
-        <h1>Gemeinsam durch die Kälte.</h1>
-        <p className="muted">Melde dich für Raidplanung, Loot und deine Gildenhistorie an.</p>
+        <h1>Gemeinsam durch die K&auml;lte.</h1>
+        <p className="muted">Melde dich f&uuml;r Raidplanung, Loot und deine Gildenhistorie an.</p>
         <label>
           Benutzername
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus />
@@ -42,7 +40,7 @@ export function LoginPage() {
         </label>
         {error && <p className="error">{error}</p>}
         <button type="submit" disabled={busy}>
-          {busy ? 'Anmelden…' : 'Anmelden'}
+          {busy ? 'Anmelden&hellip;' : 'Anmelden'}
         </button>
       </form>
     </div>

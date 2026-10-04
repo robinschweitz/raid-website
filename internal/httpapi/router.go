@@ -23,6 +23,7 @@ import (
 	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
+	"raid-website/internal/webui"
 )
 
 // Options controls optional runtime behaviour of the HTTP layer.
@@ -84,6 +85,9 @@ func New(db *bun.DB, opts Options) http.Handler {
 	mux := http.NewServeMux()
 	api.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)
+	if spa, err := webui.Handler(); err == nil {
+		mux.Handle("/", spa)
+	}
 
 	return requestID(logging(authenticate(authSvc)(mux)))
 }

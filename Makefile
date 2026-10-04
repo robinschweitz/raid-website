@@ -1,7 +1,7 @@
-.PHONY: fmt vet lint test build all
+.PHONY: fmt vet lint test frontend build all
 
 fmt:
-	gofmt -w .
+	gofmt -w cmd internal
 
 vet:
 	go vet ./...
@@ -12,7 +12,10 @@ lint:
 test:
 	go test ./...
 
-build:
+frontend:
+	cd web && npm ci && npm run build
+
+build: frontend
 	go build ./...
 
 all: fmt vet build test

@@ -25,6 +25,7 @@ lerna-debug.log*
 # Vite/Build
 web/dist/
 web/.vite/
+internal/webui/dist/
 
 # SQLite
 *.db

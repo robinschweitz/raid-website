@@ -1,0 +1,3 @@
+ALTER TABLE raid_attendance ADD COLUMN character_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE raid_attendance ADD COLUMN class TEXT NOT NULL DEFAULT '';
+ALTER TABLE raid_attendance ADD COLUMN spec TEXT NOT NULL DEFAULT '';

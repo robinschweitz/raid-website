@@ -60,6 +60,8 @@ export interface Raid {
   completed_at: string | null
   cancelled_at: string | null
   archived_at: string | null
+  series_id?: number | null
+  previous_raid_id?: number | null
   notes: string
   created_at: string
   updated_at: string
@@ -72,6 +74,9 @@ export interface Attendance {
   raid_id: number
   player_id: number
   character_id: number
+  character_name?: string
+  class?: string
+  spec?: string
   role: AttendanceRole
   is_substitute: boolean
   is_bench: boolean
@@ -80,6 +85,21 @@ export interface Attendance {
   notes: string
   created_at: string
   updated_at: string
+}
+
+export interface RaidSeries {
+  id: number
+  name: string
+  raid_leader_id: number
+  weekdays: number[]
+  interval_weeks: number
+  start_time: string
+  timezone: string
+}
+
+export interface ArchiveResponse {
+  data: Raid
+  next_raid: Raid | null
 }
 
 export interface LootAward {

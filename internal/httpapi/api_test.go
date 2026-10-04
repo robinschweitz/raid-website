@@ -22,6 +22,7 @@ import (
 	"raid-website/internal/migrations"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
+	"raid-website/internal/raidseries"
 	"raid-website/internal/validation"
 )
 
@@ -172,9 +173,15 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		}
 	}
 
+	series := &raidseries.Series{Name: "ICC", RaidLeaderID: leader, Weekdays: []int{int(now.Weekday())}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "UTC"}
+	if err := raidseries.NewService(raidseries.NewRepo(bdb)).Save(ctx, series); err != nil {
+		t.Fatalf("create series: %v", err)
+	}
 	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/raids", token, map[string]any{
-		"name":           "ICC",
-		"raid_leader_id": leader,
+		"name":            "ICC",
+		"raid_leader_id":  leader,
+		"series_id":       series.ID,
+		"scheduled_start": now.AddDate(0, 0, -7).Format(time.RFC3339),
 	})
 	if status != http.StatusCreated {
 		t.Fatalf("create raid: status %d body %s", status, body)
@@ -211,9 +218,31 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("create loot: status %d body %s", status, body)
 	}
 
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/complete", srv.URL, raidID), token, nil)
+	// Process all loot before final archiving. An off-spec token does not change EP eligibility.
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
+		"item_name":            "Weiheabzeichen des Eroberers",
+		"awarded_to_player_id": plain,
+	})
+	if status != http.StatusCreated || !bytes.Contains(body, []byte(`"token_award":true`)) {
+		t.Fatalf("create token loot: status %d body %s", status, body)
+	}
+	balanceBefore, err := enhancepoints.NewRepo(bdb).Balance(ctx, plain)
+	if err != nil || balanceBefore != 0 {
+		t.Fatalf("EP must wait for archive: balance %d error %v", balanceBefore, err)
+	}
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/archive", srv.URL, raidID), token, nil)
 	if status != http.StatusOK {
-		t.Fatalf("complete raid: status %d body %s", status, body)
+		t.Fatalf("archive raid: status %d body %s", status, body)
+	}
+	var archived struct {
+		Data raid.Raid  `json:"data"`
+		Next *raid.Raid `json:"next_raid"`
+	}
+	if err := json.Unmarshal(body, &archived); err != nil {
+		t.Fatal(err)
+	}
+	if archived.Data.ArchivedAt == nil || archived.Next == nil || archived.Next.Status != validation.RaidStatusPlanned || archived.Next.ScheduledStart == nil || !archived.Next.ScheduledStart.After(now) {
+		t.Fatalf("archive did not finalize and schedule future successor: %s", body)
 	}
 
 	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/points", srv.URL, plain), "", nil)
@@ -242,25 +271,6 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	}
 	if pointsOut.Data.Balance != 0 {
 		t.Fatalf("rewarded balance: want 0 got %d", pointsOut.Data.Balance)
-	}
-
-	// Token award derives a token transaction.
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
-		"item_name":            "Weiheabzeichen des Eroberers",
-		"awarded_to_player_id": plain,
-		"reason":               "record omitted off-spec token award",
-	})
-	if status != http.StatusCreated {
-		t.Fatalf("create token loot: status %d body %s", status, body)
-	}
-	var lootOut struct {
-		TokenAward bool `json:"token_award"`
-	}
-	if err := json.Unmarshal(body, &lootOut); err != nil {
-		t.Fatalf("decode loot: %v", err)
-	}
-	if !lootOut.TokenAward {
-		t.Fatalf("expected token_award true, body %s", body)
 	}
 
 	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/tokens", srv.URL, plain), token, nil)

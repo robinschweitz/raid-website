@@ -10,6 +10,7 @@ import (
 	"time"
 	_ "time/tzdata" // Sheet dates require Europe/Berlin even without host zoneinfo.
 
+	"raid-website/internal/attendance"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
@@ -190,11 +191,18 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 		if v, err := strconv.Atoi(strings.TrimSpace(row.Position)); err == nil {
 			pos = v
 		}
+		class := attendance.NormalizeClass(row.Class)
+		if _, valid := validation.ClassSpecs[class]; !valid {
+			p.Warnings = append(p.Warnings, fmt.Sprintf("raid row %d: missing or unknown roster class %q for %q; source value preserved, not replaced from Charaktere", i+2, row.Class, character))
+		}
+		if strings.TrimSpace(row.Spec) == "" {
+			p.Warnings = append(p.Warnings, fmt.Sprintf("raid row %d: missing roster spec for %q; historical spec remains unknown", i+2, character))
+		}
 		rp.Entries = append(rp.Entries, AttendancePlan{
 			Character: character,
 			Player:    c.PlayerName,
 			Role:      role,
-			Class:     c.Class,
+			Class:     class,
 			Spec:      strings.TrimSpace(row.Spec),
 			Position:  pos,
 		})

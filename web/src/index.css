@@ -171,6 +171,31 @@ table.table.small {
   font-size: 0.8rem;
 }
 
+.table-scroll {
+  overflow-x: auto;
+}
+
+.inline-form fieldset {
+  border: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .inline-form label,
+  .inline-form input,
+  .inline-form select {
+    max-width: 100%;
+  }
+
+  .inline-form p,
+  .plain-list span {
+    overflow-wrap: anywhere;
+  }
+}
+
 .badge {
   display: inline-block;
   padding: 0.1rem 0.5rem;

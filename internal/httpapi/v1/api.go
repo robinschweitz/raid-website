@@ -20,6 +20,7 @@ import (
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcompletion"
 	"raid-website/internal/raidcorrection"
+	"raid-website/internal/raidseries"
 	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
@@ -33,6 +34,7 @@ type Deps struct {
 	Players      *player.Repo
 	Characters   *character.Repo
 	Raids        *raid.Repo
+	RaidSeries   *raidseries.Repo
 	Attendance   *attendance.Repo
 	Loot         *loot.Service
 	LootRepo     *loot.Repo
@@ -76,9 +78,12 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/raids", RequireAuth(a.listRaids))
 	mux.HandleFunc("POST /api/v1/raids", RequireRole(validation.RoleRaidassistent, a.createRaid))
 	mux.HandleFunc("GET /api/v1/raids/{id}", RequireAuth(a.getRaid))
-	mux.HandleFunc("POST /api/v1/raids/{id}/complete", RequireRole(validation.RoleRaidassistent, a.completeRaid))
+	mux.HandleFunc("PATCH /api/v1/raids/{id}", RequireRole(validation.RoleRaidassistent, a.configureRaidSchedule))
 	mux.HandleFunc("POST /api/v1/raids/{id}/cancel", RequireRole(validation.RoleRaidassistent, a.cancelRaid))
 	mux.HandleFunc("POST /api/v1/raids/{id}/archive", RequireRole(validation.RoleRaidassistent, a.archiveRaid))
+	mux.HandleFunc("GET /api/v1/raid-series", RequireAuth(a.listRaidSeries))
+	mux.HandleFunc("POST /api/v1/raid-series", RequireRole(validation.RoleAdmin, a.createRaidSeries))
+	mux.HandleFunc("PATCH /api/v1/raid-series/{id}", RequireRole(validation.RoleAdmin, a.updateRaidSeries))
 
 	mux.HandleFunc("GET /api/v1/raids/{id}/attendance", RequireAuth(a.listAttendance))
 	mux.HandleFunc("POST /api/v1/raids/{id}/attendance", RequireRole(validation.RoleRaidassistent, a.createAttendance))

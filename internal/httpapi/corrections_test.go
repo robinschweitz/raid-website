@@ -82,6 +82,30 @@ func (f *correctionFixture) attend(playerID, charID int64) int64 {
 	return correctionID(f.t, f.request(http.MethodPost, "/attendance", map[string]any{"player_id": playerID, "character_id": charID, "role": "DD"}, http.StatusCreated))
 }
 
+// legacyCompleted models historical unarchived raids, not the current final archive flow.
+func (f *correctionFixture) legacyCompleted(rewardedPlayerIDs ...int64) {
+	f.t.Helper()
+	ctx := context.Background()
+	rd, err := raid.NewRepo(f.db).Get(ctx, f.raidID)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	rd.Status = validation.RaidStatusCompleted
+	rd.CompletedAt = &now
+	rd.ArchivedAt = nil
+	rd.UpdatedAt = now
+	if err := raid.NewRepo(f.db).Update(ctx, rd); err != nil {
+		f.t.Fatal(err)
+	}
+	for _, playerID := range rewardedPlayerIDs {
+		entry := &enhancepoints.Transaction{PlayerID: playerID, RaidID: &f.raidID, Amount: 10, Type: "award_no_mainspec_loot", Reason: "legacy raid completion", ActorID: f.actor, CreatedAt: now}
+		if err := enhancepoints.NewRepo(f.db).InsertTransaction(ctx, entry); err != nil {
+			f.t.Fatal(err)
+		}
+	}
+}
+
 func (f *correctionFixture) points(playerID int64, want int) {
 	f.t.Helper()
 	got, err := enhancepoints.NewRepo(f.db).Balance(context.Background(), playerID)
@@ -105,12 +129,12 @@ func (f *correctionFixture) tokenBalance(playerID int64, want int) {
 	}
 }
 
-func TestCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
+func TestLegacyCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
 	f := newCorrectionFixture(t)
 	f.attend(f.first, f.firstChar)
 	f.attend(f.second, f.secondChar)
 	awardID := correctionID(t, f.request(http.MethodPost, "/loot", map[string]any{"item_name": "Weiheabzeichen des Eroberers", "awarded_to_player_id": f.first, "is_main_spec": true}, http.StatusCreated))
-	f.request(http.MethodPost, "/complete", nil, http.StatusOK)
+	f.legacyCompleted(f.second)
 	f.points(f.first, 0)
 	f.points(f.second, 10)
 	f.tokenBalance(f.first, 1)
@@ -173,10 +197,10 @@ func TestCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
 	}
 }
 
-func TestCorrectionsAttendanceAndCompletedAdditions(t *testing.T) {
+func TestLegacyCorrectionsAttendanceAndCompletedAdditions(t *testing.T) {
 	f := newCorrectionFixture(t)
 	id := f.attend(f.first, f.firstChar)
-	f.request(http.MethodPost, "/complete", nil, http.StatusOK)
+	f.legacyCompleted(f.first)
 	f.points(f.first, 10)
 	suffix := fmt.Sprintf("/attendance/%d", id)
 	for i := 0; i < 2; i++ {
@@ -193,7 +217,7 @@ func TestCorrectionsAttendanceAndCompletedAdditions(t *testing.T) {
 	f.points(f.second, 0)
 }
 
-func TestCorrectionsPermissionsReferencesAndStates(t *testing.T) {
+func TestLegacyCorrectionsPermissionsReferencesAndStates(t *testing.T) {
 	f := newCorrectionFixture(t)
 	id := f.attend(f.first, f.firstChar)
 	f.request(http.MethodPost, "/attendance", map[string]any{"player_id": f.first, "character_id": f.secondChar, "role": "DD"}, http.StatusBadRequest)
@@ -201,7 +225,7 @@ func TestCorrectionsPermissionsReferencesAndStates(t *testing.T) {
 	f.request(http.MethodPost, "/loot", map[string]any{"item_name": "item", "awarded_to_player_id": f.first, "awarded_to_character_id": f.secondChar}, http.StatusBadRequest)
 	f.request(http.MethodPost, "/loot", map[string]any{"item_name": "item", "awarded_to_player_id": f.first, "awarded_to_character_id": 99999}, http.StatusNotFound)
 	awardID := correctionID(t, f.request(http.MethodPost, "/loot", map[string]any{"item_name": "item", "awarded_to_player_id": f.first}, http.StatusCreated))
-	f.request(http.MethodPost, "/complete", nil, http.StatusOK)
+	f.legacyCompleted(f.first)
 	for _, suffix := range []string{fmt.Sprintf("/attendance/%d", id), fmt.Sprintf("/loot/%d", awardID)} {
 		status, _ := do(t, f.srv.Client(), http.MethodPatch, fmt.Sprintf("%s/api/v1/raids/%d%s", f.srv.URL, f.raidID, suffix), f.memberToken, map[string]any{"reason": "denied"})
 		if status != http.StatusForbidden {
@@ -250,11 +274,11 @@ func TestCorrectionsPermissionsReferencesAndStates(t *testing.T) {
 	}
 }
 
-func TestCorrectionsAuditFailureRollsBackRecordAndLedgers(t *testing.T) {
+func TestLegacyCorrectionsAuditFailureRollsBackRecordAndLedgers(t *testing.T) {
 	f := newCorrectionFixture(t)
 	f.attend(f.first, f.firstChar)
 	awardID := correctionID(t, f.request(http.MethodPost, "/loot", map[string]any{"item_name": "Weiheabzeichen des Eroberers", "awarded_to_player_id": f.first, "is_main_spec": true}, http.StatusCreated))
-	f.request(http.MethodPost, "/complete", nil, http.StatusOK)
+	f.legacyCompleted()
 	if _, err := f.db.ExecContext(context.Background(), "CREATE TRIGGER fail_correction_audit BEFORE INSERT ON audit_log BEGIN SELECT RAISE(ABORT, 'audit unavailable'); END"); err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +303,7 @@ func TestCorrectionsAuditFailureRollsBackRecordAndLedgers(t *testing.T) {
 	}
 }
 
-func TestOrdinaryLootLockResolutionAndCorrectionDoesNotRevive(t *testing.T) {
+func TestLegacyOrdinaryLootLockResolutionAndCorrectionDoesNotRevive(t *testing.T) {
 	f := newCorrectionFixture(t)
 	now := time.Now().UTC()
 	lock := &enhancepoints.ItemLock{PlayerID: f.first, RaidID: f.raidID, ItemID: "123", ItemName: "locked item", Status: validation.LockStatusActive, LockedAt: now, ActorID: f.first, CreatedAt: now, UpdatedAt: now}
@@ -294,7 +318,7 @@ func TestOrdinaryLootLockResolutionAndCorrectionDoesNotRevive(t *testing.T) {
 	if award.AwardedToPlayerID != f.first || !award.IsMainSpec || award.ItemLockID == nil || *award.ItemLockID != lock.ID || award.AwardedToCharacterID != nil {
 		t.Fatalf("lock not applied: %+v", award)
 	}
-	f.request(http.MethodPost, "/complete", nil, http.StatusOK)
+	f.legacyCompleted()
 	f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", awardID), map[string]any{"awarded_to_player_id": f.second, "reason": "explicit recipient correction"}, http.StatusOK)
 	stored, err := enhancepoints.NewRepo(f.db).GetLock(context.Background(), lock.ID)
 	if err != nil {

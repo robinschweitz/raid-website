@@ -9,7 +9,7 @@ future agents do not re-litigate them or silently change them.
 Authoritative sources, in order of precedence:
 
 1. This file (owner-level requirements and constraints)
-2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-020)
+2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-022)
 3. `ARCHITECTURE.md` (module map and principles)
 4. `CODING_RULES.md` (defines the coding rules)
 5. `README.md` (commands)
@@ -49,6 +49,7 @@ wins and the difference is fixed here first.
    clobber existing data (ADR 008).
 6. **Archive by default.** History-affecting records are archived (`archived_at`), never deleted.
    A hard delete must be explicitly requested by a human and is Admin-only (ADR 007).
+   For raids, archiving means final processing, not removal or hiding (ADR 021).
 7. **Edits are audited.** Changes to history-affecting records (loot, attendance, character renames)
    require actor + reason and write an audit log entry (ADR 006). Numeric corrections prefer new
    adjustment transactions over mutating values.
@@ -91,14 +92,25 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   (ADR 013).
 
 ### 4.2 Raids
-- Lifecycle: `PLANNED` → `OPEN` → `COMPLETED`, plus `CANCELLED` and archived (`archived_at`).
-- Archiving is the default way to remove a raid from the active view; hard delete is explicit and
-  Admin-only (ADR 007).
-- Raid completion is idempotent: completing twice must not double-award anything.
+- Lifecycle: `PLANNED` → `OPEN` → `COMPLETED`, with cancellation as `CANCELLED`.
+  `Archivieren` is the single final action: it sets completed and archived timestamps together.
+  There is no separate completion action (ADR 021 supersedes the former raid archive semantics).
+- Archiving finalizes roster/loot processing, awards EP, expires unused locks, and schedules the
+  next raid atomically. Repeated requests must neither award twice nor create duplicate successors.
+- Archived raids remain visible as history, with read-only roster and loot.
+- Each recurring raid series explicitly configures name, leader, weekday(s), week interval,
+  local start time, and IANA timezone. No guild schedule is seeded or hard-coded.
+- Recurrence weeks are anchored to the current raid's local Monday week. Archiving chooses the
+  next future occurrence, skipping elapsed dates, and preserves local wall time across DST.
+  Ambiguous/nonexistent local times fail explicitly rather than silently shifting the schedule.
+- A preplanned eligible next occurrence is reused without replacing its data. A conflicting
+  finalized/cancelled occurrence or another predecessor is reported, not overwritten.
+- Existing stored completed raids are historical: archival never recreates their EP or starts
+  a new recurrence chain. Existing active raids can be assigned a series and scheduled start.
 
 ### 4.3 Enhance Points (EP) — the core rule
 - **+10 EP** for a player who received **no main-spec loot** in that raid.
-- Awarded **only when the raid is `COMPLETED`**.
+- Awarded **only by final archiving**, which moves the raid to `COMPLETED` (ADR 021).
 - **No EP at all if the raid is `CANCELLED`** (ADR 015).
 - One award per (player, raid) — idempotent.
 - Balance is `SUM(amount)` over the append-only `enhance_point_transactions` (ADR 004).
@@ -119,6 +131,10 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - A **substitute** is a normal player; substitute and regular participants are treated identically.
 - **Bench** participants follow the **same EP rule** as raiders: they earn +10 if they got no
   main-spec loot (ADR 016).
+- The raid roster is editable until archival. It stores the actual character name, role,
+  class, and spec played in that raid, independently of later live-character changes (ADR 022).
+- Archive rejects an incomplete active roster. Legacy unknown snapshots are not fabricated;
+  new sheet imports preserve Raid Archive's own character name, role, class, and spec.
 
 ### 4.7 Armor Tokens
 - Tokens are derived from awarding the three specific loot items
@@ -183,9 +199,9 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Matrix:
   - **Read** — any authenticated role: all `GET` endpoints.
   - **Config (`ADMIN`)** — create player; set account/credentials; create or update characters;
-    guild ranks; raid groups; list/import legacy data.
-  - **Raid operations (`RAIDASSISTENT` and up, i.e. RA + RL)** — create raid; complete, cancel,
-    archive; attendance; loot; create and close polls.
+    guild ranks; raid groups; recurring raid series; list/import legacy data.
+  - **Raid operations (`RAIDASSISTENT` and up, i.e. RA + RL)** — create raid; configure its
+    series/start; cancel; archive/finalize; attendance; loot; create and close polls.
   - **Self-service (`MEMBER` and up)** — roll Enhance Points; create and cancel **own** item locks;
     vote on polls.
 - The first admin is bootstrapped from `ADMIN_USERNAME` / `ADMIN_PASSWORD` at startup.

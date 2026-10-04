@@ -11,6 +11,7 @@ import { PlayerDetailPage } from './pages/PlayerDetail'
 import { RosterPage } from './pages/Roster'
 import { PollsPage } from './pages/Polls'
 import { ImportsPage } from './pages/Imports'
+import { RaidSeriesPage } from './pages/RaidSeries'
 
 function Routes() {
   const path = useRoute()
@@ -30,6 +31,7 @@ function Routes() {
   if (parts[0] === 'roster') {
     return <RosterPage />
   }
+  if (parts[0] === 'raid-series') return <RaidSeriesPage />
   if (parts[0] === 'polls') {
     return <PollsPage />
   }

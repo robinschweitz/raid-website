@@ -20,6 +20,7 @@ import (
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcompletion"
 	"raid-website/internal/raidcorrection"
+	"raid-website/internal/raidseries"
 	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
 	"raid-website/internal/webui"
@@ -70,6 +71,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Players:      players,
 		Characters:   chars,
 		Raids:        raids,
+		RaidSeries:   raidseries.NewRepo(db),
 		Attendance:   att,
 		Loot:         loot.NewService(lootRepo),
 		LootRepo:     lootRepo,

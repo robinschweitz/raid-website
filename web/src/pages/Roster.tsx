@@ -3,6 +3,7 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { atLeast, type GuildRank, type RaidGroup } from '../types'
 import { useSubmission } from '../useSubmission'
+import { Link } from '../router'
 
 export function RosterPage() {
   const { pending, submit, isActive } = useSubmission()
@@ -91,6 +92,7 @@ export function RosterPage() {
   return (
     <div>
       <h1>Roster</h1>
+      {isAdmin && <p><Link to="/raid-series">Raidserien konfigurieren</Link></p>}
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 

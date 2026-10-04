@@ -5,34 +5,39 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
+	"raid-website/internal/attendance"
 	"raid-website/internal/enhancepoints"
+	"raid-website/internal/raid"
+	"raid-website/internal/raidseries"
 	"raid-website/internal/validation"
 )
 
 const noMainSpecAward = 10
 
 var (
-	ErrRaidCancelled      = errors.New("raid is cancelled")
-	ErrRaidNotCompletable = errors.New("raid is not completable")
+	ErrRaidCancelled     = errors.New("raid is cancelled")
+	ErrRaidNotArchivable = errors.New("raid is not archivable")
+	ErrRosterIncomplete  = errors.New("raid roster is incomplete")
 )
 
-// Service completes raids and applies the cross-domain consequences:
-// enhance point awards for players without main-spec loot, and lock expiry.
+// Service archives raids with point awards, lock expiry and successor scheduling.
 type Service struct {
 	repo *Repo
+	now  func() time.Time
 }
 
 func NewService(repo *Repo) *Service {
-	return &Service{repo: repo}
+	return &Service{repo: repo, now: time.Now}
 }
 
-// CompleteRaid marks the raid completed and awards enhance points to each
-// participant who did not receive a main-spec item. It is idempotent: an
-// already-completed raid is a no-op, and duplicate point awards are skipped.
-func (s *Service) CompleteRaid(ctx context.Context, raidID, actorID int64) error {
-	return s.repo.InTransaction(ctx, func(repo *Repo) error {
+// ArchiveRaid finalizes rewards, locks and the next occurrence atomically.
+// Stored COMPLETED raids are historical: never recreate their rewards or cadence.
+func (s *Service) ArchiveRaid(ctx context.Context, raidID, actorID int64) (*raid.Raid, *raid.Raid, error) {
+	var archived, next *raid.Raid
+	err := s.repo.InTransaction(ctx, func(repo *Repo) error {
 		raids := repo.raids
 		att := repo.attendance
 		lo := repo.loot
@@ -45,31 +50,83 @@ func (s *Service) CompleteRaid(ctx context.Context, raidID, actorID int64) error
 		if err != nil {
 			return fmt.Errorf("load raid %d: %w", raidID, err)
 		}
+		archived = rd
+		now := s.now().UTC().Truncate(time.Microsecond)
 
 		switch rd.Status {
 		case validation.RaidStatusCancelled:
 			return ErrRaidCancelled
 		case validation.RaidStatusCompleted:
-			return nil
-		case validation.RaidStatusPlanned, validation.RaidStatusOpen:
-			if rd.ArchivedAt != nil {
-				return ErrRaidNotCompletable
+			if rd.ArchivedAt == nil {
+				rd.ArchivedAt = &now
+				rd.UpdatedAt = now
+				if err := raids.Update(ctx, rd); err != nil {
+					return err
+				}
 			}
+			next, err = raids.Successor(ctx, raidID)
+			return err
+		case validation.RaidStatusPlanned, validation.RaidStatusOpen:
+			// Old archived active raids require this explicit finalization request.
 		default:
-			return ErrRaidNotCompletable
+			return ErrRaidNotArchivable
 		}
 
-		now := time.Now().UTC()
-		rd.Status = validation.RaidStatusCompleted
-		rd.CompletedAt = &now
-		rd.UpdatedAt = now
-		if err := raids.Update(ctx, rd); err != nil {
-			return fmt.Errorf("complete raid %d: %w", raidID, err)
+		if rd.SeriesID == nil {
+			return raidseries.ErrSeriesRequired
 		}
-
+		if rd.ScheduledStart == nil {
+			return raidseries.ErrScheduledStartRequired
+		}
 		rows, err := att.ListByRaid(ctx, raidID)
 		if err != nil {
 			return fmt.Errorf("load attendance for raid %d: %w", raidID, err)
+		}
+		for _, a := range rows {
+			_, validClass := validation.ClassSpecs[attendance.NormalizeClass(a.Class)]
+			role := validation.AttendanceRole(strings.ToUpper(strings.TrimSpace(string(a.Role))))
+			validRole := role == validation.RoleTank || role == validation.RoleHeal || role == validation.RoleDD
+			if strings.TrimSpace(a.CharacterName) == "" || strings.TrimSpace(a.Spec) == "" || !validClass || !validRole {
+				return fmt.Errorf("%w: attendance %d requires character_name, valid class, spec and role", ErrRosterIncomplete, a.ID)
+			}
+		}
+		series, err := repo.series.Get(ctx, *rd.SeriesID)
+		if err != nil {
+			return err
+		}
+		if err := repo.series.RequireLeader(ctx, series.RaidLeaderID); err != nil {
+			return err
+		}
+		scheduled, err := raidseries.NextOccurrence(series, *rd.ScheduledStart, now)
+		if err != nil {
+			return err
+		}
+		next, err = raids.FindOccurrence(ctx, series.ID, scheduled)
+		if err != nil {
+			return fmt.Errorf("find successor occurrence: %w", err)
+		}
+		if next == nil {
+			next = &raid.Raid{Name: series.Name, RaidLeaderID: series.RaidLeaderID, SeriesID: rd.SeriesID, PreviousRaidID: &rd.ID, Status: validation.RaidStatusPlanned, ScheduledStart: &scheduled, CreatedAt: now, UpdatedAt: now}
+			if err := raids.Create(ctx, next); err != nil {
+				return fmt.Errorf("create successor: %w", err)
+			}
+		} else {
+			if next.ArchivedAt != nil || (next.Status != validation.RaidStatusPlanned && next.Status != validation.RaidStatusOpen) || (next.PreviousRaidID != nil && *next.PreviousRaidID != rd.ID) {
+				return raid.ErrOccurrenceConflict
+			}
+			if next.PreviousRaidID == nil {
+				if err := raids.LinkSuccessor(ctx, next.ID, rd.ID); err != nil {
+					return fmt.Errorf("link successor: %w", err)
+				}
+				next.PreviousRaidID = &rd.ID
+			}
+		}
+		rd.Status = validation.RaidStatusCompleted
+		rd.CompletedAt = &now
+		rd.ArchivedAt = &now
+		rd.UpdatedAt = now
+		if err := raids.Update(ctx, rd); err != nil {
+			return fmt.Errorf("complete raid %d: %w", raidID, err)
 		}
 
 		awardedPlayers := make(map[int64]struct{}, len(rows))
@@ -127,4 +184,8 @@ func (s *Service) CompleteRaid(ctx context.Context, raidID, actorID int64) error
 
 		return nil
 	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return archived, next, nil
 }

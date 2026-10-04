@@ -10,7 +10,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, envelope = false): Promise<T> {
   const res = await fetch(path, {
     method,
     credentials: 'include',
@@ -33,7 +33,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     const env = json as { error?: { code?: string; message?: string } } | undefined
     throw new ApiError(res.status, env?.error?.code ?? 'error', env?.error?.message ?? res.statusText)
   }
-  if (json && typeof json === 'object' && 'data' in json) {
+  if (!envelope && json && typeof json === 'object' && 'data' in json) {
     return (json as { data: T }).data
   }
   return json as T
@@ -42,6 +42,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
+  postEnvelope: <T>(path: string, body?: unknown) => request<T>('POST', path, body, true),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   del: <T>(path: string) => request<T>('DELETE', path),

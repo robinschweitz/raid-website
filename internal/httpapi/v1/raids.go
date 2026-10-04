@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -17,6 +18,12 @@ type createRaidRequest struct {
 	ScheduledStart *string `json:"scheduled_start"`
 	ScheduledEnd   *string `json:"scheduled_end"`
 	Notes          string  `json:"notes"`
+	SeriesID       *int64  `json:"series_id"`
+}
+
+type configureRaidScheduleRequest struct {
+	SeriesID       *int64          `json:"series_id"`
+	ScheduledStart json.RawMessage `json:"scheduled_start"`
 }
 
 func (a *API) listRaids(w http.ResponseWriter, r *http.Request) {
@@ -75,10 +82,14 @@ func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 		ScheduledStart: start,
 		ScheduledEnd:   end,
 		Notes:          req.Notes,
+		SeriesID:       req.SeriesID,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if err := a.Raids.Create(r.Context(), rd); err != nil {
+	if err := raid.NewService(a.Raids).CreateRaid(r.Context(), rd); err != nil {
+		if writeSeriesError(w, err) {
+			return
+		}
 		WriteError(w, http.StatusInternalServerError, "internal", "could not create raid")
 		return
 	}
@@ -97,40 +108,6 @@ func (a *API) getRaid(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
 			return
 		}
-		WriteError(w, http.StatusInternalServerError, "internal", "could not load raid")
-		return
-	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": rd})
-}
-
-func (a *API) completeRaid(w http.ResponseWriter, r *http.Request) {
-	actor, ok := ActorID(r)
-	if !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
-		return
-	}
-	id, ok := pathID(r, "id")
-	if !ok {
-		BadRequest(w, "invalid raid id")
-		return
-	}
-	if err := a.Completion.CompleteRaid(r.Context(), id, actor); err != nil {
-		switch {
-		case errors.Is(err, raid.ErrNotFound):
-			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
-		case errors.Is(err, raid.ErrActorNotFound):
-			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "raid actor not found")
-		case errors.Is(err, raidcompletion.ErrRaidCancelled):
-			WriteError(w, http.StatusConflict, "raid_cancelled", "cancelled raids cannot be completed")
-		case errors.Is(err, raidcompletion.ErrRaidNotCompletable):
-			WriteError(w, http.StatusConflict, "raid_not_completable", "raid is not in a completable state")
-		default:
-			WriteError(w, http.StatusInternalServerError, "internal", "could not complete raid")
-		}
-		return
-	}
-	rd, err := a.Raids.Get(r.Context(), id)
-	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not load raid")
 		return
 	}
@@ -176,15 +153,74 @@ func (a *API) archiveRaid(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "invalid raid id")
 		return
 	}
-	rd, err := raid.NewService(a.Raids).ArchiveRaid(r.Context(), id, actor)
+	rd, next, err := a.Completion.ArchiveRaid(r.Context(), id, actor)
 	if err != nil {
+		if writeSeriesError(w, err) {
+			return
+		}
 		switch {
 		case errors.Is(err, raid.ErrNotFound):
 			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
 		case errors.Is(err, raid.ErrActorNotFound):
 			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "raid actor not found")
+		case errors.Is(err, raidcompletion.ErrRaidCancelled):
+			WriteError(w, http.StatusConflict, "raid_cancelled", "cancelled raids cannot be archived")
+		case errors.Is(err, raidcompletion.ErrRaidNotArchivable):
+			WriteError(w, http.StatusConflict, "raid_not_archivable", "raid cannot be archived")
+		case errors.Is(err, raidcompletion.ErrRosterIncomplete):
+			WriteError(w, http.StatusConflict, "roster_incomplete", err.Error())
 		default:
 			WriteError(w, http.StatusInternalServerError, "internal", "could not archive raid")
+		}
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": rd, "next_raid": next})
+}
+
+func (a *API) configureRaidSchedule(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
+		return
+	}
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid raid id")
+		return
+	}
+	var req configureRaidScheduleRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	changes := raid.ScheduleChanges{SeriesID: req.SeriesID}
+	if req.ScheduledStart != nil {
+		var raw string
+		if err := json.Unmarshal(req.ScheduledStart, &raw); err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_scheduled_start", "scheduled_start must be a nonnull RFC3339 timestamp")
+			return
+		}
+		start, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_scheduled_start", "scheduled_start must be a nonnull RFC3339 timestamp")
+			return
+		}
+		changes.ScheduledStart = &start
+	}
+	rd, err := raid.NewService(a.Raids).ConfigureSchedule(r.Context(), id, actor, changes)
+	if err != nil {
+		if writeSeriesError(w, err) {
+			return
+		}
+		switch {
+		case errors.Is(err, raid.ErrNotFound):
+			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
+		case errors.Is(err, raid.ErrActorNotFound):
+			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "raid actor not found")
+		case errors.Is(err, raid.ErrScheduleNotEditable):
+			WriteError(w, http.StatusConflict, "schedule_not_editable", "finalized, cancelled or archived raid schedule cannot be changed")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "could not configure raid schedule")
 		}
 		return
 	}

@@ -156,6 +156,17 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 				if err != nil {
 					return p, err
 				}
+				if exists {
+					rows, err := s.att.ListByRaid(ctx, raidID)
+					if err != nil {
+						return p, err
+					}
+					for _, stored := range rows {
+						if stored.PlayerID == playerIDs[entry.Player] && stored.CharacterID == charIDs[entry.Character] && (stored.CharacterName != entry.Character || stored.Class != entry.Class || stored.Spec != entry.Spec || stored.Role != entry.Role) {
+							rep.Warnings = append(rep.Warnings, fmt.Sprintf("raid %q character %q: roster snapshot metadata differs; existing values preserved, explicit audited correction required", rp.Key, entry.Character))
+						}
+					}
+				}
 			}
 			if !exists {
 				rep.Created.Attendance++

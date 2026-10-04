@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"raid-website/internal/raid"
+	"raid-website/internal/raidseries"
 	"raid-website/internal/validation"
 )
 
@@ -23,7 +24,7 @@ func TestRaidLifecyclePermissionsAndNotFound(t *testing.T) {
 	if err := raid.NewRepo(db).Create(context.Background(), rd); err != nil {
 		t.Fatal(err)
 	}
-	for _, action := range []string{"complete", "cancel", "archive"} {
+	for _, action := range []string{"cancel", "archive"} {
 		t.Run(action, func(t *testing.T) {
 			url := fmt.Sprintf("%s/api/v1/raids/%d/%s", srv.URL, rd.ID, action)
 			status, body := do(t, srv.Client(), http.MethodPost, url, member, nil)
@@ -54,7 +55,7 @@ func TestRaidLifecyclePermissionsAndNotFound(t *testing.T) {
 	}
 }
 
-func TestRaidLifecycleArchivedCompletion(t *testing.T) {
+func TestRaidLifecycleArchiveFinalizesOrPreservesHistory(t *testing.T) {
 	srv, db := setupServer(t)
 	actor := seedAccount(t, db, "lifecycle-assistant", "password", validation.RoleRaidassistent)
 	token := login(t, srv.Client(), srv, "lifecycle-assistant", "password")
@@ -62,6 +63,15 @@ func TestRaidLifecycleArchivedCompletion(t *testing.T) {
 		t.Run(string(state), func(t *testing.T) {
 			now := time.Now().UTC()
 			rd := &raid.Raid{Name: string(state), RaidLeaderID: actor, Status: state, CreatedAt: now, UpdatedAt: now}
+			if state == validation.RaidStatusPlanned || state == validation.RaidStatusOpen {
+				series := &raidseries.Series{Name: string(state), RaidLeaderID: actor, Weekdays: []int{0, 1, 2, 3, 4, 5, 6}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "Europe/Berlin"}
+				if err := raidseries.NewService(raidseries.NewRepo(db)).Save(context.Background(), series); err != nil {
+					t.Fatal(err)
+				}
+				rd.SeriesID = &series.ID
+				start := now.AddDate(0, 0, -7)
+				rd.ScheduledStart = &start
+			}
 			if state == validation.RaidStatusCompleted {
 				rd.CompletedAt = &now
 			}
@@ -74,6 +84,14 @@ func TestRaidLifecycleArchivedCompletion(t *testing.T) {
 			url := fmt.Sprintf("%s/api/v1/raids/%d", srv.URL, rd.ID)
 			for i := 0; i < 2; i++ {
 				status, body := do(t, srv.Client(), http.MethodPost, url+"/archive", token, nil)
+				if state == validation.RaidStatusCancelled {
+					assertArchiveCode(t, status, body, "raid_cancelled")
+					stored, err := raid.NewRepo(db).Get(context.Background(), rd.ID)
+					if err != nil || stored.ArchivedAt != nil || stored.Status != state {
+						t.Fatalf("cancelled raid changed: %+v %v", stored, err)
+					}
+					continue
+				}
 				if status != http.StatusOK {
 					t.Fatalf("archive: %d %s", status, body)
 				}
@@ -81,7 +99,7 @@ func TestRaidLifecycleArchivedCompletion(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if stored.Status != state || stored.ArchivedAt == nil {
+				if stored.Status != validation.RaidStatusCompleted || stored.ArchivedAt == nil || stored.CompletedAt == nil {
 					t.Fatalf("archive changed lifecycle: %+v", stored)
 				}
 				if i == 0 {
@@ -90,19 +108,8 @@ func TestRaidLifecycleArchivedCompletion(t *testing.T) {
 					t.Fatal("archive is not idempotent")
 				}
 			}
-			want, code := http.StatusConflict, "raid_not_completable"
-			if state == validation.RaidStatusCompleted {
-				want = http.StatusOK
-			}
-			if state == validation.RaidStatusCancelled {
-				code = "raid_cancelled"
-			}
 			status, body := do(t, srv.Client(), http.MethodPost, url+"/complete", token, nil)
-			var response struct{ Error struct{ Code string } }
-			if err := json.Unmarshal(body, &response); err != nil {
-				t.Fatal(err)
-			}
-			if status != want || (want == http.StatusConflict && response.Error.Code != code) {
+			if status != http.StatusNotFound {
 				t.Fatalf("complete: %d %s", status, body)
 			}
 			status, body = do(t, srv.Client(), http.MethodPost, url+"/cancel", token, nil)

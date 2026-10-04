@@ -408,12 +408,15 @@ func (s *Service) mergeRaids(ctx context.Context, source, sheetID, reason string
 				continue
 			}
 			row := &attendance.Attendance{
-				RaidID:      raidID,
-				PlayerID:    pid,
-				CharacterID: cid,
-				Role:        e.Role,
-				CreatedAt:   now,
-				UpdatedAt:   now,
+				RaidID:        raidID,
+				PlayerID:      pid,
+				CharacterID:   cid,
+				CharacterName: e.Character,
+				Class:         e.Class,
+				Spec:          e.Spec,
+				Role:          e.Role,
+				CreatedAt:     now,
+				UpdatedAt:     now,
 			}
 			if rp.ExistingID != 0 {
 				err = s.corrections.SaveImportedAttendance(ctx, row, actorID, reason)

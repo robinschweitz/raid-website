@@ -17,13 +17,14 @@ import (
 	"raid-website/internal/migrations"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
+	"raid-website/internal/raidseries"
 	"raid-website/internal/validation"
 )
 
 func setupDB(t *testing.T) *bun.DB {
 	t.Helper()
 	ctx := context.Background()
-	dsn := "file:" + filepath.Join(t.TempDir(), "test.db") + "?_pragma=foreign_keys(1)"
+	dsn := "file:" + filepath.Join(t.TempDir(), "test.db") + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
 	bdb, err := db.Open(ctx, dsn)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
@@ -66,7 +67,18 @@ func seedCharacter(t *testing.T, ctx context.Context, chars *character.Repo, pla
 	return c.ID
 }
 
-func TestCompleteRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
+func seedSchedule(t *testing.T, ctx context.Context, bdb *bun.DB, rd *raid.Raid) {
+	t.Helper()
+	s := &raidseries.Series{Name: "Configured series", RaidLeaderID: rd.RaidLeaderID, Weekdays: []int{1, 3}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "Europe/Berlin"}
+	if err := raidseries.NewService(raidseries.NewRepo(bdb)).Save(ctx, s); err != nil {
+		t.Fatal(err)
+	}
+	rd.SeriesID = &s.ID
+	start := time.Now().UTC().AddDate(0, 0, -7)
+	rd.ScheduledStart = &start
+}
+
+func TestArchiveRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
 	ctx := context.Background()
 	bdb := setupDB(t)
 
@@ -82,16 +94,18 @@ func TestCompleteRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
 
 	chars := character.NewRepo(bdb)
 	plainCharID := seedCharacter(t, ctx, chars, plainID, "Plainchar")
+	plainAltID := seedCharacter(t, ctx, chars, plainID, "Plainalt")
 	rewardedCharID := seedCharacter(t, ctx, chars, rewardedID, "Rewardedchar")
 
 	now := time.Now().UTC()
 	rd := &raid.Raid{Name: "ICC", RaidLeaderID: leaderID, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
+	seedSchedule(t, ctx, bdb, rd)
 	if err := raids.Create(ctx, rd); err != nil {
 		t.Fatalf("create raid: %v", err)
 	}
 
-	for _, entry := range []struct{ playerID, charID int64 }{{plainID, plainCharID}, {rewardedID, rewardedCharID}} {
-		a := &attendance.Attendance{RaidID: rd.ID, PlayerID: entry.playerID, CharacterID: entry.charID, Role: validation.RoleDD, CreatedAt: now, UpdatedAt: now}
+	for _, entry := range []struct{ playerID, charID int64 }{{plainID, plainCharID}, {plainID, plainAltID}, {rewardedID, rewardedCharID}} {
+		a := &attendance.Attendance{RaidID: rd.ID, PlayerID: entry.playerID, CharacterID: entry.charID, CharacterName: "Raid-specific character", Class: "Krieger", Spec: "Waffen", Role: validation.RoleDD, CreatedAt: now, UpdatedAt: now}
 		if err := attendanceRepo.Create(ctx, a); err != nil {
 			t.Fatalf("create attendance: %v", err)
 		}
@@ -115,8 +129,12 @@ func TestCompleteRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
 	}
 
 	svc := NewService(NewRepo(bdb))
-	if err := svc.CompleteRaid(ctx, rd.ID, leaderID); err != nil {
+	archived, next, err := svc.ArchiveRaid(ctx, rd.ID, leaderID)
+	if err != nil {
 		t.Fatalf("complete raid: %v", err)
+	}
+	if archived.CompletedAt == nil || archived.ArchivedAt == nil || archived.Status != validation.RaidStatusCompleted || next == nil || next.ScheduledEnd != nil || next.Status != validation.RaidStatusPlanned || !next.ScheduledStart.After(*archived.ArchivedAt) {
+		t.Fatalf("invalid archive result: %+v %+v", archived, next)
 	}
 
 	plainBalance, err := pointsRepo.Balance(ctx, plainID)
@@ -136,8 +154,12 @@ func TestCompleteRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
 	}
 
 	// Idempotency: completing again must not double-award.
-	if err := svc.CompleteRaid(ctx, rd.ID, leaderID); err != nil {
+	_, retry, err := svc.ArchiveRaid(ctx, rd.ID, leaderID)
+	if err != nil {
 		t.Fatalf("complete raid again: %v", err)
+	}
+	if retry == nil || retry.ID != next.ID {
+		t.Fatalf("retry successor: %+v", retry)
 	}
 	plainBalance, err = pointsRepo.Balance(ctx, plainID)
 	if err != nil {
@@ -148,7 +170,7 @@ func TestCompleteRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
 	}
 }
 
-func TestCompleteRaidCancelledAwardsNoPoints(t *testing.T) {
+func TestArchiveRaidCancelledAwardsNoPoints(t *testing.T) {
 	ctx := context.Background()
 	bdb := setupDB(t)
 
@@ -168,13 +190,13 @@ func TestCompleteRaidCancelledAwardsNoPoints(t *testing.T) {
 	if err := raids.Create(ctx, rd); err != nil {
 		t.Fatalf("create raid: %v", err)
 	}
-	a := &attendance.Attendance{RaidID: rd.ID, PlayerID: plainID, CharacterID: plainCharID, Role: validation.RoleDD, CreatedAt: now, UpdatedAt: now}
+	a := &attendance.Attendance{RaidID: rd.ID, PlayerID: plainID, CharacterID: plainCharID, CharacterName: "Plainchar", Class: "Krieger", Spec: "Waffen", Role: validation.RoleDD, CreatedAt: now, UpdatedAt: now}
 	if err := attendanceRepo.Create(ctx, a); err != nil {
 		t.Fatalf("create attendance: %v", err)
 	}
 
 	svc := NewService(NewRepo(bdb))
-	if err := svc.CompleteRaid(ctx, rd.ID, leaderID); !errors.Is(err, ErrRaidCancelled) {
+	if _, _, err := svc.ArchiveRaid(ctx, rd.ID, leaderID); !errors.Is(err, ErrRaidCancelled) {
 		t.Fatalf("want ErrRaidCancelled got %v", err)
 	}
 
@@ -187,7 +209,7 @@ func TestCompleteRaidCancelledAwardsNoPoints(t *testing.T) {
 	}
 }
 
-func TestCompleteRaidExpiresActiveLocks(t *testing.T) {
+func TestArchiveRaidExpiresActiveLocks(t *testing.T) {
 	ctx := context.Background()
 	bdb := setupDB(t)
 
@@ -199,6 +221,7 @@ func TestCompleteRaidExpiresActiveLocks(t *testing.T) {
 
 	now := time.Now().UTC()
 	rd := &raid.Raid{Name: "Lockraid", RaidLeaderID: leaderID, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
+	seedSchedule(t, ctx, bdb, rd)
 	if err := raids.Create(ctx, rd); err != nil {
 		t.Fatalf("create raid: %v", err)
 	}
@@ -218,7 +241,7 @@ func TestCompleteRaidExpiresActiveLocks(t *testing.T) {
 	}
 
 	svc := NewService(NewRepo(bdb))
-	if err := svc.CompleteRaid(ctx, rd.ID, leaderID); err != nil {
+	if _, _, err := svc.ArchiveRaid(ctx, rd.ID, leaderID); err != nil {
 		t.Fatalf("complete raid: %v", err)
 	}
 

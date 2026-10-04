@@ -12,27 +12,33 @@ import (
 )
 
 type createAttendanceRequest struct {
-	PlayerID     int64  `json:"player_id"`
-	CharacterID  int64  `json:"character_id"`
-	Role         string `json:"role"`
-	IsSubstitute bool   `json:"is_substitute"`
-	IsBench      bool   `json:"is_bench"`
-	LateJoin     bool   `json:"late_join"`
-	EarlyLeave   bool   `json:"early_leave"`
-	Notes        string `json:"notes"`
-	Reason       string `json:"reason"`
+	CharacterName *string `json:"character_name"`
+	Class         *string `json:"class"`
+	Spec          *string `json:"spec"`
+	PlayerID      int64   `json:"player_id"`
+	CharacterID   int64   `json:"character_id"`
+	Role          string  `json:"role"`
+	IsSubstitute  bool    `json:"is_substitute"`
+	IsBench       bool    `json:"is_bench"`
+	LateJoin      bool    `json:"late_join"`
+	EarlyLeave    bool    `json:"early_leave"`
+	Notes         string  `json:"notes"`
+	Reason        string  `json:"reason"`
 }
 
 type correctAttendanceRequest struct {
-	PlayerID     *int64  `json:"player_id"`
-	CharacterID  *int64  `json:"character_id"`
-	Role         *string `json:"role"`
-	IsSubstitute *bool   `json:"is_substitute"`
-	IsBench      *bool   `json:"is_bench"`
-	LateJoin     *bool   `json:"late_join"`
-	EarlyLeave   *bool   `json:"early_leave"`
-	Notes        *string `json:"notes"`
-	Reason       string  `json:"reason"`
+	CharacterName *string `json:"character_name"`
+	Class         *string `json:"class"`
+	Spec          *string `json:"spec"`
+	PlayerID      *int64  `json:"player_id"`
+	CharacterID   *int64  `json:"character_id"`
+	Role          *string `json:"role"`
+	IsSubstitute  *bool   `json:"is_substitute"`
+	IsBench       *bool   `json:"is_bench"`
+	LateJoin      *bool   `json:"late_join"`
+	EarlyLeave    *bool   `json:"early_leave"`
+	Notes         *string `json:"notes"`
+	Reason        string  `json:"reason"`
 }
 
 func (a *API) correctAttendance(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +83,7 @@ func (a *API) correctAttendance(w http.ResponseWriter, r *http.Request) {
 		if req.Notes != nil {
 			row.Notes = *req.Notes
 		}
-	})
+	}, raidcorrection.SnapshotPatch{CharacterName: req.CharacterName, Class: req.Class, Spec: req.Spec})
 	if err != nil {
 		writeCorrectionError(w, err)
 		return
@@ -144,7 +150,7 @@ func (a *API) createAttendance(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
-	if err := a.Corrections.SaveAttendance(r.Context(), row, actor, req.Reason); err != nil {
+	if err := a.Corrections.SaveAttendance(r.Context(), row, actor, req.Reason, raidcorrection.SnapshotPatch{CharacterName: req.CharacterName, Class: req.Class, Spec: req.Spec}); err != nil {
 		writeCorrectionError(w, err)
 		return
 	}

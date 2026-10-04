@@ -9,6 +9,7 @@ import (
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
 	"raid-website/internal/raid"
+	"raid-website/internal/raidseries"
 )
 
 // Repo owns the transaction boundary for raid completion and its ledgers.
@@ -18,14 +19,21 @@ type Repo struct {
 	attendance *attendance.Repo
 	loot       *loot.Repo
 	points     *enhancepoints.Repo
+	series     *raidseries.Repo
 }
 
 func NewRepo(db bun.IDB) *Repo {
-	return &Repo{db: db, raids: raid.NewRepo(db), attendance: attendance.NewRepo(db), loot: loot.NewRepo(db), points: enhancepoints.NewRepo(db)}
+	return &Repo{db: db, raids: raid.NewRepo(db), attendance: attendance.NewRepo(db), loot: loot.NewRepo(db), points: enhancepoints.NewRepo(db), series: raidseries.NewRepo(db)}
 }
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo { return NewRepo(tx) }
 
 func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
-	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error { return fn(r.WithTx(tx)) })
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		repo := r.WithTx(tx)
+		if err := repo.raids.SerializeLifecycle(ctx); err != nil {
+			return err
+		}
+		return fn(repo)
+	})
 }

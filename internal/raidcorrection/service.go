@@ -90,9 +90,16 @@ func (s *Service) log(ctx context.Context, r *Repo, entity string, id, actor int
 	return r.audit.Insert(ctx, &audit.Log{ActorID: &actor, EntityType: entity, EntityID: strconv.FormatInt(id, 10), Action: "correction", BeforeJSON: string(b), AfterJSON: string(a), Reason: strings.TrimSpace(reason), CreatedAt: time.Now().UTC()})
 }
 
+// SnapshotPatch distinguishes omitted defaults from explicitly blank snapshot values.
+type SnapshotPatch struct {
+	CharacterName *string
+	Class         *string
+	Spec          *string
+}
+
 // SaveAttendance adds attendance or applies an audited correction.
-func (s *Service) SaveAttendance(ctx context.Context, row *attendance.Attendance, actor int64, reason string) error {
-	return s.saveAttendance(ctx, row, actor, reason, nil, false)
+func (s *Service) SaveAttendance(ctx context.Context, row *attendance.Attendance, actor int64, reason string, snapshot ...SnapshotPatch) error {
+	return s.saveAttendance(ctx, row, actor, reason, nil, false, snapshot...)
 }
 
 // SaveImportedAttendance audits a new historical attendance entry in an existing raid.
@@ -104,13 +111,16 @@ func (s *Service) SaveImportedAttendance(ctx context.Context, row *attendance.At
 }
 
 // CorrectAttendance loads and patches the record within the correction transaction.
-func (s *Service) CorrectAttendance(ctx context.Context, raidID, id, actor int64, reason string, patch func(*attendance.Attendance)) (*attendance.Attendance, error) {
+func (s *Service) CorrectAttendance(ctx context.Context, raidID, id, actor int64, reason string, patch func(*attendance.Attendance), snapshot ...SnapshotPatch) (*attendance.Attendance, error) {
 	row := &attendance.Attendance{ID: id, RaidID: raidID}
-	err := s.saveAttendance(ctx, row, actor, reason, patch, false)
+	if patch == nil {
+		patch = func(*attendance.Attendance) {}
+	}
+	err := s.saveAttendance(ctx, row, actor, reason, patch, false, snapshot...)
 	return row, err
 }
 
-func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance, actor int64, reason string, patch func(*attendance.Attendance), imported bool) error {
+func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance, actor int64, reason string, patch func(*attendance.Attendance), imported bool, snapshot ...SnapshotPatch) error {
 	return s.repo.InTransaction(ctx, func(r *Repo) error {
 		var before any
 		if row.ID != 0 {
@@ -139,6 +149,60 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 		}
 		if err := s.ownership(ctx, r, row.PlayerID, &row.CharacterID); err != nil {
 			return err
+		}
+		old, _ := before.(*attendance.Attendance)
+		referenceChanged := old != nil && (old.CharacterID != row.CharacterID || old.PlayerID != row.PlayerID)
+		if row.ID == 0 || referenceChanged {
+			c, err := r.characters.Get(ctx, row.CharacterID)
+			if err != nil {
+				return referenceError(err)
+			}
+			if referenceChanged || (!imported && row.CharacterName == "") {
+				row.CharacterName = c.Name
+			}
+			if referenceChanged || (!imported && row.Class == "") {
+				row.Class = c.Class
+			}
+			if referenceChanged || (!imported && row.Spec == "") {
+				row.Spec = c.MainSpec
+			}
+		}
+		if len(snapshot) > 1 {
+			return ErrInvalid
+		}
+		var input SnapshotPatch
+		if len(snapshot) == 1 {
+			input = snapshot[0]
+		}
+		if input.CharacterName != nil {
+			row.CharacterName = *input.CharacterName
+		}
+		if input.Class != nil {
+			row.Class = *input.Class
+		}
+		if input.Spec != nil {
+			row.Spec = *input.Spec
+		}
+		// Unknown migrated history stays unknown unless explicitly corrected.
+		if row.ID == 0 || referenceChanged || input.CharacterName != nil || (old != nil && old.CharacterName != row.CharacterName) {
+			row.CharacterName = strings.TrimSpace(row.CharacterName)
+			if row.CharacterName == "" {
+				return ErrInvalid
+			}
+		}
+		if row.ID == 0 || referenceChanged || input.Class != nil || (old != nil && old.Class != row.Class) {
+			row.Class = attendance.NormalizeClass(row.Class)
+			// Imported historical additions preserve unavailable source metadata,
+			// matching the initial import; they never use live character defaults.
+			if _, ok := validation.ClassSpecs[row.Class]; !ok && !imported {
+				return ErrInvalid
+			}
+		}
+		if row.ID == 0 || referenceChanged || input.Spec != nil || (old != nil && old.Spec != row.Spec) {
+			row.Spec = strings.TrimSpace(row.Spec)
+			if row.Spec == "" && !imported {
+				return ErrInvalid
+			}
 		}
 		rows, err := r.attendance.ListByRaid(ctx, row.RaidID)
 		if err != nil {

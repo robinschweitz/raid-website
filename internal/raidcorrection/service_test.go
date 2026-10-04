@@ -88,7 +88,7 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 				t.Fatal(err)
 			}
 			if scenario.legacyLoot {
-				if err := r.loot.CreateAward(ctx, &loot.Award{RaidID: rd.ID, ItemName: "historical offspec item", AwardedToPlayerID: players[0].ID, AwardedByPlayerID: players[0].ID, Source: "legacy_import", AwardedAt: now, CreatedAt: now, UpdatedAt: now}); err != nil {
+				if err := r.loot.CreateAward(ctx, &loot.Award{RaidID: rd.ID, ItemName: "historical offspec item", AwardedToPlayerID: players[0].ID, AwardedByPlayerID: players[0].ID, Source: "legacy_import", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}); err != nil {
 					t.Fatal(err)
 				}
 			}

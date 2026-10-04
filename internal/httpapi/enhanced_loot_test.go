@@ -463,7 +463,7 @@ func TestHistoricalNullableRecipientPreservedUntilRecipientChange(t *testing.T) 
 	f := newCorrectionFixture(t)
 	f.legacyCompleted()
 	now := time.Now().UTC()
-	old := &loot.Award{RaidID: f.raidID, AwardedToPlayerID: f.first, AwardedByPlayerID: f.actor, Source: "legacy_import", ItemName: "historical", AwardedAt: now, CreatedAt: now, UpdatedAt: now}
+	old := &loot.Award{RaidID: f.raidID, AwardedToPlayerID: f.first, AwardedByPlayerID: f.actor, Source: "legacy_import", ItemName: "historical", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
 	if err := loot.NewRepo(f.db).CreateAward(context.Background(), old); err != nil {
 		t.Fatal(err)
 	}

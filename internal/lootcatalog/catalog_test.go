@@ -285,6 +285,51 @@ func TestGenuineHardmodeStaysSeparateFromNormal(t *testing.T) {
 	}
 }
 
+// Boss derivation from an item is only allowed when exactly one boss drops it, so the
+// lookup must report every candidate instead of picking one.
+func TestBossesByItemReportsEveryCandidate(t *testing.T) {
+	svc, _ := setup(t)
+	ctx := context.Background()
+	if _, err := svc.EnsureBundled(ctx); err != nil {
+		t.Fatal(err)
+	}
+	byItem, err := svc.BossesByItem(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := byItem["not-an-item"]; ok {
+		t.Fatal("unknown item reported bosses")
+	}
+	ambiguous := 0
+	for itemID, bosses := range byItem {
+		if len(bosses) == 0 {
+			t.Fatalf("item %s without boss", itemID)
+		}
+		for i := 1; i < len(bosses); i++ {
+			if bosses[i-1].ID >= bosses[i].ID {
+				t.Fatalf("item %s bosses not sorted: %+v", itemID, bosses)
+			}
+		}
+		if len(bosses) > 1 {
+			ambiguous++
+		}
+	}
+	// The armor tokens drop from several bosses and must stay ambiguous.
+	for _, itemID := range []string{"52025", "52026", "52027"} {
+		if len(byItem[itemID]) < 2 {
+			t.Fatalf("token %s: %d bosses", itemID, len(byItem[itemID]))
+		}
+	}
+	for _, itemID := range []string{"50178"} {
+		if len(byItem[itemID]) != 1 {
+			t.Fatalf("item %s: %d bosses", itemID, len(byItem[itemID]))
+		}
+	}
+	if ambiguous == 0 {
+		t.Fatal("no ambiguous item reported")
+	}
+}
+
 func TestBundleCopiesAndInvalidSource(t *testing.T) {
 	s := NewService(NewRepo(nil))
 	original, err := s.List(context.Background())

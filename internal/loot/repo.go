@@ -71,13 +71,6 @@ func (r *Repo) GetByRequest(ctx context.Context, actor int64, requestID string) 
 }
 
 func (r *Repo) CreateAward(ctx context.Context, a *Award) error {
-	// Persisted imports and existing internal import callers only know the old boolean.
-	if a.AwardMethod == "" {
-		a.AwardMethod = Second
-		if a.IsMainSpec {
-			a.AwardMethod = Main
-		}
-	}
 	if err := a.DeriveMainSpec(); err != nil {
 		return err
 	}

@@ -382,6 +382,10 @@ func (s *Service) mergeRaids(ctx context.Context, source, sheetID, reason string
 				CreatedAt:      now,
 				UpdatedAt:      now,
 			}
+			if rp.CatalogInstanceID != "" {
+				instance, size := rp.CatalogInstanceID, rp.RaidSize
+				row.CatalogInstanceID, row.RaidSize = &instance, &size
+			}
 			if err := s.raids.Create(ctx, row); err != nil {
 				return nil, fmt.Errorf("create raid %q: %w", rp.Key, err)
 			}
@@ -446,15 +450,20 @@ func (s *Service) mergeLoot(ctx context.Context, source, sheetID, reason string,
 		}
 		award := &loot.Award{
 			RaidID:            raidID,
+			Boss:              l.Boss,
 			ItemID:            l.ItemID,
 			ItemName:          l.Item,
 			AwardedToPlayerID: pid,
 			AwardedByPlayerID: actorID,
 			Source:            "legacy_import",
-			IsMainSpec:        l.IsMainSpec,
+			AwardMethod:       l.Method,
 			AwardedAt:         now,
 			CreatedAt:         now,
 			UpdatedAt:         now,
+		}
+		if l.CatalogBossID != "" {
+			bossID := l.CatalogBossID
+			award.CatalogBossID = &bossID
 		}
 		if l.Date != nil {
 			award.AwardedAt = *l.Date

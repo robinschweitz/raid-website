@@ -9,7 +9,7 @@ future agents do not re-litigate them or silently change them.
 Authoritative sources, in order of precedence:
 
 1. This file (owner-level requirements and constraints)
-2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-027)
+2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-028)
 3. `ARCHITECTURE.md` (module map and principles)
 4. `CODING_RULES.md` (defines the coding rules)
 5. `README.md` (commands)
@@ -172,6 +172,17 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Imports are de-duplicated by `raw_hash`: an identical source is skipped and the previous report is
   returned instead of re-processing.
 - Parse problems are reported as warnings, not silent data loss.
+- The sheet's `Priority` is recorded as the award method: `Main` → `MAIN`, `Second`/`Token` →
+  `SECOND`, `Enhanced` → `ENHANCED`, `BoE` → `BOE`. Unknown or empty values become `SECOND` plus a
+  warning, never main-spec loot (ADR 028).
+- An imported armor token never blocks +10 EP, whatever priority the sheet recorded; the token
+  ledger still follows the item. An imported `ENHANCED` award counts as main-spec loot but costs 0
+  EP — no historical enhanced charge is ever recreated.
+- An imported loot boss is derived from the bundled catalog only when the item belongs to exactly one
+  boss; ambiguous or uncatalogued items stay unknown and are reported. Item names are never
+  rewritten.
+- The sheet raid key is the catalog context: `ICC25-01` → instance `631`, `raid_size` `25`, applied
+  only to raids this import creates.
 
 ### 4.11 Core hardening decisions (ADR 017-020)
 - Only one matching active item lock may exist per raid. Competing locks are rejected;

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"raid-website/internal/enhancepoints"
+	"raid-website/internal/loot"
 	"raid-website/internal/raid"
 	"raid-website/internal/validation"
 )
@@ -134,9 +135,11 @@ func TestIncrementalCorrectionReasonEPAndAudit(t *testing.T) {
 	if err := s.points.InsertTransaction(ctx, &enhancepoints.Transaction{PlayerID: Amisu.ID, RaidID: &raidID, Amount: 10, Type: "award_no_mainspec_loot", ActorID: actor, CreatedAt: time.Now().UTC()}); err != nil {
 		t.Fatal(err)
 	}
-	newDrop := "ICC25-01,09.07.2026,Amisu,Weiheabzeichen des Eroberers,Main,52027,b\n"
+	newDrop := "ICC25-01,09.07.2026,Amisu,Weiheabzeichen des Eroberers,Main,52027,b\n" +
+		"ICC25-01,09.07.2026,Amisu,Blutfall,Main,50178,c\n"
 	setLoot(s, stableHeader+stableDrop+"a\n"+newDrop, "second")
 	preview := previewImport(t, s, "source", "sheet")
+	// The armor token carries priority Main but never blocks +10 EP; only the item does.
 	if preview.Created.Points != 1 {
 		t.Fatalf("preview omitted EP compensation: %+v", preview)
 	}
@@ -150,9 +153,9 @@ func TestIncrementalCorrectionReasonEPAndAudit(t *testing.T) {
 	if history, err := s.List(ctx); err != nil || len(history) != 1 {
 		t.Fatalf("rejected import persisted: %+v %v", history, err)
 	}
-	reason := "additional historical main-spec token"
+	reason := "additional historical main-spec item and token"
 	rep, err = s.Merge(ctx, actor, "source", "sheet", "second", reason)
-	if err != nil || len(rep.Errors) > 0 || rep.Created.Loot != 1 || rep.Created.Tokens != 1 || rep.Created.Points != 1 {
+	if err != nil || len(rep.Errors) > 0 || rep.Created.Loot != 2 || rep.Created.Tokens != 1 || rep.Created.Points != 1 {
 		t.Fatalf("correction: %+v %v", rep, err)
 	}
 	balance, err := s.points.Balance(ctx, Amisu.ID)
@@ -160,16 +163,22 @@ func TestIncrementalCorrectionReasonEPAndAudit(t *testing.T) {
 		t.Fatalf("EP delta: %d %v", balance, err)
 	}
 	awards, err := s.loot.ListByRaid(ctx, raidID)
-	if err != nil || len(awards) != 2 {
+	if err != nil || len(awards) != 3 {
 		t.Fatalf("awards: %+v %v", awards, err)
 	}
-	var importedID int64
+	var tokenAwardID int64
 	for _, award := range awards {
-		if award.AwardedToPlayerID == Amisu.ID {
-			importedID = award.ID
-			if award.Source != "legacy_import" || award.AwardedAt.UTC().Format(time.RFC3339) != "2026-07-08T22:00:00Z" {
-				t.Fatalf("historical metadata overwritten: %+v", award)
+		if award.AwardedToPlayerID != Amisu.ID {
+			continue
+		}
+		if award.Source != "legacy_import" || award.AwardedAt.UTC().Format(time.RFC3339) != "2026-07-08T22:00:00Z" {
+			t.Fatalf("historical metadata overwritten: %+v", award)
+		}
+		if award.ItemID == "52027" {
+			if award.AwardMethod != loot.Second || award.IsMainSpec {
+				t.Fatalf("token counted as main-spec loot: %+v", award)
 			}
+			tokenAwardID = award.ID
 		}
 	}
 	var logs []struct {
@@ -181,11 +190,11 @@ func TestIncrementalCorrectionReasonEPAndAudit(t *testing.T) {
 	if err := s.imports.db.NewSelect().TableExpr("audit_log").Column("actor_id", "reason", "before_json", "after_json").Where("entity_type = ?", "loot_award").Scan(ctx, &logs); err != nil {
 		t.Fatal(err)
 	}
-	if len(logs) != 1 || logs[0].ActorID != actor || logs[0].Reason != reason || logs[0].BeforeJSON != "null" || !json.Valid([]byte(logs[0].AfterJSON)) {
+	if len(logs) != 2 || logs[0].ActorID != actor || logs[0].Reason != reason || logs[0].BeforeJSON != "null" || !json.Valid([]byte(logs[0].AfterJSON)) {
 		t.Fatalf("audit: %+v", logs)
 	}
 	txns, err := s.tokens.ListByPlayer(ctx, Amisu.ID)
-	if err != nil || len(txns) != 1 || txns[0].LootAwardID == nil || *txns[0].LootAwardID != importedID {
+	if err != nil || len(txns) != 1 || txns[0].LootAwardID == nil || *txns[0].LootAwardID != tokenAwardID {
 		t.Fatalf("tokens: %+v %v", txns, err)
 	}
 	history, err := s.List(ctx)

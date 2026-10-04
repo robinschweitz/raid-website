@@ -31,6 +31,10 @@ identities, but new loot requires the association. Local drops must evidence the
 Migration 008 adds optional `catalog_boss_id` to awards. New loot validates boss/item IDs
 against the bundled catalog for the raid's instance and size and derives names server-side.
 Unchanged historical identities remain intact. Preplanned successors are never overwritten.
+The legacy sheet import decodes the sheet raid key into the catalog association for raids it
+creates, and derives an imported award's boss from the bundled catalog when the item belongs to
+exactly one boss (ADR 028). Unproven items keep an empty boss and are reported; item names and
+other free text are never rewritten to match the catalog.
 
 ## HTTP Contract
 

@@ -144,6 +144,41 @@ func (s *Service) Bosses(ctx context.Context, instanceID string) ([]Boss, error)
 	return bosses, nil
 }
 
+// BossesByItem returns the distinct bosses that drop each catalog item, keyed by item ID
+// and sorted by boss ID. More than one boss means the item cannot identify one source,
+// so callers must not derive a boss from it.
+func (s *Service) BossesByItem(ctx context.Context) (map[string][]Boss, error) {
+	catalog, err := s.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	known := make(map[string]Boss, len(catalog.Bosses))
+	for _, boss := range catalog.Bosses {
+		known[boss.ID] = boss
+	}
+	found := map[string]map[string]Boss{}
+	for _, drop := range catalog.Drops {
+		boss, ok := known[drop.BossID]
+		if !ok {
+			continue
+		}
+		if found[drop.ItemID] == nil {
+			found[drop.ItemID] = map[string]Boss{}
+		}
+		found[drop.ItemID][boss.ID] = boss
+	}
+	out := make(map[string][]Boss, len(found))
+	for itemID, bosses := range found {
+		list := make([]Boss, 0, len(bosses))
+		for _, boss := range bosses {
+			list = append(list, boss)
+		}
+		sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
+		out[itemID] = list
+	}
+	return out, nil
+}
+
 // Items merges every source relationship of one boss, raid size, and gameplay
 // mode into a single selection and keeps the raw paths for provenance.
 func (s *Service) Items(ctx context.Context, filter Filter) ([]ItemDrop, error) {

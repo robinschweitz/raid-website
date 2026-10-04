@@ -13,6 +13,7 @@ import (
 	"raid-website/internal/db"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
+	"raid-website/internal/lootcatalog"
 	"raid-website/internal/migrations"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
@@ -80,6 +81,10 @@ func setup(t *testing.T) (*bun.DB, *Service, *player.Repo, *enhancepoints.Repo, 
 	raids := raid.NewRepo(bdb.DB)
 	att := attendance.NewRepo(bdb.DB)
 	lootRepo := loot.NewRepo(bdb.DB)
+	// Startup mirrors the bundled catalog, so imports resolve catalog context from it.
+	if _, err := lootcatalog.NewService(lootcatalog.NewRepo(bdb.DB)).EnsureBundled(ctx); err != nil {
+		t.Fatalf("catalog: %v", err)
+	}
 	tokenRepo := tokens.NewRepo(bdb.DB)
 	points := enhancepoints.NewRepo(bdb.DB)
 	imports := NewRepo(bdb.DB)

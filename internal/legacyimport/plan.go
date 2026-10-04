@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,9 +12,14 @@ import (
 	_ "time/tzdata" // Sheet dates require Europe/Berlin even without host zoneinfo.
 
 	"raid-website/internal/attendance"
+	"raid-website/internal/loot"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
+
+const icecrownCitadelInstanceID = "631"
+
+var sheetRaidKey = regexp.MustCompile(`^ICC(\d{2})-\d{2,}$`)
 
 type PlayerPlan struct {
 	Name      string
@@ -40,24 +46,37 @@ type AttendancePlan struct {
 }
 
 type RaidPlan struct {
-	ExistingID int64
-	Key        string
-	Date       *time.Time
-	Entries    []AttendancePlan
+	ExistingID        int64
+	Key               string
+	Date              *time.Time
+	CatalogInstanceID string
+	RaidSize          int
+	Entries           []AttendancePlan
 }
 
 type LootPlan struct {
-	Date        *time.Time
-	ExternalID  string
-	Identity    string
-	Fingerprint string
-	RaidKey     string
-	PlayerName  string
-	Item        string
-	ItemID      string
-	Priority    string
-	IsToken     bool
-	IsMainSpec  bool
+	Date          *time.Time
+	ExternalID    string
+	Identity      string
+	Fingerprint   string
+	RaidKey       string
+	PlayerName    string
+	Item          string
+	ItemID        string
+	Priority      string
+	Method        loot.Method
+	IsToken       bool
+	Boss          string
+	CatalogBossID string
+}
+
+// IsMainSpec reports whether the award blocks the +10 EP archive reward. An armor token
+// never blocks it, whatever priority the sheet recorded.
+func (l LootPlan) IsMainSpec() bool {
+	if l.IsToken {
+		return false
+	}
+	return l.Method == loot.Main || l.Method == loot.Enhanced
 }
 
 type Plan struct {
@@ -78,6 +97,18 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 	players := map[string]*PlayerPlan{}
 	characters := map[string]*CharacterPlan{}
 	raidMap := map[string]*RaidPlan{}
+
+	newRaidPlan := func(key string) *RaidPlan {
+		rp := &RaidPlan{Key: key}
+		if instance, size, ok := catalogContext(key); ok {
+			rp.CatalogInstanceID = instance
+			rp.RaidSize = size
+		} else {
+			p.Warnings = append(p.Warnings, fmt.Sprintf("raid %q: sheet key does not encode a proven catalog instance; raid is imported without catalog context", key))
+		}
+		raidMap[key] = rp
+		return rp
+	}
 
 	ensurePlayer := func(name string) *PlayerPlan {
 		name = strings.TrimSpace(name)
@@ -163,8 +194,7 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 		}
 		rp := raidMap[key]
 		if rp == nil {
-			rp = &RaidPlan{Key: key}
-			raidMap[key] = rp
+			rp = newRaidPlan(key)
 		}
 		if rp.Date == nil {
 			if d, ok := parseSheetDate(row.TimestampRaw); ok {
@@ -240,21 +270,24 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 			key = "LEGACY-LOOT"
 		}
 		if _, ok := raidMap[key]; !ok {
-			rp := &RaidPlan{Key: key}
+			rp := newRaidPlan(key)
 			if d, ok := parseSheetDate(row.TimestampRaw); ok {
 				rp.Date = &d
 			}
-			raidMap[key] = rp
 			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: raid %q only present in Loot Archive", i+2, key))
 		}
 		priority := strings.TrimSpace(row.Priority)
-		isMain := false
-		switch strings.ToLower(priority) {
-		case "main":
-			isMain = true
-		case "second", "token", "":
-		default:
-			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: unknown priority %q for item %q", i+2, priority, item))
+		method, known := sheetPriority(priority)
+		if !known {
+			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: unknown priority %q for item %q; recorded as SECOND, which never blocks +10 EP", i+2, priority, item))
+		}
+		isToken := tokens.IsTokenAward(item)
+		if isToken && method != loot.Second {
+			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: armor token %q recorded with priority %q; tokens never block +10 EP, recorded as SECOND", i+2, item, priority))
+			method = loot.Second
+		}
+		if !isToken && strings.EqualFold(priority, "token") {
+			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: priority Token but %q is not an armor token; no token recorded", i+2, item))
 		}
 		content, _ := json.Marshal([]string{row.RaidID, row.TimestampRaw, player, item, row.ItemID, priority})
 		fingerprint := fmt.Sprintf("%x", sha256.Sum256(content))
@@ -273,8 +306,8 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 			Item:       item,
 			ItemID:     strings.TrimSpace(row.ItemID),
 			Priority:   priority,
-			IsToken:    tokens.IsTokenAward(item),
-			IsMainSpec: isMain,
+			IsToken:    isToken,
+			Method:     method,
 		})
 	}
 
@@ -296,6 +329,43 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 	sort.Slice(p.Raids, func(i, j int) bool { return p.Raids[i].Key < p.Raids[j].Key })
 
 	return p
+}
+
+// sheetPriority maps the sheet's Priority column onto a recorded award method. Only the
+// sheet values that exist are translated; an unknown value is reported by the caller and
+// recorded as SECOND so it never silently counts as main-spec loot.
+func sheetPriority(priority string) (loot.Method, bool) {
+	switch strings.ToLower(strings.TrimSpace(priority)) {
+	case "main":
+		return loot.Main, true
+	case "second":
+		return loot.Second, true
+	case "enhanced":
+		return loot.Enhanced, true
+	case "boe":
+		return loot.BOE, true
+	case "token":
+		return loot.Second, true
+	case "":
+		return loot.Second, true
+	default:
+		return loot.Second, false
+	}
+}
+
+// catalogContext decodes a sheet raid key into the bundled catalog context. The key
+// carries the instance and the raid size ("ICC25-07"). Only that proven shape is decoded;
+// any other key leaves the raid unassociated instead of inventing a context.
+func catalogContext(key string) (string, int, bool) {
+	match := sheetRaidKey.FindStringSubmatch(strings.TrimSpace(key))
+	if match == nil {
+		return "", 0, false
+	}
+	size, err := strconv.Atoi(match[1])
+	if err != nil || size != 10 && size != 25 {
+		return "", 0, false
+	}
+	return icecrownCitadelInstanceID, size, true
 }
 
 func mapRole(s string) (validation.AttendanceRole, bool) {

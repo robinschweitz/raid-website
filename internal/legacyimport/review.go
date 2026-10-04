@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"raid-website/internal/raid"
 	"raid-website/internal/validation"
+	"sort"
 )
 
 // review resolves provenance and database conflicts before any mutation.
@@ -65,6 +66,9 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 		rep.Errors = append(rep.Errors, "ambiguous no-ID loot: removed content or changed multiplicity")
 	}
 	p.Loot = newLoot
+	if err := s.deriveLootBosses(ctx, p.Loot, rep); err != nil {
+		return p, err
+	}
 	playerIDs := map[string]int64{}
 	for _, pl := range p.Players {
 		existing, err := s.players.FindByName(ctx, pl.Name)
@@ -212,7 +216,7 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 						participants[entry.Player] = true
 					}
 					for _, row := range newLoot {
-						if row.RaidKey != rp.Key || !row.IsMainSpec {
+						if row.RaidKey != rp.Key || !row.IsMainSpec() {
 							continue
 						}
 						if participants[row.PlayerName] && !mainSpec[row.PlayerName] {
@@ -234,4 +238,52 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 		rep.Created = Counts{}
 	}
 	return p, nil
+}
+
+// deriveLootBosses fills the boss of every imported loot row whose bundled catalog item
+// belongs to exactly one boss. An item that drops from several bosses, or is not in the
+// catalog at all, proves nothing and stays unassigned with a reported warning.
+func (s *Service) deriveLootBosses(ctx context.Context, rows []LootPlan, rep *Report) error {
+	byItem, err := s.loot.Catalog().BossesByItem(ctx)
+	if err != nil {
+		return err
+	}
+	resolved := 0
+	ambiguous := map[string]int{}
+	missing := map[string]int{}
+	for i := range rows {
+		row := &rows[i]
+		if row.Boss != "" || row.ItemID == "" {
+			continue
+		}
+		bosses := byItem[row.ItemID]
+		switch len(bosses) {
+		case 0:
+			missing[row.ItemID]++
+		case 1:
+			row.Boss, row.CatalogBossID = bosses[0].Name, bosses[0].ID
+			resolved++
+		default:
+			ambiguous[row.ItemID]++
+		}
+	}
+	for _, itemID := range sortedCounts(ambiguous) {
+		rep.Warnings = append(rep.Warnings, fmt.Sprintf("loot item %s: drops from several bundled bosses in %d rows; boss stays unknown", itemID, ambiguous[itemID]))
+	}
+	for _, itemID := range sortedCounts(missing) {
+		rep.Warnings = append(rep.Warnings, fmt.Sprintf("loot item %s: not in the bundled catalog in %d rows; boss stays unknown", itemID, missing[itemID]))
+	}
+	if resolved > 0 {
+		rep.Warnings = append(rep.Warnings, fmt.Sprintf("catalog boss derived for %d loot rows", resolved))
+	}
+	return nil
+}
+
+func sortedCounts(counts map[string]int) []string {
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }

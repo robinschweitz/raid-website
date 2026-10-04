@@ -320,15 +320,6 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		if strings.TrimSpace(row.ItemName) == "" {
 			return ErrInvalid
 		}
-		if imported && row.AwardMethod == "" {
-			row.AwardMethod = loot.Second
-			if row.IsMainSpec {
-				row.AwardMethod = loot.Main
-			}
-		}
-		if imported && row.AwardMethod == loot.Enhanced {
-			return ErrInvalid
-		}
 		if err := row.DeriveMainSpec(); err != nil {
 			return err
 		}

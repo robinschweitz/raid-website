@@ -119,7 +119,7 @@ func TestArchiveRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
 		AwardedToPlayerID: rewardedID,
 		AwardedByPlayerID: leaderID,
 		Source:            "manual",
-		IsMainSpec:        true,
+		AwardMethod:       loot.Main,
 		AwardedAt:         now,
 		CreatedAt:         now,
 		UpdatedAt:         now,

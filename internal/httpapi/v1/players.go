@@ -21,7 +21,7 @@ func (a *API) listPlayers(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list players")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": ps})
+	writeListJSON(w, ps)
 }
 
 func (a *API) createPlayer(w http.ResponseWriter, r *http.Request) {

@@ -26,7 +26,7 @@ func (a *API) listGuildRanks(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list guild ranks")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": gs})
+	writeListJSON(w, gs)
 }
 
 func (a *API) createGuildRank(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +105,7 @@ func (a *API) listRaidGroups(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list raid groups")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": gs})
+	writeListJSON(w, gs)
 }
 
 func (a *API) createRaidGroup(w http.ResponseWriter, r *http.Request) {

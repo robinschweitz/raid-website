@@ -16,6 +16,6 @@ frontend:
 	cd web && npm ci && npm run build
 
 build: frontend
-	go build ./...
+	go build -o bin/ ./cmd/server
 
 all: fmt vet build test

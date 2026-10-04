@@ -30,7 +30,7 @@ func (a *API) listAttendance(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list attendance")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": rows})
+	writeListJSON(w, rows)
 }
 
 func (a *API) createAttendance(w http.ResponseWriter, r *http.Request) {

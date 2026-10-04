@@ -24,7 +24,7 @@ func (a *API) listPolls(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list polls")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": ps})
+	writeListJSON(w, ps)
 }
 
 func (a *API) createPoll(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +147,7 @@ func (a *API) listPollVotes(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list votes")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": vs})
+	writeListJSON(w, vs)
 }
 
 func (a *API) closePoll(w http.ResponseWriter, r *http.Request) {

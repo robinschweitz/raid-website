@@ -20,7 +20,7 @@ func (a *API) listImports(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list imports")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": imports})
+	writeListJSON(w, imports)
 }
 
 func (a *API) dryRunImport(w http.ResponseWriter, r *http.Request) {

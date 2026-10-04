@@ -30,7 +30,7 @@ func (a *API) listLoot(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list loot")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": awards})
+	writeListJSON(w, awards)
 }
 
 func (a *API) createLoot(w http.ResponseWriter, r *http.Request) {

@@ -45,7 +45,7 @@ func (a *API) listPlayerCharacters(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list characters")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": cs})
+	writeListJSON(w, cs)
 }
 
 func (a *API) createCharacter(w http.ResponseWriter, r *http.Request) {
@@ -244,5 +244,5 @@ func (a *API) listCharacterNameHistory(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not load name history")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": hs})
+	writeListJSON(w, hs)
 }

@@ -364,3 +364,71 @@ func TestRoleEnforcement(t *testing.T) {
 		t.Fatalf("admin create guild rank: want 201 got %d", status)
 	}
 }
+
+// TestListEndpointsReturnEmptyArrays locks in the API contract that list
+// endpoints always encode an empty JSON array (never null) when there are no
+// rows, so clients can iterate without null checks.
+func TestListEndpointsReturnEmptyArrays(t *testing.T) {
+	srv, bdb := setupServer(t)
+	client := srv.Client()
+
+	adminID := seedAccount(t, bdb, "admin", "admin-pw", validation.RoleAdmin)
+	token := login(t, client, srv, "admin", "admin-pw")
+
+	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/raids", token, map[string]any{"name": "ICC", "raid_leader_id": adminID})
+	if status != http.StatusCreated {
+		t.Fatalf("create raid: status %d body %s", status, body)
+	}
+	var raidOut struct {
+		Data struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &raidOut); err != nil {
+		t.Fatalf("decode raid: %v", err)
+	}
+	raidID := raidOut.Data.ID
+
+	assertEmptyArray := func(path string) {
+		t.Helper()
+		status, body := do(t, client, http.MethodGet, srv.URL+path, token, nil)
+		if status != http.StatusOK {
+			t.Fatalf("GET %s: status %d body %s", path, status, body)
+		}
+		var out struct {
+			Data json.RawMessage `json:"data"`
+		}
+		if err := json.Unmarshal(body, &out); err != nil {
+			t.Fatalf("GET %s: decode: %v", path, err)
+		}
+		if string(out.Data) != "[]" {
+			t.Fatalf("GET %s: want [] got %s", path, out.Data)
+		}
+	}
+
+	for _, path := range []string{
+		"/api/v1/polls",
+		"/api/v1/guild-ranks",
+		"/api/v1/raid-groups",
+		"/api/v1/imports",
+		fmt.Sprintf("/api/v1/players/%d/characters", adminID),
+		fmt.Sprintf("/api/v1/players/%d/locks", adminID),
+		fmt.Sprintf("/api/v1/raids/%d/attendance", raidID),
+		fmt.Sprintf("/api/v1/raids/%d/loot", raidID),
+	} {
+		assertEmptyArray(path)
+	}
+
+	for _, path := range []string{
+		fmt.Sprintf("/api/v1/players/%d/points", adminID),
+		fmt.Sprintf("/api/v1/players/%d/tokens", adminID),
+	} {
+		status, body := do(t, client, http.MethodGet, srv.URL+path, token, nil)
+		if status != http.StatusOK {
+			t.Fatalf("GET %s: status %d body %s", path, status, body)
+		}
+		if !bytes.Contains(body, []byte(`"transactions":[]`)) {
+			t.Fatalf("GET %s: want empty transactions array, got %s", path, body)
+		}
+	}
+}

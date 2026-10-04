@@ -29,7 +29,7 @@ func (a *API) getPoints(w http.ResponseWriter, r *http.Request) {
 		"data": map[string]any{
 			"player_id":    id,
 			"balance":      balance,
-			"transactions": txs,
+			"transactions": nonNil(txs),
 		},
 	})
 }
@@ -105,7 +105,7 @@ func (a *API) getTokens(w http.ResponseWriter, r *http.Request) {
 		"data": map[string]any{
 			"player_id":    id,
 			"total":        total,
-			"transactions": txs,
+			"transactions": nonNil(txs),
 		},
 	})
 }

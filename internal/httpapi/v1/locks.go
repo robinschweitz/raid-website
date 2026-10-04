@@ -27,7 +27,7 @@ func (a *API) listLocks(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list locks")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": locks})
+	writeListJSON(w, locks)
 }
 
 func (a *API) createLock(w http.ResponseWriter, r *http.Request) {

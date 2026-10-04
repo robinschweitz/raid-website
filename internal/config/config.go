@@ -18,8 +18,8 @@ func Load() (*Config, error) {
 		DatabaseURL:   getEnv("DATABASE_URL", "file:raid.db?_pragma=journal_mode(WAL)"),
 		Env:           env,
 		CookieSecure:  getEnv("COOKIE_SECURE", "") == "true" || env == "production",
-		AdminUsername: getEnv("ADMIN_USERNAME", ""),
-		AdminPassword: getEnv("ADMIN_PASSWORD", ""),
+		AdminUsername: getEnv("ADMIN_USERNAME", "Robin"),
+		AdminPassword: getEnv("ADMIN_PASSWORD", "test"),
 	}
 	return c, nil
 }

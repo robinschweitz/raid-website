@@ -26,7 +26,7 @@ func (a *API) listRaids(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list raids")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": rs})
+	writeListJSON(w, rs)
 }
 
 func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {

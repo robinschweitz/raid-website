@@ -200,207 +200,68 @@ const dataset = {
   instances: [{ id: '631', name: 'Reviewed instance' }, { id: '603', name: 'Other instance' }],
   bosses: [{ id: '36612', instance_id: '631', name: 'Reviewed boss' }, { id: '1', instance_id: '603', name: 'Other boss' }],
   items: [{ item_id: '50759', name: 'Reviewed item', quality: 4 }],
-  drops: [{ boss_id: '36612', item_id: '50759', raid_size: 10, difficulty: 'source-mode-path', loot_mode: 1 }, { boss_id: '1', item_id: '50759', raid_size: 25, difficulty: 'other-mode', loot_mode: 1 }],
+  drops: [{ item_id: '50759', name: 'Reviewed item', quality: 4, boss_id: '36612', raid_size: 10, mode: 'NORMAL', conditional: false, source_variants: [{ difficulty: 'raid-difficulty:0', loot_mode: 1 }] }, { item_id: '50759', name: 'Reviewed item', quality: 4, boss_id: '1', raid_size: 25, mode: 'NORMAL', conditional: false, source_variants: [{ difficulty: 'raid-difficulty:0', loot_mode: 1 }] }],
 }
 const catalog = { ...dataset, sources: [{ source: dataset.source, raw_hash: 'a'.repeat(64), notices: dataset.notices }] }
-const catalogReport = (fields = {}) => ({ source: dataset.source, notices: dataset.notices, raw_hash: 'a'.repeat(64), errors: [], conflicts: [], inserted: 6, skipped: 2, merged: false, ...fields })
 const findButton = (s, label) => nodes(s.tree, (node) => node.type === 'button' && text(node) === label)[0]
 const writes = (s) => s.requests.filter((request) => request.method !== 'get')
 const fileInput = (s) => nodes(s.tree, (node) => node.type === 'input' && node.props.type === 'file')[0]
-const confirm = (s, checked = true) => nodes(s.tree, (node) => node.type === 'input' && node.props.type === 'checkbox')[0].props.onChange({ target: { checked } })
-async function choose(s, value = dataset, name = 'reviewed.json') {
-  await fileInput(s).props.onChange({ target: { files: [{ name, size: 100, text: async () => JSON.stringify(value) }] } })
-  await flush(s)
-}
-async function mountCatalog(s) {
-  s.mount(s.load('pages/LootCatalog.tsx').LootCatalogPage)
-  s.requests[0].resolve(emptyCatalog)
-  await flush(s)
-}
-
-test('catalog API errors retain the server report and session credentials', async () => {
-  const s = setup()
-  const report = catalogReport({ conflicts: ['Existing item differs'] })
-  s.setFetch(async (url, options) => {
-    assert.equal(url, '/api/v1/loot-catalog/merge')
-    assert.equal(options.credentials, 'include')
-    return { ok: false, status: 409, statusText: 'Conflict', text: async () => JSON.stringify({ error: { code: 'catalog_conflict', message: 'Conflict' }, data: report }) }
-  })
-  const { api, ApiError } = s.load('api.ts')
-  await assert.rejects(api.post('/api/v1/loot-catalog/merge'), (err) => err instanceof ApiError && err.code === 'catalog_conflict' && err.data.conflicts[0] === 'Existing item differs')
-})
-
-for (const role of ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER']) {
-  test(`${role} cannot use the catalog import UI`, () => {
+for (const role of ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN']) {
+  test(`${role} reads the file-authoritative catalog without upload or mutation controls`, async () => {
     const s = setup({ id: 1, role })
     s.mount(s.load('pages/LootCatalog.tsx').LootCatalogPage)
-    assert.match(text(s.tree), /nur von einem Admin/)
-    assert.equal(s.requests.length, 0)
+    assert.equal(s.requests[0].url, '/api/v1/loot-catalog')
+    s.requests[0].resolve(catalog)
+    await flush(s)
+    assert.match(text(s.tree), /automatisch.*schreibgeschützt/)
+    assert.match(text(s.tree), /pinned-revision/)
+    assert.match(text(s.tree), /Reviewed license/)
+    assert.match(text(s.tree), /Incomplete source-derived fixture/)
+    assert.doesNotMatch(text(s.tree), /Administration|nur von einem Admin/)
     assert.equal(fileInput(s), undefined)
-  })
-}
-
-test('catalog import requires preview, confirmation, matching file/hash and duplicate guard', async () => {
-  const s = setup({ id: 1, role: 'ADMIN' })
-  await mountCatalog(s)
-  assert.match(text(s.tree), /Katalog ist leer/)
-  await choose(s)
-  assert.equal(fileInput(s).props.accept, '.json,application/json')
-  await findButton(s, 'Katalog importieren').props.onClick()
-  assert.equal(writes(s).length, 0)
-  const previewClick = findButton(s, 'Vorschau prüfen').props.onClick
-  previewClick(); previewClick()
-  assert.equal(writes(s).length, 1)
-  assert.equal(writes(s)[0].url, '/api/v1/loot-catalog/preview')
-  assert.deepEqual(writes(s)[0].body, { catalog: dataset })
-  writes(s)[0].resolve(catalogReport())
-  await flush(s)
-  assert.equal(findButton(s, 'Katalog importieren').props.disabled, true)
-  assert.match(text(s.tree), /Reviewed license/)
-  assert.match(text(s.tree), /Incomplete source-derived fixture/)
-  assert.match(text(s.tree), /Geplante Ergänzungen\s*:.*6.*Übersprungen:.*2/)
-  confirm(s); s.render()
-  assert.equal(findButton(s, 'Katalog importieren').props.disabled, false)
-  const mergeClick = findButton(s, 'Katalog importieren').props.onClick
-  mergeClick(); mergeClick()
-  assert.equal(writes(s).length, 2)
-  assert.deepEqual(writes(s)[1].body, { catalog: dataset, raw_hash: 'a'.repeat(64) })
-  writes(s)[1].resolve(catalogReport({ merged: true }))
-  await flush(s)
-  s.requests.at(-1).resolve(catalog)
-  await flush(s)
-  assert.match(text(s.tree), /Import abgeschlossen/)
-  assert.equal(findButton(s, 'Katalog importieren').props.disabled, true)
-})
-
-for (const [name, value, error] of [
-  ['bad.json', { ...dataset, unknown: true }, /Unbekannte Felder/],
-  ['bad.json', { ...dataset, bosses: [{ ...dataset.bosses[0], unknown: true }] }, /unbekannte Felder/],
-  ['bad.sql', dataset, /keine SQL-Datei/],
-  ['bad.json', { ...dataset, drops: [{ ...dataset.drops[0], raid_size: '10' }] }, /ungültigen Datentyp/],
-]) {
-  test(`catalog rejects unsupported file/fields ${name} ${error}`, async () => {
-    const s = setup({ id: 1, role: 'ADMIN' })
-    await mountCatalog(s)
-    await choose(s, value, name)
-    assert.match(text(s.tree), error)
-    assert.equal(findButton(s, 'Vorschau prüfen').props.disabled, true)
+    assert.equal(nodes(s.tree, (node) => node.type === 'details').length, 1)
+    assert.equal(findButton(s, 'Katalog importieren'), undefined)
+    assert.equal(findButton(s, 'Vorschau prüfen'), undefined)
+    findButton(s, 'Bestand neu laden').props.onClick()
+    s.requests.at(-1).resolve(emptyCatalog)
+    await flush(s)
+    assert.match(text(s.tree), /Keine geprüften Dropdaten/)
     assert.equal(writes(s).length, 0)
   })
 }
 
-test('catalog file reads are latest-only; changing files synchronously invalidates old merge handlers', async () => {
-  const s = setup({ id: 1, role: 'ADMIN' })
-  await mountCatalog(s)
-  await choose(s)
-  findButton(s, 'Vorschau prüfen').props.onClick()
-  writes(s)[0].resolve(catalogReport())
+test('catalog GET failure offers retry and late reads cannot overwrite newer data or unmounted state', async () => {
+  const s = setup()
+  s.mount(s.load('pages/LootCatalog.tsx').LootCatalogPage)
+  s.requests[0].reject(new Error('offline'))
   await flush(s)
-  confirm(s); s.render()
-  const staleMerge = findButton(s, 'Katalog importieren').props.onClick
-  let resolveOld
-  fileInput(s).props.onChange({ target: { files: [{ name: 'old.json', size: 100, text: () => new Promise((resolve) => { resolveOld = resolve }) }] } })
-  await staleMerge()
-  assert.equal(writes(s).length, 1)
-  await choose(s, { ...dataset, source: { ...dataset.source, revision: 'new-revision' } }, 'new.json')
-  resolveOld(JSON.stringify(dataset))
+  assert.match(text(s.tree), /erneut versuchen/)
+  const retry = findButton(s, 'Bestand neu laden').props.onClick
+  retry(); retry()
+  s.requests[2].resolve(catalog)
   await flush(s)
-  assert.match(text(s.tree), /new-revision/)
-  assert.doesNotMatch(text(s.tree), /pinned-revision/)
-  assert.equal(findButton(s, 'Katalog importieren').props.disabled, true)
-})
-
-test('catalog blocks file changes while pending and fresh selection clears previous preview', async () => {
-  const s = setup({ id: 1, role: 'ADMIN' })
-  await mountCatalog(s)
-  await choose(s)
-  findButton(s, 'Vorschau prüfen').props.onClick()
+  s.requests[1].resolve(emptyCatalog)
   await flush(s)
-  await choose(s, { ...dataset, source: { ...dataset.source, revision: 'next-revision' } })
-  // Disabled file inputs also have a synchronous pending guard.
-  assert.match(text(s.tree), /pinned-revision/)
-  writes(s)[0].resolve(catalogReport())
+  assert.match(text(s.tree), /Reviewed instance/)
+  const beforeUnmount = s.requests.length
+  findButton(s, 'Bestand neu laden').props.onClick()
+  s.unmount()
+  s.requests.at(-1).resolve(emptyCatalog)
   await flush(s)
-  await choose(s, { ...dataset, source: { ...dataset.source, revision: 'next-revision' } })
-  assert.equal(findButton(s, 'Katalog importieren').props.disabled, true)
-  assert.doesNotMatch(text(s.tree), /Geprüfter Hash/)
-})
-
-test('catalog conflict reports are shown, block merge and do not claim success', async () => {
-  const s = setup({ id: 1, role: 'ADMIN' })
-  await mountCatalog(s)
-  await choose(s)
-  findButton(s, 'Vorschau prüfen').props.onClick()
-  const { ApiError } = s.load('api.ts')
-  writes(s)[0].reject(new ApiError(409, 'catalog_conflict', 'Katalogkonflikt', catalogReport({ conflicts: ['Item 50759 differs'], errors: ['Review required'], inserted: 0 })))
-  await flush(s)
-  assert.match(text(s.tree), /Item 50759 differs/)
-  assert.match(text(s.tree), /Review required/)
-  assert.doesNotMatch(text(s.tree), /Import abgeschlossen/)
-  assert.equal(findButton(s, 'Katalog importieren').props.disabled, true)
-})
-
-test('catalog source mismatch and malformed success cannot unlock import', async () => {
-  const s = setup({ id: 1, role: 'ADMIN' })
-  await mountCatalog(s)
-  await choose(s)
-  findButton(s, 'Vorschau prüfen').props.onClick()
-  writes(s)[0].resolve(catalogReport({ source: { ...dataset.source, revision: 'wrong-revision' } }))
-  await flush(s)
-  assert.match(text(s.tree), /stimmt nicht.*überein/)
-  assert.equal(findButton(s, 'Katalog importieren').props.disabled, true)
-  findButton(s, 'Vorschau prüfen').props.onClick()
-  writes(s)[1].resolve({ raw_hash: 'a'.repeat(64) })
-  await flush(s)
-  assert.match(text(s.tree), /keinen gültigen Katalogbericht/)
-  assert.equal(findButton(s, 'Katalog importieren').props.disabled, true)
-})
-
-test('catalog merge rejection clears confirmation and preview, displays report and requires another preview', async () => {
-  const s = setup({ id: 1, role: 'ADMIN' })
-  await mountCatalog(s)
-  await choose(s)
-  findButton(s, 'Vorschau prüfen').props.onClick()
-  writes(s)[0].resolve(catalogReport()); await flush(s)
-  confirm(s); s.render()
-  const oldMerge = findButton(s, 'Katalog importieren').props.onClick
-  confirm(s, false)
-  await oldMerge()
-  assert.equal(writes(s).length, 1)
-  confirm(s); s.render()
-  findButton(s, 'Katalog importieren').props.onClick()
-  const { ApiError } = s.load('api.ts')
-  writes(s)[1].reject(new ApiError(409, 'catalog_hash_mismatch', 'Hash mismatch', catalogReport({ inserted: 0 })))
-  await flush(s)
-  assert.match(text(s.tree), /Datei und geprüfter Hash stimmen nicht überein/)
-  assert.equal(findButton(s, 'Katalog importieren').props.disabled, true)
-  assert.equal(nodes(s.tree, (node) => node.type === 'input' && node.props.type === 'checkbox')[0].props.checked, false)
-  assert.doesNotMatch(text(s.tree), /Import abgeschlossen/)
-})
-
-test('catalog rejects malformed JSON and excessive files before any upload', async () => {
-  const s = setup({ id: 1, role: 'ADMIN' })
-  await mountCatalog(s)
-  fileInput(s).props.onChange({ target: { files: [{ name: 'bad.json', size: 100, text: async () => '{not-json' }] } })
-  await flush(s)
-  assert.match(text(s.tree), /kein gültiges JSON/)
-  fileInput(s).props.onChange({ target: { files: [{ name: 'huge.json', size: 16 * 1024 * 1024 + 1, text: async () => { throw new Error('Must not read') } }] } })
-  await flush(s)
-  assert.match(text(s.tree), /Upload-Limit/)
+  assert.doesNotMatch(text(s.tree), /Keine geprüften Dropdaten/)
+  assert.equal(s.requests.length, beforeUnmount + 1)
   assert.equal(writes(s).length, 0)
 })
 
-test('catalog late upload results do not restore state or trigger reads after unmount', async () => {
-  const s = setup({ id: 1, role: 'ADMIN' })
-  await mountCatalog(s)
-  await choose(s)
-  findButton(s, 'Vorschau prüfen').props.onClick()
-  s.unmount()
-  const count = s.requests.length
-  writes(s)[0].resolve(catalogReport())
-  await flush(s)
-  assert.equal(s.requests.length, count)
-  assert.doesNotMatch(text(s.tree), /Geprüfter Hash/)
+test('catalog GET sends session credentials and retains source metadata', async () => {
+  const s = setup()
+  s.setFetch(async (url, options) => {
+    assert.equal(url, '/api/v1/loot-catalog')
+    assert.equal(options.method, 'GET')
+    assert.equal(options.credentials, 'include')
+    return { ok: true, status: 200, text: async () => JSON.stringify({ data: catalog }) }
+  })
+  assert.deepEqual(await s.load('api.ts').api.get('/api/v1/loot-catalog'), catalog)
 })
 
 test('catalog association sizes come only from drops for bosses of the selected instance', () => {

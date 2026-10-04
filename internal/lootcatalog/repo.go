@@ -5,208 +5,227 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	"github.com/uptrace/bun"
 )
 
-// Repo owns all catalog persistence and transaction boundaries.
-type Repo struct{ db bun.IDB }
+// Repo owns the catalog foreign-key mirror. Reads never select the mirror, so a
+// database row can never offer an alternative to the bundled source.
+type Repo struct {
+	db bun.IDB
+}
 
 // NewRepo constructs a catalog repository.
-func NewRepo(db bun.IDB) *Repo { return &Repo{db: db} }
+func NewRepo(db bun.IDB) *Repo {
+	return &Repo{db: db}
+}
 
 // WithTx binds a repository to an existing transaction.
-func (r *Repo) WithTx(tx bun.Tx) *Repo { return NewRepo(tx) }
+func (r *Repo) WithTx(tx bun.Tx) *Repo {
+	return NewRepo(tx)
+}
 
-// List reads all catalog records with deterministic ordering and nonnil arrays.
+// List returns the compiled catalog. It never reads the mirror and never fails
+// soft: an invalid bundled source is an error, not an empty catalog.
 func (r *Repo) List(ctx context.Context) (Catalog, error) {
-	if _, inTransaction := r.db.(bun.Tx); inTransaction {
-		return r.list(ctx)
+	if err := ctx.Err(); err != nil {
+		return Catalog{}, err
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return Catalog{}, fmt.Errorf("begin catalog read: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	// All arrays must come from one snapshot when an import commits concurrently.
-	catalog, err := r.WithTx(tx).list(ctx)
-	if err != nil {
-		return catalog, err
-	}
-	if err := tx.Commit(); err != nil {
-		return catalog, fmt.Errorf("commit catalog read: %w", err)
-	}
-	return catalog, nil
+	return bundledCatalog()
 }
 
-func (r *Repo) list(ctx context.Context) (Catalog, error) {
-	c := Catalog{Sources: []Provenance{}, Instances: []Instance{}, Bosses: []Boss{}, Items: []Item{}, Drops: []Drop{}}
-	var metadata []struct{ Metadata string }
-	if err := r.db.NewRaw("SELECT metadata FROM loot_catalog_sources ORDER BY source_id, revision").Scan(ctx, &metadata); err != nil {
-		return c, fmt.Errorf("list catalog sources: %w", err)
+// EnsureBundled mirrors the bundled source so existing and future foreign keys
+// resolve, and reports every changed fact. Nothing is deleted: historical rows
+// stay as retained targets, and the persisted report is the explicit record.
+func (r *Repo) EnsureBundled(ctx context.Context) (InitializationReport, error) {
+	catalog, err := r.List(ctx)
+	if err != nil {
+		return InitializationReport{}, err
 	}
-	for _, row := range metadata {
-		var p Provenance
-		if err := json.Unmarshal([]byte(row.Metadata), &p); err != nil {
-			return c, fmt.Errorf("decode catalog provenance: %w", err)
+	provenance := catalog.Sources[0]
+	report := InitializationReport{
+		Source:     provenance.Source,
+		SourceHash: provenance.RawHash,
+		Diffs:      []CatalogDiff{},
+		Warnings:   []string{},
+	}
+	conditional := 0
+	for _, drop := range catalog.Drops {
+		if _, isConditional, err := sourceGameMode(drop); err != nil {
+			return InitializationReport{}, err
+		} else if isConditional {
+			conditional++
 		}
-		if p.Notices == nil {
-			p.Notices = []string{}
-		}
-		c.Sources = append(c.Sources, p)
 	}
-	if err := r.db.NewRaw("SELECT id, name FROM loot_catalog_instances ORDER BY id").Scan(ctx, &c.Instances); err != nil {
-		return c, fmt.Errorf("list catalog instances: %w", err)
+	if conditional > 0 {
+		report.Warnings = append(report.Warnings, fmt.Sprintf("%d bedingte Quellbeziehungen: ihre Rohpfade bleiben je Auswahl sichtbar.", conditional))
 	}
-	if err := r.db.NewRaw("SELECT id, instance_id, name FROM loot_catalog_bosses ORDER BY id").Scan(ctx, &c.Bosses); err != nil {
-		return c, fmt.Errorf("list catalog bosses: %w", err)
-	}
-	if err := r.db.NewRaw("SELECT item_id, name, binding, quality FROM loot_catalog_items ORDER BY item_id").Scan(ctx, &c.Items); err != nil {
-		return c, fmt.Errorf("list catalog items: %w", err)
-	}
-	if err := r.db.NewRaw("SELECT boss_id, item_id, raid_size, difficulty, loot_mode FROM loot_catalog_drops ORDER BY boss_id, item_id, raid_size, difficulty, loot_mode").Scan(ctx, &c.Drops); err != nil {
-		return c, fmt.Errorf("list catalog drops: %w", err)
-	}
-	return c, nil
-}
 
-// Import compares every record before inserting anything; conflicts reject the whole merge.
-func (r *Repo) Import(ctx context.Context, d Dataset, report Report, merge bool) (Report, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return report, fmt.Errorf("begin catalog import: %w", err)
+		return InitializationReport{}, fmt.Errorf("bundled catalog transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	repo := r.WithTx(tx)
-	if merge {
-		// A harmless preview metadata write acquires the SQLite writer lock before comparison.
-		result, err := tx.ExecContext(ctx, "UPDATE loot_catalog_previews SET created_at = created_at WHERE source_id = ? AND revision = ? AND raw_hash = ?", d.Source.ID, d.Source.Revision, report.RawHash)
-		if err != nil {
-			return report, fmt.Errorf("check catalog preview: %w", err)
+	// Write first so concurrent cold starts queue on the SQLite writer lock
+	// instead of reading a mirror another process is still changing.
+	if _, err := tx.ExecContext(ctx, "INSERT INTO loot_catalog_initializations (id, source_hash, report, created_at) VALUES (0, 'lock', 'lock', '1970-01-01T00:00:00Z') ON CONFLICT(id) DO UPDATE SET source_hash = excluded.source_hash"); err != nil {
+		return InitializationReport{}, fmt.Errorf("bundled catalog writer lock: %w", err)
+	}
+
+	previous := map[string]mirrorFact{}
+	if err := readMirror(ctx, tx, previous); err != nil {
+		return InitializationReport{}, err
+	}
+	apply := func(kind, key string, value any, query string, args ...any) error {
+		old, existed := previous[kind+"/"+key]
+		delete(previous, kind+"/"+key)
+		incoming := mirrorFact{Value: value, SourceID: provenance.Source.ID}
+		if existed && reflect.DeepEqual(old, incoming) {
+			report.Unchanged++
+			return nil
 		}
-		count, err := result.RowsAffected()
+		diff := CatalogDiff{Kind: kind, Key: key, Action: "insert", Before: json.RawMessage("null")}
+		encoded, err := json.Marshal(incoming)
 		if err != nil {
-			return report, err
+			return err
 		}
-		if count == 0 {
-			return report, ErrPreviewRequired
+		diff.After = encoded
+		if existed {
+			report.Updated++
+			diff.Action = "update"
+			before, err := json.Marshal(old)
+			if err != nil {
+				return err
+			}
+			diff.Before = before
+		} else {
+			report.Inserted++
+		}
+		report.Diffs = append(report.Diffs, diff)
+		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+			return fmt.Errorf("mirror %s %s: %w", kind, key, err)
+		}
+		return nil
+	}
+
+	for _, instance := range catalog.Instances {
+		err := apply("instance", instance.ID, instance, "INSERT INTO loot_catalog_instances (id, name, source_id) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, source_id = excluded.source_id", instance.ID, instance.Name, provenance.Source.ID)
+		if err != nil {
+			return InitializationReport{}, err
 		}
 	}
-	existing, err := repo.List(ctx)
+	for _, boss := range catalog.Bosses {
+		err := apply("boss", boss.ID, boss, "INSERT INTO loot_catalog_bosses (id, instance_id, name, source_id) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET instance_id = excluded.instance_id, name = excluded.name, source_id = excluded.source_id", boss.ID, boss.InstanceID, boss.Name, provenance.Source.ID)
+		if err != nil {
+			return InitializationReport{}, err
+		}
+	}
+	for _, item := range catalog.Items {
+		err := apply("item", item.ItemID, item, "INSERT INTO loot_catalog_items (item_id, name, binding, quality, source_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(item_id) DO UPDATE SET name = excluded.name, binding = excluded.binding, quality = excluded.quality, source_id = excluded.source_id", item.ItemID, item.Name, item.Binding, item.Quality, provenance.Source.ID)
+		if err != nil {
+			return InitializationReport{}, err
+		}
+	}
+	for _, drop := range catalog.Drops {
+		err := apply("drop", dropKey(drop), drop, "INSERT INTO loot_catalog_drops (boss_id, item_id, raid_size, difficulty, loot_mode, source_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(boss_id, item_id, raid_size, difficulty, loot_mode) DO UPDATE SET source_id = excluded.source_id", drop.BossID, drop.ItemID, drop.RaidSize, drop.Difficulty, drop.LootMode, provenance.Source.ID)
+		if err != nil {
+			return InitializationReport{}, err
+		}
+	}
+
+	keys := make([]string, 0, len(previous))
+	for key := range previous {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		fact := previous[key]
+		encoded, err := json.Marshal(fact)
+		if err != nil {
+			return InitializationReport{}, err
+		}
+		report.Retained++
+		report.Diffs = append(report.Diffs, CatalogDiff{Kind: "historical", Key: key, Action: "retain", Before: encoded, After: encoded})
+	}
+
+	encodedReport, err := json.Marshal(report)
 	if err != nil {
-		return report, err
+		return InitializationReport{}, err
 	}
-	for _, source := range existing.Sources {
-		if source.Source.ID == d.Source.ID && source.Source.Revision == d.Source.Revision && source.RawHash != report.RawHash {
-			report.Conflicts = append(report.Conflicts, "source: Revision bereits mit anderem Hash vorhanden")
-		}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO loot_catalog_initializations (source_hash, report, created_at) VALUES (?, ?, ?)", provenance.RawHash, string(encodedReport), time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return InitializationReport{}, fmt.Errorf("store bundled catalog report: %w", err)
 	}
-	// Ownership is checked even when records are otherwise byte-for-byte identical.
-	owners := map[string]string{}
-	var ownership []struct {
-		Kind     string
-		ID       string
-		SourceID string
+	if _, err := tx.ExecContext(ctx, "DELETE FROM loot_catalog_initializations WHERE id = 0"); err != nil {
+		return InitializationReport{}, fmt.Errorf("release bundled catalog writer lock: %w", err)
 	}
-	if err := tx.NewRaw("SELECT 'instance' AS kind, id, source_id FROM loot_catalog_instances UNION ALL SELECT 'boss', id, source_id FROM loot_catalog_bosses UNION ALL SELECT 'item', item_id, source_id FROM loot_catalog_items").Scan(ctx, &ownership); err != nil {
-		return report, fmt.Errorf("load catalog ownership: %w", err)
-	}
-	for _, row := range ownership {
-		owners[row.Kind+":"+row.ID] = row.SourceID
-	}
-	instances := map[string]Instance{}
-	for _, i := range existing.Instances {
-		instances[i.ID] = i
-	}
-	bosses := map[string]Boss{}
-	for _, b := range existing.Bosses {
-		bosses[b.ID] = b
-	}
-	items := map[string]Item{}
-	for _, i := range existing.Items {
-		items[i.ItemID] = i
-	}
-	drops := map[string]bool{}
-	for _, drop := range existing.Drops {
-		drops[dropKey(drop)] = true
-	}
-	newInstances, newBosses, newItems, newDrops := []Instance{}, []Boss{}, []Item{}, []Drop{}
-	compare := func(kind, id string, old, incoming any) {
-		if owners[kind+":"+id] != d.Source.ID || !reflect.DeepEqual(old, incoming) {
-			report.Conflicts = append(report.Conflicts, kind+" "+id+": Bestand oder Quelle weicht ab")
-		} else {
-			report.Skipped++
-		}
-	}
-	for _, i := range d.Instances {
-		if old, ok := instances[i.ID]; ok {
-			compare("instance", i.ID, old, i)
-		} else {
-			newInstances = append(newInstances, i)
-		}
-	}
-	for _, b := range d.Bosses {
-		if old, ok := bosses[b.ID]; ok {
-			compare("boss", b.ID, old, b)
-		} else {
-			newBosses = append(newBosses, b)
-		}
-	}
-	for _, i := range d.Items {
-		if old, ok := items[i.ItemID]; ok {
-			compare("item", i.ItemID, old, i)
-		} else {
-			newItems = append(newItems, i)
-		}
-	}
-	for _, drop := range d.Drops {
-		if drops[dropKey(drop)] {
-			report.Skipped++
-		} else {
-			newDrops = append(newDrops, drop)
-		}
-	}
-	if len(report.Conflicts) != 0 {
-		return report, ErrConflict
-	}
-	if !merge {
-		if _, err := tx.ExecContext(ctx, "INSERT INTO loot_catalog_previews (source_id, revision, raw_hash, created_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING", d.Source.ID, d.Source.Revision, report.RawHash, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
-			return report, fmt.Errorf("save catalog preview: %w", err)
-		}
-	} else {
-		for _, i := range newInstances {
-			if _, err := tx.ExecContext(ctx, "INSERT INTO loot_catalog_instances (id, name, source_id) VALUES (?, ?, ?)", i.ID, i.Name, d.Source.ID); err != nil {
-				return report, fmt.Errorf("insert catalog instance: %w", err)
-			}
-		}
-		for _, b := range newBosses {
-			if _, err := tx.ExecContext(ctx, "INSERT INTO loot_catalog_bosses (id, instance_id, name, source_id) VALUES (?, ?, ?, ?)", b.ID, b.InstanceID, b.Name, d.Source.ID); err != nil {
-				return report, fmt.Errorf("insert catalog boss: %w", err)
-			}
-		}
-		for _, i := range newItems {
-			if _, err := tx.ExecContext(ctx, "INSERT INTO loot_catalog_items (item_id, name, binding, quality, source_id) VALUES (?, ?, ?, ?, ?)", i.ItemID, i.Name, i.Binding, i.Quality, d.Source.ID); err != nil {
-				return report, fmt.Errorf("insert catalog item: %w", err)
-			}
-		}
-		for _, drop := range newDrops {
-			if _, err := tx.ExecContext(ctx, "INSERT INTO loot_catalog_drops (boss_id, item_id, raid_size, difficulty, loot_mode, source_id) VALUES (?, ?, ?, ?, ?, ?)", drop.BossID, drop.ItemID, drop.RaidSize, drop.Difficulty, drop.LootMode, d.Source.ID); err != nil {
-				return report, fmt.Errorf("insert catalog drop: %w", err)
-			}
-		}
-		metadata, err := json.Marshal(Provenance{Source: d.Source, RawHash: report.RawHash, Notices: d.Notices})
-		if err != nil {
-			return report, err
-		}
-		if _, err := tx.ExecContext(ctx, "INSERT INTO loot_catalog_sources (source_id, revision, raw_hash, metadata) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING", d.Source.ID, d.Source.Revision, report.RawHash, string(metadata)); err != nil {
-			return report, fmt.Errorf("save catalog source: %w", err)
-		}
-		report.Merged = true
-	}
-	report.Inserted = len(newInstances) + len(newBosses) + len(newItems) + len(newDrops)
 	if err := tx.Commit(); err != nil {
-		return report, fmt.Errorf("commit catalog import: %w", err)
+		return InitializationReport{}, fmt.Errorf("commit bundled catalog initialization: %w", err)
 	}
 	return report, nil
+}
+
+// mirrorFact is one stored row reduced to the columns the bundled source owns.
+type mirrorFact struct {
+	Value    any    `json:"value"`
+	SourceID string `json:"source_id"`
+}
+
+func readMirror(ctx context.Context, tx bun.Tx, into map[string]mirrorFact) error {
+	var instances []struct {
+		ID       string `bun:"id"`
+		Name     string `bun:"name"`
+		SourceID string `bun:"source_id"`
+	}
+	if err := tx.NewRaw("SELECT id, name, source_id FROM loot_catalog_instances").Scan(ctx, &instances); err != nil {
+		return err
+	}
+	var bosses []struct {
+		ID         string `bun:"id"`
+		InstanceID string `bun:"instance_id"`
+		Name       string `bun:"name"`
+		SourceID   string `bun:"source_id"`
+	}
+	if err := tx.NewRaw("SELECT id, instance_id, name, source_id FROM loot_catalog_bosses").Scan(ctx, &bosses); err != nil {
+		return err
+	}
+	var items []struct {
+		ItemID   string `bun:"item_id"`
+		Name     string `bun:"name"`
+		Binding  *int   `bun:"binding"`
+		Quality  *int   `bun:"quality"`
+		SourceID string `bun:"source_id"`
+	}
+	if err := tx.NewRaw("SELECT item_id, name, binding, quality, source_id FROM loot_catalog_items").Scan(ctx, &items); err != nil {
+		return err
+	}
+	var drops []DropRow
+	if err := tx.NewRaw("SELECT boss_id, item_id, raid_size, difficulty, loot_mode, source_id FROM loot_catalog_drops").Scan(ctx, &drops); err != nil {
+		return err
+	}
+	for _, row := range instances {
+		into["instance/"+row.ID] = mirrorFact{Value: Instance{ID: row.ID, Name: row.Name}, SourceID: row.SourceID}
+	}
+	for _, row := range bosses {
+		into["boss/"+row.ID] = mirrorFact{Value: Boss{ID: row.ID, InstanceID: row.InstanceID, Name: row.Name}, SourceID: row.SourceID}
+	}
+	for _, row := range items {
+		into["item/"+row.ItemID] = mirrorFact{Value: Item{ItemID: row.ItemID, Name: row.Name, Binding: row.Binding, Quality: row.Quality}, SourceID: row.SourceID}
+	}
+	for _, row := range drops {
+		drop := Drop{BossID: row.BossID, ItemID: row.ItemID, RaidSize: row.RaidSize, Difficulty: row.Difficulty, LootMode: row.LootMode}
+		into["drop/"+dropKey(drop)] = mirrorFact{Value: drop, SourceID: row.SourceID}
+	}
+	return nil
+}
+
+// DropRow is a stored drop relationship with its provenance.
+type DropRow struct {
+	BossID     string `bun:"boss_id"`
+	ItemID     string `bun:"item_id"`
+	RaidSize   int    `bun:"raid_size"`
+	Difficulty string `bun:"difficulty"`
+	LootMode   int    `bun:"loot_mode"`
+	SourceID   string `bun:"source_id"`
 }

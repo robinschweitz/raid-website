@@ -1,5 +1,9 @@
 # ADR 025: Reviewed Local WotLK Loot Catalog
 
+## Status
+Superseded by ADR 027 (`027-bundled-loot-catalog-normalized-modes.md`). The dataset, provenance,
+and licensing rules below still apply; the Admin upload, preview, and merge flow no longer exists.
+
 ## Decision
 The owner selected imported boss/item tables for original WotLK 3.3.5, rather than manually
 maintaining every dropdown. Investigate AzerothCore world data as the primary source,

@@ -4,7 +4,7 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
 import { characterClassName } from '../characterTheme'
-import { atLeast, catalogRaidSizes, type ArchiveResponse, type Attendance, type AttendanceRole, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
+import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Attendance, type AttendanceRole, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
 
 interface Props {
   raidID: number
@@ -12,7 +12,7 @@ interface Props {
 
 type AwardMethod = 'MAIN' | 'SECOND' | 'ENHANCED' | 'BOE'
 type RecordedLoot = LootAward & { award_method?: AwardMethod; enhanced_cost?: number | null; catalog_boss_id?: string | null }
-const dropKey = (item: CatalogItemDrop) => JSON.stringify([item.boss_id, item.item_id, item.raid_size, item.difficulty, item.loot_mode])
+const dropKey = (item: CatalogItemDrop) => JSON.stringify([item.boss_id, item.item_id, item.raid_size, item.mode])
 const awardLabels: Record<AwardMethod, string> = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
 const awardMethod = (row: RecordedLoot): AwardMethod => row.award_method ?? (row.is_main_spec ? 'MAIN' : 'SECOND')
 
@@ -59,6 +59,7 @@ function raidError(err: unknown, fallback: string): string {
     request_id_required: 'Für Enhanced-Loot fehlt der Speicherschlüssel. Bitte erneut speichern; der Entwurf bleibt erhalten.',
     catalog_item_invalid: 'Boss und Item passen nicht zur gespeicherten Raidinstanz oder Raidgröße. Bitte die Zuordnung prüfen und den Drop erneut aus dem Katalog wählen.',
     catalog_invalid: 'Diese Instanz und Raidgröße sind im verfügbaren Katalog nicht belegt. Bitte eine angebotene Kombination wählen.',
+    catalog_context_required: 'Vor neuer Loot-Erfassung müssen Raidinstanz und Raidgröße zugeordnet und gespeichert sein.',
   }
   if (messages[err.code]) return messages[err.code]
   return err.message
@@ -121,6 +122,7 @@ function RaidDetail({ raidID }: Props) {
   const [catalogDifficulty, setCatalogDifficulty] = useState('')
   const [catalogStatus, setCatalogStatus] = useState('')
   const [catalogSourceStatus, setCatalogSourceStatus] = useState('Loot-Katalog wird geladen.')
+  const [catalogRetry, setCatalogRetry] = useState(0)
 
   const canManage = me ? atLeast(me.role, 'RAIDASSISTENT') : false
   const isActiveRaid = !!raid && !raid.archived_at && (raid.status === 'PLANNED' || raid.status === 'OPEN')
@@ -134,7 +136,7 @@ function RaidDetail({ raidID }: Props) {
   const renderedAssociationVersion = associationVersion.current
   const catalogInstances = catalog?.instances ?? []
   const catalogSourcesAvailable = !!catalog?.sources.length
-  const associated = !!raid?.catalog_instance_id
+  const associated = !!raid?.catalog_instance_id && raid.raid_size != null
   const catalogContext = JSON.stringify([raid?.catalog_instance_id ?? '', raid?.raid_size ?? null])
   const sizes = catalogRaidSizes(catalog, associationInstance)
   const associationChanged = associationInstance !== (raid?.catalog_instance_id ?? '') || associationSize !== (raid?.raid_size == null ? '' : String(raid.raid_size))
@@ -144,12 +146,12 @@ function RaidDetail({ raidID }: Props) {
   const unchangedLootRecipient = !!lootEditing && lootEditing.awarded_to_player_id === Number(lootPlayer)
     && (lootEditing.awarded_to_character_id ? String(lootEditing.awarded_to_character_id) : '') === lootCharacter
   const hasLootRecipient = !!lootRecipient || unchangedLootRecipient
-  const unchangedLootIdentity = !!lootEditing && catalogBoss === (lootEditing.catalog_boss_id ?? '') && lootItemID === lootEditing.item_id
-  const selectedDrop = catalogItems.find((item) => dropKey(item) === catalogItem && item.boss_id === catalogBoss && item.item_id === lootItemID && (raid?.raid_size == null || item.raid_size === raid.raid_size))
-  const hasCatalogIdentity = !associated || (!!lootEditing && unchangedLootIdentity && unchangedLootRecipient)
-    || (catalogSourcesAvailable && !!selectedDrop && catalogBosses.some((boss) => boss.id === catalogBoss && boss.instance_id === raid?.catalog_instance_id))
-  const catalogDifficulties = [...new Set(catalogItems.map((item) => item.difficulty))].sort()
-  const visibleCatalogItems = catalogItems.filter((item) => !catalogDifficulty || item.difficulty === catalogDifficulty)
+  const unchangedLootIdentity = !!lootEditing && catalogBoss === (lootEditing.catalog_boss_id ?? '') && lootItemID === lootEditing.item_id && lootItem === lootEditing.item_name && lootBoss === lootEditing.boss
+  const selectedDrop = catalogItems.find((item) => dropKey(item) === catalogItem && item.boss_id === catalogBoss && item.item_id === lootItemID && item.raid_size === raid?.raid_size && item.mode === catalogDifficulty)
+  const hasCatalogIdentity = (!!lootEditing && unchangedLootIdentity && unchangedLootRecipient)
+    || (associated && catalogSourcesAvailable && !!selectedDrop && catalogBosses.some((boss) => boss.id === catalogBoss && boss.instance_id === raid?.catalog_instance_id))
+  const catalogDifficulties = (Object.keys(catalogModeLabels) as (keyof typeof catalogModeLabels)[]).filter((mode) => catalogItems.some((item) => item.mode === mode))
+  const visibleCatalogItems = catalogItems.filter((item) => item.mode === catalogDifficulty)
   const lootGroups = [...new Set(loot.map((row) => row.boss))]
 
   const load = useCallback(async () => {
@@ -202,7 +204,7 @@ function RaidDetail({ raidID }: Props) {
       if (isActive() && !obsolete) setCatalogSourceStatus('Loot-Katalog derzeit nicht verfügbar. Ein Admin muss die Quelle prüfen.')
     })
     return () => { obsolete = true }
-  }, [isActive])
+  }, [isActive, catalogRetry])
 
   useEffect(() => {
     let obsolete = false
@@ -223,7 +225,7 @@ function RaidDetail({ raidID }: Props) {
     setLootNotes('')
     setLootReason('')
     lootRequest.current = null
-    if (!canWrite || !raid?.catalog_instance_id) return
+    if (!canWrite || !raid?.catalog_instance_id || raid.raid_size == null) return
     setCatalogStatus('Bosse der gespeicherten Raidinstanz werden geladen.')
     api.get<CatalogBoss[]>(`/api/v1/loot-catalog/bosses?instance_id=${encodeURIComponent(raid.catalog_instance_id)}`).then((rows) => {
       if (!isActive() || obsolete || context !== persistedCatalogContext.current) return
@@ -233,7 +235,7 @@ function RaidDetail({ raidID }: Props) {
       if (isActive() && !obsolete && context === persistedCatalogContext.current) setCatalogStatus('Bosse konnten nicht geladen werden. Ein Admin muss den Katalog prüfen; keine freie Ersatzeingabe für diesen zugeordneten Raid.')
     })
     return () => { obsolete = true }
-  }, [raid?.catalog_instance_id, raid?.raid_size, catalogContext, canWrite, isActive])
+  }, [raid?.catalog_instance_id, raid?.raid_size, catalogContext, canWrite, isActive, catalogRetry])
 
   useEffect(() => {
     let obsolete = false
@@ -341,8 +343,10 @@ function RaidDetail({ raidID }: Props) {
     const sizeFilter = raid?.raid_size == null ? '' : `&raid_size=${raid.raid_size}`
     api.get<CatalogItemDrop[]>(`/api/v1/loot-catalog/items?boss_id=${encodeURIComponent(id)}${sizeFilter}`).then((rows) => {
       if (!isActive() || version !== catalogVersion.current || editorVersion !== lootEditorVersion.current) return
-      setCatalogItems(rows.filter((item) => item.boss_id === id && (raid?.raid_size == null || item.raid_size === raid.raid_size)))
-      setCatalogStatus(rows.length ? '' : 'Keine Items für diesen Boss im Katalog verfügbar.')
+      const eligible = [...new Map(rows.filter((item) => item.boss_id === id && item.raid_size === raid?.raid_size && item.mode in catalogModeLabels).map((item) => [dropKey(item), item])).values()]
+      setCatalogItems(eligible)
+      setCatalogDifficulty(eligible.some((item) => item.mode === 'NORMAL') ? 'NORMAL' : eligible[0]?.mode ?? '')
+      setCatalogStatus(eligible.length ? '' : 'Keine geprüften Drops für diesen Boss und diese Raidgröße verfügbar.')
     }).catch(() => {
       if (isActive() && version === catalogVersion.current && editorVersion === lootEditorVersion.current) setCatalogStatus('Items konnten nicht geladen werden. Ein Admin muss die Dropdaten prüfen; keine freie Ersatzeingabe für diesen zugeordneten Raid.')
     })
@@ -423,8 +427,6 @@ function RaidDetail({ raidID }: Props) {
         const body = {
           ...(!lootEditing || lootItemID !== lootEditing.item_id ? { item_id: lootItemID } : {}),
           ...(catalogBoss && (!lootEditing || catalogBoss !== (lootEditing.catalog_boss_id ?? '')) ? { catalog_boss_id: catalogBoss } : {}),
-          ...(!associated && (!lootEditing || lootBoss !== lootEditing.boss) ? { boss: lootBoss } : {}),
-          ...(!associated && (!lootEditing || lootItem !== lootEditing.item_name) ? { item_name: lootItem } : {}),
           ...(!lootEditing || lootMethod !== awardMethod(lootEditing) ? { award_method: lootMethod } : {}),
           ...(!lootEditing || !unchangedLootRecipient ? {
             awarded_to_player_id: lootRecipient!.player_id,
@@ -436,7 +438,7 @@ function RaidDetail({ raidID }: Props) {
         if (lootEditing) {
           await api.patch<LootAward>(`/api/v1/raids/${raidID}/loot/${lootEditing.id}`, body)
         } else {
-          const payload = JSON.stringify(body)
+           const payload = JSON.stringify({ flow: 'catalog-new', body })
           if (lootRequest.current?.payload !== payload) {
             lootRequest.current = { payload, id: crypto.randomUUID() }
           }
@@ -592,12 +594,12 @@ function RaidDetail({ raidID }: Props) {
       <p>{attendance.length} gespeicherte Teilnehmer · {loot.length} aufgezeichnete Loot-Vergaben</p>
       {raid.archived_at && <p className="muted">Archivierte Historie: Roster und Loot sind schreibgeschützt.</p>}
       <p>Geplanter Start: {raid.scheduled_start ? new Date(raid.scheduled_start).toLocaleString() : 'Nicht verfügbar'}. Serie: {series.find((s) => s.id === raid.series_id)?.name ?? 'Nicht verfügbar'}.</p>
-      <p>Gespeicherte Kataloginstanz: {raid.catalog_instance_id ? catalogInstances.find((instance) => instance.id === raid.catalog_instance_id)?.name ?? raid.catalog_instance_id : 'Keine Zuordnung (manuelle Loot-Erfassung)'}. Raidgröße: {raid.raid_size == null ? 'Nicht zugeordnet' : `${raid.raid_size} Spieler`}.</p>
+      <p>Gespeicherte Kataloginstanz: {raid.catalog_instance_id ? catalogInstances.find((instance) => instance.id === raid.catalog_instance_id)?.name ?? raid.catalog_instance_id : 'Keine Zuordnung'}. Raidgröße: {raid.raid_size == null ? 'Nicht zugeordnet' : `${raid.raid_size} Spieler`}.</p>
       <section aria-label="Katalogquellen" className="subcard catalog-sources">
         <h3>Katalogquellen</h3>
         {catalogSourceStatus && <p className="muted" role="status">{catalogSourceStatus}</p>}
         {catalog && <>
-          <p className="muted">Nur die importierten Dropdaten sind verfügbar. Eine vollständige Boss- oder Itemabdeckung ist nicht zugesichert; Quellenhinweise zu Teilbeständen beachten.</p>
+          <p className="muted">Die geprüfte JSON-Quelldatei steht automatisch bereit. Eine vollständige Boss- oder Itemabdeckung ist nicht zugesichert; Quellenhinweise zu Teilbeständen beachten.</p>
           {!catalogSourcesAvailable && <p className="muted">Keine geprüfte Katalogquelle verfügbar. Eine neue Katalogzuordnung oder Katalogvergabe ist nicht möglich.</p>}
           <details><summary>Quellen, Lizenz und Abdeckung anzeigen</summary>
           {catalog.sources.map((entry) => <div key={`${entry.source.id}-${entry.raw_hash}`}>
@@ -606,6 +608,7 @@ function RaidDetail({ raidID }: Props) {
           </div>)}
           </details>
         </>}
+        <button type="button" disabled={pending} onClick={() => { if (isActive() && !isPending()) setCatalogRetry((value) => value + 1) }}>Katalog erneut laden</button>
       </section>
       {raid.previous_raid_id && <p><Link to={`/raids/${raid.previous_raid_id}`}>Vorheriger Raid</Link></p>}
       {archiveResult && <p role="status">Raid archiviert und weiterhin in der Historie sichtbar. {archiveResult.next_raid
@@ -815,7 +818,7 @@ function RaidDetail({ raidID }: Props) {
           <div className="subcard">
             <h3>{lootEditing ? `Loot #${lootEditing.id} korrigieren` : raid.status === 'COMPLETED' ? 'Loot nachtragen' : 'Loot erfassen'}</h3>
             {catalogStatus && <p className="muted" role="status">{catalogStatus}</p>}
-            <p className="muted">{associated ? 'Boss und Drop müssen zur gespeicherten Raidinstanz und Raidgröße passen. Fehlende Katalogdaten erlauben keine freie Ersatzeingabe; vorhandene historische Einträge bleiben erhalten.' : 'Ohne gespeicherte Katalogzuordnung können Boss und gedropptes Item ausdrücklich manuell eingetragen werden. Vorhandene historische Namen bleiben erhalten.'}</p>
+            <p className="muted">{associated ? 'Boss und Drop müssen zur gespeicherten Raidinstanz und Raidgröße passen. Fehlende Katalogdaten erlauben keine freie Ersatzeingabe; vorhandene historische Einträge bleiben erhalten.' : 'Vor neuer Loot-Erfassung bitte Raidinstanz und Raidgröße in der Katalogzuordnung oben wählen und speichern. Historische Einträge können mit unveränderter Identität und unverändertem Empfänger korrigiert werden.'}</p>
             {attendance.length === 0 && <p className="muted">Keine Empfänger verfügbar: zuerst Charaktere in den Raidroster aufnehmen.</p>}
             {lootEditing && <p className="muted">Vorher: {lootEditing.item_name} (Item-ID: {lootEditing.item_id || 'keine'}), Boss: {lootEditing.boss || 'keiner'}, Empfänger: {playerName(lootEditing.awarded_to_player_id)}, Charakter: {lootEditing.awarded_to_character_id ? `#${lootEditing.awarded_to_character_id}` : 'keiner'}, {awardLabels[awardMethod(lootEditing)]}. Notizen: {lootEditing.notes || 'keine'}</p>}
             <form className="inline-form" onSubmit={addLoot}>
@@ -826,13 +829,14 @@ function RaidDetail({ raidID }: Props) {
                   {catalogBoss && !catalogBosses.some((boss) => boss.id === catalogBoss) && <option value={catalogBoss}>Gespeicherter Boss (Quelle nicht verfügbar)</option>}
                   {catalogBosses.map((boss) => <option key={boss.id} value={boss.id}>{boss.name}</option>)}
                 </select></label>
-                <label>Quelldifficulty<select aria-label="Loot-Katalogdifficulty" disabled={pending || catalogDifficulties.length === 0} value={catalogDifficulty} onChange={(e) => changeLoot(() => {
+                <label>Modus<select aria-label="Loot-Katalogmodus" disabled={pending || catalogDifficulties.length === 0} value={catalogDifficulty} onChange={(e) => changeLoot(() => {
                   if (renderedCatalogVersion !== catalogVersion.current) return
+                  if (!catalogDifficulties.includes(e.target.value as keyof typeof catalogModeLabels)) return
                   setCatalogDifficulty(e.target.value)
-                  if (selectedDrop && e.target.value && selectedDrop.difficulty !== e.target.value) { setCatalogItem(''); setLootItem(''); setLootItemID('') }
+                  if (selectedDrop && selectedDrop.mode !== e.target.value) { setCatalogItem(''); setLootItem(''); setLootItemID('') }
                 })}>
-                  <option value="">Alle Quelldifficulties</option>
-                  {catalogDifficulties.map((difficulty) => <option key={difficulty} value={difficulty}>{difficulty}</option>)}
+                  {catalogDifficulties.length === 0 && <option value="">Zuerst Boss wählen</option>}
+                  {catalogDifficulties.map((difficulty) => <option key={difficulty} value={difficulty}>{catalogModeLabels[difficulty]}</option>)}
                 </select></label>
                 <label>Gedropptes Katalogitem<select aria-label="Loot-Katalogitem" disabled={pending || catalogItems.length === 0} value={catalogItem} onChange={(e) => changeLoot(() => {
                   if (renderedCatalogVersion !== catalogVersion.current) return
@@ -842,12 +846,14 @@ function RaidDetail({ raidID }: Props) {
                   setLootItemID(item?.item_id ?? '')
                 })}>
                   <option value="">Item und Variante wählen</option>
-                  {visibleCatalogItems.map((item) => <option key={dropKey(item)} value={dropKey(item)}>{item.name} · {item.raid_size} Spieler · Difficulty {item.difficulty} · Lootmodus {item.loot_mode}</option>)}
+                  {visibleCatalogItems.map((item) => <option key={dropKey(item)} value={dropKey(item)}>{item.name} · {item.raid_size} Spieler · {catalogModeLabels[item.mode]}{item.conditional ? ' · Bedingter Drop' : ''}</option>)}
                 </select></label>
+                {selectedDrop && <details><summary>Dropquelle und Bedingungen</summary>
+                  {selectedDrop.conditional && <p className="muted">Bedingter Drop laut Quelldaten. Die Rohmetadaten allein erklären die konkrete Bedingung nicht.</p>}
+                  <ul>{selectedDrop.source_variants.map((variant, index) => <li key={index} style={{ overflowWrap: 'anywhere' }}>Quellpfad: {variant.difficulty} · Roh-Lootmodus: {variant.loot_mode}</li>)}</ul>
+                </details>}
               </> : <>
-              <label>Boss<input disabled={pending} placeholder="Boss" value={lootBoss} onChange={(e) => changeLoot(() => { setCatalogBoss(''); setCatalogItem(''); setCatalogItems([]); ++catalogVersion.current; if (catalogInstances.length) setCatalogStatus(''); setLootBoss(e.target.value) })} /></label>
-              <label>Gedropptes Item<input disabled={pending} placeholder="Item" value={lootItem} onChange={(e) => changeLoot(() => { if (catalogItem) setLootItemID(''); setCatalogItem(''); setLootItem(e.target.value) })} required /></label>
-              <label>Item-ID (optional)<input disabled={pending} placeholder="Item-ID" value={lootItemID} onChange={(e) => changeLoot(() => { setCatalogItem(''); setLootItemID(e.target.value) })} /></label>
+              {lootEditing && <p>Gespeicherte Identität: {lootBoss || 'Boss historisch nicht gespeichert'} · {lootItem} · Item-ID {lootItemID || 'historisch nicht gespeichert'}</p>}
               </>}
               <label>Empfänger-Charakter aus dem Raidroster<select aria-label="Loot-Empfänger" disabled={pending || (attendance.length === 0 && !lootEditing)} value={lootCharacter} onChange={(e) => changeLoot(() => {
                 const selected = attendance.find((a) => a.character_id === Number(e.target.value) && a.raid_id === raidID)

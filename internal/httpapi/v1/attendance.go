@@ -161,6 +161,8 @@ func (a *API) createAttendance(w http.ResponseWriter, r *http.Request) {
 
 func writeCorrectionError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, loot.ErrCatalogContextRequired):
+		WriteError(w, http.StatusConflict, "catalog_context_required", "Raidinstanz und Raidgroesse muessen vor der Lootauswahl konfiguriert werden")
 	case errors.Is(err, lootcatalog.ErrInvalid):
 		WriteError(w, http.StatusBadRequest, "catalog_item_invalid", "Bitte einen Katalogboss und einen passenden Gegenstand fuer die Raidinstanz und Raidgroesse auswaehlen")
 	case errors.Is(err, enhancepoints.ErrInsufficientBalance):

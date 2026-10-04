@@ -1,50 +1,52 @@
 # Catalog Integration Handoff
 
-Implemented under ADR 025. The production router, raid/series metadata, loot validation,
-and Admin/frontend import controls are integrated. This file records the data/API contract
-and remaining source-coverage limits, not outstanding wiring work.
+Implemented under ADR 025 and ADR 027. The production router, raid/series metadata, loot
+validation, and the read-only frontend catalog view are integrated. This file records the
+data/API contract and remaining source-coverage limits, not outstanding wiring work.
 
 ## Coordinator Wiring
 
-`internal/httpapi/router.go` registers the catalog handlers after `api.Register(mux)`:
+`internal/httpapi/router.go` builds the catalog service and initializes the mirror before the
+listener is opened:
 
 ```go
 catalog := lootcatalog.NewService(lootcatalog.NewRepo(db))
+report, err := catalog.EnsureBundled(context.Background())
+if err != nil { return err }
 v1.CatalogHandlers{Catalog: catalog}.Register(mux)
 ```
 
-Registration uses the existing session-authenticated mux. Standalone handlers enforce
-authenticated reads and ADMIN mutations, without changing the core `v1.Deps` contract.
+An invalid embedded source or a failed mirror stops startup. Initialization is idempotent and
+serialized through a sentinel row on the SQLite writer lock.
 
 Migration `007_loot_catalog` is picked up by the existing embedded migration loader.
 It adds nullable `catalog_instance_id TEXT` and `raid_size INTEGER` to `raids` and
 `raid_series`, plus the catalog and preview tables. It seeds no guild/game records.
+Migration `009_bundled_catalog` adds `loot_catalog_initializations` for the startup report.
 
 `CatalogInstanceID *string` and `RaidSize *int` are exposed with snake_case JSON tags on
 raid/series models and requests, validated with transaction-bound catalog repositories,
-and inherited by newly created successors. Nil/nil preserves legacy free-text raids;
-a size without an instance is rejected. Local drops must evidence the selected size.
-Migration 008 adds optional `catalog_boss_id` to awards. Associated new loot validates
-boss/item IDs against the raid and derives names from the local catalog. Unchanged
-historical identities remain intact. Preplanned successors are never overwritten.
+and inherited by newly created successors. Legacy free-text raids keep their stored
+identities, but new loot requires the association. Local drops must evidence the selected size.
+Migration 008 adds optional `catalog_boss_id` to awards. New loot validates boss/item IDs
+against the bundled catalog for the raid's instance and size and derives names server-side.
+Unchanged historical identities remain intact. Preplanned successors are never overwritten.
 
 ## HTTP Contract
 
-All reads require an authenticated account, including GUEST. All writes require ADMIN.
-Existing session middleware resolves actors; no actor ID is accepted in an upload.
+All reads require an authenticated account, including GUEST. There are no catalog writes.
 
 | Method | Path | Data shape |
 | --- | --- | --- |
 | GET | `/api/v1/loot-catalog` | `Catalog` |
 | GET | `/api/v1/loot-catalog/instances` | `Instance[]` |
 | GET | `/api/v1/loot-catalog/bosses?instance_id=631` | `Boss[]` |
-| GET | `/api/v1/loot-catalog/items?boss_id=36612&raid_size=10&difficulty=...` | `ItemDrop[]` |
-| POST | `/api/v1/loot-catalog/preview` | `Report` |
-| POST | `/api/v1/loot-catalog/merge` | `Report` |
+| GET | `/api/v1/loot-catalog/items?boss_id=36612&raid_size=10&mode=HEROIC` | `ItemDrop[]` |
 
-Read query filters are optional. Difficulty matches the exact source string, not a
-guessed normal/heroic enum. Item results retain one row per drop variant; show source
-difficulty and loot_mode when mixed modes are present instead of merging by item name.
+Read query filters are optional. `mode` is an explicit enum, never a source string; an unknown
+mode is `catalog_invalid` (422) and `raid_size` must be 10 or 25. Item results are one row per
+`[boss_id, item_id, raid_size, mode]`; `source_variants` keeps the raw pairs and `conditional`
+marks unproven conditions.
 
 ```ts
 type Source = {
@@ -62,46 +64,37 @@ type Dataset = {
   instances: Instance[]; bosses: Boss[]; items: Item[]; drops: Drop[];
 };
 type Provenance = { source: Source; raw_hash: string; notices: string[] };
+type ItemDrop = Item & {
+  boss_id: string; raid_size: 10 | 25; mode: 'NORMAL' | 'HEROIC' | 'HARDMODE';
+  conditional: boolean; source_variants: { difficulty: string; loot_mode: number }[];
+};
 type Catalog = {
   sources: Provenance[];
-  instances: Instance[]; bosses: Boss[]; items: Item[]; drops: Drop[];
+  instances: Instance[]; bosses: Boss[]; items: Item[]; drops: ItemDrop[];
 };
-type ItemDrop = Item & Drop;
-type Report = {
-  source: Source; raw_hash: string; notices: string[];
-  errors: string[]; conflicts: string[];
-  inserted: number; skipped: number; merged: boolean;
-};
-type Upload = { catalog: Dataset; raw_hash?: string };
+type Report = { source: Source; raw_hash: string; notices: string[]; errors: string[] };
 ```
 
-Success is `{data: ...}`. Domain rejection is `{error: {code, message}, data: Report}`
-for uploads. Error codes: `catalog_invalid` (422), `catalog_conflict` (409),
-`catalog_preview_required` (409), `catalog_hash_mismatch` (409),
-`catalog_invalid_json` (400), and existing auth/internal codes. No array is null.
-`inserted` on preview is the proposed insert count, not persisted domain rows.
+Success is `{data: ...}`; errors are `{error: {code, message}}`. Catalog read errors are
+`catalog_invalid` (422). Loot writes add `catalog_context_required` (409) when the raid has no
+stored instance and size, and `catalog_item_invalid` (400) when the pair is not in the bundled
+catalog for that context. No array is null.
 
-Upload the normalized JSON as `{catalog: dataset}` to preview. Display notices and the
-report. Explicit confirmation posts the same dataset and the returned `raw_hash` to
-merge. Hashes are SHA-256 of the service's sorted canonical JSON, not of the uploaded
-file bytes. Validation failures persist no preview evidence; conflicts reject the entire
-merge; merges recheck database conflicts and are idempotent. The request limit is 16 MiB.
-No application read/import handler makes a network call.
+Reads are served from the immutable embedded source, never from the mirror, so a stale or
+partially updated database cannot change what the API reports. `raw_hash` is the SHA-256 of the
+embedded file bytes; the exporter's canonical sorted-JSON hash is a different value.
 
 ## Data Delivery And Blocker
 
-**A full six-raid catalog is NOT bundled. Do not expose a built-in one-click production
-import based on the included fixture.** The importer accepts an externally reviewed full
-normalized dataset. Completing the source-derived catalog requires a reviewed manifest
+The committed dataset at `scripts/data/catalog-wotlk335.json` is embedded and served
+automatically: six instances, 2,596 distinct items, and 4,330 sourced drop relationships. It is
+still a **partial** dataset. Completing the source-derived catalog requires a reviewed manifest
 of every boss variant and chest-to-encounter association, especially scripted Ulduar and
 Trial of the Crusader chests/hardmodes. The exporter deliberately requires those explicit
 associations rather than deriving them from item names or unverified lootmode numbers.
-
-An additional opt-in partial dataset is now provided at `scripts/data/catalog-wotlk335.json`,
-with six instances, 2,596 distinct items, and 4,330 sourced drop relationships. It is not
-embedded or automatically imported. `scripts/data/SOURCE.md` and the coverage JSON list
-exact proven relationships, missing cases, notices, licensing, and reproduction steps.
-Participant NPC counts are not boss-kill/progression counts.
+`scripts/data/SOURCE.md` and the coverage JSON list exact proven relationships, missing cases,
+notices, licensing, and reproduction steps. Participant NPC counts are not boss-kill/progression
+counts.
 
 The reusable standard-library exporter is `cmd/catalogexport`. Example:
 

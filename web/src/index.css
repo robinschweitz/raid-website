@@ -392,7 +392,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .inline-form h2, .inline-form > p { flex-basis: 100%; }
 .inline-form label { flex: 1 1 170px; min-width: 0; }
 .inline-form .check { flex: 0 1 auto; }
-.inline-form input, .inline-form select { flex: 1 1 150px; }
+.inline-form input, .inline-form select { /*flex: 1 1 150px;*/ }
 .inline-form input[type='checkbox'], .inline-form input[type='color'] { flex: 0 0 auto; }
 input[type='checkbox'] { min-height: auto; accent-color: var(--accent); }
 .card > form:not(.inline-form) label, form.card:not(.inline-form) label { margin-bottom: 12px; }

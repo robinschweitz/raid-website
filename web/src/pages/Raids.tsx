@@ -36,8 +36,7 @@ export function RaidsPage() {
   const [instanceID, setInstanceID] = useState('')
   const [raidSize, setRaidSize] = useState('')
   const selectedSeries = series.find((s) => s.id === Number(seriesID))
-  const associationInherited = instanceID === (selectedSeries?.catalog_instance_id ?? '') && raidSize === (selectedSeries?.raid_size == null ? '' : String(selectedSeries.raid_size))
-  const associationValid = associationInherited || (!instanceID && !raidSize) || (!!catalog?.instances.some((instance) => instance.id === instanceID) && !!raidSize && catalogRaidSizes(catalog, instanceID).includes(Number(raidSize)))
+  const associationValid = !!catalog?.sources.length && !!catalog.instances.some((instance) => instance.id === instanceID) && !!raidSize && catalogRaidSizes(catalog, instanceID).includes(Number(raidSize))
   const visibleRaids = raids.filter((r) => filter === 'all' || (filter === 'upcoming'
     ? !r.archived_at && (r.status === 'PLANNED' || r.status === 'OPEN')
     : !!r.archived_at || r.status === 'COMPLETED' || r.status === 'CANCELLED'))
@@ -53,7 +52,7 @@ export function RaidsPage() {
   useEffect(() => {
     api.get<LootCatalog>('/api/v1/loot-catalog')
       .then((value) => { if (isActive()) setCatalog(value) })
-      .catch((err) => { if (isActive()) setCatalogError(err instanceof ApiError ? err.message : 'Beutekatalog konnte nicht geladen werden. Raidplanung ohne neue Zuordnung bleibt verfügbar.') })
+      .catch((err) => { if (isActive()) setCatalogError(err instanceof ApiError ? err.message : 'Beutekatalog konnte nicht geladen werden. Neue Raids benötigen eine geprüfte Instanz und Raidgröße.') })
   }, [isActive])
 
   const onCreate = async (event: FormEvent) => {

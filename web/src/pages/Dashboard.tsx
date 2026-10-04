@@ -61,7 +61,7 @@ export function DashboardPage() {
   }, [polls])
 
   return <div className="dashboard">
-    <div className="page-heading"><div><p className="eyebrow">Bratwurst des Schicksals</p><h1>Gildenübersicht</h1></div><Link className="text-link" to="/raids">Alle Raids ansehen →</Link></div>
+    <div className="page-heading"><div><h1>Gildenübersicht</h1></div><Link className="text-link" to="/raids">Alle Raids ansehen →</Link></div>
     {error && <p className="error" role="alert">{error}</p>}
     <section className="raid-banner">
       <Citadel />

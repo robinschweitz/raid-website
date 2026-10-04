@@ -44,7 +44,8 @@ and a real-data dashboard. No external artwork, fake progression, or new UI depe
   outside range is `1 + X` to `100 + X`, where `X = min(balance, 50)`. Only an enhanced
   loot winner pays, as part of staff recording that outside outcome.
 - Migrations 006-008 add award methods, linked EP costs, request identities, and catalog
-  associations. Existing ledgers and historical free-text loot are preserved.
+  associations. Migration 009 records each bundled-catalog startup initialization. Existing
+  ledgers and historical free-text loot are preserved.
 
 ## Loot Workspace
 
@@ -63,26 +64,32 @@ same award instead of charging again. Loot DTOs use `award_method`, not a caller
 
 ## Local Beutekatalog
 
-Admins open **Beutekatalog** to select a normalized JSON dataset, review its preview,
-and explicitly confirm the import. Runtime loot recording uses local tables, not remote
-scraping. Imports reject conflicts and never silently replace catalog records.
-
-`scripts/data/catalog-wotlk335.json` is an opt-in, **partial, source-checked** AzerothCore
+`scripts/data/catalog-wotlk335.json` is the committed, **partial, source-checked** AzerothCore
 3.3.5 dataset for the six requested raids. It contains 2,596 distinct items and 4,330
 drop relationships; it is not a complete or human-reviewed catalog. Read
-`scripts/data/SOURCE.md` and the coverage JSON before importing. Missing scripted chest,
-collective encounter, and hardmode relationships are explicitly documented. The dataset
-has its own upstream GPL v2 license and attribution; it is not automatically seeded.
+`scripts/data/SOURCE.md` and the coverage JSON. Missing scripted chest, collective encounter, and
+hardmode relationships are explicitly documented. The dataset has its own upstream GPL v2 license
+and attribution.
+
+The server embeds that file and serves it as the only catalog. Startup mirrors its instances,
+bosses, items, and drops into the foreign-key tables, records a report in
+`loot_catalog_initializations`, and fails if the file or the mirror is invalid. There is no upload,
+preview, or merge: **Beutekatalog** is a read-only view, and every authenticated role may read it.
+Updating the catalog means committing a new file.
+
+Source paths are normalized server-side into `NORMAL`, `HEROIC`, and `HARDMODE`. Relationships
+that share boss, item, raid size, and mode are merged; their raw `difficulty`/`loot_mode` pairs
+stay visible as source variants, and unproven conditions are marked conditional.
 
 Optional `catalog_instance_id` and `raid_size` associations can be configured on series
-and active raids. Available sizes come from imported drop records. Associated loot must
-use valid local `catalog_boss_id` and `item_id`; canonical names are derived server-side.
-Unassociated raids retain explicit manual recording. Unchanged historical identities are
-preserved by unrelated corrections, not guessed from current catalog data.
+and active raids. Available sizes come from the bundled drops. New loot must use a bundled
+`catalog_boss_id` and `item_id` for that instance and size; canonical names are derived
+server-side. Unassociated raids cannot record new loot
+(`catalog_context_required`). Unchanged historical identities are preserved by unrelated
+corrections, not guessed from current catalog data.
 
 Catalog reads: `/api/v1/loot-catalog`, `/instances`, `/bosses`, and `/items` beneath that
-prefix. Admin writes: `/api/v1/loot-catalog/preview` with `{"catalog": ...}`, then
-`/api/v1/loot-catalog/merge` with the same dataset and preview `raw_hash`.
+prefix. There are no catalog write endpoints.
 
 `go run ./cmd/catalogexport -help` describes the standalone pinned-source exporter.
 It lexically parses source data, never executes fetched SQL, and retains provenance

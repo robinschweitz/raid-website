@@ -14,6 +14,7 @@ import (
 	"raid-website/internal/db"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
+	"raid-website/internal/lootcatalog"
 	"raid-website/internal/migrations"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
@@ -39,6 +40,21 @@ func TestConcurrentEnhancedAwardsAcrossDatabaseHandles(t *testing.T) {
 				t.Fatal(err)
 			}
 			r := NewRepo(database.DB)
+			catalog := lootcatalog.NewService(lootcatalog.NewRepo(database.DB))
+			if _, err := catalog.EnsureBundled(ctx); err != nil {
+				t.Fatal(err)
+			}
+			data, err := catalog.List(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			drop := data.Drops[0]
+			var instance string
+			for _, boss := range data.Bosses {
+				if boss.ID == drop.BossID {
+					instance = boss.InstanceID
+				}
+			}
 			now := time.Now().UTC()
 			p := &player.Player{Name: "Winner", Role: validation.RoleAdmin, Active: true, CreatedAt: now, UpdatedAt: now}
 			if err := r.players.Create(ctx, p); err != nil {
@@ -48,7 +64,7 @@ func TestConcurrentEnhancedAwardsAcrossDatabaseHandles(t *testing.T) {
 			if err := r.characters.Create(ctx, c); err != nil {
 				t.Fatal(err)
 			}
-			rd := &raid.Raid{Name: "ICC", RaidLeaderID: p.ID, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
+			rd := &raid.Raid{Name: "ICC", CatalogInstanceID: &instance, RaidSize: &drop.RaidSize, RaidLeaderID: p.ID, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
 			if err := r.raids.Create(ctx, rd); err != nil {
 				t.Fatal(err)
 			}
@@ -80,7 +96,7 @@ func TestConcurrentEnhancedAwardsAcrossDatabaseHandles(t *testing.T) {
 					if sameRequest {
 						requestID = "same"
 					}
-					award := &loot.Award{RaidID: rd.ID, ItemName: "winning loot", AwardMethod: loot.Enhanced, AwardedToPlayerID: p.ID, AwardedToCharacterID: &c.ID, RequestID: &requestID}
+					award := &loot.Award{RaidID: rd.ID, CatalogBossID: &drop.BossID, ItemID: drop.ItemID, AwardMethod: loot.Enhanced, AwardedToPlayerID: p.ID, AwardedToCharacterID: &c.ID, RequestID: &requestID}
 					if err := service.SaveLoot(ctx, award, p.ID, ""); err != nil {
 						errs <- err
 						return

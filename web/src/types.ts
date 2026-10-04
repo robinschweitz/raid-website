@@ -112,15 +112,14 @@ export interface CatalogSource {
 export interface CatalogInstance { id: string; name: string }
 export interface CatalogBoss { id: string; instance_id: string; name: string }
 export interface CatalogItem { item_id: string; name: string; binding?: number; quality?: number }
-export interface CatalogDrop { boss_id: string; item_id: string; raid_size: number; difficulty: string; loot_mode: number }
-export interface CatalogItemDrop extends CatalogItem, CatalogDrop {}
-export interface CatalogDataset {
-  source: CatalogSource
-  notices: string[]
-  instances: CatalogInstance[]
-  bosses: CatalogBoss[]
-  items: CatalogItem[]
-  drops: CatalogDrop[]
+export type CatalogMode = 'NORMAL' | 'HEROIC' | 'HARDMODE'
+export const catalogModeLabels: Record<CatalogMode, string> = { NORMAL: 'Normal', HEROIC: 'Heroisch', HARDMODE: 'Hardmode' }
+export interface CatalogItemDrop extends CatalogItem {
+  boss_id: string
+  raid_size: number
+  mode: CatalogMode
+  source_variants: { difficulty: string; loot_mode: number }[]
+  conditional: boolean
 }
 export interface CatalogProvenance { source: CatalogSource; raw_hash: string; notices: string[] }
 export interface LootCatalog {
@@ -128,17 +127,7 @@ export interface LootCatalog {
   instances: CatalogInstance[]
   bosses: CatalogBoss[]
   items: CatalogItem[]
-  drops: CatalogDrop[]
-}
-export interface CatalogReport {
-  source: CatalogSource
-  raw_hash: string
-  notices: string[]
-  errors: string[]
-  conflicts: string[]
-  inserted: number
-  skipped: number
-  merged: boolean
+  drops: CatalogItemDrop[]
 }
 
 export function catalogRaidSizes(catalog: LootCatalog | null, instanceID: string): number[] {

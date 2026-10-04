@@ -28,7 +28,7 @@ func (f *correctionFixture) seedPoints(playerID int64, amount int) {
 }
 
 func (f *correctionFixture) lootBody(method string) map[string]any {
-	return map[string]any{"item_name": "Weiheabzeichen des Eroberers", "award_method": method, "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "request_id": "winning-award"}
+	return f.selection(map[string]any{"award_method": method, "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "request_id": "winning-award"}, true)
 }
 
 func (f *correctionFixture) award(id int64) *loot.Award {
@@ -172,7 +172,7 @@ func TestDomainNewEnhancedAwardsRequireRequestID(t *testing.T) {
 					if completed && directLoot {
 						continue
 					}
-					award := &loot.Award{RaidID: f.raidID, ItemName: "Weiheabzeichen des Eroberers", AwardMethod: loot.Enhanced, AwardedToPlayerID: f.first, AwardedToCharacterID: &f.firstChar, AwardedByPlayerID: f.actor, RequestID: key}
+					award := &loot.Award{RaidID: f.raidID, CatalogBossID: &f.tokenBoss, ItemID: f.tokenItem, AwardMethod: loot.Enhanced, AwardedToPlayerID: f.first, AwardedToCharacterID: &f.firstChar, AwardedByPlayerID: f.actor, RequestID: key}
 					var err error
 					if directLoot {
 						err = loot.NewService(loot.NewRepo(f.db)).Award(context.Background(), award)
@@ -230,7 +230,7 @@ func TestEnteringEnhancedRequiresHistoricalRecipientInRoster(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			result := f.request(http.MethodPatch, suffix, map[string]any{"award_method": "ENHANCED", "reason": "outside winner"}, http.StatusBadRequest)
+			result := f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "ENHANCED", "reason": "outside winner"}, true), http.StatusBadRequest)
 			if !bytes.Contains(result, []byte(`"code":"recipient_not_in_roster"`)) {
 				t.Fatalf("roster error: %s", result)
 			}
@@ -250,7 +250,7 @@ func TestEnteringEnhancedRequiresHistoricalRecipientInRoster(t *testing.T) {
 				t.Fatal("failed enhanced transition changed history")
 			}
 			f.request(http.MethodPost, "/attendance", map[string]any{"player_id": f.first, "character_id": f.firstChar, "role": "DD", "reason": "actual historical participant"}, http.StatusCreated)
-			f.request(http.MethodPatch, suffix, map[string]any{"award_method": "ENHANCED", "awarded_to_character_id": f.firstChar, "reason": "actual roster winner"}, http.StatusOK)
+			f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "ENHANCED", "awarded_to_character_id": f.firstChar, "reason": "actual roster winner"}, true), http.StatusOK)
 			cost := f.award(old.ID).EnhancedCost
 			balance, err := enhancepoints.NewRepo(f.db).Balance(context.Background(), f.first)
 			if err != nil || cost != 50 {
@@ -295,7 +295,7 @@ func TestEnhancedLootCoupledCorrections(t *testing.T) {
 	f.seedPoints(f.second, 30)
 	id := correctionID(t, f.request(http.MethodPost, "/loot", f.lootBody("ENHANCED"), http.StatusCreated))
 	suffix := fmt.Sprintf("/loot/%d", id)
-	f.request(http.MethodPatch, suffix, map[string]any{"item_name": "ordinary item", "notes": "changed metadata", "reason": "clarify"}, http.StatusOK)
+	f.request(http.MethodPatch, suffix, f.selection(map[string]any{"notes": "changed metadata", "reason": "clarify"}, false), http.StatusOK)
 	if f.award(id).EnhancedCost != 50 {
 		t.Fatal("metadata edit recalculated cost")
 	}
@@ -475,7 +475,7 @@ func TestHistoricalNullableRecipientPreservedUntilRecipientChange(t *testing.T) 
 	f.request(http.MethodPatch, suffix, map[string]any{"awarded_to_player_id": f.second, "reason": "recipient correction"}, http.StatusBadRequest)
 	f.request(http.MethodPatch, suffix, map[string]any{"awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar, "reason": "not in roster"}, http.StatusBadRequest)
 	f.request(http.MethodPost, "/attendance", map[string]any{"player_id": f.second, "character_id": f.secondChar, "role": "DD", "reason": "missing participant"}, http.StatusCreated)
-	f.request(http.MethodPatch, suffix, map[string]any{"awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar, "reason": "recipient correction"}, http.StatusOK)
+	f.request(http.MethodPatch, suffix, f.selection(map[string]any{"awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar, "reason": "recipient correction"}, false), http.StatusOK)
 }
 
 func TestLockAwardsRequireUnambiguousRosterCharacter(t *testing.T) {

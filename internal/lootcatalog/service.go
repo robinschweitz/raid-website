@@ -11,162 +11,203 @@ import (
 	"strings"
 )
 
-// Service validates and merges only explicitly reviewed local datasets.
-type Service struct{ repo *Repo }
+// Service reads the authoritative bundled catalog and initializes its FK mirror.
+type Service struct {
+	repo *Repo
+}
 
 // NewService constructs the catalog domain service.
-func NewService(repo *Repo) *Service { return &Service{repo: repo} }
+func NewService(repo *Repo) *Service {
+	return &Service{repo: repo}
+}
 
-// Canonical validates the upload and hashes a deterministic sorted representation.
+// Canonical validates a normalized dataset and hashes a deterministic sorted
+// representation. The exporter uses it; the server never uploads datasets.
 func Canonical(input Dataset) (Dataset, Report) {
-	d := input
-	d.Instances = append([]Instance{}, input.Instances...)
-	d.Bosses = append([]Boss{}, input.Bosses...)
-	d.Items = append([]Item{}, input.Items...)
-	d.Drops = append([]Drop{}, input.Drops...)
-	d.Notices = append([]string{}, input.Notices...)
-	r := Report{Source: d.Source, Notices: d.Notices, Errors: []string{}, Conflicts: []string{}}
-	for _, value := range []string{d.Source.ID, d.Source.Revision, d.Source.URL, d.Source.License, d.Source.Attribution} {
+	canonical := input
+	canonical.Notices = append([]string{}, input.Notices...)
+	canonical.Instances = append([]Instance{}, input.Instances...)
+	canonical.Bosses = append([]Boss{}, input.Bosses...)
+	canonical.Items = make([]Item, len(input.Items))
+	for i, item := range input.Items {
+		canonical.Items[i] = cloneItem(item)
+	}
+	canonical.Drops = append([]Drop{}, input.Drops...)
+
+	report := Report{Source: canonical.Source, Notices: canonical.Notices, Errors: []string{}}
+	for _, value := range []string{canonical.Source.ID, canonical.Source.Revision, canonical.Source.URL, canonical.Source.License, canonical.Source.Attribution} {
 		if strings.TrimSpace(value) == "" {
-			r.Errors = append(r.Errors, "source: ID, Revision, URL, Lizenz und Attribution erforderlich")
+			report.Errors = append(report.Errors, "source: ID, Revision, URL, Lizenz und Attribution erforderlich")
 			break
 		}
 	}
-	if len(d.Instances) == 0 || len(d.Bosses) == 0 || len(d.Items) == 0 || len(d.Drops) == 0 {
-		r.Errors = append(r.Errors, "Katalog muss Instanzen, Bosse, Gegenstaende und Drops enthalten")
+	if len(canonical.Instances) == 0 || len(canonical.Bosses) == 0 || len(canonical.Items) == 0 || len(canonical.Drops) == 0 {
+		report.Errors = append(report.Errors, "Katalog muss Instanzen, Bosse, Gegenstaende und Drops enthalten")
 	}
+
 	validID := func(id string) bool {
-		n, err := strconv.ParseUint(id, 10, 32)
-		return err == nil && n > 0 && strconv.FormatUint(n, 10) == id
+		number, err := strconv.ParseUint(id, 10, 32)
+		return err == nil && number > 0 && strconv.FormatUint(number, 10) == id
 	}
-	instances, bosses, items := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	instances := map[string]bool{}
+	bosses := map[string]bool{}
+	items := map[string]bool{}
 	check := func(kind, id, name string, seen map[string]bool) {
 		if !validID(id) || strings.TrimSpace(name) == "" {
-			r.Errors = append(r.Errors, fmt.Sprintf("%s %q: ungueltige ID oder leerer Name", kind, id))
+			report.Errors = append(report.Errors, fmt.Sprintf("%s %q: ungueltige ID oder leerer Name", kind, id))
 		}
 		if seen[id] {
-			r.Errors = append(r.Errors, fmt.Sprintf("%s %s: doppelte ID", kind, id))
+			report.Errors = append(report.Errors, fmt.Sprintf("%s %s: doppelte ID", kind, id))
 		}
 		seen[id] = true
 	}
-	for _, i := range d.Instances {
-		check("instance", i.ID, i.Name, instances)
+	for _, instance := range canonical.Instances {
+		check("instance", instance.ID, instance.Name, instances)
 	}
-	for _, b := range d.Bosses {
-		check("boss", b.ID, b.Name, bosses)
-		if !instances[b.InstanceID] {
-			r.Errors = append(r.Errors, "boss "+b.ID+": unbekannte instance_id")
+	for _, boss := range canonical.Bosses {
+		check("boss", boss.ID, boss.Name, bosses)
+		if !instances[boss.InstanceID] {
+			report.Errors = append(report.Errors, "boss "+boss.ID+": unbekannte instance_id")
 		}
 	}
-	for _, i := range d.Items {
-		check("item", i.ItemID, i.Name, items)
-		if i.Binding != nil && *i.Binding < 0 || i.Quality != nil && *i.Quality < 0 {
-			r.Errors = append(r.Errors, "item "+i.ItemID+": negative Metadaten")
+	for _, item := range canonical.Items {
+		check("item", item.ItemID, item.Name, items)
+		if item.Binding != nil && *item.Binding < 0 || item.Quality != nil && *item.Quality < 0 {
+			report.Errors = append(report.Errors, "item "+item.ItemID+": negative Metadaten")
 		}
 	}
 	seenDrops := map[string]bool{}
-	for _, drop := range d.Drops {
+	for _, drop := range canonical.Drops {
 		if !bosses[drop.BossID] || !items[drop.ItemID] {
-			r.Errors = append(r.Errors, "drop: unbekannter Boss oder Gegenstand")
+			report.Errors = append(report.Errors, "drop: unbekannter Boss oder Gegenstand")
 		}
 		if drop.RaidSize != 10 && drop.RaidSize != 25 || strings.TrimSpace(drop.Difficulty) == "" || drop.LootMode < 1 || drop.LootMode > 65535 {
-			r.Errors = append(r.Errors, "drop: ungueltige Variante oder LootMode")
+			report.Errors = append(report.Errors, "drop: ungueltige Variante oder LootMode")
 		}
 		key := dropKey(drop)
 		if seenDrops[key] {
-			r.Errors = append(r.Errors, "drop: doppelte Beziehung "+key)
+			report.Errors = append(report.Errors, "drop: doppelte Beziehung "+key)
 		}
 		seenDrops[key] = true
 	}
-	sort.Slice(d.Instances, func(i, j int) bool { return d.Instances[i].ID < d.Instances[j].ID })
-	sort.Slice(d.Bosses, func(i, j int) bool { return d.Bosses[i].ID < d.Bosses[j].ID })
-	sort.Slice(d.Items, func(i, j int) bool { return d.Items[i].ItemID < d.Items[j].ItemID })
-	sort.Slice(d.Drops, func(i, j int) bool { return dropKey(d.Drops[i]) < dropKey(d.Drops[j]) })
-	encoded, err := json.Marshal(d)
+	sort.Slice(canonical.Instances, func(i, j int) bool { return canonical.Instances[i].ID < canonical.Instances[j].ID })
+	sort.Slice(canonical.Bosses, func(i, j int) bool { return canonical.Bosses[i].ID < canonical.Bosses[j].ID })
+	sort.Slice(canonical.Items, func(i, j int) bool { return canonical.Items[i].ItemID < canonical.Items[j].ItemID })
+	sort.Slice(canonical.Drops, func(i, j int) bool { return dropKey(canonical.Drops[i]) < dropKey(canonical.Drops[j]) })
+	encoded, err := json.Marshal(canonical)
 	if err != nil {
-		r.Errors = append(r.Errors, "Katalog kann nicht serialisiert werden")
-		return d, r
+		report.Errors = append(report.Errors, "Katalog kann nicht serialisiert werden")
+		return canonical, report
 	}
 	hash := sha256.Sum256(encoded)
-	r.RawHash = hex.EncodeToString(hash[:])
-	return d, r
+	report.RawHash = hex.EncodeToString(hash[:])
+	return canonical, report
 }
 
-func dropKey(d Drop) string { encoded, _ := json.Marshal(d); return string(encoded) }
-
-// Preview writes only preview evidence when validation and database comparison succeed.
-func (s *Service) Preview(ctx context.Context, input Dataset, suppliedHash string) (Report, error) {
-	d, report := Canonical(input)
-	if len(report.Errors) != 0 {
-		return report, ErrInvalid
-	}
-	if suppliedHash != "" && suppliedHash != report.RawHash {
-		return report, ErrHashMismatch
-	}
-	return s.repo.Import(ctx, d, report, false)
+func dropKey(drop Drop) string {
+	encoded, _ := json.Marshal(drop)
+	return string(encoded)
 }
 
-// Merge requires a matching successful preview and rechecks conflicts transactionally.
-func (s *Service) Merge(ctx context.Context, input Dataset, reviewedHash string) (Report, error) {
-	d, report := Canonical(input)
-	if len(report.Errors) != 0 {
-		return report, ErrInvalid
-	}
-	if reviewedHash == "" {
-		return report, ErrPreviewRequired
-	}
-	if reviewedHash != report.RawHash {
-		return report, ErrHashMismatch
-	}
-	return s.repo.Import(ctx, d, report, true)
+// EnsureBundled transactionally mirrors the compiled catalog without changing
+// guild history, and reports every changed fact.
+func (s *Service) EnsureBundled(ctx context.Context) (InitializationReport, error) {
+	return s.repo.EnsureBundled(ctx)
 }
 
-// List returns the complete local catalog without network access.
-func (s *Service) List(ctx context.Context) (Catalog, error) { return s.repo.List(ctx) }
+// List returns the complete bundled catalog without network or database access.
+func (s *Service) List(ctx context.Context) (Catalog, error) {
+	return s.repo.List(ctx)
+}
 
-// Instances lists local game instances.
+// Instances lists the local game instances.
 func (s *Service) Instances(ctx context.Context) ([]Instance, error) {
-	c, err := s.List(ctx)
-	return c.Instances, err
+	catalog, err := s.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return catalog.Instances, nil
 }
 
-// Bosses lists bosses, optionally restricted to an instance.
+// Bosses lists bosses, optionally restricted to one instance.
 func (s *Service) Bosses(ctx context.Context, instanceID string) ([]Boss, error) {
-	c, err := s.List(ctx)
-	result := []Boss{}
-	for _, b := range c.Bosses {
-		if instanceID == "" || b.InstanceID == instanceID {
-			result = append(result, b)
+	catalog, err := s.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	bosses := []Boss{}
+	for _, boss := range catalog.Bosses {
+		if instanceID == "" || boss.InstanceID == instanceID {
+			bosses = append(bosses, boss)
 		}
 	}
-	return result, err
+	return bosses, nil
 }
 
-// Items returns item/drop pairs, preserving mixed hardmode metadata.
+// Items merges every source relationship of one boss, raid size, and gameplay
+// mode into a single selection and keeps the raw paths for provenance.
 func (s *Service) Items(ctx context.Context, filter Filter) ([]ItemDrop, error) {
 	if filter.RaidSize != 0 && filter.RaidSize != 10 && filter.RaidSize != 25 {
 		return []ItemDrop{}, ErrInvalid
 	}
-	c, err := s.List(ctx)
+	if filter.Mode != "" && !validMode(filter.Mode) {
+		return []ItemDrop{}, ErrInvalid
+	}
+	catalog, err := s.List(ctx)
 	if err != nil {
 		return nil, err
 	}
 	items := map[string]Item{}
-	for _, i := range c.Items {
-		items[i.ItemID] = i
+	for _, item := range catalog.Items {
+		items[item.ItemID] = item
 	}
 	result := []ItemDrop{}
-	for _, d := range c.Drops {
-		if filter.BossID != "" && d.BossID != filter.BossID || filter.RaidSize != 0 && d.RaidSize != filter.RaidSize || filter.Difficulty != "" && d.Difficulty != filter.Difficulty {
+	indexes := map[string]int{}
+	for _, drop := range catalog.Drops {
+		if filter.BossID != "" && drop.BossID != filter.BossID {
 			continue
 		}
-		result = append(result, ItemDrop{Item: items[d.ItemID], BossID: d.BossID, RaidSize: d.RaidSize, Difficulty: d.Difficulty, LootMode: d.LootMode})
+		if filter.RaidSize != 0 && drop.RaidSize != filter.RaidSize {
+			continue
+		}
+		mode, conditional, err := sourceGameMode(drop)
+		if err != nil {
+			return nil, err
+		}
+		if filter.Mode != "" && mode != filter.Mode {
+			continue
+		}
+		variant := SourceVariant{Difficulty: drop.Difficulty, LootMode: drop.LootMode}
+		key := fmt.Sprintf("%s/%s/%d/%s", drop.BossID, drop.ItemID, drop.RaidSize, mode)
+		if index, merged := indexes[key]; merged {
+			result[index].SourceVariants = append(result[index].SourceVariants, variant)
+			result[index].Conditional = result[index].Conditional || conditional
+			continue
+		}
+		indexes[key] = len(result)
+		result = append(result, ItemDrop{
+			Item:           cloneItem(items[drop.ItemID]),
+			BossID:         drop.BossID,
+			RaidSize:       drop.RaidSize,
+			Mode:           mode,
+			Conditional:    conditional,
+			SourceVariants: []SourceVariant{variant},
+		})
 	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].RaidSize != result[j].RaidSize {
+			return result[i].RaidSize < result[j].RaidSize
+		}
+		if result[i].Mode != result[j].Mode {
+			return result[i].Mode < result[j].Mode
+		}
+		return result[i].ItemID < result[j].ItemID
+	})
 	return result, nil
 }
 
-// ValidateAssociation accepts only sizes evidenced by drops for the selected instance.
-// Nil values allow existing free-text raids to remain unassociated.
+// ValidateAssociation accepts only instances and sizes evidenced by the bundled
+// drops. Nil values keep existing free-text raids unassociated.
 func (s *Service) ValidateAssociation(ctx context.Context, instanceID *string, raidSize *int) error {
 	if instanceID == nil {
 		if raidSize != nil {
@@ -174,61 +215,66 @@ func (s *Service) ValidateAssociation(ctx context.Context, instanceID *string, r
 		}
 		return nil
 	}
-	c, err := s.List(ctx)
+	catalog, err := s.List(ctx)
 	if err != nil {
 		return err
 	}
-	found := false
-	bosses := map[string]bool{}
-	for _, i := range c.Instances {
-		if i.ID == *instanceID {
-			found = true
+	instance := Instance{}
+	for _, candidate := range catalog.Instances {
+		if candidate.ID == *instanceID {
+			instance = candidate
 		}
 	}
-	if !found {
+	if instance.ID == "" {
 		return ErrInvalid
 	}
 	if raidSize == nil {
 		return nil
 	}
-	for _, b := range c.Bosses {
-		if b.InstanceID == *instanceID {
-			bosses[b.ID] = true
+	bosses := map[string]bool{}
+	for _, boss := range catalog.Bosses {
+		if boss.InstanceID == instance.ID {
+			bosses[boss.ID] = true
 		}
 	}
-	for _, d := range c.Drops {
-		if bosses[d.BossID] && d.RaidSize == *raidSize {
+	for _, drop := range catalog.Drops {
+		if bosses[drop.BossID] && drop.RaidSize == *raidSize {
 			return nil
 		}
 	}
 	return ErrInvalid
 }
 
-// ValidateDrop resolves canonical names only for an evidenced local drop association.
+// ValidateDrop resolves canonical names only for a drop the bundled source
+// evidences for that instance and raid size.
 func (s *Service) ValidateDrop(ctx context.Context, instanceID string, raidSize *int, bossID *string, itemID string) (Boss, Item, error) {
 	if bossID == nil || itemID == "" {
 		return Boss{}, Item{}, ErrInvalid
 	}
-	c, err := s.List(ctx)
+	catalog, err := s.List(ctx)
 	if err != nil {
 		return Boss{}, Item{}, err
 	}
-	var boss Boss
-	for _, b := range c.Bosses {
-		if b.ID == *bossID && b.InstanceID == instanceID {
-			boss = b
+	boss := Boss{}
+	for _, candidate := range catalog.Bosses {
+		if candidate.ID == *bossID && candidate.InstanceID == instanceID {
+			boss = candidate
 			break
 		}
 	}
 	if boss.ID == "" {
 		return Boss{}, Item{}, ErrInvalid
 	}
-	for _, d := range c.Drops {
-		if d.BossID == boss.ID && d.ItemID == itemID && (raidSize == nil || d.RaidSize == *raidSize) {
-			for _, item := range c.Items {
-				if item.ItemID == itemID {
-					return boss, item, nil
-				}
+	for _, drop := range catalog.Drops {
+		if drop.BossID != boss.ID || drop.ItemID != itemID {
+			continue
+		}
+		if raidSize != nil && drop.RaidSize != *raidSize {
+			continue
+		}
+		for _, item := range catalog.Items {
+			if item.ItemID == itemID {
+				return boss, cloneItem(item), nil
 			}
 		}
 	}

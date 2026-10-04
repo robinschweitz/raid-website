@@ -84,7 +84,7 @@ function Layout() {
             <Link className={path === '/loot-catalog' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/loot-catalog"><NavIcon name="settings" />Beutekatalog</Link>
           </>}
         </nav>
-        <div className="sidebar-footer"><p>Gemeinsam durch die Kälte.</p><span>Raids · Loot · Gemeinschaft</span></div>
+        {/* <div className="sidebar-footer"><p>Gemeinsam durch die Kälte.</p><span>Raids · Loot · Gemeinschaft</span></div> */}
       </aside>
       <div className="main-shell">
       <header className="topbar">
@@ -97,7 +97,7 @@ function Layout() {
         {error && <p className="error" role="alert">{error}</p>}
         <Routes />
       </main>
-      <footer className="page-footer">Bratwurst des Schicksals <span>Raidplanung & gemeinsame Geschichte</span></footer>
+      {/* <footer className="page-footer">Bratwurst des Schicksals <span></span></footer> */}
       </div>
       <nav className="mobile-nav" aria-label="Mobile Hauptnavigation">
         <Link className={path === '/' ? 'active' : ''} to="/"><NavIcon name="home" />Übersicht</Link>

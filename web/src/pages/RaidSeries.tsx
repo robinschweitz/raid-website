@@ -21,7 +21,7 @@ export function RaidSeriesPage() {
   const [catalogError, setCatalogError] = useState('')
   const existing = series.find((row) => row.id === editingID)
   const associationUnchanged = schedule.catalog_instance_id === (existing?.catalog_instance_id ?? '') && schedule.raid_size === (existing?.raid_size == null ? '' : String(existing.raid_size))
-  const associationValid = associationUnchanged || (!schedule.catalog_instance_id && !schedule.raid_size) || (!!catalog?.instances.some((instance) => instance.id === schedule.catalog_instance_id) && !!schedule.raid_size && catalogRaidSizes(catalog, schedule.catalog_instance_id).includes(Number(schedule.raid_size)))
+  const associationValid = (!!existing && associationUnchanged) || (!!catalog?.sources.length && !!catalog.instances.some((instance) => instance.id === schedule.catalog_instance_id) && !!schedule.raid_size && catalogRaidSizes(catalog, schedule.catalog_instance_id).includes(Number(schedule.raid_size)))
   const isAdmin = !!player && atLeast(player.role, 'ADMIN')
 
   useEffect(() => {

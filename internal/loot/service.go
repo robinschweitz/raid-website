@@ -12,22 +12,22 @@ import (
 
 	"raid-website/internal/audit"
 	"raid-website/internal/enhancepoints"
-	"raid-website/internal/lootcatalog"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
 var (
-	ErrRaidState       = errors.New("raid does not allow ordinary loot awards")
-	ErrNotFound        = errors.New("referenced record not found")
-	ErrOwnership       = errors.New("character does not belong to recipient")
-	ErrLockConflict    = errors.New("multiple active locks match item")
-	ErrInvalidLock     = errors.New("item lock must match an active lock for this raid and item")
-	ErrInvalidMethod   = errors.New("award_method must be MAIN, SECOND, ENHANCED or BOE")
-	ErrItemName        = errors.New("item_name is required")
-	ErrRoster          = errors.New("recipient character must be in raid roster")
-	ErrRequestRequired = errors.New("new enhanced awards require a nonblank request_id")
-	ErrRequestConflict = errors.New("request id already used with different payload")
+	ErrRaidState              = errors.New("raid does not allow ordinary loot awards")
+	ErrNotFound               = errors.New("referenced record not found")
+	ErrOwnership              = errors.New("character does not belong to recipient")
+	ErrLockConflict           = errors.New("multiple active locks match item")
+	ErrInvalidLock            = errors.New("item lock must match an active lock for this raid and item")
+	ErrInvalidMethod          = errors.New("award_method must be MAIN, SECOND, ENHANCED or BOE")
+	ErrItemName               = errors.New("item_name is required")
+	ErrRoster                 = errors.New("recipient character must be in raid roster")
+	ErrRequestRequired        = errors.New("new enhanced awards require a nonblank request_id")
+	ErrRequestConflict        = errors.New("request id already used with different payload")
+	ErrCatalogContextRequired = errors.New("raid catalog instance and size are required")
 )
 
 // Service coordinates loot awards with derived token transactions.
@@ -278,7 +278,8 @@ func ResolveRequest(ctx context.Context, repo *Repo, a *Award, reason string) (b
 // ValidateCatalog preserves historical snapshots on unrelated edits and validates new identities.
 func ValidateCatalog(ctx context.Context, repo *Repo, a, old *Award) error {
 	sameBoss := old != nil && ((old.CatalogBossID == nil && a.CatalogBossID == nil) || (old.CatalogBossID != nil && a.CatalogBossID != nil && *old.CatalogBossID == *a.CatalogBossID))
-	if old != nil && sameBoss && old.Boss == a.Boss && old.ItemName == a.ItemName && old.ItemID == a.ItemID && old.AwardedToPlayerID == a.AwardedToPlayerID && ((old.AwardedToCharacterID == nil && a.AwardedToCharacterID == nil) || (old.AwardedToCharacterID != nil && a.AwardedToCharacterID != nil && *old.AwardedToCharacterID == *a.AwardedToCharacterID)) {
+	enteringEnhanced := old != nil && old.AwardMethod != Enhanced && a.AwardMethod == Enhanced
+	if old != nil && !enteringEnhanced && sameBoss && old.Boss == a.Boss && old.ItemName == a.ItemName && old.ItemID == a.ItemID && old.AwardedToPlayerID == a.AwardedToPlayerID && ((old.AwardedToCharacterID == nil && a.AwardedToCharacterID == nil) || (old.AwardedToCharacterID != nil && a.AwardedToCharacterID != nil && *old.AwardedToCharacterID == *a.AwardedToCharacterID)) {
 		if old.CatalogBossID != nil {
 			a.Boss, a.ItemName = old.Boss, old.ItemName
 		}
@@ -288,11 +289,8 @@ func ValidateCatalog(ctx context.Context, repo *Repo, a, old *Award) error {
 	if err != nil {
 		return err
 	}
-	if rd.CatalogInstanceID == nil && a.CatalogBossID == nil {
-		return nil
-	}
-	if rd.CatalogInstanceID == nil {
-		return lootcatalog.ErrInvalid
+	if rd.CatalogInstanceID == nil || rd.RaidSize == nil {
+		return ErrCatalogContextRequired
 	}
 	boss, item, err := repo.Catalog().ValidateDrop(ctx, *rd.CatalogInstanceID, rd.RaidSize, a.CatalogBossID, a.ItemID)
 	if err != nil {

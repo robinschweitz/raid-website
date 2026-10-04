@@ -11,6 +11,7 @@ import (
 	"raid-website/internal/db"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
+	"raid-website/internal/lootcatalog"
 	"raid-website/internal/migrations"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
@@ -42,6 +43,21 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 				t.Fatal(err)
 			}
 			r := NewRepo(database.DB)
+			catalog := lootcatalog.NewService(lootcatalog.NewRepo(database.DB))
+			if _, err := catalog.EnsureBundled(ctx); err != nil {
+				t.Fatal(err)
+			}
+			data, err := catalog.List(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			drop := data.Drops[0]
+			var instance string
+			for _, boss := range data.Bosses {
+				if boss.ID == drop.BossID {
+					instance = boss.InstanceID
+				}
+			}
 			s := NewService(r)
 			now := time.Now().UTC()
 			players := []*player.Player{
@@ -63,7 +79,7 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 					}
 				}
 			}
-			rd := &raid.Raid{Name: "ICC25-01", RaidLeaderID: players[0].ID, Status: validation.RaidStatusCompleted, CreatedAt: now, UpdatedAt: now}
+			rd := &raid.Raid{Name: "ICC25-01", CatalogInstanceID: &instance, RaidSize: &drop.RaidSize, RaidLeaderID: players[0].ID, Status: validation.RaidStatusCompleted, CreatedAt: now, UpdatedAt: now}
 			if err := r.raids.Create(ctx, rd); err != nil {
 				t.Fatal(err)
 			}
@@ -120,7 +136,7 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 			}
 			assertBalance(players[0].ID, baseline)
 			assertCorrectionAmounts(players[0].ID)
-			award := &loot.Award{RaidID: rd.ID, ItemName: "new historical offspec loot", AwardedToPlayerID: players[0].ID, AwardedToCharacterID: &chars[0].ID, AwardMethod: loot.Second}
+			award := &loot.Award{RaidID: rd.ID, CatalogBossID: &drop.BossID, ItemID: drop.ItemID, AwardedToPlayerID: players[0].ID, AwardedToCharacterID: &chars[0].ID, AwardMethod: loot.Second}
 			if err := s.SaveLoot(ctx, award, players[0].ID, "missing offspec loot"); err != nil {
 				t.Fatal(err)
 			}

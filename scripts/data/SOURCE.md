@@ -3,9 +3,9 @@
 ## Status
 
 `catalog-wotlk335.json` is a usable **PARTIAL, SOURCE-CHECKED dataset**, not a complete
-catalog and not a human-reviewed release. It can be selected for explicit Admin upload,
-preview, and confirmation. Do not advertise it as a full built-in one-click import or
-automatically seed it into the database. The first notices state this limitation in German.
+catalog and not a human-reviewed release. It is embedded with `go:embed` and served as the
+only catalog; the server mirrors it at startup. Do not advertise it as a complete catalog or
+imply complete coverage. The first notices state this limitation in German.
 
 Outputs generated on 2026-10-04:
 
@@ -19,7 +19,8 @@ Outputs generated on 2026-10-04:
 
 Canonical dataset hash:
 `5eb7c086ba61d5c27c79c6da925fbc85292b6e866509a8f2e91b98a4bf36bb26`.
-This is the import service's sorted-JSON SHA-256, not the JSON file's byte hash.
+This is the exporter's sorted-JSON SHA-256. The API reports the embedded file's byte hash in
+`raw_hash`, which is a different value.
 
 Pinned AzerothCore revision:
 [`ca7e5015d01e8818cb20b1265185f73a691e273f`](https://github.com/azerothcore/azerothcore-wotlk/tree/ca7e5015d01e8818cb20b1265185f73a691e273f).
@@ -214,8 +215,8 @@ Test-Path -LiteralPath "C:\Users\Robin\AppData\Local\Temp\opencode"
 go run ./cmd/catalogexport -manifest scripts/data/catalog-wotlk335.manifest.json -out "C:\Users\Robin\AppData\Local\Temp\opencode\catalog-wotlk335.json"
 ```
 
-The command is the only networking path. Application imports use uploaded normalized
-JSON locally. World SQL is parsed lexically, never executed. No dependency was added.
+The command is the only networking path. The application serves the committed JSON locally and
+never fetches at runtime. World SQL is parsed lexically, never executed. No dependency was added.
 Offline exporter/data tests validate source assertions, source variant sizing, static
 spawn masks, missing-root notices, catalog links/duplicates, the generated hash, counts,
 coverage totals, excluded unverified chest associations, and the separate license.

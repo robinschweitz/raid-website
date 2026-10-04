@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/uptrace/bun"
@@ -36,6 +37,12 @@ type Options struct {
 
 // New constructs the HTTP handler tree with all v1 dependencies wired.
 func New(db *bun.DB, opts Options) (http.Handler, error) {
+	catalog := lootcatalog.NewService(lootcatalog.NewRepo(db))
+	report, err := catalog.EnsureBundled(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("initialize bundled catalog: %w", err)
+	}
+	log.Printf("bundled catalog source=%s revision=%s hash=%s inserted=%d updated=%d retained=%d unchanged=%d warnings=%d (full report: loot_catalog_initializations)", report.Source.ID, report.Source.Revision, report.SourceHash, report.Inserted, report.Updated, report.Retained, report.Unchanged, len(report.Warnings))
 	players := player.NewRepo(db)
 	chars := character.NewRepo(db)
 	raids := raid.NewRepo(db)
@@ -88,7 +95,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 
 	mux := http.NewServeMux()
 	api.Register(mux)
-	v1.CatalogHandlers{Catalog: lootcatalog.NewService(lootcatalog.NewRepo(db))}.Register(mux)
+	v1.CatalogHandlers{Catalog: catalog}.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)
 	if spa, err := webui.Handler(); err == nil {
 		mux.Handle("/", spa)

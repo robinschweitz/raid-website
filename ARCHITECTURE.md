@@ -10,9 +10,11 @@ presentation data. Archived raids remain visible history (ADR 021-022).
 `loot` records outside MAIN/SECOND/ENHANCED/BOE outcomes and coordinates linked enhanced
 EP costs; `raidcorrection` appends coupled compensation and audit snapshots. EP is a
 read-only player-facing ledger, never an in-app roll generator (ADR 023-024).
-`lootcatalog` owns local instance/boss/item/drop records and preview-first, no-overwrite
-imports. `cmd/catalogexport` is a separate source-data preparation tool, not a runtime
-dependency of raid operations (ADR 025). The SVG/CSS design uses only supported data (ADR 026).
+`lootcatalog` embeds the committed source JSON as the only catalog authority, mirrors it into the
+foreign-key tables at startup, and normalizes source paths into explicit NORMAL/HEROIC/HARDMODE
+modes; there is no runtime catalog write. `cmd/catalogexport` is a separate source-data preparation
+tool, not a runtime dependency of raid operations (ADR 025, ADR 027). The SVG/CSS design uses only
+supported data (ADR 026).
 
 Principles:
 - Domain-first, boring/explicit/predictable

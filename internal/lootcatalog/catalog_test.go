@@ -1,66 +1,23 @@
-package lootcatalog_test
+package lootcatalog
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
-	"os"
+	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/uptrace/bun"
 	"raid-website/internal/db"
-	v1 "raid-website/internal/httpapi/v1"
-	"raid-website/internal/lootcatalog"
 	"raid-website/internal/migrations"
-	"raid-website/internal/player"
-	"raid-website/internal/validation"
+	catalogdata "raid-website/scripts/data"
 )
 
-func TestPinnedSourceFixtureOffline(t *testing.T) {
-	content, err := os.ReadFile("testdata/marrowgar.catalog.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var d lootcatalog.Dataset
-	if err := json.Unmarshal(content, &d); err != nil {
-		t.Fatal(err)
-	}
-	_, report := lootcatalog.Canonical(d)
-	if len(report.Errors) != 0 || report.RawHash != "174a4d8ee52eb47ab89b457e8e778bb289370800f994c0d70bbe7c4849b80316" {
-		t.Fatalf("source fixture: %+v", report)
-	}
-	if len(d.Instances) != 1 || d.Instances[0].ID != "631" || len(d.Bosses) != 1 || d.Bosses[0].ID != "36612" || len(d.Items) != 13 || len(d.Drops) != 13 {
-		t.Fatal("fixture misrepresented source subset")
-	}
-	found := false
-	for _, drop := range d.Drops {
-		if drop.ItemID == "50759" && drop.BossID == "36612" && drop.RaidSize == 10 && strings.HasSuffix(drop.Difficulty, "source-lootmode-path:1/1") {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatal("reference loot relationship missing")
-	}
-	s := setup(t)
-	ctx := context.Background()
-	p, err := s.Preview(ctx, d, report.RawHash)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s.Merge(ctx, d, p.RawHash); err != nil {
-		t.Fatal(err)
-	}
-	items, err := s.Items(ctx, lootcatalog.Filter{BossID: "36612", RaidSize: 10})
-	if err != nil || len(items) != 13 {
-		t.Fatalf("source fixture import: %v %d", err, len(items))
-	}
-}
-
-func setup(t *testing.T) *lootcatalog.Service {
+func setup(t *testing.T) (*Service, *bun.DB) {
 	t.Helper()
 	ctx := context.Background()
 	b, err := db.Open(ctx, "file:"+filepath.Join(t.TempDir(), "catalog.db"))
@@ -75,244 +32,289 @@ func setup(t *testing.T) *lootcatalog.Service {
 	if _, err := m.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	return lootcatalog.NewService(lootcatalog.NewRepo(b.DB))
+	return NewService(NewRepo(b.DB)), b.DB
 }
 
-// This synthetic domain fixture tests validation, not source catalog completeness.
-func dataset() lootcatalog.Dataset {
-	return lootcatalog.Dataset{
-		Source:    lootcatalog.Source{ID: "test-source", Revision: "test-revision", URL: "https://example.invalid/source", License: "test-only", Attribution: "Synthetic test fixture"},
-		Notices:   []string{"Synthetic; not game data"},
-		Instances: []lootcatalog.Instance{{ID: "1", Name: "Test instance"}},
-		Bosses:    []lootcatalog.Boss{{ID: "2", InstanceID: "1", Name: "Test boss"}},
-		Items:     []lootcatalog.Item{{ItemID: "3", Name: "Test item"}},
-		Drops:     []lootcatalog.Drop{{BossID: "2", ItemID: "3", RaidSize: 10, Difficulty: "source-mode:1", LootMode: 1}},
+func exec(t *testing.T, b *bun.DB, query string, args ...any) {
+	t.Helper()
+	if _, err := b.ExecContext(context.Background(), query, args...); err != nil {
+		t.Fatal(err)
 	}
 }
 
-func TestReviewedMergeNoOverwrite(t *testing.T) {
-	s := setup(t)
+func count(t *testing.T, b *bun.DB, query string) int {
+	t.Helper()
+	var result int
+	if err := b.NewRaw(query).Scan(context.Background(), &result); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+func TestColdStartAndIdempotentRestart(t *testing.T) {
+	s, b := setup(t)
 	ctx := context.Background()
-	d := dataset()
-	_, canonical := lootcatalog.Canonical(d)
-	if _, err := s.Merge(ctx, d, canonical.RawHash); !errors.Is(err, lootcatalog.ErrPreviewRequired) {
-		t.Fatalf("unreviewed merge: %v", err)
+	before, err := s.List(ctx)
+	if err != nil || len(before.Instances) != 6 || len(before.Drops) == 0 {
+		t.Fatalf("automatic source: %+v %v", before.Sources, err)
 	}
-	preview, err := s.Preview(ctx, d, "")
-	if err != nil || preview.Inserted != 4 {
-		t.Fatalf("preview: %+v %v", preview, err)
+	report, err := s.EnsureBundled(ctx)
+	if err != nil || report.Inserted != len(before.Instances)+len(before.Bosses)+len(before.Items)+len(before.Drops) || report.Updated != 0 {
+		t.Fatalf("initialization: %+v %v", report, err)
 	}
-	c, err := s.List(ctx)
-	if err != nil || len(c.Instances) != 0 {
-		t.Fatalf("preview wrote domain rows: %+v %v", c, err)
+	restarted := NewService(NewRepo(b))
+	repeat, err := restarted.EnsureBundled(ctx)
+	if err != nil || repeat.Inserted != 0 || repeat.Updated != 0 || repeat.Retained != 0 || repeat.Unchanged != report.Inserted {
+		t.Fatalf("restart: %+v %v", repeat, err)
 	}
-	report, err := s.Merge(ctx, d, preview.RawHash)
-	if err != nil || !report.Merged || report.Inserted != 4 {
-		t.Fatalf("merge: %+v %v", report, err)
+	after, err := restarted.List(ctx)
+	if err != nil || !reflect.DeepEqual(before, after) {
+		t.Fatal("restart changed source")
 	}
-	report, err = s.Merge(ctx, d, preview.RawHash)
-	if err != nil || report.Inserted != 0 || report.Skipped != 4 {
-		t.Fatalf("repeat merge: %+v %v", report, err)
+	if count(t, b, "SELECT COUNT(*) FROM loot_catalog_initializations") != 2 {
+		t.Fatal("startup report missing")
 	}
-	d.Items[0].Name = "Changed"
-	if _, err := s.Merge(ctx, d, preview.RawHash); !errors.Is(err, lootcatalog.ErrHashMismatch) {
-		t.Fatalf("changed reviewed payload: %v", err)
-	}
-	report, err = s.Preview(ctx, d, "")
-	if !errors.Is(err, lootcatalog.ErrConflict) || len(report.Conflicts) == 0 {
-		t.Fatalf("overwrite preview: %+v %v", report, err)
-	}
-	c, err = s.List(ctx)
-	if err != nil || c.Items[0].Name != "Test item" {
-		t.Fatalf("overwrote item: %+v %v", c, err)
-	}
-	if c.Sources[0].RawHash != preview.RawHash {
-		t.Fatal("provenance lost reviewed hash")
+	if count(t, b, "SELECT COUNT(*) FROM loot_catalog_sources") != 0 {
+		t.Fatal("manual source history was written")
 	}
 }
 
-func TestValidationRejectsIDsLinksDuplicatesAndVariants(t *testing.T) {
+func TestLegacyConflictsReportedAndHistoryRetained(t *testing.T) {
+	s, b := setup(t)
+	ctx := context.Background()
+	c, err := s.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := c.Sources[0]
+	exec(t, b, "INSERT INTO loot_catalog_sources VALUES (?, ?, ?, ?)", p.Source.ID, p.Source.Revision, "old-different-hash", `{"old":"unchanged"}`)
+	exec(t, b, "INSERT INTO loot_catalog_instances VALUES ('631', 'Old ICC', 'custom')")
+	exec(t, b, "INSERT INTO loot_catalog_instances VALUES ('999999', 'Custom extra', 'custom')")
+	exec(t, b, "INSERT INTO loot_catalog_bosses VALUES ('36612', '631', 'Old boss', 'custom')")
+	exec(t, b, "INSERT INTO loot_catalog_items (item_id,name,source_id) VALUES ('50759','Old item','custom')")
+	exec(t, b, "INSERT INTO loot_catalog_drops VALUES ('36612','50759',10,'manual-old-path',1,'custom')")
+	exec(t, b, "INSERT INTO players (id,name,created_at,updated_at) VALUES (1,'Historical player','2020-01-01','2020-01-01')")
+	exec(t, b, "INSERT INTO raids (id,name,raid_leader_id,status,catalog_instance_id,created_at,updated_at) VALUES (1,'History',1,'COMPLETED','999999','2020-01-01','2020-01-01')")
+	exec(t, b, "INSERT INTO loot_awards (id,raid_id,boss,item_id,item_name,awarded_to_player_id,awarded_by_player_id,source,catalog_boss_id,awarded_at,created_at,updated_at) VALUES (1,1,'Historical snapshot','50759','Historical item',1,1,'manual','36612','2020-01-01','2020-01-01','2020-01-01')")
+	exec(t, b, "INSERT INTO enhance_point_transactions (player_id,raid_id,amount,type,reason,actor_id,created_at) VALUES (1,1,91,'ADJUSTMENT','opening',1,'2020-01-01')")
+	exec(t, b, "INSERT INTO token_transactions (player_id,raid_id,loot_award_id,amount,type,reason,actor_id,created_at) VALUES (1,1,1,2,'ADJUSTMENT','opening',1,'2020-01-01')")
+	report, err := s.EnsureBundled(ctx)
+	if err != nil || report.Updated != 3 || report.Retained != 2 {
+		t.Fatalf("legacy initialization: updates=%d retained=%d err=%v", report.Updated, report.Retained, err)
+	}
+	var stored string
+	if err := b.NewRaw("SELECT report FROM loot_catalog_initializations ORDER BY id DESC LIMIT 1").Scan(ctx, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stored, "Old ICC") || !strings.Contains(stored, "Historical") && !strings.Contains(stored, "Custom extra") || !strings.Contains(stored, report.SourceHash) {
+		t.Fatal("missing detailed before/after report")
+	}
+	if count(t, b, "SELECT COUNT(*) FROM loot_catalog_sources WHERE raw_hash='old-different-hash' AND metadata='{\"old\":\"unchanged\"}'") != 1 {
+		t.Fatal("source history overwritten")
+	}
+	if count(t, b, "SELECT COUNT(*) FROM raids WHERE name='History' AND catalog_instance_id='999999' AND status='COMPLETED'") != 1 || count(t, b, "SELECT COUNT(*) FROM loot_awards WHERE boss='Historical snapshot' AND item_name='Historical item'") != 1 || count(t, b, "SELECT SUM(amount) FROM enhance_point_transactions") != 91 || count(t, b, "SELECT SUM(amount) FROM token_transactions") != 2 {
+		t.Fatal("guild history changed")
+	}
+	extra := "999999"
+	if !errors.Is(s.ValidateAssociation(ctx, &extra, nil), ErrInvalid) {
+		t.Fatal("DB-only instance selectable")
+	}
+	items, err := s.Items(ctx, Filter{BossID: "36612", RaidSize: 10, Mode: ModeNormal})
+	if err != nil || len(items) != 13 {
+		t.Fatal("old drop affected authoritative catalog")
+	}
+}
+
+func TestMirrorRollbackAndConcurrentInitialization(t *testing.T) {
+	s, b := setup(t)
+	exec(t, b, "CREATE TRIGGER reject_catalog_item BEFORE INSERT ON loot_catalog_items BEGIN SELECT RAISE(ABORT, 'fixture mirror failure'); END")
+	if _, err := s.EnsureBundled(context.Background()); err == nil {
+		t.Fatal("mirror failure ignored")
+	}
+	for _, query := range []string{"SELECT COUNT(*) FROM loot_catalog_instances", "SELECT COUNT(*) FROM loot_catalog_bosses", "SELECT COUNT(*) FROM loot_catalog_items", "SELECT COUNT(*) FROM loot_catalog_initializations"} {
+		if count(t, b, query) != 0 {
+			t.Fatal("partial mirror/report committed")
+		}
+	}
+	exec(t, b, "DROP TRIGGER reject_catalog_item")
+	var wg sync.WaitGroup
+	errors := make(chan error, 4)
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); _, err := s.EnsureBundled(context.Background()); errors <- err }()
+	}
+	wg.Wait()
+	close(errors)
+	for err := range errors {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if count(t, b, "SELECT COUNT(*) FROM loot_catalog_initializations") != 4 {
+		t.Fatal("concurrent report missing")
+	}
+}
+
+func TestGenuineMarrowgarModesAndProvenance(t *testing.T) {
+	s := NewService(NewRepo(nil))
+	ctx := context.Background()
 	for _, tc := range []struct {
-		name   string
-		change func(*lootcatalog.Dataset)
+		size  int
+		mode  Mode
+		count int
+	}{{10, ModeNormal, 13}, {10, ModeHeroic, 14}, {25, ModeNormal, 18}, {25, ModeHeroic, 18}, {0, ModeNormal, 31}, {0, ModeHeroic, 32}, {0, "", 63}} {
+		items, err := s.Items(ctx, Filter{BossID: "36612", RaidSize: tc.size, Mode: tc.mode})
+		if err != nil || len(items) != tc.count {
+			t.Fatalf("size=%d mode=%s count=%d want=%d: %v", tc.size, tc.mode, len(items), tc.count, err)
+		}
+		seen := map[string]bool{}
+		for _, item := range items {
+			key := fmt.Sprintf("%s/%s/%d", item.ItemID, item.Mode, item.RaidSize)
+			if seen[key] || item.Conditional || len(item.SourceVariants) == 0 {
+				t.Fatalf("invalid selector: %+v", item)
+			}
+			for _, variant := range item.SourceVariants {
+				if variant.LootMode != 1 || variant.Difficulty == "" {
+					t.Fatalf("invalid source variant: %+v", item)
+				}
+			}
+			seen[key] = true
+		}
+	}
+	items, _ := s.Items(ctx, Filter{BossID: "36612", RaidSize: 10, Mode: ModeNormal})
+	direct, referenced := false, false
+	for _, item := range items {
+		for _, variant := range item.SourceVariants {
+			if strings.HasSuffix(variant.Difficulty, "source-lootmode-path:1") {
+				direct = true
+			}
+			if item.ItemID == "50759" && strings.HasSuffix(variant.Difficulty, "source-lootmode-path:1/1") {
+				referenced = true
+			}
+		}
+	}
+	if !direct || !referenced {
+		t.Fatal("direct/reference provenance lost")
+	}
+	for _, mode := range []Mode{"UNKNOWN", "heroic", "2", "NORMAL/HEROIC"} {
+		if _, err := s.Items(ctx, Filter{Mode: mode}); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("accepted mode %s", mode)
+		}
+	}
+}
+
+func TestSourceModesNeverInferHeroicFromLootMask(t *testing.T) {
+	for _, tc := range []struct {
+		drop        Drop
+		mode        Mode
+		conditional bool
+		invalid     bool
 	}{
-		{"duplicate", func(d *lootcatalog.Dataset) { d.Items = append(d.Items, d.Items[0]) }},
-		{"link", func(d *lootcatalog.Dataset) { d.Bosses[0].InstanceID = "99" }},
-		{"item-link", func(d *lootcatalog.Dataset) { d.Drops[0].ItemID = "99" }},
-		{"boss-link", func(d *lootcatalog.Dataset) { d.Drops[0].BossID = "99" }},
-		{"id", func(d *lootcatalog.Dataset) { d.Items[0].ItemID = "03" }},
-		{"size", func(d *lootcatalog.Dataset) { d.Drops[0].RaidSize = 40 }},
-		{"mode", func(d *lootcatalog.Dataset) { d.Drops[0].LootMode = 0 }},
-		{"difficulty", func(d *lootcatalog.Dataset) { d.Drops[0].Difficulty = " " }},
-		{"duplicate-drop", func(d *lootcatalog.Dataset) { d.Drops = append(d.Drops, d.Drops[0]) }},
-		{"source", func(d *lootcatalog.Dataset) { d.Source.License = "" }},
+		{Drop{Difficulty: "raid-difficulty:0/source-lootmode-path:1/2", LootMode: 2}, ModeNormal, true, false},
+		{Drop{Difficulty: "raid-difficulty:2/source-lootmode-path:1", LootMode: 1}, ModeHeroic, false, false},
+		{Drop{Difficulty: "raid-difficulty:3/source-creature:35268 / source-lootmode-path:1", LootMode: 1}, ModeHeroic, false, false},
+		{Drop{Difficulty: "raid-difficulty:1/source-creature:29417 / source-lootmode-path:1/1", LootMode: 1}, ModeNormal, false, false},
+		{Drop{Difficulty: "raid-difficulty:0/thorim/hardmode:true/source-chest:194313 / source-lootmode-path:1/1", LootMode: 1}, ModeHardmode, true, false},
+		{Drop{Difficulty: "raid-difficulty:0/thorim/hardmode:false/source-chest:194312 / source-lootmode-path:1", LootMode: 1}, ModeNormal, false, false},
+		{Drop{Difficulty: "raid-difficulty:0/phase:2/source-lootmode-path:1", LootMode: 1}, ModeNormal, true, false},
+		{Drop{Difficulty: "raid-difficulty:9/source-lootmode-path:1", LootMode: 1}, "", false, true},
+		{Drop{Difficulty: "unknown", LootMode: 1}, "", false, true},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			d := dataset()
-			tc.change(&d)
-			_, report := lootcatalog.Canonical(d)
-			if len(report.Errors) == 0 {
-				t.Fatal("accepted invalid dataset")
+		mode, conditional, err := sourceGameMode(tc.drop)
+		if tc.invalid {
+			if !errors.Is(err, ErrInvalid) {
+				t.Fatalf("accepted %+v", tc.drop)
 			}
-		})
+			continue
+		}
+		if err != nil || mode != tc.mode || conditional != tc.conditional {
+			t.Fatalf("%+v: %s %t %v", tc.drop, mode, conditional, err)
+		}
 	}
 }
 
-func TestSourceConflictsAndWholeMergeRollback(t *testing.T) {
-	s := setup(t)
+// Ulduar hardmode loot must stay selectable apart from plain normal loot.
+func TestGenuineHardmodeStaysSeparateFromNormal(t *testing.T) {
+	s := NewService(NewRepo(nil))
 	ctx := context.Background()
-	d := dataset()
-	p, err := s.Preview(ctx, d, "")
+	catalog, err := s.List(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Merge(ctx, d, p.RawHash); err != nil {
-		t.Fatal(err)
-	}
-	d.Source.ID = "other-source"
-	if _, err := s.Preview(ctx, d, ""); !errors.Is(err, lootcatalog.ErrConflict) {
-		t.Fatalf("accepted foreign ownership: %v", err)
-	}
-	d = dataset()
-	d.Source.Revision = "new-revision"
-	d.Items = append(d.Items, lootcatalog.Item{ItemID: "4", Name: "New item"})
-	d.Drops = append(d.Drops, lootcatalog.Drop{BossID: "2", ItemID: "4", RaidSize: 25, Difficulty: "mixed-source-mode:3", LootMode: 3})
-	p, err = s.Preview(ctx, d, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	d.Items[0].Name = "Conflicting"
-	_, canonical := lootcatalog.Canonical(d)
-	if _, err := s.Merge(ctx, d, canonical.RawHash); !errors.Is(err, lootcatalog.ErrPreviewRequired) {
-		t.Fatalf("accepted different evidence: %v", err)
-	}
-	c, err := s.List(ctx)
-	if err != nil || len(c.Items) != 1 {
-		t.Fatalf("partial writes: %+v %v", c, err)
-	}
-	// A previously valid preview must be rechecked against changes committed afterwards.
-	d = dataset()
-	d.Source.Revision = "later"
-	d.Items = append(d.Items, lootcatalog.Item{ItemID: "4", Name: "A"})
-	d.Drops = append(d.Drops, lootcatalog.Drop{BossID: "2", ItemID: "4", RaidSize: 10, Difficulty: "source-mode:1", LootMode: 1})
-	p, err = s.Preview(ctx, d, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	other := d
-	other.Source.Revision = "intervening"
-	other.Items = append([]lootcatalog.Item{}, d.Items...)
-	other.Items[1].Name = "B"
-	op, err := s.Preview(ctx, other, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s.Merge(ctx, other, op.RawHash); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s.Merge(ctx, d, p.RawHash); !errors.Is(err, lootcatalog.ErrConflict) {
-		t.Fatalf("stale preview conflict not rechecked: %v", err)
-	}
-}
-
-func TestFiltersAndAssociationRequireDatasetSize(t *testing.T) {
-	s := setup(t)
-	ctx := context.Background()
-	d := dataset()
-	p, err := s.Preview(ctx, d, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s.Merge(ctx, d, p.RawHash); err != nil {
-		t.Fatal(err)
-	}
-	instance, size := "1", 10
-	if err := s.ValidateAssociation(ctx, &instance, &size); err != nil {
-		t.Fatal(err)
-	}
-	size = 25
-	if err := s.ValidateAssociation(ctx, &instance, &size); !errors.Is(err, lootcatalog.ErrInvalid) {
-		t.Fatal("guessed 25-player variant")
-	}
-	if err := s.ValidateAssociation(ctx, nil, &size); !errors.Is(err, lootcatalog.ErrInvalid) {
-		t.Fatal("size without instance")
-	}
-	items, err := s.Items(ctx, lootcatalog.Filter{BossID: "2", RaidSize: 10, Difficulty: "source-mode:1"})
-	if err != nil || len(items) != 1 || items[0].LootMode != 1 {
-		t.Fatalf("filter: %+v %v", items, err)
-	}
-	items, err = s.Items(ctx, lootcatalog.Filter{RaidSize: 25})
-	if err != nil || len(items) != 0 || items == nil {
-		t.Fatal("missing filter result must be empty array")
-	}
-}
-
-func TestCatalogHTTPPermissionsAndArrays(t *testing.T) {
-	s := setup(t)
-	mux := http.NewServeMux()
-	v1.CatalogHandlers{Catalog: s}.Register(mux)
-	request := func(method, path string, role validation.Role, body []byte) *httptest.ResponseRecorder {
-		r := httptest.NewRequest(method, path, bytes.NewReader(body))
-		if role != "" {
-			r = r.WithContext(v1.WithActor(r.Context(), &player.Player{ID: 1, Role: role}))
-		}
-		w := httptest.NewRecorder()
-		mux.ServeHTTP(w, r)
-		return w
-	}
-	for _, path := range []string{"/api/v1/loot-catalog", "/api/v1/loot-catalog/instances", "/api/v1/loot-catalog/bosses", "/api/v1/loot-catalog/items"} {
-		if w := request("GET", path, "", nil); w.Code != 401 {
-			t.Fatalf("unauthenticated read: %d", w.Code)
-		}
-		w := request("GET", path, validation.RoleGuest, nil)
-		if w.Code != 200 || strings.Contains(w.Body.String(), "null") {
-			t.Fatalf("empty arrays: %d %s", w.Code, w.Body)
+	var mimiron, thorim string
+	for _, boss := range catalog.Bosses {
+		switch boss.Name {
+		case "Mimiron":
+			mimiron = boss.ID
+		case "Thorim":
+			thorim = boss.ID
 		}
 	}
-	for _, role := range []validation.Role{validation.RoleGuest, validation.RoleMember, validation.RoleRaidassistent, validation.RoleRaidleader} {
-		for _, path := range []string{"/api/v1/loot-catalog/preview", "/api/v1/loot-catalog/merge"} {
-			if w := request("POST", path, role, []byte(`{}`)); w.Code != 403 {
-				t.Fatalf("%s write permission: %d", role, w.Code)
+	if mimiron == "" || thorim == "" {
+		t.Fatalf("Ulduar bosses missing: %q %q", mimiron, thorim)
+	}
+	for _, bossID := range []string{mimiron, thorim} {
+		normal, err := s.Items(ctx, Filter{BossID: bossID, RaidSize: 10, Mode: ModeNormal})
+		if err != nil {
+			t.Fatal(err)
+		}
+		hardmode, err := s.Items(ctx, Filter{BossID: bossID, RaidSize: 10, Mode: ModeHardmode})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(normal) == 0 || len(hardmode) == 0 {
+			t.Fatalf("boss %s: normal=%d hardmode=%d", bossID, len(normal), len(hardmode))
+		}
+		for _, item := range hardmode {
+			if !item.Conditional {
+				t.Fatalf("hardmode loot must stay conditional: %+v", item)
+			}
+			for _, variant := range item.SourceVariants {
+				if !strings.Contains(variant.Difficulty, "hardmode:true") {
+					t.Fatalf("hardmode selection carries a non-hardmode path: %+v", item)
+				}
+			}
+		}
+		for _, item := range normal {
+			for _, variant := range item.SourceVariants {
+				if strings.Contains(variant.Difficulty, "hardmode:true") {
+					t.Fatalf("hardmode path merged into normal: %+v", item)
+				}
 			}
 		}
 	}
-	for _, path := range []string{"/api/v1/loot-catalog/preview", "/api/v1/loot-catalog/merge"} {
-		if w := request("POST", path, "", []byte(`{}`)); w.Code != 401 {
-			t.Fatalf("unauthenticated catalog write: %d", w.Code)
+}
+
+func TestBundleCopiesAndInvalidSource(t *testing.T) {
+	s := NewService(NewRepo(nil))
+	original, err := s.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, _ := json.Marshal(original)
+	original.Sources[0].Notices[0] = "mutated"
+	original.Instances[0].Name = "mutated"
+	original.Bosses[0].Name = "mutated"
+	original.Items[0].Name = "mutated"
+	*original.Items[0].Binding = 999
+	*original.Items[0].Quality = 999
+	original.Drops[0].Difficulty = "mutated"
+	items, _ := s.Items(context.Background(), Filter{BossID: "36612"})
+	*items[0].Binding = 999
+	items[0].SourceVariants[0].Difficulty = "mutated"
+	resolvedBoss, resolvedItem, err := s.ValidateDrop(context.Background(), "631", nil, &items[0].BossID, items[0].ItemID)
+	if err != nil || resolvedBoss.ID != "36612" {
+		t.Fatal(err)
+	}
+	*resolvedItem.Binding = 999
+	after, _ := s.List(context.Background())
+	actual, _ := json.Marshal(after)
+	if string(actual) != string(expected) {
+		t.Fatal("caller mutated shared bundle")
+	}
+	for _, raw := range []string{"{}", "invalid", strings.Replace(catalogdata.JSON(), "raid-difficulty:0/", "raid-difficulty:9/", 1)} {
+		if _, err := decodeBundled(raw); err == nil {
+			t.Fatal("invalid bundle accepted")
 		}
-	}
-	body, _ := json.Marshal(map[string]any{"catalog": dataset()})
-	w := request("POST", "/api/v1/loot-catalog/preview", validation.RoleAdmin, body)
-	if w.Code != 200 {
-		t.Fatalf("preview: %d %s", w.Code, w.Body)
-	}
-	var envelope struct {
-		Data lootcatalog.Report `json:"data"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
-		t.Fatal(err)
-	}
-	body, _ = json.Marshal(map[string]any{"catalog": dataset(), "raw_hash": envelope.Data.RawHash})
-	w = request("POST", "/api/v1/loot-catalog/merge", validation.RoleAdmin, body)
-	if w.Code != 200 {
-		t.Fatalf("merge: %d %s", w.Code, w.Body)
-	}
-	w = request("GET", "/api/v1/loot-catalog/items?boss_id=2&raid_size=10", validation.RoleGuest, nil)
-	var itemEnvelope struct {
-		Data []lootcatalog.ItemDrop `json:"data"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &itemEnvelope); err != nil {
-		t.Fatal(err)
-	}
-	if w.Code != 200 || len(itemEnvelope.Data) != 1 || itemEnvelope.Data[0].ItemID != "3" || itemEnvelope.Data[0].BossID != "2" {
-		t.Fatalf("item identity missing in JSON: %s", w.Body)
-	}
-	w = request("POST", "/api/v1/loot-catalog/preview", validation.RoleAdmin, []byte(`{"catalog":{},"surprise":1}`))
-	if w.Code != 400 {
-		t.Fatal("unknown request fields accepted")
-	}
-	w = request("GET", "/api/v1/loot-catalog/items?raid_size=0", validation.RoleGuest, nil)
-	if w.Code != 422 {
-		t.Fatal("explicit invalid size accepted")
 	}
 }

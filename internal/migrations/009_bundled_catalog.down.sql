@@ -1,0 +1,1 @@
+DROP TABLE loot_catalog_initializations;

@@ -9,7 +9,7 @@ future agents do not re-litigate them or silently change them.
 Authoritative sources, in order of precedence:
 
 1. This file (owner-level requirements and constraints)
-2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-026)
+2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-027)
 3. `ARCHITECTURE.md` (module map and principles)
 4. `CODING_RULES.md` (defines the coding rules)
 5. `README.md` (commands)
@@ -193,6 +193,22 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   new merge. Preview metadata may be persisted; previews never write domain records.
 - Production requires explicit nondefault bootstrap credentials. Configuration, migrations,
   and bootstrap failures stop startup. SQLite foreign keys are enabled on every connection.
+
+### 4.12 Loot catalog is bundled and read-only (ADR 027)
+- `scripts/data/catalog-wotlk335.json` is the sole catalog authority. It is embedded with
+  `go:embed` and mirrored into the catalog tables at startup. There is no upload, preview, or
+  merge; updating the catalog means committing a new file. An invalid source or a failed mirror
+  stops startup.
+- Catalog reads are served from the embedded source, never from the mirror. The mirror exists to
+  keep historical foreign keys valid; rows are retained, never deleted.
+- Source paths are normalized server-side into `NORMAL`, `HEROIC`, and `HARDMODE`. Relationships
+  sharing boss, item, raid size, and mode are merged; raw `difficulty`/`loot_mode` pairs survive
+  as `source_variants`, and unproven conditions are marked `conditional`. Loot masks never imply
+  a mode.
+- New loot must reference a bundled boss/item pair for the raid's persisted
+  `catalog_instance_id` and `raid_size`; names are derived server-side. Missing context is
+  `catalog_context_required`, an unproven pair is `catalog_item_invalid`.
+- Historical free-text and imported loot is never rewritten to match the current catalog.
 
 ---
 

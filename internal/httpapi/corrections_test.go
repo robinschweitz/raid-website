@@ -16,19 +16,21 @@ import (
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
+	"raid-website/internal/lootcatalog"
 	"raid-website/internal/raid"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
 type correctionFixture struct {
-	t                     *testing.T
-	srv                   *httptest.Server
-	db                    *bun.DB
-	token, memberToken    string
-	actor, first, second  int64
-	firstChar, secondChar int64
-	raidID                int64
+	t                                                *testing.T
+	srv                                              *httptest.Server
+	db                                               *bun.DB
+	token, memberToken                               string
+	actor, first, second                             int64
+	firstChar, secondChar                            int64
+	raidID                                           int64
+	tokenBoss, tokenItem, ordinaryBoss, ordinaryItem string
 }
 
 func newCorrectionFixture(t *testing.T) *correctionFixture {
@@ -52,12 +54,52 @@ func newCorrectionFixture(t *testing.T) *correctionFixture {
 			f.secondChar = c.ID
 		}
 	}
-	rd := &raid.Raid{Name: "Correction raid", RaidLeaderID: f.actor, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
+	f.tokenBoss, f.tokenItem, f.ordinaryBoss, f.ordinaryItem = bundledICCDrops(t, db)
+	instance, size := "631", 25
+	rd := &raid.Raid{Name: "Correction raid", CatalogInstanceID: &instance, RaidSize: &size, RaidLeaderID: f.actor, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
 	if err := raid.NewRepo(db).Create(context.Background(), rd); err != nil {
 		t.Fatal(err)
 	}
 	f.raidID = rd.ID
 	return f
+}
+
+func bundledICCDrops(t *testing.T, db *bun.DB) (tokenBoss, tokenItem, ordinaryBoss, ordinaryItem string) {
+	t.Helper()
+	catalog, err := lootcatalog.NewService(lootcatalog.NewRepo(db)).List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]string{}
+	for _, item := range catalog.Items {
+		names[item.ItemID] = item.Name
+	}
+	bosses := map[string]bool{}
+	for _, boss := range catalog.Bosses {
+		bosses[boss.ID] = boss.InstanceID == "631"
+	}
+	for _, drop := range catalog.Drops {
+		if !bosses[drop.BossID] || drop.RaidSize != 25 {
+			continue
+		}
+		if names[drop.ItemID] == "Weiheabzeichen des Eroberers" {
+			tokenBoss, tokenItem = drop.BossID, drop.ItemID
+		} else if !tokens.IsTokenAward(names[drop.ItemID]) {
+			ordinaryBoss, ordinaryItem = drop.BossID, drop.ItemID
+		}
+	}
+	if tokenItem == "" || ordinaryItem == "" {
+		t.Fatal("bundled ICC25 token and ordinary drops required")
+	}
+	return
+}
+
+func (f *correctionFixture) selection(body map[string]any, token bool) map[string]any {
+	body["catalog_boss_id"], body["item_id"] = f.ordinaryBoss, f.ordinaryItem
+	if token {
+		body["catalog_boss_id"], body["item_id"] = f.tokenBoss, f.tokenItem
+	}
+	return body
 }
 
 func (f *correctionFixture) request(method, suffix string, body any, want int) []byte {
@@ -133,7 +175,7 @@ func TestLegacyCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
 	f := newCorrectionFixture(t)
 	f.attend(f.first, f.firstChar)
 	f.attend(f.second, f.secondChar)
-	awardID := correctionID(t, f.request(http.MethodPost, "/loot", map[string]any{"item_name": "Weiheabzeichen des Eroberers", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "award_method": "MAIN"}, http.StatusCreated))
+	awardID := correctionID(t, f.request(http.MethodPost, "/loot", f.selection(map[string]any{"awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "award_method": "MAIN"}, true), http.StatusCreated))
 	f.legacyCompleted(f.second)
 	f.points(f.first, 0)
 	f.points(f.second, 10)
@@ -151,10 +193,10 @@ func TestLegacyCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
 		f.tokenBalance(f.first, 1)
 		f.tokenBalance(f.second, 0)
 	}
-	f.request(http.MethodPatch, suffix, map[string]any{"item_name": "ordinary item", "award_method": "SECOND", "reason": "item correction"}, http.StatusOK)
+	f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "SECOND", "reason": "item correction"}, false), http.StatusOK)
 	f.points(f.first, 10)
 	f.tokenBalance(f.first, 0)
-	f.request(http.MethodPatch, suffix, map[string]any{"item_name": "Weiheabzeichen des Eroberers", "award_method": "MAIN", "reason": "restore"}, http.StatusOK)
+	f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "MAIN", "reason": "restore"}, true), http.StatusOK)
 	f.points(f.first, 0)
 	f.tokenBalance(f.first, 1)
 	before, err := enhancepoints.NewRepo(f.db).ListByPlayer(context.Background(), f.first)
@@ -213,7 +255,7 @@ func TestLegacyCorrectionsAttendanceAndCompletedAdditions(t *testing.T) {
 	}
 	f.request(http.MethodPost, "/attendance", map[string]any{"player_id": f.second, "character_id": f.secondChar, "role": "DD", "reason": "missing participant"}, http.StatusCreated)
 	f.points(f.second, 10)
-	f.request(http.MethodPost, "/loot", map[string]any{"item_name": "missing item", "awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar, "award_method": "MAIN", "reason": "missing award"}, http.StatusCreated)
+	f.request(http.MethodPost, "/loot", f.selection(map[string]any{"awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar, "award_method": "MAIN", "reason": "missing award"}, false), http.StatusCreated)
 	f.points(f.second, 0)
 }
 
@@ -222,9 +264,9 @@ func TestLegacyCorrectionsPermissionsReferencesAndStates(t *testing.T) {
 	id := f.attend(f.first, f.firstChar)
 	f.request(http.MethodPost, "/attendance", map[string]any{"player_id": f.first, "character_id": f.secondChar, "role": "DD"}, http.StatusBadRequest)
 	f.request(http.MethodPost, "/attendance", map[string]any{"player_id": 99999, "character_id": f.firstChar, "role": "DD"}, http.StatusNotFound)
-	f.request(http.MethodPost, "/loot", map[string]any{"item_name": "item", "award_method": "SECOND", "awarded_to_player_id": f.first, "awarded_to_character_id": f.secondChar}, http.StatusBadRequest)
-	f.request(http.MethodPost, "/loot", map[string]any{"item_name": "item", "award_method": "SECOND", "awarded_to_player_id": f.first, "awarded_to_character_id": 99999}, http.StatusNotFound)
-	awardID := correctionID(t, f.request(http.MethodPost, "/loot", map[string]any{"item_name": "item", "award_method": "SECOND", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar}, http.StatusCreated))
+	f.request(http.MethodPost, "/loot", f.selection(map[string]any{"award_method": "SECOND", "awarded_to_player_id": f.first, "awarded_to_character_id": f.secondChar}, false), http.StatusBadRequest)
+	f.request(http.MethodPost, "/loot", f.selection(map[string]any{"award_method": "SECOND", "awarded_to_player_id": f.first, "awarded_to_character_id": 99999}, false), http.StatusNotFound)
+	awardID := correctionID(t, f.request(http.MethodPost, "/loot", f.selection(map[string]any{"award_method": "SECOND", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar}, false), http.StatusCreated))
 	f.legacyCompleted(f.first)
 	for _, suffix := range []string{fmt.Sprintf("/attendance/%d", id), fmt.Sprintf("/loot/%d", awardID)} {
 		status, _ := do(t, f.srv.Client(), http.MethodPatch, fmt.Sprintf("%s/api/v1/raids/%d%s", f.srv.URL, f.raidID, suffix), f.memberToken, map[string]any{"reason": "denied"})
@@ -277,12 +319,12 @@ func TestLegacyCorrectionsPermissionsReferencesAndStates(t *testing.T) {
 func TestLegacyCorrectionsAuditFailureRollsBackRecordAndLedgers(t *testing.T) {
 	f := newCorrectionFixture(t)
 	f.attend(f.first, f.firstChar)
-	awardID := correctionID(t, f.request(http.MethodPost, "/loot", map[string]any{"item_name": "Weiheabzeichen des Eroberers", "award_method": "MAIN", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar}, http.StatusCreated))
+	awardID := correctionID(t, f.request(http.MethodPost, "/loot", f.selection(map[string]any{"award_method": "MAIN", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar}, true), http.StatusCreated))
 	f.legacyCompleted()
 	if _, err := f.db.ExecContext(context.Background(), "CREATE TRIGGER fail_correction_audit BEFORE INSERT ON audit_log BEGIN SELECT RAISE(ABORT, 'audit unavailable'); END"); err != nil {
 		t.Fatal(err)
 	}
-	f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", awardID), map[string]any{"item_name": "ordinary item", "award_method": "SECOND", "reason": "rollback"}, http.StatusInternalServerError)
+	f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", awardID), f.selection(map[string]any{"award_method": "SECOND", "reason": "rollback"}, false), http.StatusInternalServerError)
 	f.points(f.first, 0)
 	f.tokenBalance(f.first, 1)
 	award, err := loot.NewRepo(f.db).Get(context.Background(), awardID)
@@ -308,11 +350,11 @@ func TestLegacyOrdinaryLootLockResolutionAndCorrectionDoesNotRevive(t *testing.T
 	f.attend(f.first, f.firstChar)
 	f.attend(f.second, f.secondChar)
 	now := time.Now().UTC()
-	lock := &enhancepoints.ItemLock{PlayerID: f.first, RaidID: f.raidID, ItemID: "123", ItemName: "locked item", Status: validation.LockStatusActive, LockedAt: now, ActorID: f.first, CreatedAt: now, UpdatedAt: now}
+	lock := &enhancepoints.ItemLock{PlayerID: f.first, RaidID: f.raidID, ItemID: f.ordinaryItem, ItemName: "old snapshot", Status: validation.LockStatusActive, LockedAt: now, ActorID: f.first, CreatedAt: now, UpdatedAt: now}
 	if err := enhancepoints.NewRepo(f.db).CreateLock(context.Background(), lock); err != nil {
 		t.Fatal(err)
 	}
-	awardID := correctionID(t, f.request(http.MethodPost, "/loot", map[string]any{"item_id": "123", "item_name": "renamed item", "award_method": "SECOND", "awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar}, http.StatusCreated))
+	awardID := correctionID(t, f.request(http.MethodPost, "/loot", f.selection(map[string]any{"item_name": "untrusted name", "award_method": "SECOND", "awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar}, false), http.StatusCreated))
 	award, err := loot.NewRepo(f.db).Get(context.Background(), awardID)
 	if err != nil {
 		t.Fatal(err)
@@ -334,19 +376,19 @@ func TestLegacyOrdinaryLootLockResolutionAndCorrectionDoesNotRevive(t *testing.T
 func TestOrdinaryLootAmbiguousAndInvalidLocks(t *testing.T) {
 	f := newCorrectionFixture(t)
 	now := time.Now().UTC()
-	lock := &enhancepoints.ItemLock{PlayerID: f.first, RaidID: f.raidID, ItemID: "123", ItemName: " locked item ", Status: validation.LockStatusActive, LockedAt: now, ActorID: f.first, CreatedAt: now, UpdatedAt: now}
+	lock := &enhancepoints.ItemLock{PlayerID: f.first, RaidID: f.raidID, ItemID: f.ordinaryItem, ItemName: "old snapshot", Status: validation.LockStatusActive, LockedAt: now, ActorID: f.first, CreatedAt: now, UpdatedAt: now}
 	if err := enhancepoints.NewRepo(f.db).CreateLock(context.Background(), lock); err != nil {
 		t.Fatal(err)
 	}
-	f.request(http.MethodPost, "/loot", map[string]any{"item_id": "different-id", "item_name": "locked item", "award_method": "SECOND", "item_lock_id": lock.ID, "awarded_to_player_id": f.second}, http.StatusBadRequest)
-	f.request(http.MethodPost, "/loot", map[string]any{"item_name": "unlocked", "award_method": "SECOND", "item_lock_id": 99999, "awarded_to_player_id": f.second}, http.StatusNotFound)
+	f.request(http.MethodPost, "/loot", f.selection(map[string]any{"award_method": "SECOND", "item_lock_id": lock.ID, "awarded_to_player_id": f.second}, true), http.StatusBadRequest)
+	f.request(http.MethodPost, "/loot", f.selection(map[string]any{"award_method": "SECOND", "item_lock_id": 99999, "awarded_to_player_id": f.second}, true), http.StatusNotFound)
 	duplicate := *lock
 	duplicate.ID = 0
 	duplicate.PlayerID = f.second
 	if err := enhancepoints.NewRepo(f.db).CreateLock(context.Background(), &duplicate); err != nil {
 		t.Fatal(err)
 	}
-	f.request(http.MethodPost, "/loot", map[string]any{"item_name": "locked item", "award_method": "SECOND", "awarded_to_player_id": f.second}, http.StatusConflict)
+	f.request(http.MethodPost, "/loot", f.selection(map[string]any{"award_method": "SECOND", "awarded_to_player_id": f.second}, false), http.StatusConflict)
 	locks, err := enhancepoints.NewRepo(f.db).ListActiveLocksByRaid(context.Background(), f.raidID)
 	if err != nil {
 		t.Fatal(err)
@@ -367,7 +409,7 @@ func TestOrdinaryLootTokenFailureRollsBackLockAndAward(t *testing.T) {
 	if _, err := f.db.ExecContext(context.Background(), "CREATE TRIGGER fail_loot_token BEFORE INSERT ON token_transactions BEGIN SELECT RAISE(ABORT, 'token ledger unavailable'); END"); err != nil {
 		t.Fatal(err)
 	}
-	body := map[string]any{"item_name": "Weiheabzeichen des Eroberers", "award_method": "SECOND", "item_lock_id": lock.ID, "awarded_to_player_id": f.second}
+	body := f.selection(map[string]any{"award_method": "SECOND", "item_lock_id": lock.ID, "awarded_to_player_id": f.second}, true)
 	f.request(http.MethodPost, "/loot", body, http.StatusInternalServerError)
 	stored, err := enhancepoints.NewRepo(f.db).GetLock(context.Background(), lock.ID)
 	if err != nil {
@@ -414,12 +456,12 @@ func TestCorrectionsPlannedAndOpenAuditTokensPermissionsAndLocks(t *testing.T) {
 			}
 			attendanceID := f.attend(f.first, f.firstChar)
 			now := time.Now().UTC()
-			consumed := &enhancepoints.ItemLock{PlayerID: f.first, RaidID: f.raidID, ItemID: "123", ItemName: "Weiheabzeichen des Eroberers", Status: validation.LockStatusActive, LockedAt: now, ActorID: f.first, CreatedAt: now, UpdatedAt: now}
+			consumed := &enhancepoints.ItemLock{PlayerID: f.first, RaidID: f.raidID, ItemID: f.tokenItem, ItemName: "Weiheabzeichen des Eroberers", Status: validation.LockStatusActive, LockedAt: now, ActorID: f.first, CreatedAt: now, UpdatedAt: now}
 			if err := enhancepoints.NewRepo(f.db).CreateLock(ctx, consumed); err != nil {
 				t.Fatal(err)
 			}
-			awardID := correctionID(t, f.request(http.MethodPost, "/loot", map[string]any{"item_id": "123", "item_name": consumed.ItemName, "award_method": "SECOND", "awarded_to_player_id": f.second}, http.StatusCreated))
-			active := &enhancepoints.ItemLock{PlayerID: f.second, RaidID: f.raidID, ItemID: "456", ItemName: "replacement item", Status: validation.LockStatusActive, LockedAt: now, ActorID: f.second, CreatedAt: now, UpdatedAt: now}
+			awardID := correctionID(t, f.request(http.MethodPost, "/loot", f.selection(map[string]any{"award_method": "SECOND", "awarded_to_player_id": f.second}, true), http.StatusCreated))
+			active := &enhancepoints.ItemLock{PlayerID: f.second, RaidID: f.raidID, ItemID: f.ordinaryItem, ItemName: "old snapshot", Status: validation.LockStatusActive, LockedAt: now, ActorID: f.second, CreatedAt: now, UpdatedAt: now}
 			if err := enhancepoints.NewRepo(f.db).CreateLock(ctx, active); err != nil {
 				t.Fatal(err)
 			}
@@ -447,7 +489,7 @@ func TestCorrectionsPlannedAndOpenAuditTokensPermissionsAndLocks(t *testing.T) {
 			f.tokenBalance(f.first, 0)
 			f.tokenBalance(f.second, 1)
 			f.attend(f.first, f.firstChar)
-			f.request(http.MethodPatch, lootSuffix, map[string]any{"item_id": "456", "item_name": "replacement item", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "award_method": "SECOND", "reason": "correct item"}, http.StatusOK)
+			f.request(http.MethodPatch, lootSuffix, f.selection(map[string]any{"awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "award_method": "SECOND", "reason": "correct item"}, false), http.StatusOK)
 			f.tokenBalance(f.first, 0)
 			f.tokenBalance(f.second, 0)
 			award, err := loot.NewRepo(f.db).Get(ctx, awardID)
@@ -458,7 +500,7 @@ func TestCorrectionsPlannedAndOpenAuditTokensPermissionsAndLocks(t *testing.T) {
 				t.Fatalf("correction reapplied lock: %+v", award)
 			}
 			f.request(http.MethodPatch, lootSuffix, map[string]any{"item_lock_id": active.ID, "reason": "new lock not allowed"}, http.StatusBadRequest)
-			f.request(http.MethodPatch, lootSuffix, map[string]any{"item_id": "123", "item_name": consumed.ItemName, "reason": "restore token item"}, http.StatusOK)
+			f.request(http.MethodPatch, lootSuffix, f.selection(map[string]any{"reason": "restore token item"}, true), http.StatusOK)
 			f.tokenBalance(f.first, 1)
 			f.tokenBalance(f.second, 0)
 			for _, playerID := range []int64{f.first, f.second} {

@@ -173,7 +173,9 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		}
 	}
 
-	series := &raidseries.Series{Name: "ICC", RaidLeaderID: leader, Weekdays: []int{int(now.Weekday())}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "UTC"}
+	tokenBoss, tokenItem, ordinaryBoss, ordinaryItem := bundledICCDrops(t, bdb)
+	instance, size := "631", 25
+	series := &raidseries.Series{Name: "ICC", CatalogInstanceID: &instance, RaidSize: &size, RaidLeaderID: leader, Weekdays: []int{int(now.Weekday())}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "UTC"}
 	if err := raidseries.NewService(raidseries.NewRepo(bdb)).Save(ctx, series); err != nil {
 		t.Fatalf("create series: %v", err)
 	}
@@ -208,9 +210,8 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	}
 
 	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
-		"boss":                    "Saurfang",
-		"item_id":                 "50001",
-		"item_name":               "Testitem",
+		"catalog_boss_id":         ordinaryBoss,
+		"item_id":                 ordinaryItem,
 		"awarded_to_player_id":    rewarded,
 		"award_method":            "MAIN",
 		"awarded_to_character_id": rewardedChar.ID,
@@ -221,7 +222,8 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 
 	// Process all loot before final archiving. An off-spec token does not change EP eligibility.
 	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
-		"item_name":               "Weiheabzeichen des Eroberers",
+		"catalog_boss_id":         tokenBoss,
+		"item_id":                 tokenItem,
 		"awarded_to_player_id":    plain,
 		"awarded_to_character_id": plainChar.ID,
 		"award_method":            "SECOND",

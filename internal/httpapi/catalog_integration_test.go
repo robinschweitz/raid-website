@@ -134,6 +134,26 @@ func TestCatalogBundledAwardsValidateAndPreserveSnapshots(t *testing.T) {
 	}
 }
 
+func TestChestEncounterAwardsAndPermissionBoundary(t *testing.T) {
+	f := newCorrectionFixture(t)
+	f.attend(f.first, f.firstChar)
+	f.request(http.MethodPatch, "", map[string]any{"catalog_instance_id":"631", "raid_size":10}, http.StatusOK)
+	seedAccount(t, f.db, "chest-member", "password", validation.RoleMember)
+	member := login(t, f.srv.Client(), f.srv, "chest-member", "password")
+	for _, bossID := range []string{"encounter:631:gunship", "36789"} {
+		items, err := lootcatalog.NewService(lootcatalog.NewRepo(f.db)).Items(context.Background(), lootcatalog.Filter{BossID:bossID,RaidSize:10,Mode:lootcatalog.ModeNormal})
+		if err != nil || len(items)==0 { t.Fatal("missing encounter",bossID,err) }
+		body := map[string]any{"catalog_boss_id":bossID,"item_id":items[0].ItemID,"award_method":"SECOND","awarded_to_player_id":f.first,"awarded_to_character_id":f.firstChar,"request_id":"chest-"+bossID}
+		status, response := do(t,f.srv.Client(),http.MethodPost,fmt.Sprintf("%s/api/v1/raids/%d/loot",f.srv.URL,f.raidID),member,body)
+		if status != http.StatusForbidden { t.Fatalf("member chest award: %d %s",status,response) }
+		id := correctionID(t,f.request(http.MethodPost,"/loot",body,http.StatusCreated))
+		award := f.award(id)
+		if award.CatalogBossID==nil || *award.CatalogBossID!=bossID || award.ItemName!=items[0].Name { t.Fatalf("chest award identity: %+v",award) }
+		f.request(http.MethodPatch,fmt.Sprintf("/loot/%d",id),map[string]any{"notes":"Truhenbeute","reason":"Quelle ergänzt"},http.StatusOK)
+		if corrected := f.award(id); corrected.Boss!=award.Boss || corrected.ItemID!=award.ItemID { t.Fatal("correction changed encounter snapshot") }
+	}
+}
+
 func TestCatalogRaidSeriesInheritanceAndPreplannedReuse(t *testing.T) {
 	for _, preplanned := range []bool{false, true} {
 		t.Run(fmt.Sprint(preplanned), func(t *testing.T) {

@@ -177,7 +177,38 @@ func Parse(input, table string, visit func(map[string]string) error) error {
 		if err != nil {
 			return err
 		}
-		if !strings.EqualFold(t.value, "VALUES") || len(columns) == 0 {
+		insertColumns := columns
+		if t.value == "(" && !t.quoted {
+			insertColumns = []string{}
+			seen := map[string]bool{}
+			for {
+				column, err := next()
+				if err != nil {
+					return err
+				}
+				name := strings.ToLower(column.value)
+				if !column.quoted || name == "" || seen[name] {
+					return fmt.Errorf("invalid INSERT column")
+				}
+				seen[name] = true
+				insertColumns = append(insertColumns, name)
+				separator, err := next()
+				if err != nil {
+					return err
+				}
+				if separator.value == ")" && !separator.quoted {
+					break
+				}
+				if separator.value != "," || separator.quoted {
+					return fmt.Errorf("invalid INSERT column separator")
+				}
+			}
+			t, err = next()
+			if err != nil {
+				return err
+			}
+		}
+		if !strings.EqualFold(t.value, "VALUES") || len(insertColumns) == 0 {
 			return fmt.Errorf("INSERT must use declared column order for %s", table)
 		}
 		hasInsert = true
@@ -189,8 +220,8 @@ func Parse(input, table string, visit func(map[string]string) error) error {
 			if t.value != "(" || t.quoted {
 				return fmt.Errorf("expected SQL tuple")
 			}
-			row := make(map[string]string, len(columns))
-			for index, column := range columns {
+			row := make(map[string]string, len(insertColumns))
+			for index, column := range insertColumns {
 				value, err := next()
 				if err != nil {
 					return err
@@ -207,7 +238,7 @@ func Parse(input, table string, visit func(map[string]string) error) error {
 					return err
 				}
 				expected := ","
-				if index == len(columns)-1 {
+				if index == len(insertColumns)-1 {
 					expected = ")"
 				}
 				if separator.value != expected || separator.quoted {

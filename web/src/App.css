@@ -40,3 +40,11 @@
 .read-the-docs {
   color: #888;
 }
+.catalog-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.25rem 0; }
+.catalog-filters label { display: grid; gap: .45rem; min-width: 0; }
+.catalog-filters input, .catalog-filters select { width: 100%; min-width: 0; }
+.catalog-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 1rem; }
+.catalog-results h3 { color: #bce9ff; margin-top: 0; }
+.catalog-results article { min-width: 0; }
+.catalog-source-path { overflow-wrap: anywhere; font-size: .85rem; }
+.catalog-pagination { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 1rem; margin: 1.25rem 0; }

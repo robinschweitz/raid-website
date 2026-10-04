@@ -152,12 +152,12 @@ func TestParseMySQLDumpOffline(t *testing.T) {
 	}
 }
 
-func TestParseRejectsTruncationAndUnsupportedColumnOrder(t *testing.T) {
+func TestParseRejectsTruncationAndMalformedColumns(t *testing.T) {
 	for _, input := range []string{
 		"CREATE TABLE `t` (`id` int); INSERT INTO `t` VALUES (",
 		"CREATE TABLE `t` (`id` int); INSERT INTO `t` VALUES ('unfinished);",
 		"CREATE TABLE `t` (`id` int); INSERT INTO `t` VALUES (1,2);",
-		"CREATE TABLE `t` (`id` int); INSERT INTO `t` (`id`) VALUES (1);",
+		"CREATE TABLE `t` (`id` int); INSERT INTO `t` (`id`,`id`) VALUES (1,2);",
 		"/* never closed",
 		"CREATE TABLE `t` (`id` int);",
 	} {

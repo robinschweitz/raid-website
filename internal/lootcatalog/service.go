@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -65,7 +66,14 @@ func Canonical(input Dataset) (Dataset, Report) {
 		check("instance", instance.ID, instance.Name, instances)
 	}
 	for _, boss := range canonical.Bosses {
-		check("boss", boss.ID, boss.Name, bosses)
+		if strings.HasPrefix(boss.ID, "encounter:") {
+			if !regexp.MustCompile(`^encounter:`+regexp.QuoteMeta(boss.InstanceID)+`:[a-z][a-z0-9-]*$`).MatchString(boss.ID) || strings.TrimSpace(boss.Name) == "" || bosses[boss.ID] {
+				report.Errors = append(report.Errors, "invalid or duplicate encounter "+boss.ID)
+			}
+			bosses[boss.ID] = true
+		} else {
+			check("boss", boss.ID, boss.Name, bosses)
+		}
 		if !instances[boss.InstanceID] {
 			report.Errors = append(report.Errors, "boss "+boss.ID+": unbekannte instance_id")
 		}

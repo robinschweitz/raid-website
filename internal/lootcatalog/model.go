@@ -24,7 +24,8 @@ type Instance struct {
 	Name string `json:"name"`
 }
 
-// Boss uses the source's creature key.
+// Boss identifies a selectable encounter. Single-creature encounters retain their
+// creature key; collective encounters use encounter:<instance>:<slug> keys.
 type Boss struct {
 	ID         string `json:"id"`
 	InstanceID string `json:"instance_id"`

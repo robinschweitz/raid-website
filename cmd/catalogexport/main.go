@@ -17,14 +17,15 @@ import (
 func main() {
 	manifestPath := flag.String("manifest", "", "source-evidence association manifest JSON; not human approval")
 	outputPath := flag.String("out", "", "output catalog JSON in an existing directory")
+	replace := flag.Bool("replace", false, "explicitly regenerate existing catalog artifacts; prints old and new hashes")
 	flag.Parse()
-	if err := run(*manifestPath, *outputPath); err != nil {
+	if err := run(*manifestPath, *outputPath, *replace); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(manifestPath, outputPath string) error {
+func run(manifestPath, outputPath string, replace bool) error {
 	if manifestPath == "" || outputPath == "" {
 		return fmt.Errorf("-manifest and -out are required; no automatic production fetch")
 	}
@@ -55,9 +56,25 @@ func run(manifestPath, outputPath string) error {
 	if err != nil {
 		return err
 	}
-	// Exclusive creation prevents clobbering previously reviewed artifacts.
+	// Replacement requires an explicit maintenance flag and reports both versions.
+	if replace {
+		old, err := os.ReadFile(outputPath)
+		if err != nil {
+			return err
+		}
+		var previous lootcatalog.Dataset
+		if err := json.Unmarshal(old, &previous); err != nil {
+			return err
+		}
+		_, oldReport := lootcatalog.Canonical(previous)
+		fmt.Printf("replacing sha256:%s (bosses:%d items:%d drops:%d)\n", oldReport.RawHash, len(previous.Bosses), len(previous.Items), len(previous.Drops))
+	}
 	write := func(path string, content []byte) error {
-		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+		flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
+		if replace {
+			flags = os.O_WRONLY | os.O_TRUNC
+		}
+		file, err := os.OpenFile(path, flags, 0644)
 		if err != nil {
 			return err
 		}

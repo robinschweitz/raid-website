@@ -1,16 +1,16 @@
 {
-  "raw_hash": "5eb7c086ba61d5c27c79c6da925fbc85292b6e866509a8f2e91b98a4bf36bb26",
+  "raw_hash": "bc64971cacf8b7569695f414cf825b91c0061f7ff5249653f9954216c3f92bb3",
   "partial": true,
   "coverage": [
     {
       "instance_id": "533",
       "instance_name": "Naxxramas",
-      "boss_metadata": 18,
+      "boss_metadata": 15,
       "raid_size": 10,
       "difficulty": "raid-difficulty:0",
-      "bosses_with_drops": 14,
+      "bosses_with_drops": 15,
       "items": 139,
-      "drops": 270,
+      "drops": 279,
       "loot_modes": [
         1
       ]
@@ -18,12 +18,12 @@
     {
       "instance_id": "533",
       "instance_name": "Naxxramas",
-      "boss_metadata": 18,
+      "boss_metadata": 15,
       "raid_size": 25,
       "difficulty": "raid-difficulty:1",
-      "bosses_with_drops": 14,
+      "bosses_with_drops": 15,
       "items": 232,
-      "drops": 481,
+      "drops": 495,
       "loot_modes": [
         1
       ]
@@ -34,9 +34,9 @@
       "boss_metadata": 19,
       "raid_size": 10,
       "difficulty": "raid-difficulty:0",
-      "bosses_with_drops": 13,
-      "items": 159,
-      "drops": 238,
+      "bosses_with_drops": 15,
+      "items": 176,
+      "drops": 301,
       "loot_modes": [
         1,
         2,
@@ -64,9 +64,9 @@
       "boss_metadata": 19,
       "raid_size": 10,
       "difficulty": "raid-difficulty:0/hardmode:true",
-      "bosses_with_drops": 2,
-      "items": 29,
-      "drops": 30,
+      "bosses_with_drops": 4,
+      "items": 71,
+      "drops": 74,
       "loot_modes": [
         1
       ]
@@ -77,9 +77,9 @@
       "boss_metadata": 19,
       "raid_size": 25,
       "difficulty": "raid-difficulty:1",
-      "bosses_with_drops": 13,
-      "items": 202,
-      "drops": 532,
+      "bosses_with_drops": 15,
+      "items": 219,
+      "drops": 663,
       "loot_modes": [
         1,
         2,
@@ -107,9 +107,9 @@
       "boss_metadata": 19,
       "raid_size": 25,
       "difficulty": "raid-difficulty:1/hardmode:true",
-      "bosses_with_drops": 2,
-      "items": 53,
-      "drops": 76,
+      "bosses_with_drops": 4,
+      "items": 76,
+      "drops": 123,
       "loot_modes": [
         1
       ]
@@ -143,53 +143,11 @@
     {
       "instance_id": "631",
       "instance_name": "Icecrown Citadel",
-      "boss_metadata": 16,
+      "boss_metadata": 15,
       "raid_size": 10,
       "difficulty": "raid-difficulty:0",
-      "bosses_with_drops": 11,
-      "items": 122,
-      "drops": 132,
-      "loot_modes": [
-        1,
-        2
-      ]
-    },
-    {
-      "instance_id": "631",
-      "instance_name": "Icecrown Citadel",
-      "boss_metadata": 16,
-      "raid_size": 10,
-      "difficulty": "raid-difficulty:2",
-      "bosses_with_drops": 10,
-      "items": 124,
-      "drops": 154,
-      "loot_modes": [
-        1,
-        2
-      ]
-    },
-    {
-      "instance_id": "631",
-      "instance_name": "Icecrown Citadel",
-      "boss_metadata": 16,
-      "raid_size": 25,
-      "difficulty": "raid-difficulty:1",
-      "bosses_with_drops": 11,
-      "items": 118,
-      "drops": 158,
-      "loot_modes": [
-        1,
-        2
-      ]
-    },
-    {
-      "instance_id": "631",
-      "instance_name": "Icecrown Citadel",
-      "boss_metadata": 16,
-      "raid_size": 25,
-      "difficulty": "raid-difficulty:3",
-      "bosses_with_drops": 10,
-      "items": 120,
+      "bosses_with_drops": 13,
+      "items": 146,
       "drops": 171,
       "loot_modes": [
         1,
@@ -197,40 +155,56 @@
       ]
     },
     {
-      "instance_id": "649",
-      "instance_name": "Trial of the Crusader",
-      "boss_metadata": 36,
-      "raid_size": 10,
-      "difficulty": "raid-difficulty:0",
-      "bosses_with_drops": 5,
-      "items": 113,
-      "drops": 116,
-      "loot_modes": [
-        1
-      ]
-    },
-    {
-      "instance_id": "649",
-      "instance_name": "Trial of the Crusader",
-      "boss_metadata": 36,
+      "instance_id": "631",
+      "instance_name": "Icecrown Citadel",
+      "boss_metadata": 15,
       "raid_size": 10,
       "difficulty": "raid-difficulty:2",
-      "bosses_with_drops": 5,
-      "items": 126,
-      "drops": 180,
+      "bosses_with_drops": 12,
+      "items": 148,
+      "drops": 196,
       "loot_modes": [
-        1
+        1,
+        2
       ]
     },
     {
-      "instance_id": "649",
-      "instance_name": "Trial of the Crusader",
-      "boss_metadata": 36,
+      "instance_id": "631",
+      "instance_name": "Icecrown Citadel",
+      "boss_metadata": 15,
       "raid_size": 25,
       "difficulty": "raid-difficulty:1",
-      "bosses_with_drops": 5,
-      "items": 169,
-      "drops": 322,
+      "bosses_with_drops": 13,
+      "items": 148,
+      "drops": 212,
+      "loot_modes": [
+        1,
+        2
+      ]
+    },
+    {
+      "instance_id": "631",
+      "instance_name": "Icecrown Citadel",
+      "boss_metadata": 15,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:3",
+      "bosses_with_drops": 12,
+      "items": 150,
+      "drops": 225,
+      "loot_modes": [
+        1,
+        2
+      ]
+    },
+    {
+      "instance_id": "649",
+      "instance_name": "Trial of the Crusader",
+      "boss_metadata": 10,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:0",
+      "bosses_with_drops": 6,
+      "items": 133,
+      "drops": 137,
       "loot_modes": [
         1
       ]
@@ -238,12 +212,38 @@
     {
       "instance_id": "649",
       "instance_name": "Trial of the Crusader",
-      "boss_metadata": 36,
+      "boss_metadata": 10,
+      "raid_size": 10,
+      "difficulty": "raid-difficulty:2",
+      "bosses_with_drops": 7,
+      "items": 173,
+      "drops": 276,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "649",
+      "instance_name": "Trial of the Crusader",
+      "boss_metadata": 10,
+      "raid_size": 25,
+      "difficulty": "raid-difficulty:1",
+      "bosses_with_drops": 6,
+      "items": 199,
+      "drops": 391,
+      "loot_modes": [
+        1
+      ]
+    },
+    {
+      "instance_id": "649",
+      "instance_name": "Trial of the Crusader",
+      "boss_metadata": 10,
       "raid_size": 25,
       "difficulty": "raid-difficulty:3",
-      "bosses_with_drops": 5,
-      "items": 169,
-      "drops": 322,
+      "bosses_with_drops": 7,
+      "items": 226,
+      "drops": 463,
       "loot_modes": [
         1
       ]

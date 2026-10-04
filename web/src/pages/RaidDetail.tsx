@@ -5,6 +5,7 @@ import { useAuth } from '../auth'
 import { Link } from '../router'
 import { characterClassName } from '../characterTheme'
 import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Attendance, type AttendanceRole, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
+import { catalogSourceLabels, matchesCatalogItem } from '../catalog'
 
 interface Props {
   raidID: number
@@ -119,6 +120,7 @@ function RaidDetail({ raidID }: Props) {
   const [associationSize, setAssociationSize] = useState('')
   const [catalogBoss, setCatalogBoss] = useState('')
   const [catalogItem, setCatalogItem] = useState('')
+  const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogDifficulty, setCatalogDifficulty] = useState('')
   const [catalogStatus, setCatalogStatus] = useState('')
   const [catalogSourceStatus, setCatalogSourceStatus] = useState('Loot-Katalog wird geladen.')
@@ -151,7 +153,7 @@ function RaidDetail({ raidID }: Props) {
   const hasCatalogIdentity = (!!lootEditing && unchangedLootIdentity && unchangedLootRecipient)
     || (associated && catalogSourcesAvailable && !!selectedDrop && catalogBosses.some((boss) => boss.id === catalogBoss && boss.instance_id === raid?.catalog_instance_id))
   const catalogDifficulties = (Object.keys(catalogModeLabels) as (keyof typeof catalogModeLabels)[]).filter((mode) => catalogItems.some((item) => item.mode === mode))
-  const visibleCatalogItems = catalogItems.filter((item) => item.mode === catalogDifficulty)
+  const visibleCatalogItems = catalogItems.filter((item) => item.mode === catalogDifficulty && (dropKey(item) === catalogItem || matchesCatalogItem(item, catalogSearch)))
   const lootGroups = [...new Set(loot.map((row) => row.boss))]
 
   const load = useCallback(async () => {
@@ -327,6 +329,7 @@ function RaidDetail({ raidID }: Props) {
   }
 
   const chooseCatalogBoss = (id: string) => changeLoot(() => {
+    setCatalogSearch('')
     if (renderedCatalogVersion !== catalogVersion.current) return
     const version = ++catalogVersion.current
     const selected = catalogBosses.find((boss) => boss.id === id && boss.instance_id === raid?.catalog_instance_id)
@@ -824,7 +827,7 @@ function RaidDetail({ raidID }: Props) {
             <form className="inline-form" onSubmit={addLoot}>
               {associated ? <>
                 <p>Gespeicherter Eintrag: {lootBoss || 'Kein Boss gewählt'} · {lootItem || 'Kein Drop gewählt'}{lootItemID ? ` (Item-ID ${lootItemID})` : ''}</p>
-                <label>Katalogboss<select aria-label="Loot-Katalogboss" disabled={pending || !catalogSourcesAvailable || catalogBosses.length === 0} value={catalogBoss} onChange={(e) => chooseCatalogBoss(e.target.value)}>
+                <label>Boss / Begegnung<select aria-label="Loot-Katalogboss" disabled={pending || !catalogSourcesAvailable || catalogBosses.length === 0} value={catalogBoss} onChange={(e) => chooseCatalogBoss(e.target.value)}>
                   <option value="">{lootEditing ? 'Gespeicherte Loot-Identität beibehalten' : 'Boss wählen'}</option>
                   {catalogBoss && !catalogBosses.some((boss) => boss.id === catalogBoss) && <option value={catalogBoss}>Gespeicherter Boss (Quelle nicht verfügbar)</option>}
                   {catalogBosses.map((boss) => <option key={boss.id} value={boss.id}>{boss.name}</option>)}
@@ -838,6 +841,7 @@ function RaidDetail({ raidID }: Props) {
                   {catalogDifficulties.length === 0 && <option value="">Zuerst Boss wählen</option>}
                   {catalogDifficulties.map((difficulty) => <option key={difficulty} value={difficulty}>{catalogModeLabels[difficulty]}</option>)}
                 </select></label>
+                <label>Item suchen<input type="search" disabled={pending || catalogItems.length === 0} value={catalogSearch} onChange={(e) => setCatalogSearch(e.target.value)} placeholder="Name oder Item-ID" /></label>
                 <label>Gedropptes Katalogitem<select aria-label="Loot-Katalogitem" disabled={pending || catalogItems.length === 0} value={catalogItem} onChange={(e) => changeLoot(() => {
                   if (renderedCatalogVersion !== catalogVersion.current) return
                   const item = visibleCatalogItems.find((drop) => dropKey(drop) === e.target.value)
@@ -849,7 +853,8 @@ function RaidDetail({ raidID }: Props) {
                   {visibleCatalogItems.map((item) => <option key={dropKey(item)} value={dropKey(item)}>{item.name} · {item.raid_size} Spieler · {catalogModeLabels[item.mode]}{item.conditional ? ' · Bedingter Drop' : ''}</option>)}
                 </select></label>
                 {selectedDrop && <details><summary>Dropquelle und Bedingungen</summary>
-                  {selectedDrop.conditional && <p className="muted">Bedingter Drop laut Quelldaten. Die Rohmetadaten allein erklären die konkrete Bedingung nicht.</p>}
+                  <ul>{catalogSourceLabels(selectedDrop).map((label) => <li key={label}>{label}</li>)}</ul>
+                  {selectedDrop.conditional && <p className="muted">Bedingte Beute. Quellen können zusätzliche, nicht vollständig aufgeschlüsselte Bedingungen enthalten.</p>}
                   <ul>{selectedDrop.source_variants.map((variant, index) => <li key={index} style={{ overflowWrap: 'anywhere' }}>Quellpfad: {variant.difficulty} · Roh-Lootmodus: {variant.loot_mode}</li>)}</ul>
                 </details>}
               </> : <>

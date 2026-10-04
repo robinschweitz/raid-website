@@ -26,6 +26,15 @@ type Manifest struct {
 	CreatureVariants bool        `json:"creature_variants,omitempty"`
 	Proofs           []Proof     `json:"proofs,omitempty"`
 	BossGroups       []BossGroup `json:"boss_groups,omitempty"`
+	Encounters       []Encounter `json:"encounters,omitempty"`
+}
+
+// Encounter groups source participants under one selectable fight or reward.
+type Encounter struct {
+	ID           string   `json:"id"`
+	InstanceID   string   `json:"instance_id"`
+	Name         string   `json:"name"`
+	Participants []string `json:"participants"`
 }
 
 // BossGroup resolves explicit encounter symbols or script names from pinned source data.
@@ -68,6 +77,7 @@ type Root struct {
 	Difficulty      string `json:"difficulty"`
 	Evidence        string `json:"evidence"`
 	SpawnDifficulty *int   `json:"spawn_difficulty,omitempty"`
+	SpellID         string `json:"spell_id,omitempty"`
 }
 
 // Export fetches only a pinned revision, parses data as text, and emits a normalized subset.
@@ -75,8 +85,11 @@ type Root struct {
 func Export(ctx context.Context, manifest Manifest) (lootcatalog.Dataset, string, error) {
 	client := &http.Client{Timeout: 3 * time.Minute}
 	return Normalize(manifest, func(path string) (string, error) {
-		base := "https://raw.githubusercontent.com/azerothcore/azerothcore-wotlk/" + manifest.Revision + "/"
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+path, nil)
+		url := "https://raw.githubusercontent.com/azerothcore/azerothcore-wotlk/" + manifest.Revision + "/" + path
+		if path == clientSpellArchive {
+			url = clientSpellArchive
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return "", err
 		}
@@ -151,7 +164,7 @@ func Normalize(manifest Manifest, read func(string) (string, error)) (lootcatalo
 		if content, ok := proofCache[path]; ok {
 			return content, nil
 		}
-		if !strings.HasPrefix(path, "src/server/") || strings.Contains(path, "..") {
+		if (!strings.HasPrefix(path, "src/server/") && !strings.HasPrefix(path, "data/sql/updates/db_world/")) || strings.Contains(path, "..") {
 			return "", fmt.Errorf("invalid proof path %q", path)
 		}
 		content, err := fetch(path)
@@ -381,6 +394,15 @@ func Normalize(manifest Manifest, read func(string) (string, error)) (lootcatalo
 			wantedObjects[root.Entry] = true
 		}
 	}
+	if err := verifyChestSpells(manifest.Roots, read); err != nil {
+		return empty, "", err
+	}
+	for _, root := range manifest.Roots {
+		if root.SpellID != "" {
+			d.Notices = append(d.Notices, "Chest spell evidence: "+clientSpellArchive+" sha256:"+clientSpellHash)
+			break
+		}
+	}
 	objects := map[string]map[string]string{}
 	if len(wantedObjects) != 0 {
 		if err := parse("gameobject_template", func(row map[string]string) error {
@@ -535,6 +557,9 @@ func Normalize(manifest Manifest, read func(string) (string, error)) (lootcatalo
 		} else {
 			d.Notices = append(d.Notices, "item "+d.Items[index].ItemID+": deutscher Name fehlt; Source-Name erhalten")
 		}
+	}
+	if err := groupEncounters(&d, manifest.Encounters); err != nil {
+		return empty, "", err
 	}
 	d, report := lootcatalog.Canonical(d)
 	if len(report.Errors) != 0 {

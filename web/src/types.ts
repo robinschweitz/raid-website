@@ -127,7 +127,7 @@ export interface LootCatalog {
   instances: CatalogInstance[]
   bosses: CatalogBoss[]
   items: CatalogItem[]
-  drops: CatalogItemDrop[]
+  drops: { boss_id: string; item_id: string; raid_size: number; difficulty: string; loot_mode: number }[]
 }
 
 export function catalogRaidSizes(catalog: LootCatalog | null, instanceID: string): number[] {

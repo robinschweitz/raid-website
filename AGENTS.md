@@ -11,7 +11,8 @@ Authoritative sources, in order of precedence:
 1. This file (owner-level requirements and constraints)
 2. `docs/decisions/ADR-*.md` (one accepted decision per file, ADR 001–016)
 3. `ARCHITECTURE.md` (module map and principles)
-4. `README.md` (commands)
+4. `CODING_RULES.md` (defines the coding rules)
+5. `README.md` (commands)
 
 ---
 
@@ -29,6 +30,10 @@ TypeScript frontend built with Vite. One binary serves both the JSON API and the
 
 These came from a strict, German-language engineering-standards document that governs the whole
 codebase. They are not stylistic preferences.
+
+`CODING_RULES.md` elaborates these rules for day-to-day coding (layers, errors, migrations, tests,
+frontend, git) in 16 sections. It never overrides the list below; where the two disagree, this file
+wins and the difference is fixed here first.
 
 1. **Boring, explicit, predictable.** No clever abstractions, no hidden magic, no speculative
    generality. Prefer long and obvious over short and clever. Name things after the domain.

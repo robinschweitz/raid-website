@@ -17,9 +17,11 @@ import (
 	"raid-website/internal/auth"
 	"raid-website/internal/character"
 	"raid-website/internal/db"
+	"raid-website/internal/enhancepoints"
 	"raid-website/internal/httpapi"
 	"raid-website/internal/migrations"
 	"raid-website/internal/player"
+	"raid-website/internal/raid"
 	"raid-website/internal/validation"
 )
 
@@ -39,7 +41,11 @@ func setupServer(t *testing.T) (*httptest.Server, *bun.DB) {
 	if _, err := m.Migrate(ctx); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	srv := httptest.NewServer(httpapi.New(bdb.DB, httpapi.Options{}))
+	handler, err := httpapi.New(bdb.DB, httpapi.Options{})
+	if err != nil {
+		t.Fatalf("create handler: %v", err)
+	}
+	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 	return srv, bdb.DB
 }
@@ -152,7 +158,8 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	token := login(t, client, srv, "admin", "admin-pw")
 
 	leader := createPlayer(t, client, srv, token, "Leader")
-	plain := createPlayer(t, client, srv, token, "Plain")
+	plain := seedAccount(t, bdb, "Plain", "plain-pw", validation.RoleMember)
+	plainToken := login(t, client, srv, "Plain", "plain-pw")
 	rewarded := createPlayer(t, client, srv, token, "Rewarded")
 
 	now := time.Now().UTC()
@@ -241,6 +248,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
 		"item_name":            "Weiheabzeichen des Eroberers",
 		"awarded_to_player_id": plain,
+		"reason":               "record omitted off-spec token award",
 	})
 	if status != http.StatusCreated {
 		t.Fatalf("create token loot: status %d body %s", status, body)
@@ -272,7 +280,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	}
 
 	// Roll consumes min(balance,50) = 10 and returns a roll in [1,110].
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/points/roll", srv.URL, plain), token, nil)
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/points/roll", srv.URL, plain), plainToken, nil)
 	if status != http.StatusOK {
 		t.Fatalf("roll: status %d body %s", status, body)
 	}
@@ -297,11 +305,136 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	if rollOut.Data.BalanceAfter != 0 {
 		t.Fatalf("balance after roll: want 0 got %d", rollOut.Data.BalanceAfter)
 	}
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/points/roll", srv.URL, plain), plainToken, nil)
+	if status != http.StatusUnprocessableEntity || !bytes.Contains(body, []byte(`"code":"insufficient_balance"`)) {
+		t.Fatalf("roll with zero balance: want 422/insufficient_balance, got %d %s", status, body)
+	}
 
 	// Lock requires balance >= 150; now 0.
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/locks", srv.URL, plain), token, map[string]any{"raid_id": raidID})
-	if status != http.StatusUnprocessableEntity {
+	upcoming := &raid.Raid{Name: "Upcoming ICC", RaidLeaderID: leader, Status: validation.RaidStatusPlanned, CreatedAt: now, UpdatedAt: now}
+	if err := raid.NewRepo(bdb).Create(ctx, upcoming); err != nil {
+		t.Fatal(err)
+	}
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/locks", srv.URL, plain), plainToken, map[string]any{"raid_id": upcoming.ID, "item_name": "Test item"})
+	if status != http.StatusUnprocessableEntity || !bytes.Contains(body, []byte(`"code":"lock_not_allowed"`)) {
 		t.Fatalf("lock: want 422 got %d body %s", status, body)
+	}
+}
+
+func TestPointsAndLocksSelfServiceOwnership(t *testing.T) {
+	srv, bdb := setupServer(t)
+	client := srv.Client()
+	ctx := context.Background()
+	ownerID := seedAccount(t, bdb, "owner", "pw", validation.RoleMember)
+	otherID := seedAccount(t, bdb, "other", "pw", validation.RoleMember)
+	adminID := seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	guestID := seedAccount(t, bdb, "guest", "pw", validation.RoleGuest)
+	ownerToken := login(t, client, srv, "owner", "pw")
+	otherToken := login(t, client, srv, "other", "pw")
+	adminToken := login(t, client, srv, "admin", "pw")
+	guestToken := login(t, client, srv, "guest", "pw")
+	now := time.Now().UTC()
+	raidRecord := &raid.Raid{Name: "ICC", RaidLeaderID: adminID, Status: validation.RaidStatusPlanned, CreatedAt: now, UpdatedAt: now}
+	if err := raid.NewRepo(bdb).Create(ctx, raidRecord); err != nil {
+		t.Fatal(err)
+	}
+	points := enhancepoints.NewRepo(bdb)
+	for _, id := range []int64{ownerID, otherID, adminID, guestID} {
+		if err := points.InsertTransaction(ctx, &enhancepoints.Transaction{PlayerID: id, Amount: 150, Type: "adjustment", Reason: "test balance", ActorID: adminID, CreatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	lock := &enhancepoints.ItemLock{PlayerID: ownerID, RaidID: raidRecord.ID, Status: validation.LockStatusActive, LockedAt: now, ActorID: ownerID, CreatedAt: now, UpdatedAt: now}
+	guestLock := &enhancepoints.ItemLock{PlayerID: guestID, RaidID: raidRecord.ID, Status: validation.LockStatusActive, LockedAt: now, ActorID: guestID, CreatedAt: now, UpdatedAt: now}
+	for _, record := range []*enhancepoints.ItemLock{lock, guestLock} {
+		if err := points.CreateLock(ctx, record); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, caller := range []struct {
+		name  string
+		id    int64
+		token string
+	}{{"other member", otherID, otherToken}, {"admin", adminID, adminToken}, {"guest", guestID, guestToken}, {"unauthenticated", ownerID, ""}} {
+		for _, action := range []string{"points/roll", "locks", fmt.Sprintf("locks/%d/cancel", lock.ID)} {
+			t.Run(caller.name+"/"+action, func(t *testing.T) {
+				var requestBody any
+				if action == "locks" {
+					requestBody = map[string]any{"raid_id": raidRecord.ID}
+				}
+				wantStatus := http.StatusForbidden
+				wantCode := "forbidden"
+				if caller.token == "" {
+					wantStatus = http.StatusUnauthorized
+					wantCode = "unauthenticated"
+				}
+				status, body := do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/%s", srv.URL, ownerID, action), caller.token, requestBody)
+				var out struct {
+					Error struct {
+						Code string `json:"code"`
+					} `json:"error"`
+				}
+				if err := json.Unmarshal(body, &out); err != nil {
+					t.Fatal(err)
+				}
+				if status != wantStatus || out.Error.Code != wantCode {
+					t.Fatalf("want %d/%s, got %d %s", wantStatus, wantCode, status, body)
+				}
+			})
+		}
+		// The player's own URL must not allow cancellation of another player's lock.
+		if caller.name == "other member" || caller.name == "admin" {
+			status, body := do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/locks/%d/cancel", srv.URL, caller.id, lock.ID), caller.token, nil)
+			if status != http.StatusNotFound {
+				t.Fatalf("foreign lock under own URL: want 404, got %d %s", status, body)
+			}
+		}
+	}
+	for _, action := range []string{"points/roll", "locks", fmt.Sprintf("locks/%d/cancel", guestLock.ID)} {
+		status, body := do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/%s", srv.URL, guestID, action), guestToken, map[string]any{"raid_id": raidRecord.ID})
+		if status != http.StatusForbidden {
+			t.Fatalf("guest own %s: want 403, got %d %s", action, status, body)
+		}
+	}
+	balance, err := points.Balance(ctx, ownerID)
+	if err != nil || balance != 150 {
+		t.Fatalf("denied calls changed balance: %d, err %v", balance, err)
+	}
+	locks, err := points.ListLocksByPlayer(ctx, ownerID)
+	if err != nil || len(locks) != 1 || locks[0].Status != validation.LockStatusActive {
+		t.Fatalf("denied calls changed locks: %v, err %v", locks, err)
+	}
+	for i := 0; i < 2; i++ {
+		status, body := do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/locks", srv.URL, ownerID), ownerToken, map[string]any{"raid_id": raidRecord.ID, "item_name": fmt.Sprintf("Test item %d", i)})
+		if status != http.StatusCreated {
+			t.Fatalf("create own lock: want 201, got %d %s", status, body)
+		}
+		var out struct {
+			Data enhancepoints.ItemLock `json:"data"`
+		}
+		if err := json.Unmarshal(body, &out); err != nil {
+			t.Fatal(err)
+		}
+		if out.Data.PlayerID != ownerID || out.Data.ActorID != ownerID || out.Data.Status != validation.LockStatusActive {
+			t.Fatalf("invalid created lock: %+v", out.Data)
+		}
+	}
+	balance, err = points.Balance(ctx, ownerID)
+	if err != nil || balance != 150 {
+		t.Fatalf("locks must not debit: %d, err %v", balance, err)
+	}
+	for _, expected := range []struct {
+		status int
+		code   string
+	}{{http.StatusOK, ""}, {http.StatusConflict, "lock_not_active"}} {
+		status, body := do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/locks/%d/cancel", srv.URL, ownerID, lock.ID), ownerToken, nil)
+		if status != expected.status || expected.code != "" && !bytes.Contains(body, []byte(`"code":"`+expected.code+`"`)) {
+			t.Fatalf("cancel own lock: want %d/%s, got %d %s", expected.status, expected.code, status, body)
+		}
+	}
+	stored, err := points.GetLock(ctx, lock.ID)
+	if err != nil || stored.Status != validation.LockStatusCancelled || stored.CancelledAt == nil {
+		t.Fatalf("lock cancellation not saved: %+v, err %v", stored, err)
 	}
 }
 

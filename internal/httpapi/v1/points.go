@@ -2,9 +2,7 @@ package v1
 
 import (
 	"errors"
-	"math/rand/v2"
 	"net/http"
-	"time"
 
 	"raid-website/internal/enhancepoints"
 )
@@ -37,7 +35,7 @@ func (a *API) getPoints(w http.ResponseWriter, r *http.Request) {
 func (a *API) rollPoints(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "authenticated session required")
 		return
 	}
 	id, ok := pathID(r, "id")
@@ -45,45 +43,24 @@ func (a *API) rollPoints(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "invalid player id")
 		return
 	}
-	balance, err := a.Points.Balance(r.Context(), id)
+	result, err := a.pointService.Roll(r.Context(), id, actor)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal", "could not load balance")
-		return
-	}
-	cost, err := enhancepoints.RollCost(balance)
-	if err != nil {
+		if errors.Is(err, enhancepoints.ErrNotOwner) {
+			WriteError(w, http.StatusForbidden, "forbidden", "only own points may be rolled")
+			return
+		}
 		if errors.Is(err, enhancepoints.ErrInsufficientBalance) {
 			WriteError(w, http.StatusUnprocessableEntity, "insufficient_balance", "player has no points to roll")
 			return
 		}
-		WriteError(w, http.StatusUnprocessableEntity, "invalid_roll", "roll is not possible")
+		if errors.Is(err, enhancepoints.ErrInvalidCost) {
+			WriteError(w, http.StatusUnprocessableEntity, "invalid_roll", "roll is not possible")
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, "internal", "could not record roll")
 		return
 	}
-	now := time.Now().UTC()
-	tx := &enhancepoints.Transaction{
-		PlayerID:  id,
-		Amount:    -cost,
-		Type:      "enhance_roll",
-		Reason:    "enhance roll cost",
-		ActorID:   actor,
-		CreatedAt: now,
-	}
-	if err := a.Points.InsertTransaction(r.Context(), tx); err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal", "could not record roll cost")
-		return
-	}
-	minRoll, maxRoll := enhancepoints.RollRange(cost)
-	roll := minRoll + rand.IntN(maxRoll-minRoll+1)
-	WriteJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"player_id":     id,
-			"cost":          cost,
-			"roll":          roll,
-			"min":           minRoll,
-			"max":           maxRoll,
-			"balance_after": balance - cost,
-		},
-	})
+	WriteJSON(w, http.StatusOK, map[string]any{"data": result})
 }
 
 func (a *API) getTokens(w http.ResponseWriter, r *http.Request) {

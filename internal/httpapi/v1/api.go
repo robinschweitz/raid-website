@@ -19,6 +19,7 @@ import (
 	"raid-website/internal/poll"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcompletion"
+	"raid-website/internal/raidcorrection"
 	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
@@ -41,16 +42,18 @@ type Deps struct {
 	Roster       *roster.Repo
 	Audit        *audit.Repo
 	Completion   *raidcompletion.Service
+	Corrections  *raidcorrection.Service
 	Imports      *legacyimport.Service
 }
 
 // API holds the dependencies shared by the v1 HTTP handlers.
 type API struct {
 	Deps
+	pointService *enhancepoints.Service
 }
 
 func NewAPI(d Deps) *API {
-	return &API{Deps: d}
+	return &API{Deps: d, pointService: enhancepoints.NewService(d.Points)}
 }
 
 func (a *API) Register(mux *http.ServeMux) {
@@ -79,9 +82,11 @@ func (a *API) Register(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/raids/{id}/attendance", RequireAuth(a.listAttendance))
 	mux.HandleFunc("POST /api/v1/raids/{id}/attendance", RequireRole(validation.RoleRaidassistent, a.createAttendance))
+	mux.HandleFunc("PATCH /api/v1/raids/{id}/attendance/{recordID}", RequireRole(validation.RoleRaidassistent, a.correctAttendance))
 
 	mux.HandleFunc("GET /api/v1/raids/{id}/loot", RequireAuth(a.listLoot))
 	mux.HandleFunc("POST /api/v1/raids/{id}/loot", RequireRole(validation.RoleRaidassistent, a.createLoot))
+	mux.HandleFunc("PATCH /api/v1/raids/{id}/loot/{recordID}", RequireRole(validation.RoleRaidassistent, a.correctLoot))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/points", RequireAuth(a.getPoints))
 	mux.HandleFunc("POST /api/v1/players/{id}/points/roll", RequireRole(validation.RoleMember, a.rollPoints))

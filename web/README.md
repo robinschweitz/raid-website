@@ -1,5 +1,13 @@
 # React + TypeScript + Vite
 
+## Regression Tests
+
+Run `npm test` with Node 18 or newer. The tests use Node's built-in test runner and the
+existing TypeScript compiler, with no additional dependencies. They execute frontend
+handlers against deferred API responses using a small hook runner that models commits
+and keyed remounts. Browser rendering, native form validation, and React's concurrent
+scheduling still require browser-level verification.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

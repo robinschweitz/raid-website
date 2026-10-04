@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,31 +14,41 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() (err error) {
 	ctx := context.Background()
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		return fmt.Errorf("config: %w", err)
 	}
 	bdb, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("db: %v", err)
+		return fmt.Errorf("db: %w", err)
 	}
-	defer bdb.Close()
+	defer func() { err = errors.Join(err, bdb.Close()) }()
 	m, err := migrations.NewMigrator(bdb.DB)
 	if err != nil {
-		log.Fatalf("migrator: %v", err)
+		return fmt.Errorf("migrator: %w", err)
 	}
 	if _, err := m.Migrate(ctx); err != nil {
-		log.Printf("migrate: %v", err)
+		return fmt.Errorf("migrate: %w", err)
 	}
-	h := httpapi.New(bdb.DB, httpapi.Options{
+	h, err := httpapi.New(bdb.DB, httpapi.Options{
 		CookieSecure:  cfg.CookieSecure,
 		AdminUsername: cfg.AdminUsername,
 		AdminPassword: cfg.AdminPassword,
 	})
+	if err != nil {
+		return fmt.Errorf("http initialization: %w", err)
+	}
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("listening on %s", addr)
 	if err := http.ListenAndServe(addr, h); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }

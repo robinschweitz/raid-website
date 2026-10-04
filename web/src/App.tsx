@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { useSubmission } from './useSubmission'
 import { AuthProvider, useAuth } from './auth'
 import { Link, useRoute } from './router'
 import { atLeast } from './types'
@@ -39,6 +41,16 @@ function Routes() {
 
 function Layout() {
   const { player, logout } = useAuth()
+  const { pending, submit, isActive } = useSubmission()
+  const [error, setError] = useState('')
+  const signOut = () => submit(async () => {
+    setError('')
+    try {
+      await logout()
+    } catch {
+      if (isActive()) setError('Abmelden fehlgeschlagen. Bitte erneut versuchen.')
+    }
+  })
   if (!player) {
     return null
   }
@@ -56,10 +68,11 @@ function Layout() {
           <span>
             {player.name} · <span className="badge">{player.role}</span>
           </span>
-          <button onClick={() => void logout()}>Abmelden</button>
+          <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button>
         </div>
       </header>
       <main>
+        {error && <p className="error" role="alert">{error}</p>}
         <Routes />
       </main>
     </div>
@@ -67,11 +80,21 @@ function Layout() {
 }
 
 function Gate() {
-  const { player, loading } = useAuth()
+  const { player, loading, error, refresh } = useAuth()
   if (loading) {
     return (
       <div className="login-wrap">
         <p className="muted">Lade…</p>
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="login-wrap">
+        <div className="card login-card">
+          <p className="error" role="alert">{error}</p>
+          <button onClick={() => void refresh()}>Erneut versuchen</button>
+        </div>
       </div>
     )
   }

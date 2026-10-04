@@ -1,11 +1,14 @@
 package legacyimport
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata" // Sheet dates require Europe/Berlin even without host zoneinfo.
 
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
@@ -36,34 +39,40 @@ type AttendancePlan struct {
 }
 
 type RaidPlan struct {
-	Key     string
-	Date    *time.Time
-	Entries []AttendancePlan
+	ExistingID int64
+	Key        string
+	Date       *time.Time
+	Entries    []AttendancePlan
 }
 
 type LootPlan struct {
-	RaidKey    string
-	PlayerName string
-	Item       string
-	ItemID     string
-	Priority   string
-	IsToken    bool
-	IsMainSpec bool
+	Date        *time.Time
+	ExternalID  string
+	Identity    string
+	Fingerprint string
+	RaidKey     string
+	PlayerName  string
+	Item        string
+	ItemID      string
+	Priority    string
+	IsToken     bool
+	IsMainSpec  bool
 }
 
 type Plan struct {
-	Players    []PlayerPlan
-	Characters []CharacterPlan
-	Raids      []RaidPlan
-	Loot       []LootPlan
-	Warnings   []string
-	Errors     []string
+	RequiresReason bool
+	Players        []PlayerPlan
+	Characters     []CharacterPlan
+	Raids          []RaidPlan
+	Loot           []LootPlan
+	Warnings       []string
+	Errors         []string
 }
 
 // BuildPlan converts the parsed sheet tabs into a deterministic merge plan.
 // It performs no database access.
 func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []CharacterRow, pointsRows []PointsRow) Plan {
-	p := Plan{}
+	p := Plan{Warnings: []string{}, Errors: []string{}}
 
 	players := map[string]*PlayerPlan{}
 	characters := map[string]*CharacterPlan{}
@@ -128,6 +137,9 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 			c = &CharacterPlan{Name: name, PlayerName: playerName}
 			characters[name] = c
 		}
+		if c.PlayerName != playerName {
+			p.Errors = append(p.Errors, fmt.Sprintf("character %q has conflicting owners", name))
+		}
 		if c.Class == "" {
 			c.Class = validation.NormalizeClassName(row.Class)
 		}
@@ -141,6 +153,9 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 
 	// 3. Raid Archive -> raids with attendance.
 	for i, row := range raidRows {
+		if _, ok := parseSheetDate(row.TimestampRaw); !ok {
+			p.Warnings = append(p.Warnings, fmt.Sprintf("raid row %d: missing or invalid date %q; using import time when no raid date is available", i+2, row.TimestampRaw))
+		}
 		key := strings.TrimSpace(row.RaidID)
 		if key == "" {
 			continue
@@ -185,11 +200,30 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 		})
 	}
 
+	// IDs are checked even on incomplete rows; invalid rows cannot hide duplicates.
+	seenIDs := map[string]bool{}
+	occurrences := map[string]int{}
 	// 4. Loot Archive -> loot awards.
 	for i, row := range lootRows {
+		var date *time.Time
+		if parsed, ok := parseSheetDate(row.TimestampRaw); ok {
+			date = &parsed
+		} else {
+			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: missing or invalid date %q; using import time for award", i+2, row.TimestampRaw))
+		}
+		externalID := strings.TrimSpace(row.ImportID)
+		if externalID != "" {
+			if seenIDs[externalID] {
+				p.Errors = append(p.Errors, fmt.Sprintf("loot row %d: duplicate Import ID %q", i+2, externalID))
+			}
+			seenIDs[externalID] = true
+		}
 		player := strings.TrimSpace(row.Player)
 		item := strings.TrimSpace(row.Loot)
 		if player == "" || item == "" {
+			if player != "" || item != "" || externalID != "" {
+				p.Errors = append(p.Errors, fmt.Sprintf("loot row %d: missing player or item", i+2))
+			}
 			continue
 		}
 		ensurePlayer(player)
@@ -214,13 +248,24 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 		default:
 			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: unknown priority %q for item %q", i+2, priority, item))
 		}
+		content, _ := json.Marshal([]string{row.RaidID, row.TimestampRaw, player, item, row.ItemID, priority})
+		fingerprint := fmt.Sprintf("%x", sha256.Sum256(content))
+		var identity string
+		if externalID != "" {
+			identity = fmt.Sprintf("id:%x", sha256.Sum256([]byte(externalID)))
+		} else {
+			occurrences[fingerprint]++
+			identity = fmt.Sprintf("content:%s:%d", fingerprint, occurrences[fingerprint])
+		}
 		p.Loot = append(p.Loot, LootPlan{
+			Date:       date,
+			ExternalID: externalID, Identity: identity, Fingerprint: fingerprint,
 			RaidKey:    key,
 			PlayerName: player,
 			Item:       item,
 			ItemID:     strings.TrimSpace(row.ItemID),
 			Priority:   priority,
-			IsToken:    tokens.IsTokenAward(item) || strings.EqualFold(priority, "token"),
+			IsToken:    tokens.IsTokenAward(item),
 			IsMainSpec: isMain,
 		})
 	}
@@ -267,8 +312,12 @@ func parseSheetDate(raw string) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	layouts := []string{"02.01.2006", "2.1.2006", "02.01.06", "2006-01-02"}
+	location, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		return time.Time{}, false
+	}
 	for _, layout := range layouts {
-		if t, err := time.Parse(layout, raw); err == nil {
+		if t, err := time.ParseInLocation(layout, raw, location); err == nil {
 			return t.UTC(), true
 		}
 	}

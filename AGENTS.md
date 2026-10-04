@@ -9,7 +9,7 @@ future agents do not re-litigate them or silently change them.
 Authoritative sources, in order of precedence:
 
 1. This file (owner-level requirements and constraints)
-2. `docs/decisions/ADR-*.md` (one accepted decision per file, ADR 001–016)
+2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-020)
 3. `ARCHITECTURE.md` (module map and principles)
 4. `CODING_RULES.md` (defines the coding rules)
 5. `README.md` (commands)
@@ -147,6 +147,27 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   returned instead of re-processing.
 - Parse problems are reported as warnings, not silent data loss.
 
+### 4.11 Core hardening decisions (ADR 017-020)
+- Only one matching active item lock may exist per raid. Competing locks are rejected;
+  one player may still lock multiple different items. Item IDs are authoritative when both
+  records have IDs; otherwise matching uses the trimmed item name.
+- Attendance and loot corrections use explicit actor + nonblank reason + transactional
+  before/after audit snapshots. Corrections are available for planned, open, and completed
+  raids, not cancelled or archived raids. Completed-raid additions also require a reason.
+- Completed corrections append only the before/after EP eligibility difference. This preserves
+  imported opening balances and never recreates historical raid rewards. Token corrections
+  append compensating entries; consumed locks are not implicitly revived.
+- Incremental loot imports use an optional permanent, unique `Import ID` source column.
+  Edited IDs, duplicate IDs, and ambiguous no-ID changes are conflicts, not overwrites.
+  A conflict rejects the entire merge with a report and no domain writes.
+- Import raid identity is scoped to source and sheet provenance. New rows in existing
+  imported raids require an explicit reason and audited correction consequences; name
+  collisions without provenance and additions to cancelled/archived raids are conflicts.
+- An error-free server-side preview must exist for the source, sheet, and raw hash before a
+  new merge. Preview metadata may be persisted; previews never write domain records.
+- Production requires explicit nondefault bootstrap credentials. Configuration, migrations,
+  and bootstrap failures stop startup. SQLite foreign keys are enabled on every connection.
+
 ---
 
 ## 5. Authentication and permissions (ADR 010)
@@ -210,6 +231,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 | Frontend build | `cd web && npm run build` |
 | Go gates | `gofmt -w cmd internal`, `go vet ./...`, `go test ./...` |
 | Frontend gates | `npm run build`, `npm run lint` |
+| Frontend regression tests | `cd web && npm test` |
 
 Environment variables: `PORT` (default `8080`), `DATABASE_URL` (default
 `file:raid.db?_pragma=journal_mode(WAL)`), `ENV`, `COOKIE_SECURE`, `ADMIN_USERNAME`,

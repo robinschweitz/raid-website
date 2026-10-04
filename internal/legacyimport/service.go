@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
-
-	"github.com/uptrace/bun"
 
 	"raid-website/internal/attendance"
 	"raid-website/internal/character"
@@ -16,11 +16,14 @@ import (
 	"raid-website/internal/loot"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
+	"raid-website/internal/raidcorrection"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
 var ErrActorNotFound = errors.New("import actor is not a known player")
+var ErrPreviewRequired = errors.New("import preview required")
+var ErrSourceChanged = errors.New("import source changed since preview")
 
 type Counts struct {
 	Players    int `json:"players"`
@@ -52,42 +55,21 @@ type Report struct {
 
 // Service orchestrates legacy sheet import (dry-run and merge).
 type Service struct {
-	db      *bun.DB
-	imports *Repo
-	players *player.Repo
-	chars   *character.Repo
-	raids   *raid.Repo
-	att     *attendance.Repo
-	loot    *loot.Repo
-	points  *enhancepoints.Repo
-	tokens  *tokens.Repo
-	fetcher Fetcher
+	imports     *Repo
+	players     *player.Repo
+	chars       *character.Repo
+	raids       *raid.Repo
+	att         *attendance.Repo
+	loot        *loot.Repo
+	points      *enhancepoints.Repo
+	tokens      *tokens.Repo
+	fetcher     Fetcher
+	corrections *raidcorrection.Service
 }
 
-func NewService(
-	db *bun.DB,
-	imports *Repo,
-	players *player.Repo,
-	chars *character.Repo,
-	raids *raid.Repo,
-	att *attendance.Repo,
-	lootRepo *loot.Repo,
-	points *enhancepoints.Repo,
-	tokenRepo *tokens.Repo,
-	fetcher Fetcher,
-) *Service {
-	return &Service{
-		db:      db,
-		imports: imports,
-		players: players,
-		chars:   chars,
-		raids:   raids,
-		att:     att,
-		loot:    lootRepo,
-		points:  points,
-		tokens:  tokenRepo,
-		fetcher: fetcher,
-	}
+// NewService constructs an importer with explicit repositories and source fetching.
+func NewService(imports *Repo, players *player.Repo, chars *character.Repo, raids *raid.Repo, att *attendance.Repo, lootRepo *loot.Repo, points *enhancepoints.Repo, tokenRepo *tokens.Repo, fetcher Fetcher) *Service {
+	return &Service{imports: imports, players: players, chars: chars, raids: raids, att: att, loot: lootRepo, points: points, tokens: tokenRepo, fetcher: fetcher}
 }
 
 func planFromSheet(data SheetData) (Plan, int, error) {
@@ -155,7 +137,8 @@ func (s *Service) List(ctx context.Context) ([]Import, error) {
 	return s.imports.List(ctx)
 }
 
-// DryRun fetches and plans an import without writing anything.
+// DryRun fetches and reviews an import, persisting only successful preview metadata.
+// It never writes domain records.
 func (s *Service) DryRun(ctx context.Context, source, sheetID string) (Report, error) {
 	data, err := s.fetcher.Fetch(ctx, sheetID)
 	if err != nil {
@@ -165,96 +148,133 @@ func (s *Service) DryRun(ctx context.Context, source, sheetID string) (Report, e
 	if err != nil {
 		return Report{}, err
 	}
-	return reportFromPlan("dry_run", source, data, p, rows), nil
+	rep := reportFromPlan("dry_run", source, data, p, rows)
+	err = s.transaction(ctx, true, func(bound *Service) error {
+		_, err := bound.review(ctx, source, sheetID, p, &rep)
+		if err != nil {
+			return err
+		}
+		if len(rep.Errors) > 0 {
+			return nil
+		}
+		return bound.imports.recordPreview(ctx, source, sheetID, data.Hash)
+	})
+	return rep, err
 }
 
 // Merge fetches and applies an import. It is idempotent for identical source data.
-func (s *Service) Merge(ctx context.Context, actorID int64, source, sheetID string) (Report, error) {
+func (s *Service) Merge(ctx context.Context, actorID int64, source, sheetID, expectedHash, reason string) (Report, error) {
 	data, err := s.fetcher.Fetch(ctx, sheetID)
 	if err != nil {
 		return Report{}, err
 	}
 
-	if existing, err := s.imports.FindByHash(ctx, source, data.Hash); err == nil && existing != nil {
-		p, rows, perr := planFromSheet(data)
-		if perr != nil {
-			return Report{}, perr
+	rep := Report{Mode: "merge", Source: source, RawHash: data.Hash, Warnings: []string{}, Errors: []string{}}
+
+	err = s.transaction(ctx, true, func(s *Service) error {
+		if existing, err := s.imports.FindByHash(ctx, source, sheetID, data.Hash); err == nil {
+			if existing.DryRunReport != "" {
+				if err := json.Unmarshal([]byte(existing.DryRunReport), &rep); err != nil {
+					return fmt.Errorf("decode saved report: %w", err)
+				}
+			} else {
+				rep.Warnings = append(rep.Warnings, "legacy provenance missing: original report unavailable; no created counts reconstructed")
+			}
+			rep.Skipped = true
+			return nil
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
 		}
-		rep := reportFromPlan("merge", source, data, p, rows)
-		rep.Skipped = true
-		rep.Warnings = append(rep.Warnings, fmt.Sprintf("identical sheet already merged as import #%d; nothing to do", existing.ID))
-		return rep, nil
-	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return Report{}, err
-	}
+		if expectedHash == "" {
+			return ErrPreviewRequired
+		}
+		if expectedHash != data.Hash {
+			return ErrSourceChanged
+		}
+		hasPreview, err := s.imports.hasPreview(ctx, source, sheetID, data.Hash)
+		if err != nil {
+			return err
+		}
+		if !hasPreview {
+			return ErrPreviewRequired
+		}
+		p, rows, err := planFromSheet(data)
+		if err != nil {
+			return err
+		}
+		rep = reportFromPlan("merge", source, data, p, rows)
+		if _, err := s.players.Get(ctx, actorID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrActorNotFound
+			}
+			return err
+		}
+		p, err = s.review(ctx, source, sheetID, p, &rep)
+		if err != nil {
+			return err
+		}
+		if p.RequiresReason && strings.TrimSpace(reason) == "" {
+			rep.Errors = append(rep.Errors, "reason_required: additions to existing imported raids require an explicit correction reason")
+		}
+		if len(rep.Errors) > 0 {
+			rep.Created = Counts{}
+			return nil
+		}
+		rep.Created = Counts{}
+		pointsBefore, err := s.imports.pointTransactionCount(ctx)
+		if err != nil {
+			return err
+		}
+		now := time.Now().UTC()
+		playerIDs, err := mergePlayers(ctx, s.players, s.points, actorID, p, now, &rep)
+		if err != nil {
+			return err
+		}
+		charIDs, err := s.mergeCharacters(ctx, playerIDs, p, now, &rep)
+		if err != nil {
+			return err
+		}
+		raidIDs, err := s.mergeRaids(ctx, source, sheetID, reason, charIDs, playerIDs, actorID, p, now, &rep)
+		if err != nil {
+			return err
+		}
+		if err := s.mergeLoot(ctx, source, sheetID, reason, raidIDs, playerIDs, actorID, p, now, &rep); err != nil {
+			return err
+		}
+		pointsAfter, err := s.imports.pointTransactionCount(ctx)
+		if err != nil {
+			return err
+		}
+		rep.Created.Points = pointsAfter - pointsBefore
+		saved, err := json.Marshal(rep)
+		if err != nil {
+			return err
+		}
 
-	p, rows, err := planFromSheet(data)
-	if err != nil {
-		return Report{}, err
-	}
-	rep := reportFromPlan("merge", source, data, p, rows)
-
-	if _, err := s.players.Get(ctx, actorID); err != nil {
-		return Report{}, ErrActorNotFound
-	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return Report{}, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	now := time.Now().UTC()
-	players := s.players.WithTx(tx)
-	chars := s.chars.WithTx(tx)
-	raids := s.raids.WithTx(tx)
-	att := s.att.WithTx(tx)
-	lootRepo := s.loot.WithTx(tx)
-	pointsRepo := s.points.WithTx(tx)
-	tokenRepo := s.tokens.WithTx(tx)
-	imports := s.imports.WithTx(tx)
-
-	playerIDs, err := mergePlayers(ctx, players, pointsRepo, actorID, p, now, &rep)
-	if err != nil {
-		return Report{}, err
-	}
-	charIDs, err := mergeCharacters(ctx, chars, playerIDs, p, now, &rep)
-	if err != nil {
-		return Report{}, err
-	}
-	raidIDs, err := mergeRaids(ctx, raids, att, charIDs, playerIDs, actorID, p, now, &rep)
-	if err != nil {
-		return Report{}, err
-	}
-	if err := mergeLoot(ctx, lootRepo, tokenRepo, raidIDs, playerIDs, actorID, p, now, &rep); err != nil {
-		return Report{}, err
-	}
-
-	started := now
-	completed := now
-	imp := &Import{
-		ActorID:        actorID,
-		Source:         source,
-		SourceURL:      sheetID,
-		RawHash:        data.Hash,
-		DryRunReport:   "",
-		Status:         "MERGED",
-		WarningsCount:  len(rep.Warnings),
-		ErrorsCount:    len(rep.Errors),
-		CreatedCount:   rep.Created.Players + rep.Created.Characters + rep.Created.Raids + rep.Created.Attendance + rep.Created.Loot + rep.Created.Tokens + rep.Created.Points,
-		UpdatedCount:   0,
-		UnchangedCount: 0,
-		StartedAt:      &started,
-		CompletedAt:    &completed,
-	}
-	if err := imports.Insert(ctx, imp); err != nil {
-		return Report{}, fmt.Errorf("record import: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return Report{}, fmt.Errorf("commit import: %w", err)
-	}
-	return rep, nil
+		started := now
+		completed := now
+		imp := &Import{
+			ActorID:        actorID,
+			Source:         source,
+			SourceURL:      sheetID,
+			RawHash:        data.Hash,
+			DryRunReport:   string(saved),
+			Status:         "MERGED",
+			WarningsCount:  len(rep.Warnings),
+			ErrorsCount:    len(rep.Errors),
+			CreatedCount:   rep.Created.Players + rep.Created.Characters + rep.Created.Raids + rep.Created.Attendance + rep.Created.Loot + rep.Created.Tokens + rep.Created.Points,
+			UpdatedCount:   0,
+			UnchangedCount: 0,
+			StartedAt:      &started,
+			CompletedAt:    &completed,
+			Notes:          strings.TrimSpace(reason),
+		}
+		if err := s.imports.Insert(ctx, imp); err != nil {
+			return fmt.Errorf("record import: %w", err)
+		}
+		return nil
+	})
+	return rep, err
 }
 
 func mergePlayers(ctx context.Context, players *player.Repo, points *enhancepoints.Repo, actorID int64, p Plan, now time.Time, rep *Report) (map[string]int64, error) {
@@ -305,18 +325,22 @@ func mergePlayers(ctx context.Context, players *player.Repo, points *enhancepoin
 	return ids, nil
 }
 
-func mergeCharacters(ctx context.Context, chars *character.Repo, playerIDs map[string]int64, p Plan, now time.Time, rep *Report) (map[string]int64, error) {
+func (s *Service) mergeCharacters(ctx context.Context, playerIDs map[string]int64, p Plan, now time.Time, rep *Report) (map[string]int64, error) {
 	ids := make(map[string]int64, len(p.Characters))
 	for _, c := range p.Characters {
-		existing, err := chars.FindByName(ctx, c.Name)
-		if err == nil {
-			ids[c.Name] = existing.ID
-			continue
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
+		matches, err := s.imports.charactersByName(ctx, c.Name)
+		if err != nil {
 			return nil, fmt.Errorf("find character %q: %w", c.Name, err)
 		}
 		pid := playerIDs[c.PlayerName]
+		for _, existing := range matches {
+			if existing.PlayerID == pid {
+				ids[c.Name] = existing.ID
+			}
+		}
+		if ids[c.Name] != 0 {
+			continue
+		}
 		if pid == 0 {
 			return nil, fmt.Errorf("character %q references unknown player %q", c.Name, c.PlayerName)
 		}
@@ -330,7 +354,7 @@ func mergeCharacters(ctx context.Context, chars *character.Repo, playerIDs map[s
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		}
-		if err := chars.Create(ctx, row); err != nil {
+		if err := s.chars.Create(ctx, row); err != nil {
 			return nil, fmt.Errorf("create character %q: %w", c.Name, err)
 		}
 		ids[c.Name] = row.ID
@@ -339,17 +363,16 @@ func mergeCharacters(ctx context.Context, chars *character.Repo, playerIDs map[s
 	return ids, nil
 }
 
-func mergeRaids(ctx context.Context, raids *raid.Repo, att *attendance.Repo, charIDs, playerIDs map[string]int64, actorID int64, p Plan, now time.Time, rep *Report) (map[string]int64, error) {
+func (s *Service) mergeRaids(ctx context.Context, source, sheetID, reason string, charIDs, playerIDs map[string]int64, actorID int64, p Plan, now time.Time, rep *Report) (map[string]int64, error) {
 	ids := make(map[string]int64, len(p.Raids))
 	for _, rp := range p.Raids {
 		date := now
 		if rp.Date != nil {
 			date = *rp.Date
 		}
-		existing, err := raids.FindByName(ctx, rp.Key)
-		if err == nil {
-			ids[rp.Key] = existing.ID
-		} else if errors.Is(err, sql.ErrNoRows) {
+		if rp.ExistingID != 0 {
+			ids[rp.Key] = rp.ExistingID
+		} else {
 			row := &raid.Raid{
 				Name:           rp.Key,
 				RaidLeaderID:   actorID,
@@ -359,13 +382,14 @@ func mergeRaids(ctx context.Context, raids *raid.Repo, att *attendance.Repo, cha
 				CreatedAt:      now,
 				UpdatedAt:      now,
 			}
-			if err := raids.Create(ctx, row); err != nil {
+			if err := s.raids.Create(ctx, row); err != nil {
 				return nil, fmt.Errorf("create raid %q: %w", rp.Key, err)
 			}
 			ids[rp.Key] = row.ID
+			if err := s.imports.insertRaidMapping(ctx, &raidMapping{Source: source, SheetID: sheetID, RaidKey: rp.Key, RaidID: row.ID}); err != nil {
+				return nil, err
+			}
 			rep.Created.Raids++
-		} else {
-			return nil, fmt.Errorf("find raid %q: %w", rp.Key, err)
 		}
 
 		raidID := ids[rp.Key]
@@ -376,7 +400,7 @@ func mergeRaids(ctx context.Context, raids *raid.Repo, att *attendance.Repo, cha
 				rep.Warnings = append(rep.Warnings, fmt.Sprintf("raid %q: skipping attendance for %q (missing player/character)", rp.Key, e.Character))
 				continue
 			}
-			exists, err := att.Exists(ctx, raidID, pid, cid)
+			exists, err := s.att.Exists(ctx, raidID, pid, cid)
 			if err != nil {
 				return nil, fmt.Errorf("check attendance raid %q: %w", rp.Key, err)
 			}
@@ -391,7 +415,12 @@ func mergeRaids(ctx context.Context, raids *raid.Repo, att *attendance.Repo, cha
 				CreatedAt:   now,
 				UpdatedAt:   now,
 			}
-			if err := att.Create(ctx, row); err != nil {
+			if rp.ExistingID != 0 {
+				err = s.corrections.SaveImportedAttendance(ctx, row, actorID, reason)
+			} else {
+				err = s.att.Create(ctx, row)
+			}
+			if err != nil {
 				return nil, fmt.Errorf("create attendance raid %q character %q: %w", rp.Key, e.Character, err)
 			}
 			rep.Created.Attendance++
@@ -400,7 +429,11 @@ func mergeRaids(ctx context.Context, raids *raid.Repo, att *attendance.Repo, cha
 	return ids, nil
 }
 
-func mergeLoot(ctx context.Context, lootRepo *loot.Repo, tokenRepo *tokens.Repo, raidIDs, playerIDs map[string]int64, actorID int64, p Plan, now time.Time, rep *Report) error {
+func (s *Service) mergeLoot(ctx context.Context, source, sheetID, reason string, raidIDs, playerIDs map[string]int64, actorID int64, p Plan, now time.Time, rep *Report) error {
+	existingRaids := map[string]bool{}
+	for _, rp := range p.Raids {
+		existingRaids[rp.Key] = rp.ExistingID != 0
+	}
 	for _, l := range p.Loot {
 		raidID := raidIDs[l.RaidKey]
 		pid := playerIDs[l.PlayerName]
@@ -420,12 +453,26 @@ func mergeLoot(ctx context.Context, lootRepo *loot.Repo, tokenRepo *tokens.Repo,
 			CreatedAt:         now,
 			UpdatedAt:         now,
 		}
-		if err := lootRepo.CreateAward(ctx, award); err != nil {
+		if l.Date != nil {
+			award.AwardedAt = *l.Date
+		}
+		var err error
+		if existingRaids[l.RaidKey] {
+			err = s.corrections.SaveImportedLoot(ctx, award, actorID, reason)
+		} else {
+			err = s.loot.CreateAward(ctx, award)
+		}
+		if err != nil {
 			return fmt.Errorf("create loot %q: %w", l.Item, err)
 		}
 		rep.Created.Loot++
+		if err := s.imports.insertMapping(ctx, &lootMapping{Source: source, SheetID: sheetID, Tab: "Loot Archive", Identity: l.Identity, ExternalID: l.ExternalID, Fingerprint: l.Fingerprint, LootAwardID: award.ID}); err != nil {
+			return err
+		}
 
-		if l.IsToken {
+		if l.IsToken && existingRaids[l.RaidKey] {
+			rep.Created.Tokens++
+		} else if l.IsToken {
 			raidIDCopy := raidID
 			awardID := award.ID
 			txn := &tokens.Transaction{
@@ -440,7 +487,7 @@ func mergeLoot(ctx context.Context, lootRepo *loot.Repo, tokenRepo *tokens.Repo,
 				ActorID:     actorID,
 				CreatedAt:   now,
 			}
-			if err := tokenRepo.InsertTransaction(ctx, txn); err != nil {
+			if err := s.tokens.InsertTransaction(ctx, txn); err != nil {
 				return fmt.Errorf("derive token for %q: %w", l.Item, err)
 			}
 			rep.Created.Tokens++

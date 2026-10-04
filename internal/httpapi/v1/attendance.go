@@ -1,10 +1,13 @@
 package v1
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"raid-website/internal/attendance"
+	"raid-website/internal/loot"
+	"raid-website/internal/raidcorrection"
 	"raid-website/internal/validation"
 )
 
@@ -17,6 +20,69 @@ type createAttendanceRequest struct {
 	LateJoin     bool   `json:"late_join"`
 	EarlyLeave   bool   `json:"early_leave"`
 	Notes        string `json:"notes"`
+	Reason       string `json:"reason"`
+}
+
+type correctAttendanceRequest struct {
+	PlayerID     *int64  `json:"player_id"`
+	CharacterID  *int64  `json:"character_id"`
+	Role         *string `json:"role"`
+	IsSubstitute *bool   `json:"is_substitute"`
+	IsBench      *bool   `json:"is_bench"`
+	LateJoin     *bool   `json:"late_join"`
+	EarlyLeave   *bool   `json:"early_leave"`
+	Notes        *string `json:"notes"`
+	Reason       string  `json:"reason"`
+}
+
+func (a *API) correctAttendance(w http.ResponseWriter, r *http.Request) {
+	actor, _ := ActorID(r)
+	raidID, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid raid id")
+		return
+	}
+	id, ok := pathID(r, "recordID")
+	if !ok {
+		BadRequest(w, "invalid attendance id")
+		return
+	}
+	var req correctAttendanceRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	row, err := a.Corrections.CorrectAttendance(r.Context(), raidID, id, actor, req.Reason, func(row *attendance.Attendance) {
+		if req.PlayerID != nil {
+			row.PlayerID = *req.PlayerID
+		}
+		if req.CharacterID != nil {
+			row.CharacterID = *req.CharacterID
+		}
+		if req.Role != nil {
+			row.Role = validation.AttendanceRole(*req.Role)
+		}
+		if req.IsSubstitute != nil {
+			row.IsSubstitute = *req.IsSubstitute
+		}
+		if req.IsBench != nil {
+			row.IsBench = *req.IsBench
+		}
+		if req.LateJoin != nil {
+			row.LateJoin = *req.LateJoin
+		}
+		if req.EarlyLeave != nil {
+			row.EarlyLeave = *req.EarlyLeave
+		}
+		if req.Notes != nil {
+			row.Notes = *req.Notes
+		}
+	})
+	if err != nil {
+		writeCorrectionError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": row})
 }
 
 func (a *API) listAttendance(w http.ResponseWriter, r *http.Request) {
@@ -34,8 +100,9 @@ func (a *API) listAttendance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) createAttendance(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
 		return
 	}
 	raidID, ok := pathID(r, "id")
@@ -77,9 +144,30 @@ func (a *API) createAttendance(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
-	if err := a.Attendance.Create(r.Context(), row); err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal", "could not create attendance")
+	if err := a.Corrections.SaveAttendance(r.Context(), row, actor, req.Reason); err != nil {
+		writeCorrectionError(w, err)
 		return
 	}
 	WriteJSON(w, http.StatusCreated, map[string]any{"data": row})
+}
+
+func writeCorrectionError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, raidcorrection.ErrNotFound), errors.Is(err, loot.ErrNotFound):
+		WriteError(w, http.StatusNotFound, "not_found", "Referenzierter Datensatz nicht gefunden")
+	case errors.Is(err, raidcorrection.ErrOwnership), errors.Is(err, loot.ErrOwnership):
+		WriteError(w, http.StatusBadRequest, "character_ownership", "Charakter gehoert nicht zum Spieler")
+	case errors.Is(err, raidcorrection.ErrReason):
+		WriteError(w, http.StatusBadRequest, "reason_required", "Korrektur erfordert einen Akteur und eine nichtleere Begruendung")
+	case errors.Is(err, raidcorrection.ErrInvalid), errors.Is(err, loot.ErrInvalidLock):
+		WriteError(w, http.StatusBadRequest, "invalid_correction", "Ungueltige Korrektur oder unpassender Item-Lock")
+	case errors.Is(err, raidcorrection.ErrRaidState), errors.Is(err, loot.ErrRaidState):
+		WriteError(w, http.StatusConflict, "raid_state", "Raid erlaubt diese Aenderung nicht")
+	case errors.Is(err, loot.ErrLockConflict):
+		WriteError(w, http.StatusConflict, "item_lock_conflict", "Mehrere aktive Item-Locks passen auf dieses Item")
+	case errors.Is(err, raidcorrection.ErrConflict):
+		WriteError(w, http.StatusConflict, "attendance_conflict", "Teilnahme ist bereits vorhanden")
+	default:
+		WriteError(w, http.StatusInternalServerError, "internal", "Datensatz konnte nicht gespeichert werden")
+	}
 }

@@ -2,6 +2,8 @@ package enhancepoints
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -18,6 +20,17 @@ func NewRepo(db bun.IDB) *Repo {
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
+}
+
+// InTransaction passes a transaction-bound repository to fn. All queries in fn
+// must use that repository, not the connection pool, which has one connection.
+func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
+	if err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		return fn(r.WithTx(tx))
+	}); err != nil {
+		return fmt.Errorf("enhance points transaction: %w", err)
+	}
+	return nil
 }
 
 func (r *Repo) InsertTransaction(ctx context.Context, t *Transaction) error {
@@ -83,6 +96,28 @@ func (r *Repo) ListActiveLocksByRaid(ctx context.Context, raidID int64) ([]ItemL
 		return nil, err
 	}
 	return locks, nil
+}
+
+// FindActiveLockByItem resolves item identity consistently for creation and loot.
+// Use WithTx when resolving a lock as part of a write. Multiple matches return
+// ErrLockConflict, including legacy name-only locks; no match returns nil, nil.
+func (r *Repo) FindActiveLockByItem(ctx context.Context, raidID int64, itemID, itemName string) (*ItemLock, error) {
+	locks, err := r.ListActiveLocksByRaid(ctx, raidID)
+	if err != nil {
+		return nil, fmt.Errorf("list active locks for raid %d: %w", raidID, err)
+	}
+	return ResolveActiveLock(locks, itemID, itemName)
+}
+
+// GetRaidLockState reads raid lifecycle state using this repository's transaction.
+func (r *Repo) GetRaidLockState(ctx context.Context, raidID int64) (validation.RaidStatus, bool, error) {
+	var status validation.RaidStatus
+	var archivedAt *time.Time
+	if err := r.db.NewSelect().TableExpr("raids").Column("status", "archived_at").
+		Where("id = ?", raidID).Scan(ctx, &status, &archivedAt); err != nil {
+		return "", false, fmt.Errorf("load raid %d lock state: %w", raidID, err)
+	}
+	return status, archivedAt != nil, nil
 }
 
 func (r *Repo) UpdateLock(ctx context.Context, l *ItemLock) error {

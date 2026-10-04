@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useSubmission } from '../useSubmission'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
@@ -34,6 +35,13 @@ interface Props {
 }
 
 export function PlayerDetailPage({ playerID }: Props) {
+  return <PlayerDetail key={playerID} playerID={playerID} />
+}
+
+function PlayerDetail({ playerID }: Props) {
+  const { pending, submit, isActive } = useSubmission()
+  const loadVersion = useRef(0)
+  const historyVersion = useRef(0)
   const { player: me } = useAuth()
   const [player, setPlayer] = useState<Player | null>(null)
   const [characters, setCharacters] = useState<Character[]>([])
@@ -60,18 +68,21 @@ export function PlayerDetailPage({ playerID }: Props) {
   const [accRole, setAccRole] = useState<Role>('MEMBER')
 
   const isAdmin = me ? atLeast(me.role, 'ADMIN') : false
-  const isMember = me ? atLeast(me.role, 'MEMBER') : false
+  const isOwnMember = me ? me.id === playerID && atLeast(me.role, 'MEMBER') : false
 
-  const load = () => {
+  const load = useCallback(async () => {
+    if (!isActive()) return
+    const version = ++loadVersion.current
     setError('')
-    Promise.all([
-      api.get<Player>(`/api/v1/players/${playerID}`),
-      api.get<Character[]>(`/api/v1/players/${playerID}/characters`),
-      api.get<PointsResponse>(`/api/v1/players/${playerID}/points`),
-      api.get<TokensResponse>(`/api/v1/players/${playerID}/tokens`),
-      api.get<ItemLock[]>(`/api/v1/players/${playerID}/locks`),
-    ])
-      .then(([p, cs, pts, tks, lk]) => {
+    try {
+      const [p, cs, pts, tks, lk] = await Promise.all([
+        api.get<Player>(`/api/v1/players/${playerID}`),
+        api.get<Character[]>(`/api/v1/players/${playerID}/characters`),
+        api.get<PointsResponse>(`/api/v1/players/${playerID}/points`),
+        api.get<TokensResponse>(`/api/v1/players/${playerID}/tokens`),
+        api.get<ItemLock[]>(`/api/v1/players/${playerID}/locks`),
+      ])
+      if (isActive() && version === loadVersion.current) {
         setPlayer(p)
         setCharacters(cs)
         setPoints(pts)
@@ -79,120 +90,158 @@ export function PlayerDetailPage({ playerID }: Props) {
         setLocks(lk)
         setAccUser(p.username ?? '')
         setAccRole(p.role)
-      })
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Laden fehlgeschlagen'))
-  }
+      }
+    } catch (err) {
+      if (isActive() && version === loadVersion.current) {
+        setError(err instanceof ApiError ? err.message : 'Laden fehlgeschlagen')
+      }
+    }
+  }, [playerID, isActive])
 
-  useEffect(load, [playerID])
+  useEffect(() => { void load() }, [load])
 
   const createCharacter = async (event: FormEvent) => {
     event.preventDefault()
-    setError('')
-    try {
-      await api.post<Character>(`/api/v1/players/${playerID}/characters`, {
-        name: charName,
-        class: charClass,
-        main_spec: charMainSpec,
-        is_main: charIsMain,
-      })
-      setCharName('')
-      setCharMainSpec('')
-      setCharIsMain(false)
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Charakter anlegen fehlgeschlagen')
-    }
+    if (!isAdmin) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post<Character>(`/api/v1/players/${playerID}/characters`, {
+          name: charName,
+          class: charClass,
+          main_spec: charMainSpec,
+          is_main: charIsMain,
+        })
+        if (!isActive()) return
+        setCharName('')
+        setCharMainSpec('')
+        setCharIsMain(false)
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Charakter anlegen fehlgeschlagen')
+      }
+    })
   }
 
   const toggleMain = async (c: Character) => {
-    setError('')
-    try {
-      await api.patch<Character>(`/api/v1/characters/${c.id}`, { is_main: !c.is_main, reason: 'main flag change' })
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Aktualisieren fehlgeschlagen')
-    }
+    if (!isAdmin || c.player_id !== playerID) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.patch<Character>(`/api/v1/characters/${c.id}`, { is_main: !c.is_main, reason: 'main flag change' })
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Aktualisieren fehlgeschlagen')
+      }
+    })
   }
 
   const renameCharacter = async (c: Character) => {
+    if (!isAdmin || c.player_id !== playerID || pending) return
     const next = window.prompt('Neuer Name', c.name)
     if (!next || next === c.name) return
     const reason = window.prompt('Grund', '')
     if (reason === null) return
-    setError('')
-    try {
-      await api.patch<Character>(`/api/v1/characters/${c.id}`, { name: next, reason })
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Umbenennen fehlgeschlagen')
+    if (!reason.trim()) {
+      setError('Umbenennen erfordert eine nichtleere Begründung. Bitte erneut versuchen.')
+      return
     }
+    await submit(async () => {
+      setError('')
+      try {
+        await api.patch<Character>(`/api/v1/characters/${c.id}`, { name: next, reason: reason.trim() })
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Umbenennen fehlgeschlagen')
+      }
+    })
   }
 
   const showHistory = async (c: Character) => {
+    const version = ++historyVersion.current
+    setHistory(null)
+    setHistoryChar(c.id)
     setError('')
     try {
       const hs = await api.get<NameHistory[]>(`/api/v1/characters/${c.id}/name-history`)
+      if (!isActive() || version !== historyVersion.current) return
       setHistory(hs)
       setHistoryChar(c.id)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Historie fehlgeschlagen')
+      if (isActive() && version === historyVersion.current) setError(err instanceof ApiError ? err.message : 'Historie fehlgeschlagen')
     }
   }
 
   const doRoll = async () => {
-    setError('')
-    try {
-      setRoll(await api.post<RollResult>(`/api/v1/players/${playerID}/points/roll`))
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Würfeln fehlgeschlagen')
-    }
+    if (!isOwnMember || (points?.balance ?? 0) < 1) return
+    await submit(async () => {
+      setError('')
+      try {
+        const result = await api.post<RollResult>(`/api/v1/players/${playerID}/points/roll`)
+        if (!isActive()) return
+        setRoll(result)
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Würfeln fehlgeschlagen')
+      }
+    })
   }
 
   const createLock = async (event: FormEvent) => {
     event.preventDefault()
-    setError('')
-    try {
-      await api.post<ItemLock>(`/api/v1/players/${playerID}/locks`, {
-        raid_id: Number(lockRaid),
-        item_id: lockItemID,
-        item_name: lockItem,
-        boss: lockBoss,
-      })
-      setLockRaid('')
-      setLockItem('')
-      setLockItemID('')
-      setLockBoss('')
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Lock anlegen fehlgeschlagen')
-    }
+    if (!isOwnMember) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post<ItemLock>(`/api/v1/players/${playerID}/locks`, {
+          raid_id: Number(lockRaid),
+          item_id: lockItemID,
+          item_name: lockItem,
+          boss: lockBoss,
+        })
+        if (!isActive()) return
+        setLockRaid('')
+        setLockItem('')
+        setLockItemID('')
+        setLockBoss('')
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Lock anlegen fehlgeschlagen')
+      }
+    })
   }
 
   const cancelLock = async (lock: ItemLock) => {
-    setError('')
-    try {
-      await api.post<ItemLock>(`/api/v1/players/${playerID}/locks/${lock.id}/cancel`)
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Lock stornieren fehlgeschlagen')
-    }
+    if (!isOwnMember || lock.player_id !== playerID) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post<ItemLock>(`/api/v1/players/${playerID}/locks/${lock.id}/cancel`)
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Lock stornieren fehlgeschlagen')
+      }
+    })
   }
 
   const setAccount = async (event: FormEvent) => {
     event.preventDefault()
-    setError('')
-    try {
-      await api.put<Player>(`/api/v1/players/${playerID}/account`, {
-        username: accUser,
-        password: accPass,
-        role: accRole,
-      })
-      setAccPass('')
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Konto speichern fehlgeschlagen')
-    }
+    if (!isAdmin) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.put<Player>(`/api/v1/players/${playerID}/account`, {
+          username: accUser,
+          password: accPass,
+          role: accRole,
+        })
+        if (!isActive()) return
+        setAccPass('')
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Konto speichern fehlgeschlagen')
+      }
+    })
   }
 
   if (!player) {
@@ -215,13 +264,14 @@ export function PlayerDetailPage({ playerID }: Props) {
         {player.name} <span className="badge">{player.role}</span>
       </h1>
       {error && <p className="error">{error}</p>}
+      {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
       <div className="grid">
         <section className="card">
           <h2>Punkte</h2>
           <p className="stat">{points?.balance ?? '—'}</p>
-          {isMember && (
-            <button onClick={doRoll} disabled={(points?.balance ?? 0) < 1}>
+          {isOwnMember && (
+            <button onClick={doRoll} disabled={pending || (points?.balance ?? 0) < 1}>
               Enhance würfeln
             </button>
           )}
@@ -281,8 +331,8 @@ export function PlayerDetailPage({ playerID }: Props) {
                 <td className="actions">
                   {isAdmin && (
                     <>
-                      <button onClick={() => toggleMain(c)}>Main umschalten</button>
-                      <button onClick={() => renameCharacter(c)}>Umbenennen</button>
+                      <button disabled={pending} onClick={() => toggleMain(c)}>Main umschalten</button>
+                      <button disabled={pending} onClick={() => renameCharacter(c)}>Umbenennen</button>
                     </>
                   )}
                   <button onClick={() => showHistory(c)}>Historie</button>
@@ -325,7 +375,7 @@ export function PlayerDetailPage({ playerID }: Props) {
             <label className="check">
               <input type="checkbox" checked={charIsMain} onChange={(e) => setCharIsMain(e.target.checked)} /> Main
             </label>
-            <button type="submit">Anlegen</button>
+            <button type="submit" disabled={pending}>Anlegen</button>
           </form>
         )}
       </section>
@@ -350,7 +400,7 @@ export function PlayerDetailPage({ playerID }: Props) {
                 <td>#{l.raid_id}</td>
                 <td>{l.status}</td>
                 <td>
-                  {l.status === 'ACTIVE' && <button onClick={() => cancelLock(l)}>Stornieren</button>}
+                  {isOwnMember && l.status === 'ACTIVE' && <button disabled={pending} onClick={() => cancelLock(l)}>Stornieren</button>}
                 </td>
               </tr>
             ))}
@@ -363,13 +413,13 @@ export function PlayerDetailPage({ playerID }: Props) {
             )}
           </tbody>
         </table>
-        {isMember && (
+        {isOwnMember && (
           <form className="inline-form" onSubmit={createLock}>
             <input placeholder="Raid-ID" value={lockRaid} onChange={(e) => setLockRaid(e.target.value)} required />
             <input placeholder="Item" value={lockItem} onChange={(e) => setLockItem(e.target.value)} required />
             <input placeholder="Item-ID" value={lockItemID} onChange={(e) => setLockItemID(e.target.value)} />
             <input placeholder="Boss" value={lockBoss} onChange={(e) => setLockBoss(e.target.value)} />
-            <button type="submit">Lock anlegen</button>
+            <button type="submit" disabled={pending}>Lock anlegen</button>
           </form>
         )}
       </section>
@@ -392,7 +442,7 @@ export function PlayerDetailPage({ playerID }: Props) {
                 </option>
               ))}
             </select>
-            <button type="submit">Speichern</button>
+            <button type="submit" disabled={pending}>Speichern</button>
           </form>
         </section>
       )}

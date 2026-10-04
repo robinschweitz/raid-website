@@ -3,6 +3,7 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link, navigate } from '../router'
 import { atLeast, type Raid } from '../types'
+import { useSubmission } from '../useSubmission'
 
 function statusClass(status: Raid['status']): string {
   switch (status) {
@@ -18,6 +19,7 @@ function statusClass(status: Raid['status']): string {
 }
 
 export function DashboardPage() {
+  const { pending, submit, isActive } = useSubmission()
   const { player } = useAuth()
   const [raids, setRaids] = useState<Raid[]>([])
   const [error, setError] = useState('')
@@ -37,20 +39,23 @@ export function DashboardPage() {
 
   const onCreate = async (event: FormEvent) => {
     event.preventDefault()
-    if (!player) return
-    setError('')
-    try {
-      const created = await api.post<Raid>('/api/v1/raids', {
-        name,
-        raid_leader_id: player.id,
-        scheduled_start: scheduled ? new Date(scheduled).toISOString() : null,
-      })
-      setName('')
-      setScheduled('')
-      navigate(`/raids/${created.id}`)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
-    }
+    if (!player || !canManage) return
+    await submit(async () => {
+      setError('')
+      try {
+        const created = await api.post<Raid>('/api/v1/raids', {
+          name,
+          raid_leader_id: player.id,
+          scheduled_start: scheduled ? new Date(scheduled).toISOString() : null,
+        })
+        if (!isActive()) return
+        setName('')
+        setScheduled('')
+        navigate(`/raids/${created.id}`)
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
+      }
+    })
   }
 
   return (
@@ -100,7 +105,7 @@ export function DashboardPage() {
             Start
             <input type="datetime-local" value={scheduled} onChange={(e) => setScheduled(e.target.value)} />
           </label>
-          <button type="submit">Anlegen</button>
+          <button type="submit" disabled={pending}>{pending ? 'Anlegen…' : 'Anlegen'}</button>
         </form>
       )}
     </div>

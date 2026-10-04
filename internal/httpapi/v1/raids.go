@@ -31,7 +31,7 @@ func (a *API) listRaids(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 	if _, ok := ActorID(r); !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
 		return
 	}
 	var req createRaidRequest
@@ -93,7 +93,7 @@ func (a *API) getRaid(w http.ResponseWriter, r *http.Request) {
 	}
 	rd, err := a.Raids.Get(r.Context(), id)
 	if err != nil {
-		if isNotFound(err) {
+		if errors.Is(err, raid.ErrNotFound) {
 			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
 			return
 		}
@@ -106,7 +106,7 @@ func (a *API) getRaid(w http.ResponseWriter, r *http.Request) {
 func (a *API) completeRaid(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
 		return
 	}
 	id, ok := pathID(r, "id")
@@ -116,6 +116,10 @@ func (a *API) completeRaid(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := a.Completion.CompleteRaid(r.Context(), id, actor); err != nil {
 		switch {
+		case errors.Is(err, raid.ErrNotFound):
+			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
+		case errors.Is(err, raid.ErrActorNotFound):
+			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "raid actor not found")
 		case errors.Is(err, raidcompletion.ErrRaidCancelled):
 			WriteError(w, http.StatusConflict, "raid_cancelled", "cancelled raids cannot be completed")
 		case errors.Is(err, raidcompletion.ErrRaidNotCompletable):
@@ -134,8 +138,9 @@ func (a *API) completeRaid(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) cancelRaid(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
 		return
 	}
 	id, ok := pathID(r, "id")
@@ -143,33 +148,27 @@ func (a *API) cancelRaid(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "invalid raid id")
 		return
 	}
-	rd, err := a.Raids.Get(r.Context(), id)
+	rd, err := raid.NewService(a.Raids).CancelRaid(r.Context(), id, actor)
 	if err != nil {
-		if isNotFound(err) {
+		switch {
+		case errors.Is(err, raid.ErrNotFound):
 			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
-			return
+		case errors.Is(err, raid.ErrActorNotFound):
+			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "raid actor not found")
+		case errors.Is(err, raid.ErrNotCancellable):
+			WriteError(w, http.StatusConflict, "raid_not_cancellable", "raid is not in a cancellable state")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "could not cancel raid")
 		}
-		WriteError(w, http.StatusInternalServerError, "internal", "could not load raid")
-		return
-	}
-	if rd.Status == validation.RaidStatusCompleted || rd.Status == validation.RaidStatusCancelled {
-		WriteError(w, http.StatusConflict, "raid_not_cancellable", "completed or cancelled raids cannot be cancelled")
-		return
-	}
-	now := time.Now().UTC()
-	rd.Status = validation.RaidStatusCancelled
-	rd.CancelledAt = &now
-	rd.UpdatedAt = now
-	if err := a.Raids.Update(r.Context(), rd); err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal", "could not cancel raid")
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": rd})
 }
 
 func (a *API) archiveRaid(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
 		return
 	}
 	id, ok := pathID(r, "id")
@@ -177,20 +176,16 @@ func (a *API) archiveRaid(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "invalid raid id")
 		return
 	}
-	rd, err := a.Raids.Get(r.Context(), id)
+	rd, err := raid.NewService(a.Raids).ArchiveRaid(r.Context(), id, actor)
 	if err != nil {
-		if isNotFound(err) {
+		switch {
+		case errors.Is(err, raid.ErrNotFound):
 			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
-			return
+		case errors.Is(err, raid.ErrActorNotFound):
+			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "raid actor not found")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "could not archive raid")
 		}
-		WriteError(w, http.StatusInternalServerError, "internal", "could not load raid")
-		return
-	}
-	now := time.Now().UTC()
-	rd.ArchivedAt = &now
-	rd.UpdatedAt = now
-	if err := a.Raids.Update(r.Context(), rd); err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal", "could not archive raid")
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": rd})

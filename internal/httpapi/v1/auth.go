@@ -49,7 +49,11 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusForbidden, "inactive", "account is inactive")
 			return
 		}
-		WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid username or password")
+		if errors.Is(err, auth.ErrInvalidCredentials) {
+			WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid username or password")
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, "internal", "could not create login session")
 		return
 	}
 	a.setSessionCookie(w, token, sessionMaxAgeSeconds)
@@ -58,7 +62,10 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(auth.CookieName); err == nil && c.Value != "" {
-		_ = a.Auth.Logout(r.Context(), c.Value)
+		if err := a.Auth.Logout(r.Context(), c.Value); err != nil {
+			WriteError(w, http.StatusInternalServerError, "internal", "could not end session")
+			return
+		}
 	}
 	a.setSessionCookie(w, "", -1)
 	w.WriteHeader(http.StatusNoContent)

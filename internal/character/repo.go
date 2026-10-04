@@ -4,6 +4,9 @@ import (
 	"context"
 
 	"github.com/uptrace/bun"
+
+	"raid-website/internal/audit"
+	"raid-website/internal/player"
 )
 
 type Repo struct {
@@ -16,6 +19,12 @@ func NewRepo(db bun.IDB) *Repo {
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
+}
+
+func (r *Repo) correctInTransaction(ctx context.Context, fn func(*Repo, *player.Repo, *audit.Repo) error) error {
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		return fn(r.WithTx(tx), player.NewRepo(tx), audit.NewRepo(tx))
+	})
 }
 
 func (r *Repo) Create(ctx context.Context, c *Character) error {

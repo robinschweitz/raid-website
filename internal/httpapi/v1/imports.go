@@ -12,6 +12,8 @@ const DefaultSheetID = "1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU"
 
 type importRequest struct {
 	SheetID string `json:"sheet_id"`
+	RawHash string `json:"raw_hash"`
+	Reason  string `json:"reason"`
 }
 
 func (a *API) listImports(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +27,7 @@ func (a *API) listImports(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) dryRunImport(w http.ResponseWriter, r *http.Request) {
 	if _, ok := ActorID(r); !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "Anmeldung erforderlich")
 		return
 	}
 	var req importRequest
@@ -48,7 +50,7 @@ func (a *API) dryRunImport(w http.ResponseWriter, r *http.Request) {
 func (a *API) mergeImport(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "Anmeldung erforderlich")
 		return
 	}
 	var req importRequest
@@ -60,10 +62,18 @@ func (a *API) mergeImport(w http.ResponseWriter, r *http.Request) {
 	if sheetID == "" {
 		sheetID = DefaultSheetID
 	}
-	rep, err := a.Imports.Merge(r.Context(), actor, "google_sheets", sheetID)
+	rep, err := a.Imports.Merge(r.Context(), actor, "google_sheets", sheetID, req.RawHash, req.Reason)
 	if err != nil {
+		if errors.Is(err, legacyimport.ErrPreviewRequired) {
+			WriteError(w, http.StatusConflict, "preview_required", "Bitte zuerst eine Vorschau erstellen")
+			return
+		}
+		if errors.Is(err, legacyimport.ErrSourceChanged) {
+			WriteError(w, http.StatusConflict, "source_changed", "Die Quelle hat sich seit der Vorschau geaendert")
+			return
+		}
 		if errors.Is(err, legacyimport.ErrActorNotFound) {
-			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "X-Actor-ID must reference an existing player")
+			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "Import-Benutzer nicht gefunden")
 			return
 		}
 		WriteError(w, http.StatusInternalServerError, "internal", "could not merge the spreadsheet")

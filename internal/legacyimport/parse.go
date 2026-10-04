@@ -19,6 +19,7 @@ type RaidArchiveRow struct {
 
 // LootArchiveRow is a row from the "Loot Archive" tab (loot awards).
 type LootArchiveRow struct {
+	ImportID     string
 	RaidID       string
 	TimestampRaw string
 	Player       string
@@ -111,6 +112,7 @@ func ParseRaidArchive(r io.Reader) ([]RaidArchiveRow, error) {
 }
 
 var lootArchiveAliases = map[string]string{
+	"import id": "ImportID",
 	"raid id":   "RaidID",
 	"timestamp": "Timestamp",
 	"spieler":   "Player",
@@ -127,6 +129,7 @@ func ParseLootArchive(r io.Reader) ([]LootArchiveRow, error) {
 	out := make([]LootArchiveRow, 0, len(rows))
 	for _, m := range rows {
 		out = append(out, LootArchiveRow{
+			ImportID:     m["ImportID"],
 			RaidID:       m["RaidID"],
 			TimestampRaw: m["Timestamp"],
 			Player:       m["Player"],

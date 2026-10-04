@@ -1,11 +1,10 @@
 package v1
 
 import (
+	"errors"
 	"net/http"
-	"time"
 
 	"raid-website/internal/enhancepoints"
-	"raid-website/internal/validation"
 )
 
 type createLockRequest struct {
@@ -33,7 +32,7 @@ func (a *API) listLocks(w http.ResponseWriter, r *http.Request) {
 func (a *API) createLock(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "authenticated session required")
 		return
 	}
 	id, ok := pathID(r, "id")
@@ -50,30 +49,39 @@ func (a *API) createLock(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "raid_id is required")
 		return
 	}
-	balance, err := a.Points.Balance(r.Context(), id)
-	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal", "could not load balance")
-		return
-	}
-	if !enhancepoints.CanLock(balance) {
-		WriteError(w, http.StatusUnprocessableEntity, "lock_not_allowed", "balance >= 150 required for a lock")
-		return
-	}
-	now := time.Now().UTC()
 	lock := &enhancepoints.ItemLock{
-		PlayerID:  id,
-		RaidID:    req.RaidID,
-		ItemID:    req.ItemID,
-		ItemName:  req.ItemName,
-		Boss:      req.Boss,
-		Status:    validation.LockStatusActive,
-		LockedAt:  now,
-		ActorID:   actor,
-		Notes:     req.Notes,
-		CreatedAt: now,
-		UpdatedAt: now,
+		PlayerID: id,
+		RaidID:   req.RaidID,
+		ItemID:   req.ItemID,
+		ItemName: req.ItemName,
+		Boss:     req.Boss,
+		Notes:    req.Notes,
 	}
-	if err := a.Points.CreateLock(r.Context(), lock); err != nil {
+	if err := a.pointService.CreateLock(r.Context(), lock, actor); err != nil {
+		if errors.Is(err, enhancepoints.ErrNotOwner) {
+			WriteError(w, http.StatusForbidden, "forbidden", "only own locks may be created")
+			return
+		}
+		if errors.Is(err, enhancepoints.ErrLockItemNameRequired) {
+			BadRequest(w, "item_name darf nicht leer sein")
+			return
+		}
+		if errors.Is(err, enhancepoints.ErrLockRaidNotFound) {
+			WriteError(w, http.StatusNotFound, "not_found", "Raid nicht gefunden")
+			return
+		}
+		if errors.Is(err, enhancepoints.ErrLockRaidClosed) {
+			WriteError(w, http.StatusConflict, "lock_raid_closed", "Dieser Raid nimmt keine Locks mehr an")
+			return
+		}
+		if errors.Is(err, enhancepoints.ErrLockConflict) {
+			WriteError(w, http.StatusConflict, "lock_conflict", "Es gibt bereits einen aktiven Lock auf dieses Item")
+			return
+		}
+		if errors.Is(err, enhancepoints.ErrLockBalanceTooLow) {
+			WriteError(w, http.StatusUnprocessableEntity, "lock_not_allowed", "balance >= 150 required for a lock")
+			return
+		}
 		WriteError(w, http.StatusInternalServerError, "internal", "could not create lock")
 		return
 	}
@@ -81,8 +89,9 @@ func (a *API) createLock(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) cancelLock(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "authenticated session required")
 		return
 	}
 	playerID, ok := pathID(r, "id")
@@ -95,28 +104,20 @@ func (a *API) cancelLock(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "invalid lock id")
 		return
 	}
-	lock, err := a.Points.GetLock(r.Context(), lockID)
+	lock, err := a.pointService.CancelLock(r.Context(), playerID, lockID, actor)
 	if err != nil {
-		if isNotFound(err) {
+		if errors.Is(err, enhancepoints.ErrNotOwner) {
+			WriteError(w, http.StatusForbidden, "forbidden", "only own locks may be cancelled")
+			return
+		}
+		if errors.Is(err, enhancepoints.ErrLockNotFound) {
 			WriteError(w, http.StatusNotFound, "not_found", "lock not found")
 			return
 		}
-		WriteError(w, http.StatusInternalServerError, "internal", "could not load lock")
-		return
-	}
-	if lock.PlayerID != playerID {
-		WriteError(w, http.StatusNotFound, "not_found", "lock not found")
-		return
-	}
-	if lock.Status != validation.LockStatusActive {
-		WriteError(w, http.StatusConflict, "lock_not_active", "only active locks can be cancelled")
-		return
-	}
-	now := time.Now().UTC()
-	lock.Status = validation.LockStatusCancelled
-	lock.CancelledAt = &now
-	lock.UpdatedAt = now
-	if err := a.Points.UpdateLock(r.Context(), lock); err != nil {
+		if errors.Is(err, enhancepoints.ErrLockNotActive) {
+			WriteError(w, http.StatusConflict, "lock_not_active", "only active locks can be cancelled")
+			return
+		}
 		WriteError(w, http.StatusInternalServerError, "internal", "could not cancel lock")
 		return
 	}

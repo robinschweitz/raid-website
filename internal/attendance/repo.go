@@ -23,6 +23,17 @@ func (r *Repo) Create(ctx context.Context, a *Attendance) error {
 	return err
 }
 
+func (r *Repo) Get(ctx context.Context, id int64) (*Attendance, error) {
+	a := new(Attendance)
+	err := r.db.NewSelect().Model(a).Where("id = ?", id).Scan(ctx)
+	return a, err
+}
+
+func (r *Repo) Update(ctx context.Context, a *Attendance) error {
+	_, err := r.db.NewUpdate().Model(a).WherePK().Exec(ctx)
+	return err
+}
+
 func (r *Repo) Exists(ctx context.Context, raidID, playerID, characterID int64) (bool, error) {
 	count, err := r.db.NewSelect().Model((*Attendance)(nil)).
 		Where("raid_id = ?", raidID).

@@ -1,25 +1,25 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
 import { ApiError } from '../api'
+import { useSubmission } from '../useSubmission'
 
 export function LoginPage() {
   const { login } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
+  const { pending: busy, submit, isActive } = useSubmission()
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    setError('')
-    setBusy(true)
-    try {
-      await login(username, password)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Login failed')
-    } finally {
-      setBusy(false)
-    }
+    await submit(async () => {
+      setError('')
+      try {
+        await login(username, password)
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anmelden fehlgeschlagen. Bitte erneut versuchen.')
+      }
+    })
   }
 
   return (

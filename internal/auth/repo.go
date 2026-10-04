@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"raid-website/internal/player"
 )
 
 type Repo struct {
@@ -17,6 +19,13 @@ func NewRepo(db bun.IDB) *Repo {
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
+}
+
+// InTransaction runs account changes using a transaction-bound player repository.
+func (r *Repo) InTransaction(ctx context.Context, fn func(*player.Repo) error) error {
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		return fn(player.NewRepo(tx))
+	})
 }
 
 func (r *Repo) CreateSession(ctx context.Context, s *Session) error {

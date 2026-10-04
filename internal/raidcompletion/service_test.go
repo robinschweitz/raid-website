@@ -114,7 +114,7 @@ func TestCompleteRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
 		t.Fatalf("create award: %v", err)
 	}
 
-	svc := New(bdb, raids, attendanceRepo, lootRepo, pointsRepo)
+	svc := NewService(NewRepo(bdb))
 	if err := svc.CompleteRaid(ctx, rd.ID, leaderID); err != nil {
 		t.Fatalf("complete raid: %v", err)
 	}
@@ -155,7 +155,6 @@ func TestCompleteRaidCancelledAwardsNoPoints(t *testing.T) {
 	players := player.NewRepo(bdb)
 	raids := raid.NewRepo(bdb)
 	attendanceRepo := attendance.NewRepo(bdb)
-	lootRepo := loot.NewRepo(bdb)
 	pointsRepo := enhancepoints.NewRepo(bdb)
 
 	leaderID := seedPlayer(t, ctx, players, "Leader")
@@ -174,7 +173,7 @@ func TestCompleteRaidCancelledAwardsNoPoints(t *testing.T) {
 		t.Fatalf("create attendance: %v", err)
 	}
 
-	svc := New(bdb, raids, attendanceRepo, lootRepo, pointsRepo)
+	svc := NewService(NewRepo(bdb))
 	if err := svc.CompleteRaid(ctx, rd.ID, leaderID); !errors.Is(err, ErrRaidCancelled) {
 		t.Fatalf("want ErrRaidCancelled got %v", err)
 	}
@@ -194,9 +193,6 @@ func TestCompleteRaidExpiresActiveLocks(t *testing.T) {
 
 	players := player.NewRepo(bdb)
 	raids := raid.NewRepo(bdb)
-	attendanceRepo := attendance.NewRepo(bdb)
-	lootRepo := loot.NewRepo(bdb)
-	pointsRepo := enhancepoints.NewRepo(bdb)
 
 	leaderID := seedPlayer(t, ctx, players, "Leader")
 	lockerID := seedPlayer(t, ctx, players, "Locker")
@@ -221,7 +217,7 @@ func TestCompleteRaidExpiresActiveLocks(t *testing.T) {
 		t.Fatalf("create lock: %v", err)
 	}
 
-	svc := New(bdb, raids, attendanceRepo, lootRepo, pointsRepo)
+	svc := NewService(NewRepo(bdb))
 	if err := svc.CompleteRaid(ctx, rd.ID, leaderID); err != nil {
 		t.Fatalf("complete raid: %v", err)
 	}

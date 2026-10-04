@@ -2,8 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { atLeast, type Poll, type Player, type Vote } from '../types'
+import { useSubmission } from '../useSubmission'
 
 export function PollsPage() {
+  const { pending, submit, isActive } = useSubmission()
   const { player: me } = useAuth()
   const [polls, setPolls] = useState<Poll[]>([])
   const [players, setPlayers] = useState<Player[]>([])
@@ -32,50 +34,62 @@ export function PollsPage() {
 
   const createPoll = async (event: FormEvent) => {
     event.preventDefault()
-    setError('')
-    try {
-      await api.post<Poll>('/api/v1/polls', { title, description })
-      setTitle('')
-      setDescription('')
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
-    }
+    if (!canManage) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post<Poll>('/api/v1/polls', { title, description })
+        if (!isActive()) return
+        setTitle('')
+        setDescription('')
+        load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
+      }
+    })
   }
 
   const vote = async (poll: Poll) => {
     const value = choice[poll.id]
-    if (!value) return
-    setError('')
-    try {
-      await api.post<Vote>(`/api/v1/polls/${poll.id}/vote`, { choice: value })
-      loadVotes(poll.id)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Abstimmen fehlgeschlagen')
-    }
+    if (!value || !canVote) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post<Vote>(`/api/v1/polls/${poll.id}/vote`, { choice: value })
+        if (!isActive()) return
+        loadVotes(poll.id)
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Abstimmen fehlgeschlagen')
+      }
+    })
   }
 
   const loadVotes = (pollID: number) => {
     api
       .get<Vote[]>(`/api/v1/polls/${pollID}/votes`)
       .then((vs) => setVotes((prev) => ({ ...prev, [pollID]: vs })))
-      .catch(() => undefined)
+      .catch((err) => { if (isActive()) setError(err instanceof ApiError ? err.message : 'Stimmen laden fehlgeschlagen') })
   }
 
   const closePoll = async (poll: Poll) => {
-    setError('')
-    try {
-      await api.post<Poll>(`/api/v1/polls/${poll.id}/close`)
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Schließen fehlgeschlagen')
-    }
+    if (!canManage) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post<Poll>(`/api/v1/polls/${poll.id}/close`)
+        if (!isActive()) return
+        load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Schließen fehlgeschlagen')
+      }
+    })
   }
 
   return (
     <div>
       <h1>Umfragen</h1>
       {error && <p className="error">{error}</p>}
+      {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
       {polls.map((p) => (
         <section className="card" key={p.id}>
@@ -91,11 +105,11 @@ export function PollsPage() {
                   value={choice[p.id] ?? ''}
                   onChange={(e) => setChoice((prev) => ({ ...prev, [p.id]: e.target.value }))}
                 />
-                <button onClick={() => vote(p)}>Abstimmen</button>
+                <button disabled={pending} onClick={() => vote(p)}>Abstimmen</button>
               </>
             )}
             <button onClick={() => loadVotes(p.id)}>Stimmen</button>
-            {canManage && p.status === 'OPEN' && <button onClick={() => closePoll(p)}>Schließen</button>}
+            {canManage && p.status === 'OPEN' && <button disabled={pending} onClick={() => closePoll(p)}>Schließen</button>}
           </div>
           {votes[p.id] && (
             <ul className="plain-list">
@@ -122,7 +136,7 @@ export function PollsPage() {
             Beschreibung
             <input value={description} onChange={(e) => setDescription(e.target.value)} />
           </label>
-          <button type="submit">Anlegen</button>
+          <button type="submit" disabled={pending}>Anlegen</button>
         </form>
       )}
     </div>

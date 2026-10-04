@@ -3,6 +3,7 @@ package httpapi
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -28,7 +29,13 @@ func authenticate(svc *auth.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if c, err := r.Cookie(auth.CookieName); err == nil && c.Value != "" {
-				if p, err := svc.Authenticate(r.Context(), c.Value); err == nil {
+				p, err := svc.Authenticate(r.Context(), c.Value)
+				if err != nil && !errors.Is(err, auth.ErrInactive) {
+					log.Printf("authenticate: %v", err)
+					v1.WriteError(w, http.StatusInternalServerError, "internal", "could not authenticate session")
+					return
+				}
+				if p != nil {
 					r = r.WithContext(v1.WithActor(r.Context(), p))
 				}
 			}

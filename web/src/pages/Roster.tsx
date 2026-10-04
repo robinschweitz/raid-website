@@ -2,8 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { atLeast, type GuildRank, type RaidGroup } from '../types'
+import { useSubmission } from '../useSubmission'
 
 export function RosterPage() {
+  const { pending, submit, isActive } = useSubmission()
   const { player: me } = useAuth()
   const [ranks, setRanks] = useState<GuildRank[]>([])
   const [groups, setGroups] = useState<RaidGroup[]>([])
@@ -28,52 +30,69 @@ export function RosterPage() {
 
   const createRank = async (event: FormEvent) => {
     event.preventDefault()
-    setError('')
-    try {
-      await api.post<GuildRank>('/api/v1/guild-ranks', { name: rankName })
-      setRankName('')
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
-    }
+    if (!isAdmin) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post<GuildRank>('/api/v1/guild-ranks', { name: rankName })
+        if (!isActive()) return
+        setRankName('')
+        load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
+      }
+    })
   }
 
   const createGroup = async (event: FormEvent) => {
     event.preventDefault()
-    setError('')
-    try {
-      await api.post<RaidGroup>('/api/v1/raid-groups', { name: groupName, color: groupColor })
-      setGroupName('')
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
-    }
+    if (!isAdmin) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post<RaidGroup>('/api/v1/raid-groups', { name: groupName, color: groupColor })
+        if (!isActive()) return
+        setGroupName('')
+        load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
+      }
+    })
   }
 
   const toggleRank = async (r: GuildRank) => {
-    setError('')
-    try {
-      await api.patch<GuildRank>(`/api/v1/guild-ranks/${r.id}`, { active: !r.active })
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Aktualisieren fehlgeschlagen')
-    }
+    if (!isAdmin) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.patch<GuildRank>(`/api/v1/guild-ranks/${r.id}`, { active: !r.active })
+        if (!isActive()) return
+        load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Aktualisieren fehlgeschlagen')
+      }
+    })
   }
 
   const toggleGroup = async (g: RaidGroup) => {
-    setError('')
-    try {
-      await api.patch<RaidGroup>(`/api/v1/raid-groups/${g.id}`, { active: !g.active })
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Aktualisieren fehlgeschlagen')
-    }
+    if (!isAdmin) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.patch<RaidGroup>(`/api/v1/raid-groups/${g.id}`, { active: !g.active })
+        if (!isActive()) return
+        load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Aktualisieren fehlgeschlagen')
+      }
+    })
   }
 
   return (
     <div>
       <h1>Roster</h1>
       {error && <p className="error">{error}</p>}
+      {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
       <section className="card">
         <h2>Gildenränge</h2>
@@ -83,7 +102,7 @@ export function RosterPage() {
               <span className={r.active ? '' : 'muted'}>
                 {r.name} (#{r.sort_order})
               </span>
-              {isAdmin && <button onClick={() => toggleRank(r)}>{r.active ? 'deaktivieren' : 'aktivieren'}</button>}
+              {isAdmin && <button disabled={pending} onClick={() => toggleRank(r)}>{r.active ? 'deaktivieren' : 'aktivieren'}</button>}
             </li>
           ))}
           {ranks.length === 0 && <li className="muted">Keine Ränge.</li>}
@@ -91,7 +110,7 @@ export function RosterPage() {
         {isAdmin && (
           <form className="inline-form" onSubmit={createRank}>
             <input placeholder="Rangname" value={rankName} onChange={(e) => setRankName(e.target.value)} required />
-            <button type="submit">Anlegen</button>
+            <button type="submit" disabled={pending}>Anlegen</button>
           </form>
         )}
       </section>
@@ -105,7 +124,7 @@ export function RosterPage() {
               <span className={g.active ? '' : 'muted'}>
                 {g.name} (#{g.sort_order})
               </span>
-              {isAdmin && <button onClick={() => toggleGroup(g)}>{g.active ? 'deaktivieren' : 'aktivieren'}</button>}
+              {isAdmin && <button disabled={pending} onClick={() => toggleGroup(g)}>{g.active ? 'deaktivieren' : 'aktivieren'}</button>}
             </li>
           ))}
           {groups.length === 0 && <li className="muted">Keine Gruppen.</li>}
@@ -114,7 +133,7 @@ export function RosterPage() {
           <form className="inline-form" onSubmit={createGroup}>
             <input placeholder="Gruppenname" value={groupName} onChange={(e) => setGroupName(e.target.value)} required />
             <input type="color" value={groupColor} onChange={(e) => setGroupColor(e.target.value)} />
-            <button type="submit">Anlegen</button>
+            <button type="submit" disabled={pending}>Anlegen</button>
           </form>
         )}
       </section>

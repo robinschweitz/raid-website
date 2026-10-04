@@ -2,9 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/uptrace/bun"
 
@@ -20,9 +19,9 @@ import (
 	"raid-website/internal/poll"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcompletion"
+	"raid-website/internal/raidcorrection"
 	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
-	"raid-website/internal/validation"
 	"raid-website/internal/webui"
 )
 
@@ -34,7 +33,7 @@ type Options struct {
 }
 
 // New constructs the HTTP handler tree with all v1 dependencies wired.
-func New(db *bun.DB, opts Options) http.Handler {
+func New(db *bun.DB, opts Options) (http.Handler, error) {
 	players := player.NewRepo(db)
 	chars := character.NewRepo(db)
 	raids := raid.NewRepo(db)
@@ -46,10 +45,9 @@ func New(db *bun.DB, opts Options) http.Handler {
 	polls := poll.NewRepo(db)
 	audits := audit.NewRepo(db)
 
-	authSvc := auth.NewService(db, players, auth.NewRepo(db))
+	authSvc := auth.NewService(players, auth.NewRepo(db))
 
 	importsSvc := legacyimport.NewService(
-		db,
 		legacyimport.NewRepo(db),
 		players,
 		chars,
@@ -61,7 +59,9 @@ func New(db *bun.DB, opts Options) http.Handler {
 		legacyimport.GoogleFetcher{},
 	)
 
-	bootstrapAdmin(authSvc, players, opts)
+	if err := authSvc.BootstrapAdmin(context.Background(), opts.AdminUsername, opts.AdminPassword); err != nil {
+		return nil, fmt.Errorf("bootstrap admin: %w", err)
+	}
 
 	api := v1.NewAPI(v1.Deps{
 		DB:           db,
@@ -71,14 +71,15 @@ func New(db *bun.DB, opts Options) http.Handler {
 		Characters:   chars,
 		Raids:        raids,
 		Attendance:   att,
-		Loot:         loot.NewService(db, lootRepo, tokenRepo),
+		Loot:         loot.NewService(lootRepo),
 		LootRepo:     lootRepo,
 		Points:       points,
 		Tokens:       tokenRepo,
 		Polls:        polls,
 		Roster:       rosterRepo,
 		Audit:        audits,
-		Completion:   raidcompletion.New(db, raids, att, lootRepo, points),
+		Completion:   raidcompletion.NewService(raidcompletion.NewRepo(db)),
+		Corrections:  raidcorrection.NewService(raidcorrection.NewRepo(db)),
 		Imports:      importsSvc,
 	})
 
@@ -89,30 +90,5 @@ func New(db *bun.DB, opts Options) http.Handler {
 		mux.Handle("/", spa)
 	}
 
-	return requestID(logging(authenticate(authSvc)(mux)))
-}
-
-// bootstrapAdmin creates the initial admin account from configuration when the
-// configured username does not exist yet. It is a no-op without configuration.
-func bootstrapAdmin(authSvc *auth.Service, players *player.Repo, opts Options) {
-	if opts.AdminUsername == "" || opts.AdminPassword == "" {
-		return
-	}
-	ctx := context.Background()
-	username := strings.ToLower(strings.TrimSpace(opts.AdminUsername))
-	if _, err := players.FindByUsername(ctx, username); err == nil {
-		return
-	}
-	now := time.Now().UTC()
-	p := &player.Player{
-		Name:      opts.AdminUsername,
-		Active:    true,
-		Role:      validation.RoleAdmin,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := players.Create(ctx, p); err != nil {
-		return
-	}
-	_, _ = authSvc.SetCredentials(ctx, p.ID, username, opts.AdminPassword, validation.RoleAdmin)
+	return requestID(logging(authenticate(authSvc)(mux))), nil
 }

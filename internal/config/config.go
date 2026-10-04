@@ -1,6 +1,10 @@
 package config
 
-import "os"
+import (
+	"errors"
+	"os"
+	"strings"
+)
 
 type Config struct {
 	Port          string
@@ -20,6 +24,13 @@ func Load() (*Config, error) {
 		CookieSecure:  getEnv("COOKIE_SECURE", "") == "true" || env == "production",
 		AdminUsername: getEnv("ADMIN_USERNAME", "Robin"),
 		AdminPassword: getEnv("ADMIN_PASSWORD", "test"),
+	}
+	if env == "production" {
+		username := strings.TrimSpace(os.Getenv("ADMIN_USERNAME"))
+		password := os.Getenv("ADMIN_PASSWORD")
+		if username == "" || strings.EqualFold(username, "Robin") || strings.TrimSpace(password) == "" || password == "test" {
+			return nil, errors.New("production requires explicit nondefault ADMIN_USERNAME and ADMIN_PASSWORD")
+		}
 	}
 	return c, nil
 }

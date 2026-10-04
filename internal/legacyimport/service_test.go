@@ -84,7 +84,7 @@ func setup(t *testing.T) (*bun.DB, *Service, *player.Repo, *enhancepoints.Repo, 
 	points := enhancepoints.NewRepo(bdb.DB)
 	imports := NewRepo(bdb.DB)
 
-	svc := NewService(bdb.DB, imports, players, chars, raids, att, lootRepo, points, tokenRepo, fakeFetcher{data: sampleSheet()})
+	svc := NewService(imports, players, chars, raids, att, lootRepo, points, tokenRepo, fakeFetcher{data: sampleSheet()})
 	return bdb.DB, svc, players, points, tokenRepo, lootRepo, raids
 }
 
@@ -132,7 +132,8 @@ func TestMergeThenIdempotent(t *testing.T) {
 		t.Fatalf("create actor: %v", err)
 	}
 
-	rep, err := svc.Merge(ctx, actor.ID, "google_sheets", "sheet")
+	previewImport(t, svc, "google_sheets", "sheet")
+	rep, err := svc.Merge(ctx, actor.ID, "google_sheets", "sheet", sampleSheet().Hash, "")
 	if err != nil {
 		t.Fatalf("merge: %v", err)
 	}
@@ -208,7 +209,7 @@ func TestMergeThenIdempotent(t *testing.T) {
 	_ = bdb
 
 	// Re-merge identical data must be a no-op.
-	rep2, err := svc.Merge(ctx, actor.ID, "google_sheets", "sheet")
+	rep2, err := svc.Merge(ctx, actor.ID, "google_sheets", "sheet", "", "")
 	if err != nil {
 		t.Fatalf("re-merge: %v", err)
 	}

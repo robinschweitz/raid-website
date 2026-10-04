@@ -3,10 +3,12 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
 import { atLeast, type Player, type Role } from '../types'
+import { useSubmission } from '../useSubmission'
 
 const ROLES: Role[] = ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN']
 
 export function PlayersPage() {
+  const { pending, submit, isActive } = useSubmission()
   const { player: me } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
   const [error, setError] = useState('')
@@ -26,15 +28,19 @@ export function PlayersPage() {
 
   const onCreate = async (event: FormEvent) => {
     event.preventDefault()
-    setError('')
-    try {
-      await api.post<Player>('/api/v1/players', { name, role })
-      setName('')
-      setRole('GUEST')
-      load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
-    }
+    if (!isAdmin) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post<Player>('/api/v1/players', { name, role })
+        if (!isActive()) return
+        setName('')
+        setRole('GUEST')
+        load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
+      }
+    })
   }
 
   return (
@@ -83,7 +89,7 @@ export function PlayersPage() {
               ))}
             </select>
           </label>
-          <button type="submit">Anlegen</button>
+          <button type="submit" disabled={pending}>{pending ? 'Anlegen…' : 'Anlegen'}</button>
         </form>
       )}
     </div>

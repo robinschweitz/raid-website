@@ -1,6 +1,6 @@
 # Architecture
 
-Modular monolith. Domains: players/characters, raids/attendance, loot, enhancepoints (ledger), tokens (ledger), roster (configurable ranks/groups), audit, legacyimport/export, httpapi (v1).
+Modular monolith. Domains: players/characters, raids/attendance, loot, enhancepoints (ledger), tokens (ledger), roster (configurable ranks/groups), audit, legacyimport/export, httpapi (v1). `raidcompletion` and `raidcorrection` coordinate cross-domain writes through repository-owned transactions.
 
 Principles:
 - Domain-first, boring/explicit/predictable

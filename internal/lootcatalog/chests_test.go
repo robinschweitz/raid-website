@@ -86,7 +86,9 @@ func TestChestAwardContextAndCanonicalName(t *testing.T) {
 	// Shared emblems legitimately occur in both caches. An encounter-specific
 	// equipment item must still be rejected for the other boss.
 	for _, candidate := range items {
-		if _, _, err := s.ValidateDrop(ctx, "631", &size, &wrongBoss, candidate.ItemID); err != nil { return }
+		if _, _, err := s.ValidateDrop(ctx, "631", &size, &wrongBoss, candidate.ItemID); err != nil {
+			return
+		}
 	}
 	t.Fatal("all Gunship items accepted for Valithria")
 }

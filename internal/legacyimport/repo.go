@@ -102,6 +102,11 @@ func (r *Repo) hasPreview(ctx context.Context, source, sheetID, hash string) (bo
 	return r.db.NewSelect().TableExpr("import_previews").Where("source = ?", source).Where("sheet_id = ?", sheetID).Where("raw_hash = ?", hash).Exists(ctx)
 }
 
+func (r *Repo) hasMergedSource(ctx context.Context, source, sheetID string) (bool, error) {
+	return r.db.NewSelect().Model((*Import)(nil)).Where("source = ?", source).
+		Where("source_url = ?", sheetID).Where("status = ?", "MERGED").Exists(ctx)
+}
+
 func (r *Repo) pointTransactionCount(ctx context.Context) (int, error) {
 	count, err := r.db.NewSelect().TableExpr("enhance_point_transactions").Count(ctx)
 	return int(count), err
@@ -135,6 +140,7 @@ func (s *Service) transaction(ctx context.Context, commit bool, fn func(*Service
 	bound.loot = s.loot.WithTx(tx)
 	bound.points = s.points.WithTx(tx)
 	bound.tokens = s.tokens.WithTx(tx)
+	bound.series = s.series.WithTx(tx)
 	bound.corrections = raidcorrection.NewService(raidcorrection.NewRepo(tx))
 	if err := fn(&bound); err != nil {
 		return err

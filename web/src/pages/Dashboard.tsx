@@ -106,7 +106,7 @@ export function DashboardPage() {
               <span><strong>{attendance.filter((a) => a.role === 'HEAL').length}</strong> Heiler</span>
               <span><strong>{attendance.filter((a) => a.role === 'DD').length}</strong> DD</span>
             </div>
-            <BossProgression bosses={ICC_BOSSES} killedCount={nextRaid.status === 'COMPLETED' ? ICC_BOSSES.length : 0} />
+            <BossProgression bosses={ICC_BOSSES} killedCount={0} currentIndex={0} />
           </> : <p className="muted" role="status">Aufstellung wird geladen&hellip;</p>}
           <Link className="button-link primary" to={`/raids/${nextRaid.id}`}>Raid &ouml;ffnen &rarr;</Link>
         </> : <><h2>{error ? 'Raidplanung nicht verf&uuml;gbar' : 'Kein zuk&uuml;nftiger Raid geplant'}</h2><p className="muted">{error ? 'Bitte lade die Seite erneut.' : 'Hier erscheint der n&auml;chste gespeicherte Termin.'}</p><Link className="button-link" to="/raids">Zur Raidplanung &rarr;</Link></>}
@@ -154,8 +154,8 @@ export function DashboardPage() {
       </section>
 
       <section className="card widget-boss">
-        <div className="section-heading"><h2>Boss Progression</h2><span className="eyebrow">Icecrown Citadel 25</span></div>
-        <BossProgression bosses={ICC_BOSSES} killedCount={nextRaid?.status === 'COMPLETED' ? ICC_BOSSES.length : 0} />
+        <div className="section-heading"><h2>Boss Progression</h2><span className="eyebrow">{nextRaid?.name ?? 'Kein aktiver Raid'}</span></div>
+        <BossProgression bosses={ICC_BOSSES} killedCount={0} currentIndex={0} />
       </section>
 
       <section className="card widget-notifications">

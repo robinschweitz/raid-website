@@ -17,6 +17,7 @@ import (
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcorrection"
+	"raid-website/internal/raidseries"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
@@ -63,13 +64,14 @@ type Service struct {
 	loot        *loot.Repo
 	points      *enhancepoints.Repo
 	tokens      *tokens.Repo
+	series      *raidseries.Repo
 	fetcher     Fetcher
 	corrections *raidcorrection.Service
 }
 
 // NewService constructs an importer with explicit repositories and source fetching.
-func NewService(imports *Repo, players *player.Repo, chars *character.Repo, raids *raid.Repo, att *attendance.Repo, lootRepo *loot.Repo, points *enhancepoints.Repo, tokenRepo *tokens.Repo, fetcher Fetcher) *Service {
-	return &Service{imports: imports, players: players, chars: chars, raids: raids, att: att, loot: lootRepo, points: points, tokens: tokenRepo, fetcher: fetcher}
+func NewService(imports *Repo, players *player.Repo, chars *character.Repo, raids *raid.Repo, att *attendance.Repo, lootRepo *loot.Repo, points *enhancepoints.Repo, tokenRepo *tokens.Repo, series *raidseries.Repo, fetcher Fetcher) *Service {
+	return &Service{imports: imports, players: players, chars: chars, raids: raids, att: att, loot: lootRepo, points: points, tokens: tokenRepo, series: series, fetcher: fetcher}
 }
 
 func planFromSheet(data SheetData) (Plan, int, error) {
@@ -241,6 +243,15 @@ func (s *Service) Merge(ctx context.Context, actorID int64, source, sheetID, exp
 		if err := s.mergeLoot(ctx, source, sheetID, reason, raidIDs, playerIDs, actorID, p, now, &rep); err != nil {
 			return err
 		}
+		alreadyImported, err := s.imports.hasMergedSource(ctx, source, sheetID)
+		if err != nil {
+			return err
+		}
+		if !alreadyImported {
+			if err := s.mergeCurrentRaid(ctx, actorID, p, now, &rep); err != nil {
+				return err
+			}
+		}
 		pointsAfter, err := s.imports.pointTransactionCount(ctx)
 		if err != nil {
 			return err
@@ -379,6 +390,7 @@ func (s *Service) mergeRaids(ctx context.Context, source, sheetID, reason string
 				Status:         validation.RaidStatusCompleted,
 				ScheduledStart: &date,
 				CompletedAt:    &date,
+				ArchivedAt:     &date,
 				CreatedAt:      now,
 				UpdatedAt:      now,
 			}
@@ -505,5 +517,102 @@ func (s *Service) mergeLoot(ctx context.Context, source, sheetID, reason string,
 			rep.Created.Tokens++
 		}
 	}
+	return nil
+}
+
+func (s *Service) mergeCurrentRaid(ctx context.Context, actorID int64, p Plan, now time.Time, rep *Report) error {
+	if len(p.Raids) == 0 {
+		return nil
+	}
+
+	var latest *RaidPlan
+	for i := range p.Raids {
+		rp := &p.Raids[i]
+		if rp.Date == nil {
+			continue
+		}
+		if latest == nil || rp.Date.After(*latest.Date) {
+			latest = rp
+		}
+	}
+	if latest == nil {
+		return nil
+	}
+
+	seriesName := latest.Key
+	if idx := strings.LastIndex(seriesName, "-"); idx > 0 {
+		seriesName = seriesName[:idx]
+	}
+
+	weekday := int(latest.Date.Weekday())
+	if weekday == 0 {
+		weekday = 6
+	} else {
+		weekday--
+	}
+
+	raidSize := 25
+	if latest.RaidSize > 0 {
+		raidSize = latest.RaidSize
+	}
+
+	instanceID := latest.CatalogInstanceID
+	if instanceID == "" {
+		instanceID = "631"
+	}
+
+	startTime := "19:30"
+	if latest.Date.Hour() > 0 || latest.Date.Minute() > 0 {
+		startTime = fmt.Sprintf("%02d:%02d", latest.Date.Hour(), latest.Date.Minute())
+	}
+
+	series := &raidseries.Series{
+		Name:              seriesName,
+		RaidLeaderID:      actorID,
+		Weekdays:          []int{weekday},
+		IntervalWeeks:     1,
+		StartTime:         startTime,
+		Timezone:          "Europe/Berlin",
+		CatalogInstanceID: &instanceID,
+		RaidSize:          &raidSize,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+
+	if err := s.series.Save(ctx, series); err != nil {
+		return fmt.Errorf("create raid series: %w", err)
+	}
+
+	scheduled, err := raidseries.NextOccurrence(series, *latest.Date, now)
+	if err != nil {
+		return fmt.Errorf("compute next occurrence: %w", err)
+	}
+
+	existing, err := s.raids.FindOccurrence(ctx, series.ID, scheduled)
+	if err != nil {
+		return fmt.Errorf("check existing occurrence: %w", err)
+	}
+	if existing != nil {
+		return nil
+	}
+
+	nextRaid := &raid.Raid{
+		Name:              series.Name,
+		RaidLeaderID:      actorID,
+		SeriesID:          &series.ID,
+		Status:            validation.RaidStatusPlanned,
+		ScheduledStart:    &scheduled,
+		CatalogInstanceID: &instanceID,
+		RaidSize:          &raidSize,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+
+	if err := s.raids.Create(ctx, nextRaid); err != nil {
+		return fmt.Errorf("create current raid: %w", err)
+	}
+
+	rep.Created.Raids++
+	rep.Warnings = append(rep.Warnings, fmt.Sprintf("created current raid %q scheduled %s from series %q", nextRaid.Name, scheduled.Format(time.RFC3339), series.Name))
 	return nil
 }

@@ -65,6 +65,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		lootRepo,
 		points,
 		tokenRepo,
+		raidseries.NewRepo(db),
 		legacyimport.GoogleFetcher{},
 	)
 

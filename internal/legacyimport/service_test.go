@@ -17,6 +17,7 @@ import (
 	"raid-website/internal/migrations"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
+	"raid-website/internal/raidseries"
 	"raid-website/internal/tokens"
 )
 
@@ -89,7 +90,7 @@ func setup(t *testing.T) (*bun.DB, *Service, *player.Repo, *enhancepoints.Repo, 
 	points := enhancepoints.NewRepo(bdb.DB)
 	imports := NewRepo(bdb.DB)
 
-	svc := NewService(imports, players, chars, raids, att, lootRepo, points, tokenRepo, fakeFetcher{data: sampleSheet()})
+	svc := NewService(imports, players, chars, raids, att, lootRepo, points, tokenRepo, raidseries.NewRepo(bdb.DB), fakeFetcher{data: sampleSheet()})
 	return bdb.DB, svc, players, points, tokenRepo, lootRepo, raids
 }
 

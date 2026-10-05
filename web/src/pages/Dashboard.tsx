@@ -107,7 +107,7 @@ export function DashboardPage() {
           </> : <p className="muted" role="status">Aufstellung wird geladen&hellip;</p>}
           <BossProgression catalogInstanceId={nextRaid.catalog_instance_id} />
           <Link className="button-link primary" to={`/raids/${nextRaid.id}`}>Raid &ouml;ffnen &rarr;</Link>
-        </> : <><h2>{error ? 'Raidplanung nicht verf&uuml;gbar' : 'Kein zuk&uuml;nftiger Raid geplant'}</h2><p className="muted">{error ? 'Bitte lade die Seite erneut.' : 'Hier erscheint der n&auml;chste gespeicherte Termin.'}</p><Link className="button-link" to="/raids">Zur Raidplanung &rarr;</Link></>}
+        </> : <><h2>{error ? 'Raidplanung nicht verfügbar' : 'Kein zukünftiger Raid geplant'}</h2><p className="muted">{error ? 'Bitte lade die Seite erneut.' : 'Hier erscheint der nächste gespeicherte Termin.'}</p><Link className="button-link" to="/raids">Zur Raidplanung &rarr;</Link></>}
       </div>
     </RaidBanner>
 
@@ -145,7 +145,7 @@ export function DashboardPage() {
               <div className="option-label"><span>{choice}</span><span className="votes">{count} Stimmen</span></div>
               <div className="bar-track"><div className="bar-fill" style={{ width: `${(count / totalVotes) * 100}%` }} /></div>
             </div>)}
-            <div className="section-heading"><span className="muted">{pollVotes ? `${totalVotes} abgegebene Stimmen` : 'Stimmen werden geladen&hellip;'}</span><Link to="/polls">Zur Abstimmung &rarr;</Link></div>
+            <div className="section-heading"><span className="muted">{pollVotes ? `${totalVotes} abgegebene Stimmen` : 'Stimmen werden geladen…'}</span><Link to="/polls">Zur Abstimmung &rarr;</Link></div>
           </div>
         })}
         {!loading && !error && polls.length === 0 && <p className="muted">Aktuell keine offenen Umfragen.</p>}

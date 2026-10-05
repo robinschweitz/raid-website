@@ -38,7 +38,7 @@ export function LoginPage() {
         </label>
         {error && <p className="error">{error}</p>}
         <button type="submit" disabled={busy}>
-          {busy ? 'Anmelden&hellip;' : 'Anmelden'}
+          {busy ? 'Anmelden…' : 'Anmelden'}
         </button>
       </form>
     </div>

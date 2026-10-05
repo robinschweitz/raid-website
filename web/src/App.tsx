@@ -89,7 +89,7 @@ function Layout() {
       <header className="topbar">
         <span className="topbar-brand">Bratwurst des Schicksals <span className="muted">/ Raidverwaltung</span></span>
         <div className="user"><Link to={`/players/${player.id}`}><NavIcon name="profile" />{player.name}</Link><span className="badge">{player.role}</span>
-          <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden&hellip;' : 'Abmelden'}</button>
+          <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button>
         </div>
       </header>
       <main id="main-content" className={path === '/' ? undefined : 'secondary-page'} tabIndex={-1}>

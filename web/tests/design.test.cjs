@@ -86,6 +86,7 @@ function resolveOverview(s, raids = [], polls = []) {
     else if (request.url === '/api/v1/players') request.resolve([{ id: 2, name: 'Actual leader' }])
     else if (request.url === '/api/v1/polls') request.resolve(polls)
     else if (request.url.endsWith('/points')) request.resolve({ balance: 30, transactions: [] })
+    else if (request.url.endsWith('/characters')) request.resolve([])
   }
 }
 
@@ -126,22 +127,25 @@ test('dashboard chooses earliest actual future active raid and fetches its compo
     raid(4, 'Cancelled raid', '2026-10-04T18:00:00Z', 'CANCELLED'),
     raid(5, 'Archived raid', '2026-10-04T17:00:00Z', 'COMPLETED', '2026-10-01T18:00:00Z'),
     raid(6, 'Unscheduled raid', null),
-  ], [{ id: 8, title: 'Actual poll', status: 'OPEN' }, { id: 9, title: 'Closed poll', status: 'CLOSED' }])
+  ], [{ id: 8, title: 'Actual poll', status: 'OPEN', created_at: '2026-10-04T10:00:00Z' }, { id: 9, title: 'Closed poll', status: 'CLOSED' }])
   await flush(s)
   assert.deepEqual(s.requests.filter((r) => r.url.endsWith('/attendance')).map((r) => r.url), ['/api/v1/raids/3/attendance'])
+  assert.match(text(s.tree), /Stimmen werden geladen…/)
   s.requests.find((r) => r.url.endsWith('/attendance')).resolve([{ role: 'TANK' }, { role: 'HEAL' }, { role: 'DD' }, { role: 'DD', is_bench: true }])
-  s.requests.find((r) => r.url.endsWith('/votes')).resolve([{ id: 1 }, { id: 2 }])
+  s.requests.find((r) => r.url.endsWith('/votes')).resolve([{ id: 1, choice: 'Montag' }, { id: 2, choice: 'Montag' }])
   await flush(s)
-  const banner = nodes(s.tree, (n) => n.props.className === 'raid-banner')[0]
+  const banner = nodes(s.tree, (n) => typeof n.type === 'function' && n.type.name === 'RaidBanner')[0]
   assert.match(text(banner), /Real next raid/)
   assert.match(text(banner), /Actual leader/)
   assert.match(text(banner), /10\s+Spieler/)
   assert.match(text(banner), /4\s+Aufgestellt.*1\s+Tanks.*1\s+Heiler.*2\s+DD/)
   assert.match(text(s.tree), /2 abgegebene Stimmen/)
-  assert.doesNotMatch(text(s.tree), /Closed poll|ICC25|%/)
+  assert.doesNotMatch(text(s.tree), /Closed poll|ICC25/)
+  assert.match(text(s.tree), /Montag.*2\s+Stimmen/)
   assert.equal(nodes(s.tree, (n) => n.type === 'form').length, 0)
-  const panels = nodes(s.tree, (n) => /dashboard-(points|agenda|polls|history)/.test(n.props.className ?? ''))
-  assert.deepEqual(panels.map((n) => n.props.className), ['dashboard-points', 'card dashboard-agenda', 'card dashboard-polls', 'card dashboard-history'])
+  for (const className of ['widget-composition', 'widget-attendance', 'widget-poll', 'widget-notifications', 'widget-history', 'widget-profile', 'widget-agenda']) {
+    assert.equal(nodes(s.tree, (n) => n.props.className === `card ${className}`).length, 1)
+  }
 })
 
 test('dashboard empty state invents no raid, capacity or statistics', async () => {
@@ -151,7 +155,9 @@ test('dashboard empty state invents no raid, capacity or statistics', async () =
   await flush(s)
   assert.match(text(s.tree), /Kein zukünftiger Raid geplant/)
   assert.match(text(s.tree), /Noch keine archivierten Raids/)
-  assert.doesNotMatch(text(s.tree), /ICC25|25 Spieler|Fortschritt|Benachrichtigung/)
+  assert.match(text(s.tree), /Keine Aufstellung verfügbar/)
+  assert.match(text(s.tree), /Keine Benachrichtigungen/)
+  assert.doesNotMatch(text(s.tree), /ICC25|25 Spieler|Fortschritt|%/)
 })
 
 test('dashboard network failure is explicit, not an empty success', async () => {
@@ -206,26 +212,54 @@ const catalog = { ...dataset, sources: [{ source: dataset.source, raw_hash: 'a'.
 const findButton = (s, label) => nodes(s.tree, (node) => node.type === 'button' && text(node) === label)[0]
 const writes = (s) => s.requests.filter((request) => request.method !== 'get')
 const fileInput = (s) => nodes(s.tree, (node) => node.type === 'input' && node.props.type === 'file')[0]
+function resolveCatalogLoad(requests, value, drops = value.drops) {
+  assert.deepEqual(requests.map((request) => request.url), ['/api/v1/loot-catalog', '/api/v1/loot-catalog/items'])
+  requests[0].resolve(value)
+  requests[1].resolve(drops)
+}
 for (const role of ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN']) {
   test(`${role} reads the file-authoritative catalog without upload or mutation controls`, async () => {
     const s = setup({ id: 1, role })
     s.mount(s.load('pages/LootCatalog.tsx').LootCatalogPage)
-    assert.equal(s.requests[0].url, '/api/v1/loot-catalog')
-    s.requests[0].resolve(catalog)
+    resolveCatalogLoad(s.requests, catalog)
     await flush(s)
-    assert.match(text(s.tree), /automatisch.*schreibgeschützt/)
+    assert.match(text(s.tree), /Reviewed item/)
+    assert.match(text(s.tree), /2\s+Dropvarianten gefunden/)
     assert.match(text(s.tree), /pinned-revision/)
     assert.match(text(s.tree), /Reviewed license/)
     assert.match(text(s.tree), /Incomplete source-derived fixture/)
     assert.doesNotMatch(text(s.tree), /Administration|nur von einem Admin/)
     assert.equal(fileInput(s), undefined)
-    assert.equal(nodes(s.tree, (node) => node.type === 'details').length, 1)
+    assert.equal(nodes(s.tree, (node) => node.type === 'summary' && text(node) === 'Abdeckung und Quellen').length, 1)
     assert.equal(findButton(s, 'Katalog importieren'), undefined)
     assert.equal(findButton(s, 'Vorschau prüfen'), undefined)
     findButton(s, 'Bestand neu laden').props.onClick()
-    s.requests.at(-1).resolve(emptyCatalog)
+    resolveCatalogLoad(s.requests.slice(-2), emptyCatalog)
     await flush(s)
     assert.match(text(s.tree), /Keine geprüften Dropdaten/)
+    assert.equal(writes(s).length, 0)
+  })
+}
+
+for (const failedIndex of [0, 1]) {
+  test(`catalog load reports failure of ${failedIndex === 0 ? 'metadata' : 'items'} and retries both reads`, async () => {
+    const s = setup()
+    s.mount(s.load('pages/LootCatalog.tsx').LootCatalogPage)
+    s.requests[failedIndex].reject(new Error('offline'))
+    s.requests[1 - failedIndex].resolve(failedIndex === 0 ? catalog.drops : catalog)
+    await flush(s)
+    assert.match(text(s.tree), /erneut versuchen/)
+    assert.doesNotMatch(text(s.tree), /Reviewed item|Dropvarianten gefunden/)
+    assert.equal(findButton(s, 'Bestand neu laden').props.disabled, false)
+    findButton(s, 'Bestand neu laden').props.onClick()
+    s.requests[2].resolve(catalog)
+    await flush(s)
+    assert.match(text(s.tree), /Beutekatalog wird geladen/)
+    assert.doesNotMatch(text(s.tree), /Dropvarianten gefunden/)
+    s.requests[3].resolve(catalog.drops)
+    await flush(s)
+    assert.match(text(s.tree), /2\s+Dropvarianten gefunden/)
+    assert.doesNotMatch(text(s.tree), /erneut versuchen/)
     assert.equal(writes(s).length, 0)
   })
 }
@@ -237,19 +271,21 @@ test('catalog GET failure offers retry and late reads cannot overwrite newer dat
   await flush(s)
   assert.match(text(s.tree), /erneut versuchen/)
   const retry = findButton(s, 'Bestand neu laden').props.onClick
+  const retryStart = s.requests.length
   retry(); retry()
-  s.requests[2].resolve(catalog)
+  resolveCatalogLoad(s.requests.slice(retryStart + 2), catalog)
   await flush(s)
-  s.requests[1].resolve(emptyCatalog)
+  resolveCatalogLoad(s.requests.slice(retryStart, retryStart + 2), emptyCatalog)
   await flush(s)
   assert.match(text(s.tree), /Reviewed instance/)
+  assert.match(text(s.tree), /Reviewed item/)
   const beforeUnmount = s.requests.length
   findButton(s, 'Bestand neu laden').props.onClick()
   s.unmount()
-  s.requests.at(-1).resolve(emptyCatalog)
+  resolveCatalogLoad(s.requests.slice(-2), emptyCatalog)
   await flush(s)
   assert.doesNotMatch(text(s.tree), /Keine geprüften Dropdaten/)
-  assert.equal(s.requests.length, beforeUnmount + 1)
+  assert.equal(s.requests.length, beforeUnmount + 2)
   assert.equal(writes(s).length, 0)
 })
 

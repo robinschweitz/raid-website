@@ -3,7 +3,7 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
 import type { Attendance, Character, Player, PointsResponse, Poll, Raid, Vote } from '../types'
-import { Citadel } from '../components/Citadel'
+import { RaidBanner } from '../components/RaidBanner'
 // import { EnhancePointsCard } from '../components/EnhancePointsCard'
 import { AttendanceRing } from '../components/AttendanceRing'
 import { BossProgression } from '../components/BossProgression'
@@ -87,8 +87,7 @@ export function DashboardPage() {
     </div>
     {error && <p className="error" role="alert">{error}</p>}
 
-    <section className="raid-banner">
-      <Citadel />
+    <RaidBanner catalogInstanceId={nextRaid?.catalog_instance_id}>
       <div className="raid-banner-content">
         <p className="eyebrow">N&auml;chster geplanter Raid</p>
         {loading ? <p role="status" className="muted">Raidplanung wird geladen&hellip;</p> : nextRaid ? <>
@@ -111,7 +110,7 @@ export function DashboardPage() {
           <Link className="button-link primary" to={`/raids/${nextRaid.id}`}>Raid &ouml;ffnen &rarr;</Link>
         </> : <><h2>{error ? 'Raidplanung nicht verf&uuml;gbar' : 'Kein zuk&uuml;nftiger Raid geplant'}</h2><p className="muted">{error ? 'Bitte lade die Seite erneut.' : 'Hier erscheint der n&auml;chste gespeicherte Termin.'}</p><Link className="button-link" to="/raids">Zur Raidplanung &rarr;</Link></>}
       </div>
-    </section>
+    </RaidBanner>
 
     <div className="dashboard-widgets">
       <section className="card widget-composition">

@@ -537,15 +537,54 @@ button, a, input, select, textarea {
   background: linear-gradient(90deg, rgba(16, 32, 54, 0.8), transparent 80%);
 }
 
-.citadel {
+.raid-banner-bg {
   position: absolute;
-  bottom: 0;
-  right: -10%;
-  width: 90%;
-  height: 100%;
-  color: #07101c;
-  opacity: .5;
+  inset: 0;
   pointer-events: none;
+}
+
+.banner-default .raid-banner-bg {
+  background:
+    radial-gradient(ellipse at 85% 20%, rgba(43, 89, 114, 0.5), transparent 60%),
+    linear-gradient(110deg, rgba(19, 38, 59, 0.95), rgba(11, 22, 39, 0.98));
+  background-size: cover;
+  background-position: center;
+}
+
+.banner-naxxramas .raid-banner-bg {
+  background-image: url('/banners/naxxramas.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+.banner-ulduar .raid-banner-bg {
+  background-image: url('/banners/ulduar.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+.banner-archavon .raid-banner-bg {
+  background-image: url('/banners/archavon.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+.banner-icecrown .raid-banner-bg {
+  background-image: url('/banners/icecrown.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+.banner-crusader .raid-banner-bg {
+  background-image: url('/banners/crusader.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+.banner-ruby .raid-banner-bg {
+  background-image: url('/banners/ruby.jpg');
+  background-size: cover;
+  background-position: center;
 }
 
 .raid-banner-content {

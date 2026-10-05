@@ -1185,13 +1185,19 @@ input[type='checkbox'] {
 
 .boss-icons {
   display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
   gap: 6px;
   flex: 1;
 }
 
 .boss-icon {
-  width: 36px;
-  height: 36px;
+  position: relative;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
   border-radius: 3px;
   display: flex;
   align-items: center;
@@ -1202,6 +1208,47 @@ input[type='checkbox'] {
   background: var(--panel-2);
   color: var(--muted);
   transition: all 0.2s ease;
+}
+
+.boss-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+}
+
+.boss-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 3;
+  padding: 6px 10px;
+  width: max-content;
+  max-width: 190px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 4px 16px #0008;
+}
+
+.boss-icon:hover, .boss-icon:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--glow);
+}
+
+.boss-icon:hover .boss-tooltip, .boss-icon:focus-visible .boss-tooltip {
+  display: block;
+}
+
+.boss-progression {
+  flex-wrap: wrap;
+}
+
+.boss-progression .progress-text {
+  flex-basis: 100%;
+  white-space: normal;
 }
 
 .boss-icon.killed {

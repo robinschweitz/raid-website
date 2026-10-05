@@ -12,7 +12,6 @@ import { GuildNotifications } from '../components/GuildNotifications'
 import { PlayerProfilePanel } from '../components/PlayerProfilePanel'
 // import { StatisticsCharts } from '../components/StatisticsCharts'
 
-const ICC_BOSSES = ['Marrowgar', 'Lady Deathwhisper', 'Gunship', 'Saurfang', 'Festergut', 'Rotface', 'Putricide', 'Valithria', 'Sindragosa', 'Lich King']
 
 export function DashboardPage() {
   const { player } = useAuth()
@@ -105,8 +104,8 @@ export function DashboardPage() {
               <span><strong>{attendance.filter((a) => a.role === 'HEAL').length}</strong> Heiler</span>
               <span><strong>{attendance.filter((a) => a.role === 'DD').length}</strong> DD</span>
             </div>
-            <BossProgression bosses={ICC_BOSSES} killedCount={0} currentIndex={0} />
           </> : <p className="muted" role="status">Aufstellung wird geladen&hellip;</p>}
+          <BossProgression catalogInstanceId={nextRaid.catalog_instance_id} />
           <Link className="button-link primary" to={`/raids/${nextRaid.id}`}>Raid &ouml;ffnen &rarr;</Link>
         </> : <><h2>{error ? 'Raidplanung nicht verf&uuml;gbar' : 'Kein zuk&uuml;nftiger Raid geplant'}</h2><p className="muted">{error ? 'Bitte lade die Seite erneut.' : 'Hier erscheint der n&auml;chste gespeicherte Termin.'}</p><Link className="button-link" to="/raids">Zur Raidplanung &rarr;</Link></>}
       </div>

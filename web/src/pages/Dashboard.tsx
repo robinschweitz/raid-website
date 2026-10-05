@@ -185,7 +185,7 @@ export function DashboardPage() {
         {pointsError && <p className="error" role="alert">{pointsError}</p>}
       </section>
 
-      <section className="card dashboard-agenda">
+      <section className="card widget-agenda">
         <div className="section-heading"><h2>Raidagenda</h2><span className="eyebrow">Gespeicherte Termine</span></div>
         {upcoming.slice(0, 5).map((r) => <div className="agenda-row" key={r.id}>
           <time dateTime={r.scheduled_start!}><strong>{new Date(r.scheduled_start!).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</strong><span>{new Date(r.scheduled_start!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></time>
@@ -202,7 +202,7 @@ export function DashboardPage() {
         <EnhancePointsCard points={points} />
         {player && <p className="profile-link"><Link to={`/players/${player.id}`}>Mein Profil &amp; EP-Historie &rarr;</Link></p>}
       </div>
-      <section className="card dashboard-agenda">
+      <section className="card widget-agenda">
         <div className="section-heading"><h2>Raidagenda</h2><span className="eyebrow">Gespeicherte Termine</span></div>
         {upcoming.slice(0, 5).map((r) => <div className="agenda-row" key={r.id}>
           <time dateTime={r.scheduled_start!}><strong>{new Date(r.scheduled_start!).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</strong><span>{new Date(r.scheduled_start!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></time>

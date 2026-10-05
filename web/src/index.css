@@ -623,8 +623,8 @@ button, a, input, select, textarea {
   grid-area: points;
 }
 
-.dashboard-agenda {
-  grid-area: agenda;
+.widget-agenda {
+  grid-column: span 8;
 }
 
 .dashboard-polls {
@@ -1384,7 +1384,7 @@ input[type='checkbox'] {
   .widget-stats, .widget-history {
     grid-column: span 6;
   }
-  .widget-profile, .widget-notifications {
+  .widget-profile, .widget-notifications, .widget-agenda {
     grid-column: span 3;
   }
 }
@@ -1487,7 +1487,7 @@ input[type='checkbox'] {
     grid-template-columns: 1fr;
   }
   .widget-composition, .widget-attendance, .widget-poll,
-  .widget-stats, .widget-profile, .widget-notifications, .widget-history {
+  .widget-stats, .widget-profile, .widget-notifications, .widget-history, .widget-agenda {
     grid-column: span 1;
   }
 }

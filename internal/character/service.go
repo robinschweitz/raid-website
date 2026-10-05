@@ -48,9 +48,6 @@ func NewService(repo *Repo) *Service {
 // Correct applies a partial update and records its history atomically.
 func (s *Service) Correct(ctx context.Context, actorID, characterID int64, patch Patch) (*Character, error) {
 	patch.Reason = strings.TrimSpace(patch.Reason)
-	if patch.Reason == "" {
-		return nil, ErrReasonRequired
-	}
 	if patch.Name != nil && *patch.Name == "" {
 		return nil, ErrInvalidName
 	}

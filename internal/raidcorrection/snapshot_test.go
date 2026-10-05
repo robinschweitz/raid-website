@@ -81,7 +81,7 @@ func TestRosterSnapshotCorrectionDefaultsValidationAndArchive(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(stored, baseline) {
 		t.Fatalf("invalid edit persisted: %+v %v", stored, err)
 	}
-	if _, err := s.CorrectAttendance(ctx, rd.ID, row.ID, p.ID, " ", nil, SnapshotPatch{Spec: &playedSpec}); !errors.Is(err, ErrReason) {
+	if _, err := s.CorrectAttendance(ctx, rd.ID, row.ID, p.ID, " ", nil, SnapshotPatch{Spec: &playedSpec}); err != nil {
 		t.Fatalf("reason: %v", err)
 	}
 	other := &character.Character{PlayerID: p.ID, Name: "Alternate", Class: "Priester", MainSpec: "Disziplin", CreatedAt: now, UpdatedAt: now}
@@ -106,7 +106,10 @@ func TestRosterSnapshotCorrectionDefaultsValidationAndArchive(t *testing.T) {
 	if err := r.raids.Update(ctx, rd); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CorrectAttendance(ctx, rd.ID, row.ID, p.ID, "archived", nil, SnapshotPatch{Spec: &playedSpec}); !errors.Is(err, ErrRaidState) {
+	if _, err := s.CorrectAttendance(ctx, rd.ID, row.ID, p.ID, " ", nil, SnapshotPatch{Spec: &playedSpec}); !errors.Is(err, ErrReason) {
+		t.Fatalf("archive reason: %v", err)
+	}
+	if _, err := s.CorrectAttendance(ctx, rd.ID, row.ID, p.ID, "archived", nil, SnapshotPatch{Spec: &playedSpec}); err != nil {
 		t.Fatalf("archive: %v", err)
 	}
 }

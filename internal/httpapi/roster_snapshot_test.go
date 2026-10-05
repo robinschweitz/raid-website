@@ -78,8 +78,8 @@ func TestRosterSnapshotsPreserveHistoryAndAuditedRaidReality(t *testing.T) {
 	if err := raid.NewRepo(f.db).Update(ctx, rd); err != nil {
 		t.Fatal(err)
 	}
-	f.request(http.MethodPatch, suffix, map[string]any{"spec": "Forbidden", "reason": "archived"}, http.StatusConflict)
-	f.request(http.MethodPost, "/attendance", map[string]any{"player_id": f.second, "character_id": f.secondChar, "role": "DD"}, http.StatusConflict)
+	f.request(http.MethodPatch, suffix, map[string]any{"spec": "Archived correction", "reason": "archived"}, http.StatusOK)
+	f.request(http.MethodPost, "/attendance", map[string]any{"player_id": f.second, "character_id": f.secondChar, "role": "DD"}, http.StatusBadRequest)
 	status, body := do(t, f.srv.Client(), http.MethodGet, fmt.Sprintf("%s/api/v1/raids/%d/attendance", f.srv.URL, f.raidID), f.token, nil)
 	var list struct {
 		Data []attendance.Attendance `json:"data"`
@@ -87,11 +87,11 @@ func TestRosterSnapshotsPreserveHistoryAndAuditedRaidReality(t *testing.T) {
 	if err := json.Unmarshal(body, &list); err != nil {
 		t.Fatal(err)
 	}
-	if status != http.StatusOK || len(list.Data) != 1 || list.Data[0].Spec != "Historical correction" || list.Data[0].CharacterName != name {
+	if status != http.StatusOK || len(list.Data) != 1 || list.Data[0].Spec != "Archived correction" || list.Data[0].CharacterName != name {
 		t.Fatalf("archived read: %d %s", status, body)
 	}
 	logs, err := audit.NewRepo(f.db).ListByEntity(ctx, "attendance", fmt.Sprint(row.ID))
-	if err != nil || len(logs) != 5 {
+	if err != nil || len(logs) != 6 {
 		t.Fatalf("audit: %+v %v", logs, err)
 	}
 	var before, after attendance.Attendance
@@ -122,7 +122,7 @@ func TestRosterSnapshotValidationPermissionsAndRollback(t *testing.T) {
 	}
 	for _, patch := range []map[string]any{
 		{"spec": "", "reason": "blank"}, {"class": "unknown", "reason": "invalid"},
-		{"character_name": " ", "reason": "blank"}, {"spec": "Frost", "reason": " "},
+		{"character_name": " ", "reason": "blank"},
 		{"player_id": f.second, "reason": "wrong owner"},
 	} {
 		f.request(http.MethodPatch, suffix, patch, http.StatusBadRequest)
@@ -187,7 +187,7 @@ func TestRosterPlannedCreationSpecDefaultsOnlyWhenAbsent(t *testing.T) {
 		t.Fatalf("explicit spec: %+v", row)
 	}
 	suffix := fmt.Sprintf("/attendance/%d", row.ID)
-	f.request(http.MethodPatch, suffix, map[string]any{"spec": "Frost"}, http.StatusBadRequest)
+	f.request(http.MethodPatch, suffix, map[string]any{"spec": "Frost"}, http.StatusOK)
 	row = snapshotResponse(t, f.request(http.MethodPatch, suffix, map[string]any{"spec": "Frost", "reason": "planned roster edit"}, http.StatusOK))
 	if row.Spec != "Frost" {
 		t.Fatalf("planned edit: %+v", row)

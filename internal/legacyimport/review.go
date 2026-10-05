@@ -188,8 +188,10 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 			} else if existing.Status != validation.RaidStatusCompleted && existing.Status != validation.RaidStatusPlanned && existing.Status != validation.RaidStatusOpen {
 				rep.Errors = append(rep.Errors, fmt.Sprintf("raid %q: state does not allow import additions", rp.Key))
 			} else {
-				p.RequiresReason = true
-				rep.Warnings = append(rep.Warnings, fmt.Sprintf("raid %q: reason_required for audited additions to existing imported raid", rp.Key))
+				if existing.ArchivedAt != nil {
+					p.RequiresReason = true
+					rep.Warnings = append(rep.Warnings, fmt.Sprintf("raid %q: reason_required for audited additions to archived imported raid", rp.Key))
+				}
 				if existing.Status == validation.RaidStatusCompleted {
 					// Match the correction service's per-addition eligibility deltas.
 					participants := map[string]bool{}

@@ -9,7 +9,7 @@ future agents do not re-litigate them or silently change them.
 Authoritative sources, in order of precedence:
 
 1. This file (owner-level requirements and constraints)
-2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-029)
+2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-032)
 3. `ARCHITECTURE.md` (module map and principles)
 4. `CODING_RULES.md` (defines the coding rules)
 5. `README.md` (commands)
@@ -51,7 +51,8 @@ wins and the difference is fixed here first.
    A hard delete must be explicitly requested by a human and is Admin-only (ADR 007).
    For raids, archiving means final processing, not removal or hiding (ADR 021).
 7. **Edits are audited.** Changes to history-affecting records (loot, attendance, character renames)
-   require actor + reason and write an audit log entry (ADR 006). Numeric corrections prefer new
+   require an actor and write an audit log entry. A reason is mandatory only for archived raid changes
+   (ADR 032 supersedes the reason requirement in ADR 006). Numeric corrections prefer new
    adjustment transactions over mutating values.
 8. **UTC in storage, local time at display.** Persist all timestamps in UTC; the frontend formats in
    the user's timezone. Import must convert German sheet timestamps explicitly (ADR 003).
@@ -97,7 +98,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   There is no separate completion action (ADR 021 supersedes the former raid archive semantics).
 - Archiving finalizes roster/loot processing, awards EP, expires unused locks, and schedules the
   next raid atomically. Repeated requests must neither award twice nor create duplicate successors.
-- Archived raids remain visible as history, with read-only roster and loot.
+- Archived raids remain visible as history. Raid staff can correct roster and loot or add missing
+  entries with a mandatory reason; archival timestamps, finalization, and successors stay fixed (ADR 032).
 - Each recurring raid series explicitly configures name, leader, weekday(s), week interval,
   local start time, and IANA timezone. No guild schedule is seeded or hard-coded.
 - Recurrence weeks are anchored to the current raid's local Monday week. Archiving chooses the
@@ -128,7 +130,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Coupled corrections preserve the historical cost for the same enhanced winner on
   unrelated edits. Changing away from enhanced refunds that cost; changing the enhanced
   recipient refunds the old winner and charges `min(new winner's current balance, 50)`.
-  All corrections are actor/reason audited and append compensating transactions atomically.
+  All corrections are actor-audited, require a reason for archived raids, and append compensating transactions atomically.
 - Existing ledger history is retained, not recalculated under the revised rules.
 
 ### 4.5 Item locks
@@ -141,7 +143,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - A **substitute** is a normal player; substitute and regular participants are treated identically.
 - **Bench** participants follow the **same EP rule** as raiders: they earn +10 if they got no
   main-spec loot (ADR 016).
-- The raid roster is editable until archival. It stores the actual character name, role,
+- The raid roster remains editable after archival with a reason. It stores the actual character name, role,
   class, and spec played in that raid, independently of later live-character changes (ADR 022).
 - Archive rejects an incomplete active roster. Legacy unknown snapshots are not fabricated;
   new sheet imports preserve Raid Archive's own character name, role, class, and spec.
@@ -155,8 +157,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   over derived data.
 
 ### 4.8 Loot, attendance, and character corrections
-- Corrections are allowed but must be auditable: actor + reason + before/after snapshot
-  (ADR 006).
+- Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived
+  raid history only; live-character changes never rewrite raid snapshots (ADR 032).
 
 ### 4.9 Roster configuration
 - Guild ranks and raid groups are configurable rows in the database, not hard-coded constants
@@ -191,9 +193,10 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Only one matching active item lock may exist per raid. Competing locks are rejected;
   one player may still lock multiple different items. Item IDs are authoritative when both
   records have IDs; otherwise matching uses the trimmed item name.
-- Attendance and loot corrections use explicit actor + nonblank reason + transactional
-  before/after audit snapshots. Corrections are available for planned, open, and completed
-  raids, not cancelled or archived raids. Completed-raid additions also require a reason.
+- Attendance and loot corrections use explicit actor + transactional before/after audit snapshots.
+  Planned, open, and completed raids can be corrected, including archived completed raids.
+  Cancelled and inconsistently archived active raids remain blocked. Archived corrections and
+  additions require a nonblank reason; unarchived writes do not (ADR 032).
 - Completed corrections append only the before/after EP eligibility difference. This preserves
   imported opening balances and never recreates historical raid rewards. Token corrections
   append compensating entries; consumed locks are not implicitly revived.
@@ -201,12 +204,12 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   Edited IDs, duplicate IDs, and ambiguous no-ID changes are conflicts, not overwrites.
   A conflict rejects the entire merge with a report and no domain writes.
 - Import raid identity is scoped to source and sheet provenance. New rows in existing
-  imported raids require an explicit reason and audited correction consequences; name
+  imported raids require audited correction consequences and an explicit reason when archived; name
   collisions without provenance and additions to cancelled raids are conflicts.
   ADR 029 permits ADMIN import-only additions to provenance-mapped archived COMPLETED
-  raids, with actor/reason audit and append-only EP/token differences. Ordinary archived
-  edits remain forbidden. Imported historical raids are archived; archival classification
-  of older imports never re-awards EP or creates recurrence successors.
+  raids, with actor/reason audit and append-only EP/token differences. ADR 032 also permits ordinary
+  archived corrections by raid staff with a reason. Imported historical raids are archived; archival
+  classification of older imports never re-awards EP or creates recurrence successors.
 - An error-free server-side preview must exist for the source, sheet, and raw hash before a
   new merge. Preview metadata may be persisted; previews never write domain records.
 - Production requires explicit nondefault bootstrap credentials. Configuration, migrations,

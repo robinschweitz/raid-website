@@ -34,7 +34,8 @@ Schwellen, Status, Rollen oder Workflows.
 nur auf ausdrückliche Anforderung eines Menschen und nur als Admin (ADR-007).
 
 1.7 **Änderungen sind auditiert.** Eingriffe in Historie (Loot, Anwesenheit, Umbenennungen) brauchen
-Actor und Reason und schreiben einen Audit-Eintrag (ADR-006). Zahlenkorrekturen sind neue
+einen Actor und schreiben einen Audit-Eintrag. Eine Reason ist nur für Änderungen an archivierten
+Raids erforderlich (ADR-032 ersetzt diese Anforderung aus ADR-006). Zahlenkorrekturen sind neue
 Ausgleichstransaktionen im Ledger, kein `UPDATE` auf einem Saldo.
 
 1.8 **UTC speichern, lokal anzeigen.** Alle Zeitstempel werden in UTC persistiert; das Frontend

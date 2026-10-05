@@ -5,7 +5,10 @@ Modular monolith. Domains: players/characters, raids/attendance, loot, enhancepo
 `raidseries` owns explicit recurring schedule configuration and local-calendar calculations.
 `raidcompletion` implements final archival: lifecycle, EP, lock expiry, and successor linkage
 share a transaction. Attendance stores per-raid name/class/spec snapshots, not live-character
-presentation data. Archived raids remain visible history (ADR 021-022).
+presentation data. Archived raids remain visible history (ADR 021-022). Raid staff may correct
+archived roster and loot with a reason through `raidcorrection`; finalization stays fixed.
+Unarchived edits and live-character corrections remain audited without requiring a reason.
+Frontend editors are rendered inside the selected record (ADR 032).
 
 `legacyimport` permits provenance-checked, audited additions to archived historical imports.
 It imports the first roster block in `ICC25 Raidsetup` A–F and uses explicit administrator

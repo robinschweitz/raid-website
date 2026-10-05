@@ -2,7 +2,6 @@ package legacyimport
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -74,14 +73,14 @@ func TestSetupBootstrapPreviewRosterScheduleAndIdempotence(t *testing.T) {
 	if err != nil || historical.ArchivedAt == nil {
 		t.Fatalf("history: %+v %v", historical, err)
 	}
-	// The import exception must not open ordinary edit endpoints on archived history.
+	// Archived imported snapshots can also be corrected through the ordinary audited path.
 	historicalRows, err := s.att.ListByRaid(ctx, historical.ID)
 	if err != nil || len(historicalRows) == 0 {
 		t.Fatalf("historical roster: %+v %v", historicalRows, err)
 	}
 	corrections := raidcorrection.NewService(raidcorrection.NewRepo(s.imports.db))
-	if _, err := corrections.CorrectAttendance(ctx, historical.ID, historicalRows[0].ID, actor, "ordinary edit", nil); !errors.Is(err, raidcorrection.ErrRaidState) {
-		t.Fatalf("ordinary archived correction must be rejected: %v", err)
+	if _, err := corrections.CorrectAttendance(ctx, historical.ID, historicalRows[0].ID, actor, "ordinary edit", nil); err != nil {
+		t.Fatalf("ordinary archived correction: %v", err)
 	}
 	repeated, err := s.MergeWithSetup(ctx, actor, "source", "sheet", "", "", setupConfig())
 	if err != nil || !repeated.Skipped {

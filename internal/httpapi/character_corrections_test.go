@@ -57,33 +57,31 @@ func characterSnapshotsEqual(first, second character.Character) bool {
 	return reflect.DeepEqual(first, second)
 }
 
-func TestCharacterCorrectionsRequireReasonForEveryField(t *testing.T) {
+func TestCharacterCorrectionsAuditEveryFieldWithoutRequiredReason(t *testing.T) {
 	f := newCharacterCorrectionFixture(t)
 	url := fmt.Sprintf("%s/api/v1/characters/%d", f.srv.URL, f.initial.ID)
 	for field, value := range map[string]any{"name": "Renamed", "class": "Krieger", "main_spec": "Arkan", "second_spec": "", "is_main": true, "active": false} {
 		for _, reason := range []string{"", " \t\r\n "} {
 			t.Run(field+fmt.Sprintf("/%q", reason), func(t *testing.T) {
 				status, body := do(t, f.srv.Client(), http.MethodPatch, url, f.token, map[string]any{field: value, "reason": reason})
-				if status != http.StatusBadRequest {
+				if status != http.StatusOK {
 					t.Fatalf("status %d: %s", status, body)
-				}
-				var out struct{ Error struct{ Code string } }
-				if err := json.Unmarshal(body, &out); err != nil {
-					t.Fatal(err)
-				}
-				if out.Error.Code != "reason_required" {
-					t.Fatalf("error code %q", out.Error.Code)
 				}
 			})
 		}
 	}
 	stored, err := character.NewRepo(f.db).Get(context.Background(), f.initial.ID)
-	if err != nil || !reflect.DeepEqual(*stored, f.initial) {
-		t.Fatalf("rejected correction changed character: %+v, %v", stored, err)
+	if err != nil || stored.Name != "Renamed" || stored.Class != "Krieger" || stored.MainSpec != "Arkan" || stored.SecondSpec != "" || !stored.IsMain || stored.Active {
+		t.Fatalf("correction not applied: %+v, %v", stored, err)
 	}
 	logs, err := audit.NewRepo(f.db).ListByEntity(context.Background(), "character", fmt.Sprint(f.initial.ID))
-	if err != nil || len(logs) != 0 {
-		t.Fatalf("rejected correction wrote audit: %+v, %v", logs, err)
+	if err != nil || len(logs) != 12 {
+		t.Fatalf("missing audit: %+v, %v", logs, err)
+	}
+	for _, log := range logs {
+		if log.ActorID == nil || *log.ActorID != f.actorID || log.Reason != "" || !json.Valid([]byte(log.BeforeJSON)) || !json.Valid([]byte(log.AfterJSON)) {
+			t.Fatalf("invalid audit: %+v", log)
+		}
 	}
 }
 

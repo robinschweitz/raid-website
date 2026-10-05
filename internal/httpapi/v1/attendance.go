@@ -182,7 +182,7 @@ func writeCorrectionError(w http.ResponseWriter, err error) {
 	case errors.Is(err, raidcorrection.ErrOwnership), errors.Is(err, loot.ErrOwnership):
 		WriteError(w, http.StatusBadRequest, "character_ownership", "Charakter gehoert nicht zum Spieler")
 	case errors.Is(err, raidcorrection.ErrReason):
-		WriteError(w, http.StatusBadRequest, "reason_required", "Korrektur erfordert einen Akteur und eine nichtleere Begruendung")
+		WriteError(w, http.StatusBadRequest, "reason_required", "Ein Akteur ist erforderlich; Aenderungen im Archiv brauchen eine nichtleere Begruendung")
 	case errors.Is(err, raidcorrection.ErrInvalid), errors.Is(err, loot.ErrInvalidLock):
 		WriteError(w, http.StatusBadRequest, "invalid_correction", "Ungueltige Korrektur oder unpassender Item-Lock")
 	case errors.Is(err, raidcorrection.ErrRaidState), errors.Is(err, loot.ErrRaidState):

@@ -3,10 +3,12 @@ package legacyimport
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"raid-website/internal/audit"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
 	"raid-website/internal/raid"
@@ -209,6 +211,49 @@ func TestIncrementalCorrectionReasonEPAndAudit(t *testing.T) {
 	balance, err = s.points.Balance(ctx, Amisu.ID)
 	if err != nil || balance != 30 {
 		t.Fatalf("replay repeated correction: %d %v", balance, err)
+	}
+}
+
+func TestActiveImportedRaidAdditionsNeedNoReasonAndStayAudited(t *testing.T) {
+	s, actor := importFixture(t)
+	ctx := context.Background()
+	raidID := seedImportedRaid(t, s, actor)
+	rd, err := s.raids.Get(ctx, raidID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rd.Status, rd.ArchivedAt, rd.CompletedAt = validation.RaidStatusOpen, nil, nil
+	if err := s.raids.Update(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	setLoot(s, stableHeader+stableDrop+"a\n"+stableDrop+"b\n", "active-addition")
+	preview := previewImport(t, s, "source", "sheet")
+	if strings.Contains(strings.Join(preview.Warnings, "\n"), "reason_required") {
+		t.Fatalf("unexpected reason requirement: %+v", preview)
+	}
+	rep, err := s.Merge(ctx, actor, "source", "sheet", "active-addition", "")
+	if err != nil || len(rep.Errors) > 0 || rep.Created.Loot != 1 || rep.Created.Points != 0 {
+		t.Fatalf("active merge: %+v %v", rep, err)
+	}
+	rows, err := s.loot.ListByRaid(ctx, raidID)
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("loot: %+v %v", rows, err)
+	}
+	var count int
+	for _, row := range rows {
+		logs, err := audit.NewRepo(s.imports.db).ListByEntity(ctx, "loot_award", fmt.Sprint(row.ID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, log := range logs {
+			count++
+			if log.ActorID == nil || *log.ActorID != actor || log.Reason != "" {
+				t.Fatalf("audit: %+v", log)
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("addition audit count %d", count)
 	}
 }
 

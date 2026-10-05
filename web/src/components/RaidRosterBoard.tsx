@@ -1,5 +1,6 @@
 import { characterClassName } from '../characterTheme'
 import type { Attendance } from '../types'
+import type { ReactNode } from 'react'
 
 interface Props {
   attendance: Attendance[]
@@ -7,6 +8,8 @@ interface Props {
   canWrite: boolean
   pending: boolean
   onEdit: (row: Attendance) => void
+  editingID?: number
+  children?: ReactNode
 }
 
 const groups = [
@@ -15,9 +18,10 @@ const groups = [
   { role: 'DD', label: 'Schaden', symbol: '⚔' },
 ] as const
 
-export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit }: Props) {
+export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, children }: Props) {
   const member = (row: Attendance) => (
-    <li key={row.id} className={`setup-member ${characterClassName(row.class ?? '')}`}>
+    <li key={row.id} className={`setup-member ${characterClassName(row.class ?? '')}${editingID === row.id ? ' is-editing' : ''}`}>
+      {editingID === row.id ? <div className="in-place-editor"><h3>{row.character_name || 'Teilnahme'} bearbeiten</h3>{children}</div> : <>
       <span className="setup-sigil" aria-hidden="true">{row.character_name?.trim().slice(0, 1) || '?'}</span>
       <div className="setup-member-info">
         <strong className="character-name">{row.character_name?.trim() || 'Name nicht gespeichert'}</strong>
@@ -37,6 +41,7 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
           <span className="visually-hidden">Teilnahme korrigieren</span>
         </button>}
       </div>
+      </>}
     </li>
   )
   const bench = attendance.filter((row) => row.is_bench)
@@ -55,5 +60,6 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
       <header><h3>Bank</h3><span className="badge">{bench.length}</span></header>
       {bench.length ? <ul>{bench.map(member)}</ul> : <p className="muted">Keine Teilnehmer auf der Bank.</p>}
     </section>
+    {canWrite && editingID == null && <details className="editor-disclosure"><summary>Teilnahme hinzufügen</summary>{children}</details>}
   </>
 }

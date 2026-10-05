@@ -3,6 +3,13 @@
 }
 
 .secondary-page [hidden] { display: none !important; }
+.secondary-page .in-place-editor { width: 100%; min-width: 0; padding: 12px; border: 1px solid #6198b5; border-radius: 4px; background: #0b2032; }
+.secondary-page .in-place-editor h3 { margin: 0 0 12px; color: #c5eaff; }
+.secondary-page .setup-member.is-editing { display: block; padding: 8px; grid-column: 1 / -1; }
+.secondary-page .setup-member.is-editing .inline-form > label,
+.secondary-page .setup-member.is-editing .inline-form > select { flex-basis: 100%; }
+.secondary-page .setup-member.is-editing .inline-form .check { flex-basis: auto; }
+.secondary-page .series-directory > .is-editing { grid-column: 1 / -1; border-color: #6198b5; }
 
 .secondary-page .page-heading {
   padding: 18px 22px;

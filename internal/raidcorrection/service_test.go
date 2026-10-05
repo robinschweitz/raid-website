@@ -23,10 +23,12 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 		name           string
 		openingBalance bool
 		legacyLoot     bool
+		archived       bool
 	}{
 		{name: "imported raid without loot", openingBalance: true},
 		{name: "imported raid with loot", openingBalance: true, legacyLoot: true},
 		{name: "manually constructed completed raid"},
+		{name: "archived imported raid with opening balance", openingBalance: true, legacyLoot: true, archived: true},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -80,6 +82,9 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 				}
 			}
 			rd := &raid.Raid{Name: "ICC25-01", CatalogInstanceID: &instance, RaidSize: &drop.RaidSize, RaidLeaderID: players[0].ID, Status: validation.RaidStatusCompleted, CreatedAt: now, UpdatedAt: now}
+			if scenario.archived {
+				rd.ArchivedAt, rd.CompletedAt = &now, &now
+			}
 			if err := r.raids.Create(ctx, rd); err != nil {
 				t.Fatal(err)
 			}

@@ -417,6 +417,7 @@ func TestEnhancedCompletedCorrectionEligibilityDelta(t *testing.T) {
 	f.seedPoints(f.first, 70)
 	id := correctionID(t, f.request(http.MethodPost, "/loot", f.lootBody("SECOND"), http.StatusCreated))
 	f.legacyCompleted()
+	f.archiveHistory()
 	suffix := fmt.Sprintf("/loot/%d", id)
 	f.request(http.MethodPatch, suffix, map[string]any{"award_method": "ENHANCED", "reason": "enhanced winner"}, http.StatusOK)
 	f.points(f.first, 10) // 70 - 50 cost - 10 eligibility delta, no reconstructed reward.
@@ -512,7 +513,7 @@ func TestLockAwardsRequireUnambiguousRosterCharacter(t *testing.T) {
 	}
 }
 
-func TestEnhancedLootFinalizedRaidsRejectWrites(t *testing.T) {
+func TestEnhancedLootCancelledRejectsAndArchiveRequiresReason(t *testing.T) {
 	for _, archived := range []bool{false, true} {
 		t.Run(fmt.Sprint(archived), func(t *testing.T) {
 			f := newCorrectionFixture(t)
@@ -532,11 +533,26 @@ func TestEnhancedLootFinalizedRaidsRejectWrites(t *testing.T) {
 			if err := raid.NewRepo(f.db).Update(context.Background(), rd); err != nil {
 				t.Fatal(err)
 			}
-			f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"award_method": "SECOND", "reason": "blocked refund"}, http.StatusConflict)
+			if archived {
+				f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"award_method": "SECOND", "reason": " "}, http.StatusBadRequest)
+				f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"notes": "clarification", "reason": "archived note"}, http.StatusOK)
+				f.points(f.first, 20)
+				f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"award_method": "SECOND", "reason": "refund"}, http.StatusOK)
+				f.points(f.first, 80)
+			} else {
+				f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"award_method": "SECOND", "reason": "blocked refund"}, http.StatusConflict)
+			}
 			body := f.lootBody("ENHANCED")
 			body["request_id"] = "another-award"
-			f.request(http.MethodPost, "/loot", body, http.StatusConflict)
-			f.points(f.first, 20)
+			if archived {
+				f.request(http.MethodPost, "/loot", body, http.StatusBadRequest)
+				body["reason"] = "missing enhanced award"
+				f.request(http.MethodPost, "/loot", body, http.StatusCreated)
+				f.points(f.first, 20)
+			} else {
+				f.request(http.MethodPost, "/loot", body, http.StatusConflict)
+				f.points(f.first, 20)
+			}
 		})
 	}
 }

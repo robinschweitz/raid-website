@@ -122,14 +122,14 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
 function nodes(tree, predicate) {
   if (!tree || typeof tree !== 'object') return []
   if (Array.isArray(tree)) return tree.flatMap((child) => nodes(child, predicate))
-  if (typeof tree.type === 'function' && tree.type.name === 'RaidRosterBoard') return nodes(tree.type(tree.props), predicate)
+  if (typeof tree.type === 'function' && ['RaidRosterBoard', 'RaidLootList'].includes(tree.type.name)) return nodes(tree.type(tree.props), predicate)
   return [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)]
 }
 function text(tree) {
   if (tree == null || typeof tree === 'boolean') return ''
   if (Array.isArray(tree)) return tree.map(text).join(' ')
   if (typeof tree !== 'object') return String(tree)
-  if (typeof tree.type === 'function' && tree.type.name === 'RaidRosterBoard') return text(tree.type(tree.props))
+  if (typeof tree.type === 'function' && ['RaidRosterBoard', 'RaidLootList'].includes(tree.type.name)) return text(tree.type(tree.props))
   return text(tree.props?.children)
 }
 const button = (view, label) => nodes(view.tree, (n) => n.type === 'button' && text(n) === label)[0]
@@ -643,9 +643,9 @@ const lootRow = {
   awarded_to_player_id: 1, awarded_to_character_id: 11, is_main_spec: true, notes: 'old loot note',
 }
 const recipientRow = { ...attendanceRow, id: 9, player_id: 2, character_id: 20, character_name: 'Saved raid character', class: 'Magier', spec: 'Fire', role: 'DD' }
-const completed = { raid: { status: 'COMPLETED' }, attendance: [attendanceRow, recipientRow], loot: [lootRow] }
+const completed = { raid: { status: 'COMPLETED', archived_at: '2026-10-04T19:00:00Z' }, attendance: [attendanceRow, recipientRow], loot: [lootRow] }
 
-test('completed attendance additions require trimmed reason and send all form fields', async () => {
+test('archived attendance additions require trimmed reason and send all form fields', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, completed)
@@ -680,15 +680,15 @@ test('completed attendance additions require trimmed reason and send all form fi
   await first
 })
 
-test('completed attendance edit prefills before values and PATCHes with an explicit reason', async () => {
+test('archived attendance edits in place, prefills saved values and PATCHes with an explicit reason', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, completed)
   await flush(view)
   button(view, 'Teilnahme korrigieren').props.onClick()
   view.render()
-  assert.match(text(view.tree), /Vorher:.*Spieler 1.*Charakter\s+Nicht verfügbar.*HEAL/)
-  assert.match(text(view.tree), /old attendance note/)
+  assert.equal(input(view, 'Teilnahme-Notizen').props.value, 'old attendance note')
+  assert.ok(nodes(view.tree, (n) => n.type === 'li' && /is-editing/.test(n.props.className ?? '') && nodes(n, (child) => child.type === 'form').length === 1).length)
   assert.equal(select(view, 'Teilnahme-Rolle').props.value, 'HEAL')
   assert.equal(checkbox(view, 'Ersatz').props.checked, true)
   assert.equal(input(view, 'Teilnahme-Begründung').props.value, '')
@@ -726,7 +726,7 @@ test('loot corrections replace identity only from source and preserve audited re
   await flush(view)
   button(view, 'Loot korrigieren').props.onClick()
   view.render()
-  assert.match(text(view.tree), /Vorher:.*Old item.*123.*Old boss.*Spieler 1/)
+  assert.ok(nodes(view.tree, (n) => n.type === 'tr' && nodes(n, (child) => child.type === 'form').length === 1).length)
   assert.equal(input(view, 'Item'), undefined)
   assert.equal(select(view, 'Loot-Empfänger').props.value, '11')
   assert.equal(input(view, 'Loot-Notizen').props.value, 'old loot note')
@@ -762,7 +762,7 @@ test('loot corrections replace identity only from source and preserve audited re
   await first
 })
 
-test('completed loot addition requires reason and sends roster character ID', async () => {
+test('archived loot addition requires reason and sends roster character ID', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, sourceLoot(completed))
@@ -875,7 +875,7 @@ for (const kind of ['attendance', 'loot']) {
     const pending = oldSubmit(event)
     assert.equal(writes(s)[0].method, 'patch')
     view.render({ raidID: 2 })
-    resolveRaid(s, 2, { raid: { status: 'COMPLETED' } })
+    resolveRaid(s, 2, { raid: { status: 'COMPLETED', archived_at: '2026-10-04T19:00:00Z' } })
     await flush(view)
     const count = s.requests.length
     writes(s)[0].resolve({ id: 7 })
@@ -893,7 +893,7 @@ for (const kind of ['attendance', 'loot']) {
 
 for (const [status, archived, active, corrections] of [
   ['PLANNED', false, true, true], ['OPEN', false, true, true], ['COMPLETED', false, false, true],
-  ['CANCELLED', false, false, false], ['OPEN', true, false, false], ['COMPLETED', true, false, false],
+  ['CANCELLED', false, false, false], ['OPEN', true, false, false], ['COMPLETED', true, false, true],
 ]) {
   test(`raid lifecycle controls: ${status}, archived=${archived}`, async () => {
     const s = setup()
@@ -986,9 +986,9 @@ test('source_changed clears merge permission and next preview provides the new h
   assert.equal(button(view, 'Zusammenführen').props.disabled, true)
 })
 
-for (const status of ['PLANNED', 'OPEN']) {
+for (const status of ['PLANNED', 'OPEN', 'COMPLETED']) {
   for (const kind of ['attendance', 'loot']) {
-    test(`${status} ${kind} edit requires reason and guards pending PATCH`, async () => {
+    test(`${status} unarchived ${kind} edit needs no reason and guards pending PATCH`, async () => {
       const s = setup()
       const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
       resolveRaid(s, 1, { ...completed, raid: { status } })
@@ -1002,17 +1002,9 @@ for (const status of ['PLANNED', 'OPEN']) {
       const index = kind === 'attendance' ? 0 : 1
       const reasonField = kind === 'attendance' ? 'Teilnahme-Begründung' : 'Loot-Begründung'
       const saveLabel = kind === 'attendance' ? 'Teilnahme-Korrektur speichern' : 'Loot-Korrektur speichern'
-      assert.equal(input(view, reasonField).props.required, true)
-      assert.match(text(view.tree), /Vorher:/)
+      assert.equal(input(view, reasonField), undefined)
       // Editing one form must not turn the other active-raid addition into a correction.
       assert.equal(input(view, kind === 'attendance' ? 'Loot-Begründung' : 'Teilnahme-Begründung'), undefined)
-      input(view, reasonField).props.onChange(change('   '))
-      view.render()
-      await form(view, index).props.onSubmit(event)
-      assert.equal(writes(s).length, 0)
-      view.render()
-      assert.equal(button(view, saveLabel).props.disabled, true)
-      input(view, reasonField).props.onChange(change(' audited edit '))
       if (kind === 'attendance') {
         select(view, 'Teilnahme-Rolle').props.onChange(change('TANK'))
       } else {
@@ -1026,7 +1018,7 @@ for (const status of ['PLANNED', 'OPEN']) {
       assert.equal(writes(s).length, 1)
       assert.equal(write.method, 'patch')
       assert.equal(write.url, `/api/v1/raids/1/${kind}/${kind === 'attendance' ? 7 : 8}`)
-      assert.equal(write.body.reason, 'audited edit')
+      assert.equal('reason' in write.body, false)
       if (kind === 'attendance') assert.equal(write.body.role, 'TANK')
       else {
         assert.equal('item_name' in write.body, false)
@@ -1038,7 +1030,7 @@ for (const status of ['PLANNED', 'OPEN']) {
       await first
       view.render()
       assert.equal(button(view, saveLabel).props.disabled, false)
-      assert.equal(input(view, reasonField).props.value, ' audited edit ')
+      assert.equal(input(view, reasonField), undefined)
       button(view, 'Bearbeitung abbrechen').props.onClick()
       view.render()
       assert.equal(input(view, reasonField), undefined)
@@ -1073,38 +1065,48 @@ for (const status of ['PLANNED', 'OPEN']) {
   })
 }
 
-for (const reason of ['', ' \t ', null]) {
-  test(`rename rejects blank or cancelled reason ${JSON.stringify(reason)} without request`, async () => {
+for (const name of ['', ' \t ']) {
+  test(`in-place character editor rejects blank name ${JSON.stringify(name)} and cancels without request`, async () => {
     const s = setup()
     const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
     resolvePlayer(s, 1)
     await flush(view)
-    s.prompts.push('New name', reason)
-    await button(view, 'Umbenennen').props.onClick()
+    button(view, 'Bearbeiten').props.onClick()
     view.render()
+    nodes(view.tree, (n) => n.props['aria-label'] === 'Charakter bearbeiten: Name')[0].props.onChange(change(name))
+    view.render()
+    const editor = nodes(view.tree, (n) => n.type === 'form' && n.props.className.includes('in-place-editor'))[0]
+    await editor.props.onSubmit(event)
     assert.equal(writes(s).length, 0)
-    if (reason !== null) assert.match(text(view.tree), /Umbenennen erfordert eine nichtleere Begründung/)
-    else assert.doesNotMatch(text(view.tree), /Umbenennen erfordert/)
+    button(view, 'Bearbeitung abbrechen').props.onClick()
+    view.render()
+    assert.equal(button(view, 'Charakter speichern'), undefined)
   })
 }
 
-test('rename sends trimmed nonblank reason and retains duplicate guard', async () => {
+test('in-place character editor saves without reason, guards duplicates and preserves failed draft', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
   resolvePlayer(s, 1)
   await flush(view)
-  const rename = button(view, 'Umbenennen').props.onClick
-  s.prompts.push('New name', ' in-game rename ', 'New name', ' duplicate ')
-  const first = rename()
-  await rename()
+  button(view, 'Bearbeiten').props.onClick()
+  view.render()
+  nodes(view.tree, (n) => n.props['aria-label'] === 'Charakter bearbeiten: Name')[0].props.onChange(change(' New name '))
+  view.render()
+  const editor = nodes(view.tree, (n) => n.type === 'form' && n.props.className.includes('in-place-editor'))[0]
+  assert.ok(nodes(view.tree, (n) => n.type === 'tr' && nodes(n, (child) => child === editor).length).length)
+  const first = editor.props.onSubmit(event)
+  await editor.props.onSubmit(event)
   assert.equal(writes(s).length, 1)
   assert.equal(writes(s)[0].method, 'patch')
   assert.equal(writes(s)[0].body.name, 'New name')
-  assert.equal(writes(s)[0].body.reason, 'in-game rename')
+  assert.equal('reason' in writes(s)[0].body, false)
   view.render()
-  assert.equal(button(view, 'Umbenennen').props.disabled, true)
+  assert.equal(button(view, 'Charakter speichern').props.disabled, true)
   writes(s)[0].reject(new Error('offline'))
   await first
+  view.render()
+  assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Charakter bearbeiten: Name')[0].props.value, ' New name ')
 })
 
 const historicalPreview = () => ({ ...report(), warnings: ['raid "ICC25-01": reason_required for audited additions to existing imported raid'] })
@@ -1239,7 +1241,7 @@ test('missing historical reason merge report shows no writes and requires a fres
   assert.equal(button(view, 'Zusammenführen').props.disabled, true)
 })
 
-test('archive preserves successor envelope and makes the raid read-only', async () => {
+test('archive preserves successor, invalidates old submits and requires reasons for later changes', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, { raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' }, attendance: [recipientRow] })
@@ -1254,9 +1256,9 @@ test('archive preserves successor envelope and makes the raid read-only', async 
   assert.equal(writes(s).length, 1)
   assert.equal(writes(s)[0].method, 'postEnvelope')
   assert.equal(writes(s)[0].url, '/api/v1/raids/1/archive')
-  writes(s)[0].resolve({ data: { ...raid(1), archived_at: '2026-10-04T19:00:00Z' }, next_raid: { ...raid(2), scheduled_start: '2026-10-07T18:30:00Z' } })
+  writes(s)[0].resolve({ data: { ...raid(1), status: 'COMPLETED', archived_at: '2026-10-04T19:00:00Z' }, next_raid: { ...raid(2), scheduled_start: '2026-10-07T18:30:00Z' } })
   await flush(view)
-  resolveRaid(s, 1, { raid: { archived_at: '2026-10-04T19:00:00Z' } })
+  resolveRaid(s, 1, { raid: { status: 'COMPLETED', archived_at: '2026-10-04T19:00:00Z' } })
   await first
   view.render()
   await oldLootSubmit(event)
@@ -1264,7 +1266,9 @@ test('archive preserves successor envelope and makes the raid read-only', async 
   assert.match(text(view.tree), /Archiviert/)
   assert.equal(nodes(view.tree, (n) => n.type === 'a' && n.props.to === '/raids/2').length, 1)
   assert.equal(button(view, 'Archivieren'), undefined)
-  assert.equal(nodes(view.tree, (n) => n.type === 'form').length, 0)
+  assert.equal(nodes(view.tree, (n) => n.type === 'form').length, 2)
+  assert.equal(input(view, 'Teilnahme-Begründung').props.required, true)
+  assert.equal(input(view, 'Loot-Begründung').props.required, true)
 })
 
 for (const missing of ['series_id', 'scheduled_start']) {
@@ -1283,7 +1287,7 @@ for (const missing of ['series_id', 'scheduled_start']) {
 test('completed historical archive has no successor and does not require a series', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
-  resolveRaid(s, 1, completed)
+  resolveRaid(s, 1, { ...completed, raid: { status: 'COMPLETED', archived_at: null } })
   await flush(view)
   assert.match(text(view.tree), /Keine erneute EP-Vergabe/)
   const first = button(view, 'Archivieren').props.onClick()
@@ -1380,13 +1384,13 @@ test('snapshot correction preserves saved details instead of current character d
   view.render()
   input(view, 'Gespeicherte Klasse').props.onChange(change('Magier'))
   view.render()
-  input(view, 'Teilnahme-Begründung').props.onChange(change('snapshot correction'))
+  assert.equal(input(view, 'Teilnahme-Begründung'), undefined)
   view.render()
   const first = form(view).props.onSubmit(event)
   assert.equal(writes(s)[0].body.character_name, 'Corrected name')
   assert.equal(writes(s)[0].body.class, 'Magier')
   assert.equal('spec' in writes(s)[0].body, false)
-  assert.equal(writes(s)[0].body.reason, 'snapshot correction')
+  assert.equal('reason' in writes(s)[0].body, false)
   writes(s)[0].reject(new Error('offline'))
   await first
 })
@@ -1623,7 +1627,7 @@ test('notes-only historical PATCH omits untouched unknown and blank snapshots', 
   await flush(view)
   assert.equal(input(view, 'Gespeicherte Klasse').props.value, 'Unknown imported class')
   input(view, 'Teilnahme-Notizen').props.onChange(change('Corrected notes'))
-  input(view, 'Teilnahme-Begründung').props.onChange(change('notes correction'))
+  assert.equal(input(view, 'Teilnahme-Begründung'), undefined)
   view.render()
   const first = form(view).props.onSubmit(event)
   for (const field of ['character_name', 'class', 'spec']) assert.equal(field in writes(s)[0].body, false)
@@ -1646,7 +1650,7 @@ test('reference changes use new defaults while preserving manual snapshots enter
   input(view, 'Tatsächlicher Spec').props.onChange(change('Actual replacement spec'))
   s.requests.at(-1).resolve([character(20, 2)])
   await flush(view)
-  input(view, 'Teilnahme-Begründung').props.onChange(change('changed participant'))
+  assert.equal(input(view, 'Teilnahme-Begründung'), undefined)
   view.render()
   const first = form(view).props.onSubmit(event)
   assert.equal(writes(s)[0].body.character_name, 'Char 20')
@@ -1784,13 +1788,13 @@ test('notes-only enhanced correction preserves method and historical association
   button(view, 'Loot korrigieren').props.onClick()
   view.render()
   input(view, 'Loot-Notizen').props.onChange(change('Notes correction'))
-  input(view, 'Loot-Begründung').props.onChange(change(' historical note '))
+  assert.equal(input(view, 'Loot-Begründung'), undefined)
   view.render()
   assert.equal(select(view, 'Loot-Vergabemethode').props.value, 'ENHANCED')
   const first = form(view, 1).props.onSubmit(event)
   const write = writes(s)[0]
   for (const key of ['award_method', 'catalog_boss_id', 'item_id', 'boss', 'item_name', 'awarded_to_character_id', 'awarded_to_player_id', 'enhanced_cost', 'amount', 'request_id']) assert.equal(key in write.body, false)
-  assert.equal(write.body.reason, 'historical note')
+  assert.equal('reason' in write.body, false)
   write.reject(new Error('offline'))
   await first
 })
@@ -1812,14 +1816,14 @@ test('correction switch disables stale field handlers as well as stale submissio
 })
 
 test('archived enhanced history shows saved class-colored names and no write controls', async () => {
-  const s = setup()
+  const s = setup({ id: 1, role: 'MEMBER' })
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, { raid: { status: 'COMPLETED', archived_at: '2026-10-04T19:00:00Z' },
     attendance: [recipientRow], loot: [{ ...lootRow, awarded_to_player_id: 2, awarded_to_character_id: 20, award_method: 'ENHANCED', enhanced_cost: 23 }] })
   await flush(view)
   assert.match(text(view.tree), /Saved raid character/)
   assert.match(text(view.tree), /23 EP/)
-  assert.match(text(view.tree), /schreibgeschützt/)
+  assert.match(text(view.tree), /Archivierte Historie/)
   assert.ok(nodes(view.tree, (n) => n.props.className === 'setup-member class-mage').length >= 1)
   assert.ok(nodes(view.tree, (n) => n.type === 'span' && n.props.className === 'character-name class-mage').length >= 1)
   assert.equal(form(view), undefined)
@@ -1953,10 +1957,10 @@ for (const sourceState of ['empty', 'failed', 'missing-provenance']) {
     button(view, 'Loot korrigieren').props.onClick()
     view.render()
     input(view, 'Loot-Notizen').props.onChange(change('Historical note only'))
-    input(view, 'Loot-Begründung').props.onChange(change(' preserve history '))
+    assert.equal(input(view, 'Loot-Begründung'), undefined)
     view.render()
     const save = form(view, 1).props.onSubmit(event)
-    assert.deepEqual(writes(s)[0].body, { notes: 'Historical note only', reason: 'preserve history' })
+    assert.deepEqual(writes(s)[0].body, { notes: 'Historical note only' })
     writes(s)[0].reject(new Error('offline'))
     await save
   })
@@ -1977,10 +1981,10 @@ for (const catalogBossID of [null, 'old:catalog-boss']) {
     assert.match(text(view.tree), /Old item/)
     assert.match(text(view.tree), /17 EP/)
     input(view, 'Loot-Notizen').props.onChange(change('Corrected note'))
-    input(view, 'Loot-Begründung').props.onChange(change(' metadata unchanged '))
+    assert.equal(input(view, 'Loot-Begründung'), undefined)
     view.render()
     const save = form(view, 1).props.onSubmit(event)
-    assert.deepEqual(writes(s)[0].body, { notes: 'Corrected note', reason: 'metadata unchanged' })
+    assert.deepEqual(writes(s)[0].body, { notes: 'Corrected note' })
     writes(s)[0].reject(new Error('offline'))
     await save
   })
@@ -1997,7 +2001,7 @@ test('associated correction sends changed catalog ID and item ID only; recipient
   button(view, 'Loot korrigieren').props.onClick()
   view.render()
   select(view, 'Loot-Empfänger').props.onChange(change('20'))
-  input(view, 'Loot-Begründung').props.onChange(change(' correct identity and recipient '))
+  assert.equal(input(view, 'Loot-Begründung'), undefined)
   view.render()
   assert.equal(button(view, 'Loot-Korrektur speichern').props.disabled, true)
   await form(view, 1).props.onSubmit(event)
@@ -2013,7 +2017,7 @@ test('associated correction sends changed catalog ID and item ID only; recipient
   assert.equal(writes(s)[0].method, 'patch')
   assert.deepEqual(writes(s)[0].body, {
     catalog_boss_id: 'boss:1', item_id: '12345', awarded_to_player_id: 2, awarded_to_character_id: 20,
-    notes: 'old loot note', reason: 'correct identity and recipient',
+    notes: 'old loot note',
   })
   writes(s)[0].reject(new Error('offline'))
   await save
@@ -2036,10 +2040,10 @@ test('same catalog item recipient correction omits unchanged catalog IDs and met
   await flush(view)
   select(view, 'Loot-Katalogitem').props.onChange(change(nodes(select(view, 'Loot-Katalogitem'), (n) => n.type === 'option' && n.props.value)[0].props.value))
   select(view, 'Loot-Empfänger').props.onChange(change('20'))
-  input(view, 'Loot-Begründung').props.onChange(change(' recipient only '))
+  assert.equal(input(view, 'Loot-Begründung'), undefined)
   view.render()
   const save = form(view, 1).props.onSubmit(event)
-  assert.deepEqual(writes(s)[0].body, { awarded_to_player_id: 2, awarded_to_character_id: 20, notes: 'old loot note', reason: 'recipient only' })
+  assert.deepEqual(writes(s)[0].body, { awarded_to_player_id: 2, awarded_to_character_id: 20, notes: 'old loot note' })
   writes(s)[0].reject(new Error('offline'))
   await save
 })
@@ -2141,7 +2145,7 @@ for (const code of ['catalog_item_invalid', 'request_id_required']) {
 }
 
 test('archived associated history keeps boss groups and saved names without catalog write selectors', async () => {
-  const s = setup()
+  const s = setup({ id: 1, role: 'MEMBER' })
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, { raid: { catalog_instance_id: 'map:631', raid_size: 25, archived_at: '2026-10-04T19:00:00Z' },
     attendance: [recipientRow], loot: [{ ...lootRow, awarded_to_player_id: 2, awarded_to_character_id: 20 }, { ...lootRow, id: 9, boss: '' }], catalog: emptyCatalog() })
@@ -2169,7 +2173,7 @@ test('an unrelated historical correction does not discard the pending boss list 
   button(view, 'Loot korrigieren').props.onClick()
   view.render()
   input(view, 'Loot-Notizen').props.onChange(change('Unrelated note'))
-  input(view, 'Loot-Begründung').props.onChange(change('notes only'))
+  assert.equal(input(view, 'Loot-Begründung'), undefined)
   view.render()
   const save = form(view, 1).props.onSubmit(event)
   writes(s)[0].resolve({ ...lootRow, notes: 'Unrelated note' })
@@ -2245,4 +2249,67 @@ test('profile navigation exposes one area and keeps account controls administrat
   assert.equal(panel('profile-locks').props.hidden, false)
   assert.equal(button(view, 'Konto'), undefined)
   assert.equal(panel('profile-account'), undefined)
+})
+
+for (const role of ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN']) {
+  test(`${role} archived in-place loot editing respects permission, reason, cancel and save`, async () => {
+    const s = setup({ id: 1, role })
+    const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+    resolveRaid(s, 1, completed)
+    await flush(view)
+    if (role === 'GUEST' || role === 'MEMBER') {
+      assert.equal(button(view, 'Loot korrigieren'), undefined)
+      assert.equal(button(view, 'Teilnahme korrigieren'), undefined)
+      assert.equal(form(view), undefined)
+      return
+    }
+    button(view, 'Loot korrigieren').props.onClick()
+    view.render()
+    input(view, 'Loot-Notizen').props.onChange(change('Discard draft'))
+    view.render()
+    const abandonedSubmit = form(view, 1).props.onSubmit
+    button(view, 'Bearbeitung abbrechen').props.onClick()
+    await abandonedSubmit(event)
+    view.render()
+    assert.equal(writes(s).length, 0)
+    assert.equal(button(view, 'Loot-Korrektur speichern'), undefined)
+    button(view, 'Loot korrigieren').props.onClick()
+    view.render()
+    assert.equal(input(view, 'Loot-Notizen').props.value, 'old loot note')
+    assert.equal(button(view, 'Loot-Korrektur speichern').props.disabled, true)
+    input(view, 'Loot-Begründung').props.onChange(change(' \t '))
+    view.render()
+    await form(view, 1).props.onSubmit(event)
+    assert.equal(writes(s).length, 0)
+    input(view, 'Loot-Begründung').props.onChange(change('  archive correction  '))
+    input(view, 'Loot-Notizen').props.onChange(change('Saved inline'))
+    view.render()
+    assert.ok(nodes(view.tree, (n) => n.type === 'tr' && nodes(n, (child) => child.type === 'form').length === 1).length)
+    const save = form(view, 1).props.onSubmit(event)
+    assert.deepEqual(writes(s)[0].body, { notes: 'Saved inline', reason: 'archive correction' })
+    writes(s)[0].resolve({ ...lootRow, notes: 'Saved inline' })
+    await flush(view)
+    resolveRaid(s, 1, { ...completed, loot: [{ ...lootRow, notes: 'Saved inline' }] })
+    await save
+    view.render()
+    assert.equal(button(view, 'Loot-Korrektur speichern'), undefined)
+    assert.match(text(view.tree), /Saved inline/)
+    assert.equal(button(view, 'Archivieren'), undefined)
+  })
+}
+
+test('series editor stays inside its selected card and cancelling invalidates its submit', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidSeries.tsx').RaidSeriesPage)
+  for (const request of s.requests) request.resolve(request.url === '/api/v1/raid-series' ? [seriesRow] : request.url === '/api/v1/loot-catalog' ? catalogFixture() : [player(1)])
+  await flush(view)
+  button(view, 'Serie bearbeiten').props.onClick()
+  view.render()
+  assert.equal(nodes(view.tree, (n) => n.type === 'li' && nodes(n, (child) => child.type === 'form').length === 1).length, 1)
+  const oldSubmit = form(view).props.onSubmit
+  button(view, 'Bearbeitung abbrechen').props.onClick()
+  await oldSubmit(event)
+  view.render()
+  assert.equal(writes(s).length, 0)
+  assert.equal(nodes(view.tree, (n) => n.type === 'li' && nodes(n, (child) => child.type === 'form').length > 0).length, 0)
 })

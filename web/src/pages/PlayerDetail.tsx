@@ -41,7 +41,7 @@ export function PlayerDetailPage({ playerID }: Props) {
 }
 
 function PlayerDetail({ playerID }: Props) {
-  const { pending, submit, isActive } = useSubmission()
+  const { pending, submit, isActive, isPending } = useSubmission()
   const loadVersion = useRef(0)
   const historyVersion = useRef(0)
   const { player: me } = useAuth()
@@ -62,6 +62,10 @@ function PlayerDetail({ playerID }: Props) {
   const [charClass, setCharClass] = useState(CLASSES[0])
   const [charMainSpec, setCharMainSpec] = useState('')
   const [charIsMain, setCharIsMain] = useState(false)
+  const [editingCharacter, setEditingCharacter] = useState<Character | null>(null)
+  const [characterDraft, setCharacterDraft] = useState({ name: '', class: '', main_spec: '', second_spec: '', is_main: false, active: true })
+  const characterEditVersion = useRef(0)
+  const renderedCharacterEditVersion = characterEditVersion.current
 
   const [lockRaid, setLockRaid] = useState('')
   const [lockItem, setLockItem] = useState('')
@@ -145,7 +149,7 @@ function PlayerDetail({ playerID }: Props) {
     await submit(async () => {
       setError('')
       try {
-        await api.patch<Character>(`/api/v1/characters/${c.id}`, { is_main: !c.is_main, reason: 'main flag change' })
+        await api.patch<Character>(`/api/v1/characters/${c.id}`, { is_main: !c.is_main })
         await load()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Aktualisieren fehlgeschlagen')
@@ -153,25 +157,33 @@ function PlayerDetail({ playerID }: Props) {
     })
   }
 
-  const renameCharacter = async (c: Character) => {
-    if (!isAdmin || c.player_id !== playerID || pending) return
-    const next = window.prompt('Neuer Name', c.name)
-    if (!next || next === c.name) return
-    const reason = window.prompt('Grund', '')
-    if (reason === null) return
-    if (!reason.trim()) {
-      setError('Umbenennen erfordert eine nichtleere Begründung. Bitte erneut versuchen.')
-      return
-    }
+  const editCharacter = (c: Character | null) => {
+    if (!isAdmin || !isActive() || isPending() || (c && c.player_id !== playerID)) return
+    ++characterEditVersion.current
+    setEditingCharacter(c)
+    if (c) setCharacterDraft({ name: c.name, class: c.class, main_spec: c.main_spec, second_spec: c.second_spec, is_main: c.is_main, active: c.active })
+  }
+
+  const saveCharacter = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isAdmin || !editingCharacter || !characterDraft.name.trim() || renderedCharacterEditVersion !== characterEditVersion.current) return
     await submit(async () => {
       setError('')
       try {
-        await api.patch<Character>(`/api/v1/characters/${c.id}`, { name: next, reason: reason.trim() })
+        await api.patch<Character>(`/api/v1/characters/${editingCharacter.id}`, { ...characterDraft, name: characterDraft.name.trim() })
+        if (!isActive()) return
+        ++characterEditVersion.current
+        setEditingCharacter(null)
         await load()
       } catch (err) {
-        if (isActive()) setError(err instanceof ApiError ? err.message : 'Umbenennen fehlgeschlagen')
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Charakter speichern fehlgeschlagen')
       }
     })
+  }
+
+  const changeCharacter = (patch: Partial<typeof characterDraft>) => {
+    if (!isActive() || isPending() || renderedCharacterEditVersion !== characterEditVersion.current) return
+    setCharacterDraft((previous) => ({ ...previous, ...patch }))
   }
 
   const showHistory = async (c: Character) => {
@@ -315,6 +327,20 @@ function PlayerDetail({ playerID }: Props) {
           <tbody>
             {ownedCharacters.map((c) => (
               <tr key={c.id} className={characterClassName(c.class)}>
+                {editingCharacter?.id === c.id ? <td colSpan={5}><form className="inline-form in-place-editor" onSubmit={saveCharacter}>
+                  <label>Name<input autoFocus aria-label="Charakter bearbeiten: Name" disabled={pending} required value={characterDraft.name} onChange={(e) => changeCharacter({ name: e.target.value })} /></label>
+                  <label>Klasse<select disabled={pending} value={characterDraft.class} onChange={(e) => changeCharacter({ class: e.target.value })}>
+                    {!CLASSES.includes(characterDraft.class) && <option value={characterDraft.class}>{characterDraft.class}</option>}
+                    {CLASSES.map((cl) => <option key={cl} value={cl}>{cl}</option>)}
+                  </select></label>
+                  <label>Main-Spec<input disabled={pending} value={characterDraft.main_spec} onChange={(e) => changeCharacter({ main_spec: e.target.value })} /></label>
+                  <label>Second-Spec<input disabled={pending} value={characterDraft.second_spec} onChange={(e) => changeCharacter({ second_spec: e.target.value })} /></label>
+                  <label className="check"><input type="checkbox" disabled={pending} checked={characterDraft.is_main} onChange={(e) => changeCharacter({ is_main: e.target.checked })} />Main</label>
+                  <label className="check"><input type="checkbox" disabled={pending} checked={characterDraft.active} onChange={(e) => changeCharacter({ active: e.target.checked })} />Aktiv</label>
+                  <button type="submit" disabled={pending || !characterDraft.name.trim()}>Charakter speichern</button>
+                  <button type="button" disabled={pending} onClick={() => editCharacter(null)}>Bearbeitung abbrechen</button>
+                  {error && <p className="error" role="alert">{error}</p>}
+                </form></td> : <>
                 <td className="character-name">{c.name}</td>
                 <td>{c.class}</td>
                 <td>{c.main_spec || '—'}</td>
@@ -323,11 +349,12 @@ function PlayerDetail({ playerID }: Props) {
                   {isAdmin && (
                     <>
                       <button disabled={pending} onClick={() => toggleMain(c)}>Main umschalten</button>
-                      <button disabled={pending} onClick={() => renameCharacter(c)}>Umbenennen</button>
+                      <button disabled={pending} onClick={() => editCharacter(c)}>Bearbeiten</button>
                     </>
                   )}
                   <button onClick={() => showHistory(c)}>Historie</button>
                 </td>
+                </>}
               </tr>
             ))}
             {ownedCharacters.length === 0 && (

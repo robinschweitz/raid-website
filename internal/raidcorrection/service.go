@@ -38,8 +38,8 @@ func referenceError(err error) error {
 	return err
 }
 
-func (s *Service) check(ctx context.Context, r *Repo, raidID, actor int64, reason string, edit, imported bool) (bool, error) {
-	if edit && (actor <= 0 || strings.TrimSpace(reason) == "") {
+func (s *Service) check(ctx context.Context, r *Repo, raidID, actor int64, reason string, imported bool) (bool, error) {
+	if actor <= 0 {
 		return false, ErrReason
 	}
 	rd, err := r.raids.Get(ctx, raidID)
@@ -53,21 +53,23 @@ func (s *Service) check(ctx context.Context, r *Repo, raidID, actor int64, reaso
 		return false, ErrRaidState
 	}
 	if rd.ArchivedAt != nil {
-		if !imported || rd.Status != validation.RaidStatusCompleted {
+		if rd.Status != validation.RaidStatusCompleted {
 			return false, ErrRaidState
 		}
-		mapped, err := r.isImportedRaid(ctx, raidID)
-		if err != nil {
-			return false, err
+		if strings.TrimSpace(reason) == "" {
+			return false, ErrReason
 		}
-		if !mapped {
-			return false, ErrRaidState
+		if imported {
+			mapped, err := r.isImportedRaid(ctx, raidID)
+			if err != nil {
+				return false, err
+			}
+			if !mapped {
+				return false, ErrRaidState
+			}
 		}
 	}
 	completed := rd.Status == validation.RaidStatusCompleted
-	if completed && (actor <= 0 || strings.TrimSpace(reason) == "") {
-		return false, ErrReason
-	}
 	if !completed && rd.Status != validation.RaidStatusPlanned && rd.Status != validation.RaidStatusOpen {
 		return false, ErrRaidState
 	}
@@ -152,7 +154,7 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 				row.RaidID = old.RaidID
 			}
 		}
-		completed, err := s.check(ctx, r, row.RaidID, actor, reason, row.ID != 0 || imported, imported)
+		completed, err := s.check(ctx, r, row.RaidID, actor, reason, imported)
 		if err != nil {
 			return err
 		}
@@ -311,7 +313,7 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 			}
 			row.ItemLockID = old.ItemLockID
 		}
-		completed, err := s.check(ctx, r, row.RaidID, actor, reason, row.ID != 0 || imported, imported)
+		completed, err := s.check(ctx, r, row.RaidID, actor, reason, imported)
 		if err != nil {
 			return err
 		}

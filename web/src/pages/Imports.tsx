@@ -79,10 +79,10 @@ export function ImportsPage() {
 
   return (
     <div>
-      <h1>Importe</h1>
+      <div className="page-heading"><div><p className="eyebrow">Administration · Datenübernahme</p><h1>Importe</h1></div></div>
       {error && <p className="error">{error}</p>}
 
-      <form className="card" onSubmit={submit}>
+      <form className="card import-workflow" onSubmit={submit}>
         <h2>Google-Sheet importieren</h2>
         <label>
           Sheet-ID
@@ -119,9 +119,11 @@ export function ImportsPage() {
           </button>
         </div>
         <p className="muted">Vor dem Zusammenführen ist eine fehlerfreie Vorschau erforderlich. Der Server prüft den Vorschau-Hash beim erneuten Laden der Quelle. Hat sich die Quelle geändert, ist eine neue Vorschau nötig.</p>
-        <p className="muted">Ergänzungen zu bereits importierten Raids sind auch im Archiv mit ausdrücklicher Begründung möglich. Bestehende Zeilen bleiben erhalten; Änderungen werden auditiert und EP-/Token-Differenzen als neue Buchungen erfasst. Abgesagte Raids bleiben gesperrt. Beim Erstimport darf die Begründung leer bleiben.</p>
         {needsReason && previewSheet === sheetID && <p className="muted" role="status">Die Vorschau ist gültig, aber vor dem Zusammenführen ist eine nichtleere Begründung erforderlich.</p>}
+        <details className="editor-disclosure"><summary>Hinweise zu historischen Ergänzungen & Import-IDs</summary>
+        <p className="muted">Ergänzungen zu bereits importierten Raids sind auch im Archiv mit ausdrücklicher Begründung möglich. Bestehende Zeilen bleiben erhalten; Änderungen werden auditiert und EP-/Token-Differenzen als neue Buchungen erfasst. Abgesagte Raids bleiben gesperrt. Beim Erstimport darf die Begründung leer bleiben.</p>
         <p className="muted">Für neue Loot-Zeilen nach einem Import bitte im Loot Archive die optionale Spalte „Import ID“ verwenden: pro neuer Zeile eine eindeutige, dauerhaft unveränderte ID. Bereits importierte Zeilen unverändert lassen; IDs nicht wiederverwenden oder ändern. Neue Zeilen ohne stabile ID werden nach einem früheren Import als mehrdeutig abgelehnt. Konflikte stehen im Bericht, bestehende Daten werden nicht überschrieben.</p>
+        </details>
         {busy && <p className="muted" role="status">Import wird verarbeitet…</p>}
       </form>
 

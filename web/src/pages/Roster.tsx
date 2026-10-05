@@ -91,12 +91,12 @@ export function RosterPage() {
 
   return (
     <div>
-      <p className="eyebrow">Administration</p><h1>Gildenkonfiguration</h1>
+      <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Gildenkonfiguration</h1></div></div>
       {isAdmin && <div className="actions"><Link to="/raid-series">Raidserien konfigurieren</Link><Link to="/loot-catalog">Beutekatalog verwalten</Link></div>}
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
-      <section className="card">
+      <div className="configuration-grid"><section className="card">
         <h2>Gildenränge</h2>
         <ul className="plain-list">
           {ranks.map((r) => (
@@ -110,10 +110,12 @@ export function RosterPage() {
           {ranks.length === 0 && <li className="muted">Keine Ränge.</li>}
         </ul>
         {isAdmin && (
+          <details className="editor-disclosure"><summary>Gildenrang hinzufügen</summary>
           <form className="inline-form" onSubmit={createRank}>
             <input aria-label="Rangname" placeholder="Rangname" value={rankName} onChange={(e) => setRankName(e.target.value)} required />
             <button type="submit" disabled={pending}>Anlegen</button>
           </form>
+          </details>
         )}
       </section>
 
@@ -132,13 +134,15 @@ export function RosterPage() {
           {groups.length === 0 && <li className="muted">Keine Gruppen.</li>}
         </ul>
         {isAdmin && (
+          <details className="editor-disclosure"><summary>Raidgruppe hinzufügen</summary>
           <form className="inline-form" onSubmit={createGroup}>
             <input aria-label="Gruppenname" placeholder="Gruppenname" value={groupName} onChange={(e) => setGroupName(e.target.value)} required />
             <input aria-label="Gruppenfarbe" type="color" value={groupColor} onChange={(e) => setGroupColor(e.target.value)} />
             <button type="submit" disabled={pending}>Anlegen</button>
           </form>
+          </details>
         )}
-      </section>
+      </section></div>
     </div>
   )
 }

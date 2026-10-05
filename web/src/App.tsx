@@ -92,7 +92,7 @@ function Layout() {
           <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden&hellip;' : 'Abmelden'}</button>
         </div>
       </header>
-      <main id="main-content" tabIndex={-1}>
+      <main id="main-content" className={path === '/' ? undefined : 'secondary-page'} tabIndex={-1}>
         {error && <p className="error" role="alert">{error}</p>}
         <Routes />
       </main>

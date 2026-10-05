@@ -4,6 +4,8 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
 import { characterClassName } from '../characterTheme'
+import { RaidBanner } from '../components/RaidBanner'
+import { RaidRosterBoard } from '../components/RaidRosterBoard'
 import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Attendance, type AttendanceRole, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
 import { catalogSourceLabels, matchesCatalogItem } from '../catalog'
 
@@ -81,9 +83,9 @@ function RaidDetail({ raidID }: Props) {
   const catalogVersion = useRef(0)
   const associationVersion = useRef(0)
   const persistedCatalogContext = useRef('')
-  const summarySection = useRef<HTMLElement>(null)
-  const rosterSection = useRef<HTMLElement>(null)
-  const lootSection = useRef<HTMLElement>(null)
+  const [view, setView] = useState<'roster' | 'loot' | 'planning'>('roster')
+  const attendanceEditor = useRef<HTMLDetailsElement>(null)
+  const lootEditor = useRef<HTMLDetailsElement>(null)
   const { player: me } = useAuth()
   const [raid, setRaid] = useState<Raid | null>(null)
   const [attendance, setAttendance] = useState<Attendance[]>([])
@@ -283,6 +285,10 @@ function RaidDetail({ raidID }: Props) {
     ++characterVersion.current
     snapshotDirty.current.clear()
     setAttEditing(row)
+    if (row && attendanceEditor.current) {
+      attendanceEditor.current.open = true
+      attendanceEditor.current.scrollIntoView({ block: 'nearest' })
+    }
     setAttPlayer(row ? String(row.player_id) : '')
     setAttCharacter(row ? String(row.character_id) : '')
     setCharacters([])
@@ -318,6 +324,10 @@ function RaidDetail({ raidID }: Props) {
     if (catalogBosses.length) setCatalogStatus('')
     lootRequest.current = null
     setLootEditing(row)
+    if (row && lootEditor.current) {
+      lootEditor.current.open = true
+      lootEditor.current.scrollIntoView({ block: 'nearest' })
+    }
     setLootItem(row?.item_name ?? '')
     setLootItemID(row?.item_id ?? '')
     setLootBoss(row?.boss ?? '')
@@ -582,24 +592,34 @@ function RaidDetail({ raidID }: Props) {
       <p>
         <Link to="/raids">← Raids</Link>
       </p>
-      <h1>
-        {raid.name} <span className="badge">{raid.archived_at ? 'ARCHIVIERT' : raid.status}</span>
-      </h1>
+      <RaidBanner catalogInstanceId={raid.catalog_instance_id}>
+        <p className="eyebrow">Raidaufstellung · {raid.archived_at ? 'Historie' : 'Planung & Teilnahme'}</p>
+        <h1>{raid.name}</h1>
+        <p className="setup-date">{raid.scheduled_start ? new Date(raid.scheduled_start).toLocaleString('de-DE', { dateStyle: 'full', timeStyle: 'short' }) : 'Start noch nicht geplant'}</p>
+        <div className="actions setup-meta">
+          <span className="badge info">{raid.archived_at ? 'Archiviert' : ({ PLANNED: 'Geplant', OPEN: 'Offen', COMPLETED: 'Abgeschlossen', CANCELLED: 'Abgesagt' })[raid.status]}</span>
+          {raid.raid_size != null && <span className="badge">{raid.raid_size} Spieler</span>}
+          <span className="badge">Raidleitung: {playerName(raid.raid_leader_id)}</span>
+          <span className="badge">{attendance.length} Teilnehmer · {loot.length} Loot-Vergaben</span>
+        </div>
+        {raid.notes && <p className="setup-note">{raid.notes}</p>}
+        {raid.archived_at && <p className="muted">Archivierte Historie: Roster und Loot sind schreibgeschützt.</p>}
+      </RaidBanner>
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
-      <nav className="actions raid-section-nav" aria-label="Raidbereiche">
-        <button type="button" onClick={() => summarySection.current?.scrollIntoView({ behavior: 'smooth' })}>Übersicht</button>
-        <button type="button" onClick={() => rosterSection.current?.scrollIntoView({ behavior: 'smooth' })}>Roster ({attendance.length})</button>
-        <button type="button" onClick={() => lootSection.current?.scrollIntoView({ behavior: 'smooth' })}>Loot ({loot.length})</button>
+      <nav className="workspace-tabs" aria-label="Raidbereiche">
+        <button type="button" aria-pressed={view === 'roster'} aria-controls="raid-roster" onClick={() => setView('roster')}>Aufstellung ({attendance.length})</button>
+        <button type="button" aria-pressed={view === 'loot'} aria-controls="raid-loot" onClick={() => setView('loot')}>Loot ({loot.length})</button>
+        <button type="button" aria-pressed={view === 'planning'} aria-controls="raid-planning" onClick={() => setView('planning')}>Planung & Details</button>
       </nav>
-      <section ref={summarySection} className="card raid-summary" aria-label="Raidübersicht">
+      <section id="raid-planning" hidden={view !== 'planning'} className="card raid-summary" aria-label="Raidübersicht">
       <h2>Übersicht</h2>
       <p>{attendance.length} gespeicherte Teilnehmer · {loot.length} aufgezeichnete Loot-Vergaben</p>
       {raid.archived_at && <p className="muted">Archivierte Historie: Roster und Loot sind schreibgeschützt.</p>}
       <p>Geplanter Start: {raid.scheduled_start ? new Date(raid.scheduled_start).toLocaleString() : 'Nicht verfügbar'}. Serie: {series.find((s) => s.id === raid.series_id)?.name ?? 'Nicht verfügbar'}.</p>
       <p>Gespeicherte Kataloginstanz: {raid.catalog_instance_id ? catalogInstances.find((instance) => instance.id === raid.catalog_instance_id)?.name ?? raid.catalog_instance_id : 'Keine Zuordnung'}. Raidgröße: {raid.raid_size == null ? 'Nicht zugeordnet' : `${raid.raid_size} Spieler`}.</p>
-      <section aria-label="Katalogquellen" className="subcard catalog-sources">
-        <h3>Katalogquellen</h3>
+      <details aria-label="Katalogquellen" className="subcard catalog-sources">
+        <summary>Katalogquellen & Abdeckung</summary>
         {catalogSourceStatus && <p className="muted" role="status">{catalogSourceStatus}</p>}
         {catalog && <>
           <p className="muted">Die geprüfte JSON-Quelldatei steht automatisch bereit. Eine vollständige Boss- oder Itemabdeckung ist nicht zugesichert; Quellenhinweise zu Teilbeständen beachten.</p>
@@ -612,7 +632,7 @@ function RaidDetail({ raidID }: Props) {
           </details>
         </>}
         <button type="button" disabled={pending} onClick={() => { if (isActive() && !isPending()) setCatalogRetry((value) => value + 1) }}>Katalog erneut laden</button>
-      </section>
+      </details>
       {raid.previous_raid_id && <p><Link to={`/raids/${raid.previous_raid_id}`}>Vorheriger Raid</Link></p>}
       {archiveResult && <p role="status">Raid archiviert und weiterhin in der Historie sichtbar. {archiveResult.next_raid
         ? <Link to={`/raids/${archiveResult.next_raid.id}`}>Nächster Raid: {archiveResult.next_raid.name}{archiveResult.next_raid.scheduled_start ? ` (${new Date(archiveResult.next_raid.scheduled_start).toLocaleString()})` : ''}</Link>
@@ -667,57 +687,13 @@ function RaidDetail({ raidID }: Props) {
       )}
       </section>
 
-      <section ref={rosterSection} className="card raid-roster" aria-label="Raidroster">
-        <h2>Roster · Teilnahme ({attendance.length})</h2>
-        <div className="grid roster-role-cards">
-          {(['TANK', 'HEAL', 'DD'] as const).map((role) => <div className="subcard" key={role}>
-            <h3>{role === 'TANK' ? 'Tank' : role === 'HEAL' ? 'Heilung' : 'Schaden'}</h3>
-            <p>{attendance.filter((a) => a.role === role).length} Teilnehmer</p>
-          </div>)}
-        </div>
-        <p className="muted">Gespeicherte Namen, Klasse, Rolle und tatsächlich gespielter Spec dieses Raids. Bank und Ersatz folgen derselben EP-Regel.</p>
-        <div className="table-scroll">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Spieler</th>
-              <th>Charakter</th>
-              <th>Tatsächliche Rolle</th>
-              <th>Klasse</th>
-              <th>Tatsächlicher Spec</th>
-              {canWrite && <th></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {attendance.map((a) => (
-              <tr key={a.id}>
-                <td>{playerName(a.player_id)}</td>
-                <td><span className={`character-name ${characterClassName(a.class ?? '')}`}>{a.character_name?.trim() || 'Nicht verfügbar (historisch nicht gespeichert)'}</span>
-                  {attendanceFlags.filter(({ key }) => a[key]).map(({ key, label }) => <span className="badge" key={key}>{label}</span>)}</td>
-                <td>{a.role}</td>
-                <td>{a.class?.trim() || 'Nicht verfügbar (historisch nicht gespeichert)'}</td>
-                <td>{a.spec?.trim() || 'Nicht verfügbar (historisch nicht gespeichert)'}</td>
-                {canWrite && <td>
-                  {isActiveRaid && (!a.character_name?.trim() || !a.class?.trim() || !a.spec?.trim()) && <p className="error">Teilnahme #{a.id}: {[
-                    !a.character_name?.trim() && 'Charaktername', !a.class?.trim() && 'Klasse', !a.spec?.trim() && 'tatsächlicher Spec',
-                  ].filter(Boolean).join(', ')} fehlt. Vor dem Archivieren korrigieren.</p>}
-                  <button disabled={pending} onClick={() => editAttendance(a)}>Teilnahme korrigieren</button>
-                </td>}
-              </tr>
-            ))}
-            {attendance.length === 0 && (
-              <tr>
-                <td colSpan={canWrite ? 6 : 5} className="muted">
-                  Keine Einträge.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        </div>
+      <section id="raid-roster" hidden={view !== 'roster'} className="card raid-roster" aria-label="Raidroster">
+        <div className="section-heading"><h2>Raidaufstellung</h2><span className="muted">{attendance.filter((row) => !row.is_bench).length} im Raid · {attendance.filter((row) => row.is_bench).length} auf der Bank</span></div>
+        <RaidRosterBoard attendance={attendance} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} />
+        <p className="muted setup-caption">Gespeicherte Aufstellung dieses Raids. Bank und Ersatz folgen derselben EP-Regel.</p>
         {canWrite && (
-          <div className="subcard">
-            <h3>{attEditing ? `Teilnahme #${attEditing.id} korrigieren` : raid.status === 'COMPLETED' ? 'Teilnahme nachtragen' : 'Teilnahme hinzufügen'}</h3>
+          <details ref={attendanceEditor} className="editor-disclosure">
+            <summary>{attEditing ? `Teilnahme #${attEditing.id} korrigieren` : raid.status === 'COMPLETED' ? 'Teilnahme nachtragen' : 'Teilnahme hinzufügen'}</summary>
             {attEditing && <p className="muted">Vorher: {playerName(attEditing.player_id)}, Charakter {attEditing.character_name || 'Nicht verfügbar'}, Klasse {attEditing.class || 'Nicht verfügbar'}, tatsächlicher Spec {attEditing.spec || 'Nicht verfügbar'}, Rolle {attEditing.role}. {attendanceFlags.map(({ key, label }) => `${label}: ${attEditing[key] ? 'ja' : 'nein'}`).join(', ')}. Notizen: {attEditing.notes || 'keine'}</p>}
             <form className="inline-form" onSubmit={addAttendance}>
               <select aria-label="Teilnahme-Spieler" disabled={pending} value={attPlayer} onChange={(e) => {
@@ -774,11 +750,11 @@ function RaidDetail({ raidID }: Props) {
               <button type="submit" disabled={pending || !hasAttCharacter || (attNeedsReason && !attReason.trim())}>{attEditing ? 'Teilnahme-Korrektur speichern' : 'Hinzufügen'}</button>
               {attEditing && <button type="button" disabled={pending} onClick={() => editAttendance(null)}>Bearbeitung abbrechen</button>}
             </form>
-          </div>
+          </details>
         )}
       </section>
 
-      <section ref={lootSection} className="card raid-loot" aria-label="Raidloot">
+      <section id="raid-loot" hidden={view !== 'loot'} className="card raid-loot" aria-label="Raidloot">
         <h2>Loot ({loot.length})</h2>
         <p className="muted">Außerhalb der Website entschiedene Gewinner erfassen. Hier wird weder gewürfelt noch ein frei wählbarer EP-Betrag ausgegeben.</p>
         <p className="muted">Main-Spec und Enhanced zählen als Main-Spec-Loot. Second-Spec und Spieler-BoE verhindern die +10 EP beim Archivieren nicht.</p>
@@ -818,8 +794,8 @@ function RaidDetail({ raidID }: Props) {
         </div>
         </div>)}
         {canWrite && (
-          <div className="subcard">
-            <h3>{lootEditing ? `Loot #${lootEditing.id} korrigieren` : raid.status === 'COMPLETED' ? 'Loot nachtragen' : 'Loot erfassen'}</h3>
+          <details ref={lootEditor} className="editor-disclosure">
+            <summary>{lootEditing ? `Loot #${lootEditing.id} korrigieren` : raid.status === 'COMPLETED' ? 'Loot nachtragen' : 'Loot erfassen'}</summary>
             {catalogStatus && <p className="muted" role="status">{catalogStatus}</p>}
             <p className="muted">{associated ? 'Boss und Drop müssen zur gespeicherten Raidinstanz und Raidgröße passen. Fehlende Katalogdaten erlauben keine freie Ersatzeingabe; vorhandene historische Einträge bleiben erhalten.' : 'Vor neuer Loot-Erfassung bitte Raidinstanz und Raidgröße in der Katalogzuordnung oben wählen und speichern. Historische Einträge können mit unveränderter Identität und unverändertem Empfänger korrigiert werden.'}</p>
             {attendance.length === 0 && <p className="muted">Keine Empfänger verfügbar: zuerst Charaktere in den Raidroster aufnehmen.</p>}
@@ -879,7 +855,7 @@ function RaidDetail({ raidID }: Props) {
               <button type="submit" disabled={pending || !lootItem.trim() || !hasLootRecipient || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : 'Vergeben'}</button>
               {lootEditing && <button type="button" disabled={pending} onClick={() => editLoot(null)}>Bearbeitung abbrechen</button>}
             </form>
-          </div>
+          </details>
         )}
       </section>
     </div>

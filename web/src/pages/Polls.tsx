@@ -91,7 +91,7 @@ export function PollsPage() {
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
-      {polls.map((p) => (
+      <div className="poll-directory">{polls.map((p) => (
         <section className="card" key={p.id}>
           <h2>
             {p.title} <span className="badge">{p.status}</span>
@@ -123,12 +123,12 @@ export function PollsPage() {
             </ul>
           )}
         </section>
-      ))}
+      ))}</div>
       {polls.length === 0 && <p className="muted">Keine Umfragen.</p>}
 
       {canManage && (
+        <details className="card editor-disclosure"><summary>Neue Umfrage</summary>
         <form className="card" onSubmit={createPoll}>
-          <h2>Neue Umfrage</h2>
           <label>
             Titel
             <input value={title} onChange={(e) => setTitle(e.target.value)} required />
@@ -139,6 +139,7 @@ export function PollsPage() {
           </label>
           <button type="submit" disabled={pending}>Anlegen</button>
         </form>
+        </details>
       )}
     </div>
   )

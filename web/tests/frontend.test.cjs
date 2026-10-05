@@ -122,12 +122,14 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
 function nodes(tree, predicate) {
   if (!tree || typeof tree !== 'object') return []
   if (Array.isArray(tree)) return tree.flatMap((child) => nodes(child, predicate))
+  if (typeof tree.type === 'function' && tree.type.name === 'RaidRosterBoard') return nodes(tree.type(tree.props), predicate)
   return [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)]
 }
 function text(tree) {
   if (tree == null || typeof tree === 'boolean') return ''
   if (Array.isArray(tree)) return tree.map(text).join(' ')
   if (typeof tree !== 'object') return String(tree)
+  if (typeof tree.type === 'function' && tree.type.name === 'RaidRosterBoard') return text(tree.type(tree.props))
   return text(tree.props?.children)
 }
 const button = (view, label) => nodes(view.tree, (n) => n.type === 'button' && text(n) === label)[0]
@@ -1259,7 +1261,7 @@ test('archive preserves successor envelope and makes the raid read-only', async 
   view.render()
   await oldLootSubmit(event)
   assert.equal(writes(s).length, 1)
-  assert.match(text(view.tree), /ARCHIVIERT/)
+  assert.match(text(view.tree), /Archiviert/)
   assert.equal(nodes(view.tree, (n) => n.type === 'a' && n.props.to === '/raids/2').length, 1)
   assert.equal(button(view, 'Archivieren'), undefined)
   assert.equal(nodes(view.tree, (n) => n.type === 'form').length, 0)
@@ -1327,7 +1329,7 @@ test('archived attendance uses saved name, class and actual spec; missing histor
   assert.match(text(view.tree), /Saved old name/)
   assert.match(text(view.tree), /Priester/)
   assert.match(text(view.tree), /Holy/)
-  assert.match(text(view.tree), /Nicht verfügbar \(historisch nicht gespeichert\)/)
+  assert.match(text(view.tree), /Name nicht gespeichert/)
   assert.doesNotMatch(text(view.tree), /#11/)
   assert.equal(s.requests.some((r) => r.url.endsWith('/characters')), false)
 })
@@ -1673,7 +1675,7 @@ test('roster_incomplete archive errors identify missing row details and leave co
   await flush(view)
   assert.equal(button(view, 'Teilnahme korrigieren'), undefined)
   assert.equal(button(view, 'Planung speichern'), undefined)
-  assert.match(text(view.tree), /Nicht verfügbar \(historisch nicht gespeichert\)/)
+  assert.match(text(view.tree), /Klasse unbekannt/)
 })
 
 for (const method of ['MAIN', 'SECOND', 'ENHANCED', 'BOE']) {
@@ -1818,7 +1820,8 @@ test('archived enhanced history shows saved class-colored names and no write con
   assert.match(text(view.tree), /Saved raid character/)
   assert.match(text(view.tree), /23 EP/)
   assert.match(text(view.tree), /schreibgeschützt/)
-  assert.ok(nodes(view.tree, (n) => n.type === 'span' && n.props.className === 'character-name class-mage').length >= 2)
+  assert.ok(nodes(view.tree, (n) => n.props.className === 'setup-member class-mage').length >= 1)
+  assert.ok(nodes(view.tree, (n) => n.type === 'span' && n.props.className === 'character-name class-mage').length >= 1)
   assert.equal(form(view), undefined)
   for (const label of ['Vergeben', 'Loot korrigieren', 'Planung speichern', 'Archivieren', 'Abschließen', 'Enhance würfeln']) assert.equal(button(view, label), undefined)
   assert.equal(writes(s).length, 0)
@@ -2177,4 +2180,69 @@ test('an unrelated historical correction does not discard the pending boss list 
   await flush(view)
   assert.equal(select(view, 'Loot-Katalogboss').props.disabled, false)
   assert.match(text(select(view, 'Loot-Katalogboss')), /Gespeicherter Boss/)
+})
+
+test('raid workspace opens on roster, preserves drafts between views and resets on raid switch', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1)
+  await flush(view)
+  const panel = (id) => nodes(view.tree, (n) => n.props.id === id)[0]
+  assert.equal(panel('raid-roster').props.hidden, false)
+  assert.equal(panel('raid-loot').props.hidden, true)
+  assert.equal(panel('raid-planning').props.hidden, true)
+  input(view, 'Teilnahme-Notizen').props.onChange(change('Keep this draft'))
+  nodes(view.tree, (n) => n.type === 'button' && n.props['aria-controls'] === 'raid-loot')[0].props.onClick()
+  view.render()
+  assert.equal(panel('raid-roster').props.hidden, true)
+  assert.equal(panel('raid-loot').props.hidden, false)
+  button(view, 'Planung & Details').props.onClick()
+  view.render()
+  assert.equal(panel('raid-planning').props.hidden, false)
+  assert.equal(input(view, 'Teilnahme-Notizen').props.value, 'Keep this draft')
+  view.render({ raidID: 2 })
+  resolveRaid(s, 2)
+  await flush(view)
+  assert.equal(panel('raid-roster').props.hidden, false)
+  assert.equal(input(view, 'Teilnahme-Notizen').props.value, '')
+})
+
+test('roster board groups saved roles, separates bench, preserves substitute and note details', () => {
+  const s = setup()
+  const Board = s.load('components/RaidRosterBoard.tsx').RaidRosterBoard
+  const attendance = [
+    { ...attendanceRow, id: 1, role: 'TANK', character_name: 'Saved tank', class: 'Krieger', spec: 'Schutz' },
+    { ...attendanceRow, id: 2, role: 'HEAL', character_name: 'Saved healer', is_substitute: true, notes: 'Assignment note' },
+    { ...attendanceRow, id: 3, role: 'DD', character_name: 'Saved damage' },
+    { ...attendanceRow, id: 4, role: 'TANK', character_name: 'Bench tank', is_bench: true },
+  ]
+  let edited
+  const props = { attendance, playerName: () => 'Owner', canWrite: true, pending: false, onEdit: (row) => { edited = row } }
+  const tree = Board(props)
+  const group = (label) => nodes(tree, (n) => n.props['aria-label'] === label)[0]
+  assert.match(text(group('Tanks')), /Saved tank/)
+  assert.doesNotMatch(text(group('Tanks')), /Bench tank/)
+  assert.match(text(group('Bank')), /Bench tank/)
+  assert.match(text(group('Heilung')), /Saved healer.*Ersatz.*Assignment note/)
+  assert.equal(nodes(tree, (n) => n.type === 'li').length, 4)
+  nodes(tree, (n) => n.type === 'button')[0].props.onClick()
+  assert.equal(edited.id, 1)
+  assert.equal(nodes(Board({ ...props, canWrite: false }), (n) => n.type === 'button').length, 0)
+  assert.ok(nodes(Board({ ...props, pending: true }), (n) => n.type === 'button').every((n) => n.props.disabled))
+})
+
+test('profile navigation exposes one area and keeps account controls administrator-only', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
+  resolvePlayer(s, 1)
+  await flush(view)
+  const panel = (id) => nodes(view.tree, (n) => n.props.id === id)[0]
+  assert.equal(panel('profile-points').props.hidden, false)
+  assert.equal(panel('profile-locks').props.hidden, true)
+  button(view, 'Item-Locks').props.onClick()
+  view.render()
+  assert.equal(panel('profile-points').props.hidden, true)
+  assert.equal(panel('profile-locks').props.hidden, false)
+  assert.equal(button(view, 'Konto'), undefined)
+  assert.equal(panel('profile-account'), undefined)
 })

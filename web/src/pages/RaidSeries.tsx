@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
@@ -15,6 +15,7 @@ export function RaidSeriesPage() {
   const [series, setSeries] = useState<RaidSeries[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [editingID, setEditingID] = useState<number | null>(null)
+  const editor = useRef<HTMLDetailsElement>(null)
   const [schedule, setSchedule] = useState(emptySchedule)
   const [error, setError] = useState('')
   const [catalog, setCatalog] = useState<LootCatalog | null>(null)
@@ -39,6 +40,10 @@ export function RaidSeriesPage() {
   const edit = (row: RaidSeries | null) => {
     if (!isAdmin || isPending() || !isActive()) return
     setEditingID(row?.id ?? null)
+    if (row && editor.current) {
+      editor.current.open = true
+      editor.current.scrollIntoView({ block: 'nearest' })
+    }
     setSchedule(row ? { name: row.name, raid_leader_id: String(row.raid_leader_id), weekdays: [...row.weekdays], interval_weeks: String(row.interval_weeks), start_time: row.start_time, timezone: row.timezone, catalog_instance_id: row.catalog_instance_id ?? '', raid_size: row.raid_size == null ? '' : String(row.raid_size) } : emptySchedule)
     setError('')
   }
@@ -71,16 +76,15 @@ export function RaidSeriesPage() {
 
   return <div>
     <p><Link to="/roster">← Gildenkonfiguration</Link></p>
-    <p className="eyebrow">Administration</p><h1>Raidserien</h1>
+    <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Raidserien</h1></div></div>
     <p className="muted">Beim Archivieren entsteht der nächste zukünftige Termin nach dieser Konfiguration. Die Wiederholung verwendet die konfigurierte IANA-Zeitzone, nicht die Browser-Zeitzone.</p>
     {error && <p className="error" role="alert">{error}</p>}
-    <ul className="plain-list">{series.map((s) => <li key={s.id}>
-      <span>{s.name}: {s.weekdays.map((day) => weekdays[day]).join(', ')}, alle {s.interval_weeks} Wochen, {s.start_time} ({s.timezone}); Raidleiter: {players.find((p) => p.id === s.raid_leader_id)?.name ?? 'Nicht verfügbar'}{s.catalog_instance_id && ` · ${catalog?.instances.find((instance) => instance.id === s.catalog_instance_id)?.name ?? `Instanz #${s.catalog_instance_id}`}${s.raid_size ? ` · ${s.raid_size} Spieler` : ''}`}</span>
+    <ul className="series-directory">{series.map((s) => <li className="card" key={s.id}>
+      <div><h2>{s.name}</h2><p>{s.weekdays.map((day) => weekdays[day]).join(', ')} · {s.start_time}</p><p className="muted">Alle {s.interval_weeks} Wochen · {s.timezone}</p><p className="muted">Raidleitung: {players.find((p) => p.id === s.raid_leader_id)?.name ?? 'Nicht verfügbar'}{s.catalog_instance_id && ` · ${catalog?.instances.find((instance) => instance.id === s.catalog_instance_id)?.name ?? `Instanz #${s.catalog_instance_id}`}${s.raid_size ? ` · ${s.raid_size} Spieler` : ''}`}</p></div>
       {isAdmin && <button disabled={pending} onClick={() => edit(s)}>Serie bearbeiten</button>}
     </li>)}</ul>
     {series.length === 0 && <p className="muted">Keine Raidserien konfiguriert.</p>}
-    {isAdmin && <form className="card inline-form" onSubmit={save}>
-      <h2>{editingID === null ? 'Neue Raidserie' : 'Raidserie bearbeiten'}</h2>
+    {isAdmin && <details ref={editor} className="card editor-disclosure"><summary>{editingID === null ? 'Neue Raidserie' : 'Raidserie bearbeiten'}</summary><form className="inline-form" onSubmit={save}>
       <label>Name<input disabled={pending} required placeholder="Serienname" value={schedule.name} onChange={(e) => setSchedule({ ...schedule, name: e.target.value })} /></label>
       <label>Raidleiter<select aria-label="Serien-Raidleiter" disabled={pending} required value={schedule.raid_leader_id} onChange={(e) => setSchedule({ ...schedule, raid_leader_id: e.target.value })}>
         <option value="">Raidleiter auswählen</option>{players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -96,6 +100,6 @@ export function RaidSeriesPage() {
       {!associationValid && <p className="error">Bitte eine durch lokale Drops belegte Raidgröße zur Instanz auswählen.</p>}
       <button disabled={pending || schedule.weekdays.length === 0 || !associationValid} type="submit">Serie speichern</button>
       {editingID !== null && <button disabled={pending} type="button" onClick={() => edit(null)}>Bearbeitung abbrechen</button>}
-    </form>}
+    </form></details>}
   </div>
 }

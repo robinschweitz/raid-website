@@ -82,9 +82,10 @@ export function RaidsPage() {
     <div>
       <div className="page-heading"><div><p className="eyebrow">Planung & Historie</p><h1>Raids</h1></div><Link to="/">Zur Übersicht</Link></div>
       {error && <p className="error">{error}</p>}
-      <label>Ansicht <select aria-label="Raid-Ansicht" value={filter} onChange={(e) => setFilter(e.target.value)}>
+      <section className="card directory-panel" aria-label="Raidübersicht">
+      <div className="section-heading"><h2>Raidkalender & Historie</h2><label>Ansicht <select aria-label="Raid-Ansicht" value={filter} onChange={(e) => setFilter(e.target.value)}>
         <option value="all">Alle Raids</option><option value="upcoming">Anstehend</option><option value="history">Historie</option>
-      </select></label>
+      </select></label></div>
       <div className="table-scroll"><table className="table">
         <thead>
           <tr>
@@ -116,10 +117,11 @@ export function RaidsPage() {
           )}
         </tbody>
       </table></div>
+      </section>
 
       {canManage && (
+        <details className="card editor-disclosure"><summary>Neuer Raid</summary>
         <form className="card inline-form" onSubmit={onCreate}>
-          <h2>Neuer Raid</h2>
           <label>Raidserie<select aria-label="Neue Raidserie" disabled={pending} value={seriesID} required onChange={(e) => {
             if (isPending() || !isActive()) return
             setSeriesID(e.target.value)
@@ -145,6 +147,7 @@ export function RaidsPage() {
           </label>
           <button type="submit" disabled={pending || !associationValid}>{pending ? 'Anlegen…' : 'Anlegen'}</button>
         </form>
+        </details>
       )}
     </div>
   )

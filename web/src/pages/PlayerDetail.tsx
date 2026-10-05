@@ -56,6 +56,7 @@ function PlayerDetail({ playerID }: Props) {
   const [rankError, setRankError] = useState('')
   const [rankLoading, setRankLoading] = useState(true)
   const [error, setError] = useState('')
+  const [view, setView] = useState<'points' | 'characters' | 'locks' | 'account'>('points')
 
   const [charName, setCharName] = useState('')
   const [charClass, setCharClass] = useState(CLASSES[0])
@@ -271,7 +272,13 @@ function PlayerDetail({ playerID }: Props) {
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
-      <div className="grid">
+      <nav className="workspace-tabs" aria-label="Profilbereiche">
+        <button type="button" aria-pressed={view === 'points'} aria-controls="profile-points" onClick={() => setView('points')}>EP & Tokens</button>
+        <button type="button" aria-pressed={view === 'characters'} aria-controls="profile-characters" onClick={() => setView('characters')}>Charaktere ({ownedCharacters.length})</button>
+        <button type="button" aria-pressed={view === 'locks'} aria-controls="profile-locks" onClick={() => setView('locks')}>Item-Locks</button>
+        {isAdmin && <button type="button" aria-pressed={view === 'account'} aria-controls="profile-account" onClick={() => setView('account')}>Konto</button>}
+      </nav>
+      <div id="profile-points" hidden={view !== 'points'} className="grid profile-ledgers">
         <EnhancePointsCard points={points} showHistory />
 
         <section className="card">
@@ -293,7 +300,7 @@ function PlayerDetail({ playerID }: Props) {
         </section>
       </div>
 
-      <section className="card">
+      <section id="profile-characters" hidden={view !== 'characters'} className="card">
         <h2>Charaktere</h2>
         <div className="table-scroll"><table className="table">
           <thead>
@@ -346,6 +353,7 @@ function PlayerDetail({ playerID }: Props) {
           </div>
         )}
         {isAdmin && (
+          <details className="editor-disclosure"><summary>Charakter hinzufügen</summary>
           <form className="inline-form" onSubmit={createCharacter}>
             <input aria-label="Charaktername" placeholder="Name" value={charName} onChange={(e) => setCharName(e.target.value)} required />
             <select aria-label="Charakterklasse" value={charClass} onChange={(e) => setCharClass(e.target.value)}>
@@ -361,10 +369,11 @@ function PlayerDetail({ playerID }: Props) {
             </label>
             <button type="submit" disabled={pending}>Anlegen</button>
           </form>
+          </details>
         )}
       </section>
 
-      <section className="card">
+      <section id="profile-locks" hidden={view !== 'locks'} className="card">
         <h2>Item-Locks</h2>
         <div className="table-scroll"><table className="table">
           <thead>
@@ -409,7 +418,7 @@ function PlayerDetail({ playerID }: Props) {
       </section>
 
       {isAdmin && (
-        <section className="card">
+        <section id="profile-account" hidden={view !== 'account'} className="card">
           <h2>Konto</h2>
           <form className="inline-form" onSubmit={setAccount}>
             <input aria-label="Benutzername" placeholder="Benutzername" value={accUser} onChange={(e) => setAccUser(e.target.value)} required />

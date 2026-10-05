@@ -74,8 +74,8 @@ export function PlayersPage() {
       </table></div>
 
       {isAdmin && (
+        <details className="card editor-disclosure"><summary>Neuer Spieler</summary>
         <form className="card inline-form" onSubmit={onCreate}>
-          <h2>Neuer Spieler</h2>
           <label>
             Name
             <input value={name} onChange={(e) => setName(e.target.value)} required />
@@ -92,6 +92,7 @@ export function PlayersPage() {
           </label>
           <button type="submit" disabled={pending}>{pending ? 'Anlegen…' : 'Anlegen'}</button>
         </form>
+        </details>
       )}
     </div>
   )

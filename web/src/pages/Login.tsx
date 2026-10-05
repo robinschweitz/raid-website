@@ -28,8 +28,6 @@ export function LoginPage() {
       <form className="card login-card" onSubmit={onSubmit}>
         <GuildCrest />
         <p className="eyebrow">Bratwurst des Schicksals</p>
-        <h1>Gemeinsam durch die K&auml;lte.</h1>
-        <p className="muted">Melde dich f&uuml;r Raidplanung, Loot und deine Gildenhistorie an.</p>
         <label>
           Benutzername
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus />

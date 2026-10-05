@@ -84,7 +84,6 @@ function Layout() {
             <Link className={path === '/loot-catalog' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/loot-catalog"><NavIcon name="settings" />Beutekatalog</Link>
           </>}
         </nav>
-        <div className="sidebar-footer"><p>Gemeinsam durch die K&auml;lte.</p><span>Raids &middot; Loot &middot; Gemeinschaft</span></div>
       </aside>
       <div className="main-shell">
       <header className="topbar">

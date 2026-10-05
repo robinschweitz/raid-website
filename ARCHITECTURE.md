@@ -7,6 +7,11 @@ Modular monolith. Domains: players/characters, raids/attendance, loot, enhancepo
 share a transaction. Attendance stores per-raid name/class/spec snapshots, not live-character
 presentation data. Archived raids remain visible history (ADR 021-022).
 
+`legacyimport` permits provenance-checked, audited additions to archived historical imports.
+It imports the first roster block in `ICC25 Raidsetup` A–F and uses explicit administrator
+schedule input to bootstrap one PLANNED raid and series. Source/sheet setup mappings and
+configuration-bound previews prevent duplicate bootstrap or silent replacement (ADR 029).
+
 `loot` records outside MAIN/SECOND/ENHANCED/BOE outcomes and coordinates linked enhanced
 EP costs; `raidcorrection` appends coupled compensation and audit snapshots. EP is a
 read-only player-facing ledger, never an in-app roll generator (ADR 023-024).

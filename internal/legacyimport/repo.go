@@ -5,6 +5,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/audit"
 	"raid-website/internal/character"
 	"raid-website/internal/raidcorrection"
 )
@@ -102,9 +103,27 @@ func (r *Repo) hasPreview(ctx context.Context, source, sheetID, hash string) (bo
 	return r.db.NewSelect().TableExpr("import_previews").Where("source = ?", source).Where("sheet_id = ?", sheetID).Where("raw_hash = ?", hash).Exists(ctx)
 }
 
-func (r *Repo) hasMergedSource(ctx context.Context, source, sheetID string) (bool, error) {
-	return r.db.NewSelect().Model((*Import)(nil)).Where("source = ?", source).
-		Where("source_url = ?", sheetID).Where("status = ?", "MERGED").Exists(ctx)
+func (r *Repo) writeAudit(ctx context.Context, row *audit.Log) error {
+	return audit.NewRepo(r.db).Insert(ctx, row)
+}
+
+type setupMapping struct {
+	bun.BaseModel `bun:"table:legacy_setup_mappings"`
+	Source        string `bun:",pk"`
+	SheetID       string `bun:",pk"`
+	SeriesID      int64
+	RaidID        int64
+}
+
+func (r *Repo) setupMapping(ctx context.Context, source, sheetID string) (*setupMapping, error) {
+	row := new(setupMapping)
+	err := r.db.NewSelect().Model(row).Where("source = ?", source).Where("sheet_id = ?", sheetID).Scan(ctx)
+	return row, err
+}
+
+func (r *Repo) insertSetupMapping(ctx context.Context, row *setupMapping) error {
+	_, err := r.db.NewInsert().Model(row).Exec(ctx)
+	return err
 }
 
 func (r *Repo) pointTransactionCount(ctx context.Context) (int, error) {

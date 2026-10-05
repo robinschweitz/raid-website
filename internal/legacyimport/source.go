@@ -21,6 +21,7 @@ type SheetData struct {
 	Loot      []byte
 	Character []byte
 	Points    []byte
+	Setup     []byte
 	Hash      string
 }
 
@@ -35,6 +36,7 @@ type SheetNames struct {
 	Loot      string
 	Character string
 	Points    string
+	Setup     string
 }
 
 func DefaultSheetNames() SheetNames {
@@ -43,6 +45,7 @@ func DefaultSheetNames() SheetNames {
 		Loot:      "Loot Archive",
 		Character: "Charaktere",
 		Points:    "Punkte",
+		Setup:     "ICC25 Raidsetup",
 	}
 }
 
@@ -67,9 +70,12 @@ func (g GoogleFetcher) Fetch(ctx context.Context, sheetID string) (SheetData, er
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
 
-	fetch := func(name string) ([]byte, error) {
+	fetch := func(name, columns string) ([]byte, error) {
 		u := fmt.Sprintf("%s/spreadsheets/d/%s/gviz/tq?tqx=out:csv&sheet=%s",
 			base, url.PathEscape(sheetID), url.QueryEscape(name))
+		if columns != "" {
+			u += "&range=" + url.QueryEscape(columns) + "&headers=1"
+		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		if err != nil {
 			return nil, err
@@ -93,25 +99,32 @@ func (g GoogleFetcher) Fetch(ctx context.Context, sheetID string) (SheetData, er
 		return data, nil
 	}
 
-	raid, err := fetch(names.Raid)
+	raid, err := fetch(names.Raid, "")
 	if err != nil {
 		return SheetData{}, err
 	}
-	loot, err := fetch(names.Loot)
+	loot, err := fetch(names.Loot, "")
 	if err != nil {
 		return SheetData{}, err
 	}
-	chars, err := fetch(names.Character)
+	chars, err := fetch(names.Character, "")
 	if err != nil {
 		return SheetData{}, err
 	}
-	points, err := fetch(names.Points)
+	points, err := fetch(names.Points, "")
 	if err != nil {
 		return SheetData{}, err
 	}
 
+	var setup []byte
+	if names.Setup != "" {
+		setup, err = fetch(names.Setup, "A:F")
+		if err != nil {
+			return SheetData{}, err
+		}
+	}
 	h := sha256.New()
-	for _, part := range [][]byte{raid, loot, chars, points} {
+	for _, part := range [][]byte{raid, loot, chars, points, setup} {
 		_, _ = h.Write(part)
 		_, _ = h.Write([]byte{0})
 	}
@@ -120,6 +133,7 @@ func (g GoogleFetcher) Fetch(ctx context.Context, sheetID string) (SheetData, er
 		Loot:      loot,
 		Character: chars,
 		Points:    points,
+		Setup:     setup,
 		Hash:      hex.EncodeToString(h.Sum(nil)),
 	}, nil
 }

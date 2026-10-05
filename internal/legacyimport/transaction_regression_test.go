@@ -50,12 +50,13 @@ func TestChangedSnapshotDoesNotBootstrapAnotherSeries(t *testing.T) {
 	for _, hash := range []string{"initial", "reordered"} {
 		data := sampleSheet()
 		data.Hash = hash
+		data.Setup = setupCSV()
 		svc.fetcher = fakeFetcher{data: data}
-		preview, err := svc.DryRun(ctx, "test", "sheet")
+		preview, err := svc.DryRunWithSetup(ctx, "test", "sheet", setupConfig())
 		if err != nil || len(preview.Errors) != 0 {
 			t.Fatalf("preview: %+v, %v", preview, err)
 		}
-		report, err := svc.Merge(ctx, actor.ID, "test", "sheet", hash, "")
+		report, err := svc.MergeWithSetup(ctx, actor.ID, "test", "sheet", preview.RawHash, "", setupConfig())
 		if err != nil || len(report.Errors) != 0 {
 			t.Fatalf("merge: %+v, %v", report, err)
 		}

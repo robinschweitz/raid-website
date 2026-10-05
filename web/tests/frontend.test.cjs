@@ -504,6 +504,32 @@ test('import ignores preview response after source edit and guards merge duplica
   assert.equal(button(view, 'Zusammenführen').props.disabled, true)
 })
 
+test('import setup sends explicit owner settings and schedule edits invalidate preview and stale handlers', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
+  form(view).props.onSubmit(event)
+  assert.deepEqual(JSON.parse(JSON.stringify(writes(s)[0].body.setup)), {
+    name: 'ICC25', leader: 'Oxora', first_date: '2026-10-05', start_time: '19:00',
+    timezone: 'Europe/Berlin', weekdays: [1], interval_weeks: 1,
+  })
+  writes(s)[0].resolve(report())
+  await flush(view)
+  const staleMerge = button(view, 'Zusammenführen').props.onClick
+  nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'time')[0].props.onChange(change('20:00'))
+  await staleMerge()
+  view.render()
+  assert.equal(writes(s).length, 1)
+  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
+  form(view).props.onSubmit(event)
+  assert.equal(writes(s).at(-1).body.setup.start_time, '20:00')
+  nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')[0].props.onChange({ target: { checked: false } })
+  writes(s).at(-1).resolve(report())
+  await flush(view)
+  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
+  form(view).props.onSubmit(event)
+  assert.equal('setup' in writes(s).at(-1).body, false)
+})
+
 test('auth distinguishes network failure from anonymous and supports retry', async () => {
   const s = setup()
   const view = s.mount(s.load('auth.tsx').AuthProvider, { children: null })

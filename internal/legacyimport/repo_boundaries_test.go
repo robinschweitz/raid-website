@@ -51,7 +51,7 @@ func TestMappedRaidLifecycleRejectsAdditions(t *testing.T) {
 	for _, archived := range []bool{false, true} {
 		name := "cancelled"
 		if archived {
-			name = "archived"
+			name = "inconsistent archived active raid"
 		}
 		t.Run(name, func(t *testing.T) {
 			s, actor := importFixture(t)
@@ -62,6 +62,7 @@ func TestMappedRaidLifecycleRejectsAdditions(t *testing.T) {
 				t.Fatal(err)
 			}
 			if archived {
+				rd.Status = validation.RaidStatusOpen
 				now := time.Now().UTC()
 				rd.ArchivedAt = &now
 			} else {

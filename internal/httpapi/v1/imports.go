@@ -11,9 +11,10 @@ import (
 const DefaultSheetID = "1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU"
 
 type importRequest struct {
-	SheetID string `json:"sheet_id"`
-	RawHash string `json:"raw_hash"`
-	Reason  string `json:"reason"`
+	Setup   *legacyimport.SetupConfig `json:"setup"`
+	SheetID string                    `json:"sheet_id"`
+	RawHash string                    `json:"raw_hash"`
+	Reason  string                    `json:"reason"`
 }
 
 func (a *API) listImports(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +40,7 @@ func (a *API) dryRunImport(w http.ResponseWriter, r *http.Request) {
 	if sheetID == "" {
 		sheetID = DefaultSheetID
 	}
-	rep, err := a.Imports.DryRun(r.Context(), "google_sheets", sheetID)
+	rep, err := a.Imports.DryRunWithSetup(r.Context(), "google_sheets", sheetID, req.Setup)
 	if err != nil {
 		WriteError(w, http.StatusBadGateway, "fetch_failed", "could not fetch or parse the spreadsheet")
 		return
@@ -62,7 +63,7 @@ func (a *API) mergeImport(w http.ResponseWriter, r *http.Request) {
 	if sheetID == "" {
 		sheetID = DefaultSheetID
 	}
-	rep, err := a.Imports.Merge(r.Context(), actor, "google_sheets", sheetID, req.RawHash, req.Reason)
+	rep, err := a.Imports.MergeWithSetup(r.Context(), actor, "google_sheets", sheetID, req.RawHash, req.Reason, req.Setup)
 	if err != nil {
 		if errors.Is(err, legacyimport.ErrPreviewRequired) {
 			WriteError(w, http.StatusConflict, "preview_required", "Bitte zuerst eine Vorschau erstellen")

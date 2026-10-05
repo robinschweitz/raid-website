@@ -9,7 +9,7 @@ future agents do not re-litigate them or silently change them.
 Authoritative sources, in order of precedence:
 
 1. This file (owner-level requirements and constraints)
-2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-028)
+2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-029)
 3. `ARCHITECTURE.md` (module map and principles)
 4. `CODING_RULES.md` (defines the coding rules)
 5. `README.md` (commands)
@@ -164,6 +164,9 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 
 ### 4.10 Legacy Google Sheet import
 - Source tabs: `Raid Archive`, `Loot Archive`, `Charaktere`, `Punkte`.
+  Current setup additionally reads `ICC25 Raidsetup` A–F (ADR 029): the first numbered
+  roster block, with explicit administrator-supplied schedule and leader. One source/sheet
+  bootstrap creates a PLANNED raid and series; repeat imports preserve that setup.
   Sheet ID `1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU`; fetched as CSV via
   `https://docs.google.com/spreadsheets/d/<id>/gviz/tq?tqx=out:csv&sheet=<escaped-name>`.
 - Sheet date format is German `DD.MM.YYYY`; raid IDs look like `ICC25-01`.
@@ -199,7 +202,11 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   A conflict rejects the entire merge with a report and no domain writes.
 - Import raid identity is scoped to source and sheet provenance. New rows in existing
   imported raids require an explicit reason and audited correction consequences; name
-  collisions without provenance and additions to cancelled/archived raids are conflicts.
+  collisions without provenance and additions to cancelled raids are conflicts.
+  ADR 029 permits ADMIN import-only additions to provenance-mapped archived COMPLETED
+  raids, with actor/reason audit and append-only EP/token differences. Ordinary archived
+  edits remain forbidden. Imported historical raids are archived; archival classification
+  of older imports never re-awards EP or creates recurrence successors.
 - An error-free server-side preview must exist for the source, sheet, and raw hash before a
   new merge. Preview metadata may be persisted; previews never write domain records.
 - Production requires explicit nondefault bootstrap credentials. Configuration, migrations,

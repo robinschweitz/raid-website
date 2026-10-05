@@ -260,6 +260,7 @@ export interface Vote {
 }
 
 export interface ImportCounts {
+	series?: number
   players: number
   characters: number
   raids: number
@@ -270,6 +271,8 @@ export interface ImportCounts {
 }
 
 export interface ImportReport {
+	archived_raids?: number
+	setup?: { name: string; leader: string; scheduled_start: string; timezone: string; weekdays: number[]; interval_weeks: number; attendance: number; already_imported: boolean }
   mode: string
   source: string
   raw_hash: string

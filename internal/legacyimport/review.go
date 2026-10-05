@@ -128,6 +128,11 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 			}
 			raidID = existing.ID
 			rp.ExistingID = raidID
+			if existing.Status == validation.RaidStatusCompleted && existing.ArchivedAt == nil {
+				p.RequiresReason = true
+				rep.ArchivedRaids++
+				rep.Warnings = append(rep.Warnings, fmt.Sprintf("raid %q: reason_required to classify existing imported history as archived without awarding EP again", rp.Key))
+			}
 		} else if errors.Is(err, sql.ErrNoRows) {
 			_, err = s.raids.FindByName(ctx, rp.Key)
 			if err == nil {
@@ -178,8 +183,8 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 			}
 		}
 		if existing != nil && newRows > 0 {
-			if existing.ArchivedAt != nil || existing.Status == validation.RaidStatusCancelled {
-				rep.Errors = append(rep.Errors, fmt.Sprintf("raid %q: new attendance/loot forbidden for cancelled or archived raid", rp.Key))
+			if existing.Status == validation.RaidStatusCancelled || (existing.ArchivedAt != nil && existing.Status != validation.RaidStatusCompleted) {
+				rep.Errors = append(rep.Errors, fmt.Sprintf("raid %q: new attendance/loot forbidden for cancelled or inconsistent archived raid", rp.Key))
 			} else if existing.Status != validation.RaidStatusCompleted && existing.Status != validation.RaidStatusPlanned && existing.Status != validation.RaidStatusOpen {
 				rep.Errors = append(rep.Errors, fmt.Sprintf("raid %q: state does not allow import additions", rp.Key))
 			} else {
@@ -229,6 +234,11 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 		}
 	}
 	rep.Created.Loot = len(newLoot)
+	if p.Setup != nil {
+		rep.Created.Series++
+		rep.Created.Raids++
+		rep.Created.Attendance += len(p.Setup.Entries)
+	}
 	for _, row := range newLoot {
 		if row.IsToken {
 			rep.Created.Tokens++
@@ -236,6 +246,7 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 	}
 	if len(rep.Errors) > 0 {
 		rep.Created = Counts{}
+		rep.ArchivedRaids = 0
 	}
 	return p, nil
 }

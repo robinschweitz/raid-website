@@ -4,13 +4,13 @@ import { useAuth } from '../auth'
 import { Link } from '../router'
 import type { Attendance, Character, Player, PointsResponse, Poll, Raid, Vote } from '../types'
 import { Citadel } from '../components/Citadel'
-import { EnhancePointsCard } from '../components/EnhancePointsCard'
+// import { EnhancePointsCard } from '../components/EnhancePointsCard'
 import { AttendanceRing } from '../components/AttendanceRing'
 import { BossProgression } from '../components/BossProgression'
 import { RaidCompositionCard } from '../components/RaidCompositionCard'
 import { GuildNotifications } from '../components/GuildNotifications'
 import { PlayerProfilePanel } from '../components/PlayerProfilePanel'
-import { StatisticsCharts } from '../components/StatisticsCharts'
+// import { StatisticsCharts } from '../components/StatisticsCharts'
 
 const ICC_BOSSES = ['Marrowgar', 'Lady Deathwhisper', 'Gunship', 'Saurfang', 'Festergut', 'Rotface', 'Putricide', 'Valithria', 'Sindragosa', 'Lich King']
 
@@ -51,7 +51,7 @@ export function DashboardPage() {
         .catch((err) => { if (active) setPointsError(err instanceof ApiError ? err.message : 'EP konnten nicht geladen werden.') })
       api.get<Character[]>(`/api/v1/players/${player.id}/characters`)
         .then((chars) => { if (active) setCharacters(chars) })
-        .catch(() => {})
+        .catch((err) => { if (active) setError(err instanceof ApiError ? err.message : 'Charaktere konnten nicht geladen werden.') })
     }
     return () => { active = false }
   }, [player])
@@ -153,11 +153,6 @@ export function DashboardPage() {
         {!loading && !error && polls.length === 0 && <p className="muted">Aktuell keine offenen Umfragen.</p>}
       </section>
 
-      <section className="card widget-boss">
-        <div className="section-heading"><h2>Boss Progression</h2><span className="eyebrow">{nextRaid?.name ?? 'Kein aktiver Raid'}</span></div>
-        <BossProgression bosses={ICC_BOSSES} killedCount={0} currentIndex={0} />
-      </section>
-
       <section className="card widget-notifications">
         <div className="section-heading"><h2>Benachrichtigungen</h2><span className="eyebrow">Aktivit&auml;t</span></div>
         <GuildNotifications polls={polls} raids={raids} />
@@ -179,18 +174,29 @@ export function DashboardPage() {
         </table></div>
       </section>
 
-      <section className="card widget-stats">
+      {/* <section className="card widget-stats">
         <div className="section-heading"><h2>Statistiken</h2><span className="eyebrow">Saison</span></div>
         <StatisticsCharts raids={raids} />
-      </section>
+      </section> */}
 
       <section className="card widget-profile">
         <div className="section-heading"><h2>Mein Profil</h2></div>
         {player && <PlayerProfilePanel player={player} characters={characters} points={points} />}
+        {pointsError && <p className="error" role="alert">{pointsError}</p>}
+      </section>
+
+      <section className="card dashboard-agenda">
+        <div className="section-heading"><h2>Raidagenda</h2><span className="eyebrow">Gespeicherte Termine</span></div>
+        {upcoming.slice(0, 5).map((r) => <div className="agenda-row" key={r.id}>
+          <time dateTime={r.scheduled_start!}><strong>{new Date(r.scheduled_start!).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</strong><span>{new Date(r.scheduled_start!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></time>
+          <Link to={`/raids/${r.id}`}>{r.name}</Link>
+          <span className="badge">{r.status === 'OPEN' ? 'Offen' : 'Geplant'}</span>
+        </div>)}
+        {!loading && !error && upcoming.length === 0 && <p className="muted">Keine zuk&uuml;nftigen Termine gespeichert.</p>}
       </section>
     </div>
 
-    <div className="dashboard-columns">
+    {/* <div className="dashboard-columns">
       <div className="dashboard-points">
         {pointsError && <p className="error" role="alert">{pointsError}</p>}
         <EnhancePointsCard points={points} />
@@ -224,6 +230,6 @@ export function DashboardPage() {
         </div>)}
         {!loading && !error && history.length === 0 && <p className="muted">Noch keine archivierten Raids.</p>}
       </section>
-    </div>
+    </div> */}
   </div>
 }

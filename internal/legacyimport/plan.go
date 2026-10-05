@@ -80,6 +80,7 @@ func (l LootPlan) IsMainSpec() bool {
 }
 
 type Plan struct {
+	Setup          *SetupPlan
 	RequiresReason bool
 	Players        []PlayerPlan
 	Characters     []CharacterPlan

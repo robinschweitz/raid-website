@@ -38,7 +38,7 @@ func (b *sourceLimitsBody) Close() error {
 func TestGoogleFetcherSourceLimits(t *testing.T) {
 	const limit = 8 << 20
 	names := DefaultSheetNames()
-	tabs := []string{names.Raid, names.Loot, names.Character, names.Points}
+	tabs := []string{names.Raid, names.Loot, names.Character, names.Points, names.Setup}
 	for tabIndex, tab := range tabs {
 		for _, size := range []int{limit, limit + 1} {
 			name := tab + "/exact_limit"
@@ -57,6 +57,9 @@ func TestGoogleFetcherSourceLimits(t *testing.T) {
 					}
 					if got := req.URL.Query().Get("sheet"); got != tabs[index] {
 						t.Fatalf("requested tab = %q, want %q", got, tabs[index])
+					}
+					if tabs[index] == names.Setup && req.URL.Query().Get("range") != "A:F" {
+						t.Fatal("setup request must be restricted to A:F")
 					}
 					part := "name\nexample\n"
 					if index == tabIndex {
@@ -93,7 +96,7 @@ func TestGoogleFetcherSourceLimits(t *testing.T) {
 					t.Fatalf("requests = %d, want %d", len(bodies), len(tabs))
 				}
 				hash := sha256.New()
-				for index, part := range [][]byte{data.Raid, data.Loot, data.Character, data.Points} {
+				for index, part := range [][]byte{data.Raid, data.Loot, data.Character, data.Points, data.Setup} {
 					if string(part) != parts[index] {
 						t.Fatalf("tab %d content was truncated or changed", index)
 					}

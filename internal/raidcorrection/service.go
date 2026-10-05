@@ -38,7 +38,7 @@ func referenceError(err error) error {
 	return err
 }
 
-func (s *Service) check(ctx context.Context, r *Repo, raidID, actor int64, reason string, edit bool) (bool, error) {
+func (s *Service) check(ctx context.Context, r *Repo, raidID, actor int64, reason string, edit, imported bool) (bool, error) {
 	if edit && (actor <= 0 || strings.TrimSpace(reason) == "") {
 		return false, ErrReason
 	}
@@ -49,8 +49,20 @@ func (s *Service) check(ctx context.Context, r *Repo, raidID, actor int64, reaso
 	if _, err := r.players.Get(ctx, actor); err != nil {
 		return false, referenceError(err)
 	}
-	if rd.ArchivedAt != nil || rd.Status == validation.RaidStatusCancelled {
+	if rd.Status == validation.RaidStatusCancelled {
 		return false, ErrRaidState
+	}
+	if rd.ArchivedAt != nil {
+		if !imported || rd.Status != validation.RaidStatusCompleted {
+			return false, ErrRaidState
+		}
+		mapped, err := r.isImportedRaid(ctx, raidID)
+		if err != nil {
+			return false, err
+		}
+		if !mapped {
+			return false, ErrRaidState
+		}
 	}
 	completed := rd.Status == validation.RaidStatusCompleted
 	if completed && (actor <= 0 || strings.TrimSpace(reason) == "") {
@@ -140,7 +152,7 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 				row.RaidID = old.RaidID
 			}
 		}
-		completed, err := s.check(ctx, r, row.RaidID, actor, reason, row.ID != 0 || imported)
+		completed, err := s.check(ctx, r, row.RaidID, actor, reason, row.ID != 0 || imported, imported)
 		if err != nil {
 			return err
 		}
@@ -299,7 +311,7 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 			}
 			row.ItemLockID = old.ItemLockID
 		}
-		completed, err := s.check(ctx, r, row.RaidID, actor, reason, row.ID != 0 || imported)
+		completed, err := s.check(ctx, r, row.RaidID, actor, reason, row.ID != 0 || imported, imported)
 		if err != nil {
 			return err
 		}

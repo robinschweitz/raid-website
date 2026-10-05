@@ -27,6 +27,7 @@ var ErrPreviewRequired = errors.New("import preview required")
 var ErrSourceChanged = errors.New("import source changed since preview")
 
 type Counts struct {
+	Series     int `json:"series"`
 	Players    int `json:"players"`
 	Characters int `json:"characters"`
 	Raids      int `json:"raids"`
@@ -37,21 +38,23 @@ type Counts struct {
 }
 
 type Report struct {
-	Mode          string   `json:"mode"`
-	Source        string   `json:"source"`
-	RawHash       string   `json:"raw_hash"`
-	RowsRead      int      `json:"rows_read"`
-	Players       int      `json:"players"`
-	Characters    int      `json:"characters"`
-	Raids         int      `json:"raids"`
-	Attendance    int      `json:"attendance"`
-	Loot          int      `json:"loot"`
-	Tokens        int      `json:"tokens"`
-	PointsEntries int      `json:"points_entries"`
-	Created       Counts   `json:"created"`
-	Skipped       bool     `json:"skipped"`
-	Warnings      []string `json:"warnings"`
-	Errors        []string `json:"errors"`
+	ArchivedRaids int          `json:"archived_raids"`
+	Setup         *SetupReport `json:"setup,omitempty"`
+	Mode          string       `json:"mode"`
+	Source        string       `json:"source"`
+	RawHash       string       `json:"raw_hash"`
+	RowsRead      int          `json:"rows_read"`
+	Players       int          `json:"players"`
+	Characters    int          `json:"characters"`
+	Raids         int          `json:"raids"`
+	Attendance    int          `json:"attendance"`
+	Loot          int          `json:"loot"`
+	Tokens        int          `json:"tokens"`
+	PointsEntries int          `json:"points_entries"`
+	Created       Counts       `json:"created"`
+	Skipped       bool         `json:"skipped"`
+	Warnings      []string     `json:"warnings"`
+	Errors        []string     `json:"errors"`
 }
 
 // Service orchestrates legacy sheet import (dry-run and merge).
@@ -142,17 +145,24 @@ func (s *Service) List(ctx context.Context) ([]Import, error) {
 // DryRun fetches and reviews an import, persisting only successful preview metadata.
 // It never writes domain records.
 func (s *Service) DryRun(ctx context.Context, source, sheetID string) (Report, error) {
+	return s.DryRunWithSetup(ctx, source, sheetID, nil)
+}
+
+func (s *Service) DryRunWithSetup(ctx context.Context, source, sheetID string, config *SetupConfig) (Report, error) {
 	data, err := s.fetcher.Fetch(ctx, sheetID)
 	if err != nil {
 		return Report{}, err
 	}
-	p, rows, err := planFromSheet(data)
-	if err != nil {
-		return Report{}, err
-	}
-	rep := reportFromPlan("dry_run", source, data, p, rows)
+	data.Hash = setupHash(data.Hash, config)
+	var rep Report
 	err = s.transaction(ctx, true, func(bound *Service) error {
-		_, err := bound.review(ctx, source, sheetID, p, &rep)
+		p, rows, setupReport, err := bound.planWithSetup(ctx, source, sheetID, data, config)
+		if err != nil {
+			return err
+		}
+		rep = reportFromPlan("dry_run", source, data, p, rows)
+		rep.Setup = setupReport
+		_, err = bound.review(ctx, source, sheetID, p, &rep)
 		if err != nil {
 			return err
 		}
@@ -166,11 +176,16 @@ func (s *Service) DryRun(ctx context.Context, source, sheetID string) (Report, e
 
 // Merge fetches and applies an import. It is idempotent for identical source data.
 func (s *Service) Merge(ctx context.Context, actorID int64, source, sheetID, expectedHash, reason string) (Report, error) {
+	return s.MergeWithSetup(ctx, actorID, source, sheetID, expectedHash, reason, nil)
+}
+
+func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, sheetID, expectedHash, reason string, config *SetupConfig) (Report, error) {
 	data, err := s.fetcher.Fetch(ctx, sheetID)
 	if err != nil {
 		return Report{}, err
 	}
 
+	data.Hash = setupHash(data.Hash, config)
 	rep := Report{Mode: "merge", Source: source, RawHash: data.Hash, Warnings: []string{}, Errors: []string{}}
 
 	err = s.transaction(ctx, true, func(s *Service) error {
@@ -200,11 +215,12 @@ func (s *Service) Merge(ctx context.Context, actorID int64, source, sheetID, exp
 		if !hasPreview {
 			return ErrPreviewRequired
 		}
-		p, rows, err := planFromSheet(data)
+		p, rows, setupReport, err := s.planWithSetup(ctx, source, sheetID, data, config)
 		if err != nil {
 			return err
 		}
 		rep = reportFromPlan("merge", source, data, p, rows)
+		rep.Setup = setupReport
 		if _, err := s.players.Get(ctx, actorID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrActorNotFound
@@ -220,9 +236,11 @@ func (s *Service) Merge(ctx context.Context, actorID int64, source, sheetID, exp
 		}
 		if len(rep.Errors) > 0 {
 			rep.Created = Counts{}
+			rep.ArchivedRaids = 0
 			return nil
 		}
 		rep.Created = Counts{}
+		rep.ArchivedRaids = 0
 		pointsBefore, err := s.imports.pointTransactionCount(ctx)
 		if err != nil {
 			return err
@@ -243,14 +261,11 @@ func (s *Service) Merge(ctx context.Context, actorID int64, source, sheetID, exp
 		if err := s.mergeLoot(ctx, source, sheetID, reason, raidIDs, playerIDs, actorID, p, now, &rep); err != nil {
 			return err
 		}
-		alreadyImported, err := s.imports.hasMergedSource(ctx, source, sheetID)
-		if err != nil {
+		if err := s.archiveImportedHistory(ctx, actorID, reason, p, now, &rep); err != nil {
 			return err
 		}
-		if !alreadyImported {
-			if err := s.mergeCurrentRaid(ctx, actorID, p, now, &rep); err != nil {
-				return err
-			}
+		if err := s.mergeSetup(ctx, source, sheetID, p, charIDs, playerIDs, now, &rep); err != nil {
+			return err
 		}
 		pointsAfter, err := s.imports.pointTransactionCount(ctx)
 		if err != nil {
@@ -273,8 +288,8 @@ func (s *Service) Merge(ctx context.Context, actorID int64, source, sheetID, exp
 			Status:         "MERGED",
 			WarningsCount:  len(rep.Warnings),
 			ErrorsCount:    len(rep.Errors),
-			CreatedCount:   rep.Created.Players + rep.Created.Characters + rep.Created.Raids + rep.Created.Attendance + rep.Created.Loot + rep.Created.Tokens + rep.Created.Points,
-			UpdatedCount:   0,
+			CreatedCount:   rep.Created.Series + rep.Created.Players + rep.Created.Characters + rep.Created.Raids + rep.Created.Attendance + rep.Created.Loot + rep.Created.Tokens + rep.Created.Points,
+			UpdatedCount:   rep.ArchivedRaids,
 			UnchangedCount: 0,
 			StartedAt:      &started,
 			CompletedAt:    &completed,
@@ -517,102 +532,5 @@ func (s *Service) mergeLoot(ctx context.Context, source, sheetID, reason string,
 			rep.Created.Tokens++
 		}
 	}
-	return nil
-}
-
-func (s *Service) mergeCurrentRaid(ctx context.Context, actorID int64, p Plan, now time.Time, rep *Report) error {
-	if len(p.Raids) == 0 {
-		return nil
-	}
-
-	var latest *RaidPlan
-	for i := range p.Raids {
-		rp := &p.Raids[i]
-		if rp.Date == nil {
-			continue
-		}
-		if latest == nil || rp.Date.After(*latest.Date) {
-			latest = rp
-		}
-	}
-	if latest == nil {
-		return nil
-	}
-
-	seriesName := latest.Key
-	if idx := strings.LastIndex(seriesName, "-"); idx > 0 {
-		seriesName = seriesName[:idx]
-	}
-
-	weekday := int(latest.Date.Weekday())
-	if weekday == 0 {
-		weekday = 6
-	} else {
-		weekday--
-	}
-
-	raidSize := 25
-	if latest.RaidSize > 0 {
-		raidSize = latest.RaidSize
-	}
-
-	instanceID := latest.CatalogInstanceID
-	if instanceID == "" {
-		instanceID = "631"
-	}
-
-	startTime := "19:30"
-	if latest.Date.Hour() > 0 || latest.Date.Minute() > 0 {
-		startTime = fmt.Sprintf("%02d:%02d", latest.Date.Hour(), latest.Date.Minute())
-	}
-
-	series := &raidseries.Series{
-		Name:              seriesName,
-		RaidLeaderID:      actorID,
-		Weekdays:          []int{weekday},
-		IntervalWeeks:     1,
-		StartTime:         startTime,
-		Timezone:          "Europe/Berlin",
-		CatalogInstanceID: &instanceID,
-		RaidSize:          &raidSize,
-		CreatedAt:         now,
-		UpdatedAt:         now,
-	}
-
-	if err := s.series.Save(ctx, series); err != nil {
-		return fmt.Errorf("create raid series: %w", err)
-	}
-
-	scheduled, err := raidseries.NextOccurrence(series, *latest.Date, now)
-	if err != nil {
-		return fmt.Errorf("compute next occurrence: %w", err)
-	}
-
-	existing, err := s.raids.FindOccurrence(ctx, series.ID, scheduled)
-	if err != nil {
-		return fmt.Errorf("check existing occurrence: %w", err)
-	}
-	if existing != nil {
-		return nil
-	}
-
-	nextRaid := &raid.Raid{
-		Name:              series.Name,
-		RaidLeaderID:      actorID,
-		SeriesID:          &series.ID,
-		Status:            validation.RaidStatusPlanned,
-		ScheduledStart:    &scheduled,
-		CatalogInstanceID: &instanceID,
-		RaidSize:          &raidSize,
-		CreatedAt:         now,
-		UpdatedAt:         now,
-	}
-
-	if err := s.raids.Create(ctx, nextRaid); err != nil {
-		return fmt.Errorf("create current raid: %w", err)
-	}
-
-	rep.Created.Raids++
-	rep.Warnings = append(rep.Warnings, fmt.Sprintf("created current raid %q scheduled %s from series %q", nextRaid.Name, scheduled.Format(time.RFC3339), series.Name))
 	return nil
 }

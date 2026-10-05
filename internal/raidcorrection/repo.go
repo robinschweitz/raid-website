@@ -34,6 +34,10 @@ func NewRepo(db bun.IDB) *Repo {
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo { return NewRepo(tx) }
 
+func (r *Repo) isImportedRaid(ctx context.Context, raidID int64) (bool, error) {
+	return r.db.NewSelect().TableExpr("legacy_raid_mappings").Where("raid_id = ?", raidID).Exists(ctx)
+}
+
 func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
 	if _, isBound := r.db.(bun.Tx); isBound {
 		if err := r.loot.ReserveWriter(ctx); err != nil {

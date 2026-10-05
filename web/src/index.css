@@ -1131,6 +1131,7 @@ input[type='checkbox'] {
   gap: 8px;
   margin-top: 14px;
   padding-top: 14px;
+  padding-bottom: 14px;
   border-top: 1px solid var(--border);
 }
 

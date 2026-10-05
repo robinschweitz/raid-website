@@ -30,14 +30,14 @@ export function PlayerProfilePanel({ player, characters, points }: PlayerProfile
       </div>
     </div>
     <div className="profile-recent">
-      <h4>Letzte EP-Buchungen</h4>
+      <h4>History</h4>
       {recentTransactions.map((t) => <div className="recent-ep" key={t.id}>
         <span>{t.reason || t.type}</span>
         <span className={`ep-amount ${t.amount > 0 ? 'positive' : t.amount < 0 ? 'negative' : ''}`}>
           {t.amount > 0 ? `+${t.amount}` : t.amount}
         </span>
       </div>)}
-      {recentTransactions.length === 0 && <p className="muted">Noch keine Buchungen.</p>}
+      {recentTransactions.length === 0 && <p className="muted">Noch keine Einträge in der Historie.</p>}
     </div>
     <p style={{ marginTop: 12, fontSize: 12 }}>
       <Link to={`/players/${player.id}`}>Vollst&auml;ndiges Profil &rarr;</Link>

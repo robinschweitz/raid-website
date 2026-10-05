@@ -19,7 +19,7 @@ export function AttendanceRing({ confirmed, total, size = 100 }: AttendanceRingP
     </svg>
     <div className="ring-text">
       <strong>{percentage}%</strong>
-      <span>Besucht</span>
+      {/* <span>Besucht</span> */}
     </div>
   </div>
 }

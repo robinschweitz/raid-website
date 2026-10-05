@@ -71,6 +71,25 @@ export interface Raid {
 
 export type AttendanceRole = 'TANK' | 'HEAL' | 'DD'
 
+export interface RaidSignup {
+  id: number
+  player_id: number
+  character_id: number
+  character_name: string
+  class: string
+  spec: string
+  is_withdrawn: boolean
+  is_accepted: boolean
+  attendance_id: number
+}
+
+export interface SignupOverview {
+  is_enabled: boolean
+  is_open: boolean
+  entries: RaidSignup[]
+  class_specs: Record<string, string[]>
+}
+
 export interface Attendance {
   id: number
   raid_id: number

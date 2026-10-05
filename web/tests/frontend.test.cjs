@@ -79,7 +79,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
       const exports = load(path.relative(path.resolve(__dirname, '../src'), resolved + extension))
       return name.endsWith('/api') ? { ...exports, api } : exports
     }
-    vm.runInThisContext(`(function(require,module,exports,window,crypto){${source}\n})`, { filename })(localRequire, module, module.exports, { prompt: () => prompts.shift() }, crypto)
+    vm.runInThisContext(`(function(require,module,exports,window,crypto){${source}\n})`, { filename })(localRequire, module, module.exports, { prompt: () => prompts.shift(), setInterval: () => 0, clearInterval: () => {} }, crypto)
     return module.exports
   }
 
@@ -142,6 +142,50 @@ const change = (value) => ({ target: { value } })
 const flush = async (view) => { for (let i = 0; i < 8; i++) await Promise.resolve(); view.render() }
 const writes = (s) => s.requests.filter((r) => r.method !== 'get')
 const raid = (id) => ({ id, name: `Raid ${id}`, status: 'OPEN' })
+
+test('raid signups submit several own characters and guard duplicate submissions', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, entries: [], class_specs: { Magier: ['Arkan', 'Feuer', 'Frost'] } })
+  resolveIf(s, '/api/v1/players/1/characters', [1, 2].map((id) => ({ id, player_id: 1, name: `Magier ${id}`, class: 'Magier', main_spec: 'Feuer' })))
+  await flush(view)
+  for (const node of nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')) node.props.onChange({ target: { checked: true } })
+  view.render()
+  const selects = nodes(view.tree, (n) => n.type === 'select')
+  selects[1].props.onChange(change('Arkan'))
+  view.render()
+  form(view).props.onSubmit(event)
+  form(view).props.onSubmit(event)
+  assert.equal(writes(s).length, 1)
+  assert.deepEqual(writes(s)[0].body, { choices: [{ character_id: 1, spec: 'Feuer' }, { character_id: 2, spec: 'Arkan' }] })
+  assert.equal(button(view, 'Anmeldungen öffnen'), undefined)
+  view.unmount()
+})
+
+test('raid assistants explicitly confirm alternative switches after signup closure', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, {
+    raid: { ...raid(8), scheduled_start: '2000-01-01T20:00:00Z' },
+    attendance: [{ id: 44, player_id: 2, character_id: 11 }], players: [{ id: 2, name: 'Spieler' }], onRosterChange: async () => {},
+  })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: false, class_specs: {}, entries: [
+    { id: 4, player_id: 2, character_id: 11, character_name: 'Erster', class: 'Magier', spec: 'Feuer', attendance_id: 44, is_accepted: true, is_withdrawn: false },
+    { id: 5, player_id: 2, character_id: 12, character_name: 'Alternative', class: 'Magier', spec: 'Frost', attendance_id: 44, is_accepted: false, is_withdrawn: false },
+  ] })
+  resolveIf(s, '/api/v1/players/1/characters', [])
+  await flush(view)
+  assert.equal(form(view), undefined)
+  button(view, 'Auf diesen Charakter wechseln').props.onClick()
+  view.render()
+  assert.equal(writes(s).length, 0)
+  button(view, 'Charakterwechsel bestätigen').props.onClick()
+  assert.equal(writes(s).length, 1)
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/signups/5/accept')
+  assert.deepEqual(writes(s)[0].body, { replace_attendance_id: 44, expected_character_id: 11 })
+  view.unmount()
+})
 const player = (id, role = 'MEMBER') => ({ id, name: `Spieler ${id}`, role, username: `user${id}` })
 const character = (id, playerID) => ({ id, player_id: playerID, name: `Char ${id}`, class: 'Priest', main_spec: 'Shadow', second_spec: 'Holy' })
 const seriesRow = { id: 3, name: 'Configured raid', raid_leader_id: 2, weekdays: [0, 3], interval_weeks: 2, start_time: '20:30', timezone: 'Europe/Berlin', catalog_instance_id: 'map:631', raid_size: 25 }

@@ -9,7 +9,7 @@ future agents do not re-litigate them or silently change them.
 Authoritative sources, in order of precedence:
 
 1. This file (owner-level requirements and constraints)
-2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-032)
+2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-033)
 3. `ARCHITECTURE.md` (module map and principles)
 4. `CODING_RULES.md` (defines the coding rules)
 5. `README.md` (commands)
@@ -109,6 +109,15 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   finalized/cancelled occurrence or another predecessor is reported, not overwritten.
 - Existing stored completed raids are historical: archival never recreates their EP or starts
   a new recurrence chain. Existing active raids can be assigned a series and scheduled start.
+
+### 4.2.1 Future raid signups (ADR 033)
+- RAIDASSISTENT and higher explicitly open/close signups independently of raid lifecycle.
+- MEMBER and higher may submit multiple own characters, each with any valid class spec.
+- Pending choices can be edited/withdrawn while open; accepted choices are staff-managed.
+- Only one character per player is accepted, automatically creating the roster snapshot.
+- Alternatives remain visible; staff can explicitly switch the roster slot.
+- Signups close at the scheduled start (server-enforced) or manually earlier. Staff may
+  continue accepting choices in active raids after closing. All changes are audited.
 
 ### 4.3 Enhance Points (EP) — the core rule
 - **+10 EP** for a player who received **no main-spec loot** in that raid.

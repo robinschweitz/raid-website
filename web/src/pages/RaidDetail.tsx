@@ -6,6 +6,7 @@ import { Link } from '../router'
 import { RaidLootList } from '../components/RaidLootList'
 import { RaidBanner } from '../components/RaidBanner'
 import { RaidRosterBoard } from '../components/RaidRosterBoard'
+import { RaidSignups } from '../components/RaidSignups'
 import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Attendance, type AttendanceRole, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
 import { catalogSourceLabels, matchesCatalogItem } from '../catalog'
 
@@ -83,7 +84,7 @@ function RaidDetail({ raidID }: Props) {
   const catalogVersion = useRef(0)
   const associationVersion = useRef(0)
   const persistedCatalogContext = useRef('')
-  const [view, setView] = useState<'roster' | 'loot' | 'planning'>('roster')
+  const [view, setView] = useState<'roster' | 'loot' | 'planning' | 'signups'>('roster')
   const { player: me } = useAuth()
   const [raid, setRaid] = useState<Raid | null>(null)
   const [attendance, setAttendance] = useState<Attendance[]>([])
@@ -597,10 +598,12 @@ function RaidDetail({ raidID }: Props) {
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
       <nav className="workspace-tabs" aria-label="Raidbereiche">
+        <button type="button" aria-pressed={view === 'signups'} aria-controls="raid-signups" onClick={() => setView('signups')}>Anmeldungen</button>
         <button type="button" aria-pressed={view === 'roster'} aria-controls="raid-roster" onClick={() => setView('roster')}>Aufstellung ({attendance.length})</button>
         <button type="button" aria-pressed={view === 'loot'} aria-controls="raid-loot" onClick={() => setView('loot')}>Loot ({loot.length})</button>
         <button type="button" aria-pressed={view === 'planning'} aria-controls="raid-planning" onClick={() => setView('planning')}>Planung & Details</button>
       </nav>
+      {view === 'signups' && <div id="raid-signups"><RaidSignups raid={raid} attendance={attendance} players={players} onRosterChange={load} /></div>}
       <section id="raid-planning" hidden={view !== 'planning'} className="card raid-summary" aria-label="Raidübersicht">
       <h2>Übersicht</h2>
       <p>{attendance.length} gespeicherte Teilnehmer · {loot.length} aufgezeichnete Loot-Vergaben</p>

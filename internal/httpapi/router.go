@@ -23,6 +23,7 @@ import (
 	"raid-website/internal/raidcompletion"
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidseries"
+	"raid-website/internal/raidsignup"
 	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
 	"raid-website/internal/webui"
@@ -92,6 +93,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Completion:   raidcompletion.NewService(raidcompletion.NewRepo(db)),
 		Corrections:  raidcorrection.NewService(raidcorrection.NewRepo(db)),
 		Imports:      importsSvc,
+		Signups:      raidsignup.NewService(raidsignup.NewRepo(db)),
 	})
 
 	mux := http.NewServeMux()

@@ -31,7 +31,7 @@ export function RaidLootList({ loot, attendance, playerName, canWrite, pending, 
               {method === 'ENHANCED' && <p className="muted">Gespeicherte Kosten: {row.enhanced_cost == null ? 'Historisch nicht gespeichert' : `${row.enhanced_cost} EP`}</p>}
               {children}</div></td> : <>
               <td>{row.item_name}</td><td>{row.boss || '—'}</td>
-              <td><span className={`character-name ${characterClassName(saved?.class ?? '')}`}>{saved?.character_name?.trim() || 'Charaktername historisch nicht gespeichert'}</span><br />{playerName(row.awarded_to_player_id)}</td>
+              <td><span className={`character-name ${characterClassName(saved?.class ?? '')}`}>{row.awarded_to_character_name?.trim() || saved?.character_name?.trim() || 'Charaktername historisch nicht gespeichert'}</span><br />{playerName(row.awarded_to_player_id)}</td>
               <td>{labels[method]}{row.item_lock_id && <span className="badge">Lock</span>}</td>
               <td>{method === 'ENHANCED' ? row.enhanced_cost == null ? 'Historisch nicht gespeichert' : `${row.enhanced_cost} EP` : '0 EP'}</td>
               <td>{row.notes || '—'}</td>

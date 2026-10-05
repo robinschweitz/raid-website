@@ -40,9 +40,9 @@ func TestAwardMethodMigrationPreservesHistory(t *testing.T) {
 	if _, err := database.DB.ExecContext(ctx, string(up)); err != nil {
 		t.Fatal(err)
 	}
-	// Inspect the version-six schema without requiring later catalog columns.
+	// Inspect the version-six schema without requiring later columns.
 	var awards []Award
-	err = database.DB.NewSelect().Model(&awards).ExcludeColumn("catalog_boss_id").Where("raid_id = ?", 1).Order("id ASC").Scan(ctx)
+	err = database.DB.NewSelect().Model(&awards).ExcludeColumn("catalog_boss_id", "awarded_to_character_name").Where("raid_id = ?", 1).Order("id ASC").Scan(ctx)
 	if err != nil || len(awards) != 2 {
 		t.Fatalf("awards %v error %v", awards, err)
 	}

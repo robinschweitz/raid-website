@@ -41,7 +41,9 @@ func TestCatalogAwardMigrationPreservesHistoryAndForeignKey(t *testing.T) {
 	}
 	for pass := 0; pass < 2; pass++ {
 		apply("008_catalog_awards.up.sql")
-		awards, err := NewRepo(database.DB).ListByRaid(ctx, 1)
+		// Inspect the version-eight schema without requiring later columns.
+		var awards []Award
+		err := database.DB.NewSelect().Model(&awards).ExcludeColumn("awarded_to_character_name").Where("raid_id = ?", 1).Scan(ctx)
 		if err != nil || len(awards) != 1 {
 			t.Fatalf("history: %v %v", awards, err)
 		}
@@ -61,6 +63,19 @@ func TestCatalogAwardMigrationPreservesHistoryAndForeignKey(t *testing.T) {
 		}
 		if pass == 0 {
 			apply("008_catalog_awards.down.sql")
+		}
+	}
+	for pass := 0; pass < 2; pass++ {
+		apply("012_loot_character_name.up.sql")
+		awards, err := NewRepo(database.DB).ListByRaid(ctx, 1)
+		if err != nil || len(awards) != 1 {
+			t.Fatalf("character snapshot migration: %+v %v", awards, err)
+		}
+		if awards[0].AwardedToCharacterName != "" || awards[0].AwardedToCharacterID != nil || awards[0].AwardedToPlayerID != 1 || awards[0].ItemName != "Old item" {
+			t.Fatalf("character snapshot migration fabricated history: %+v", awards[0])
+		}
+		if pass == 0 {
+			apply("012_loot_character_name.down.sql")
 		}
 	}
 }

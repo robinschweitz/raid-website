@@ -2204,6 +2204,15 @@ test('archived associated history keeps boss groups and saved names without cata
   assert.equal(s.requests.some((request) => request.url.includes('/loot-catalog/bosses')), false)
 })
 
+test('imported loot displays the sheet character name even without historical attendance', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { attendance: [], loot: [{ ...lootRow, awarded_to_character_name: 'Opinoid' }] })
+  await flush(view)
+  assert.match(text(view.tree), /Opinoid/)
+  assert.doesNotMatch(text(view.tree), /Charaktername historisch nicht gespeichert/)
+})
+
 test('an unrelated historical correction does not discard the pending boss list for the same persisted context', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })

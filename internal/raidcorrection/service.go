@@ -350,6 +350,11 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		row.UpdatedAt = time.Now().UTC()
 		old, _ := before.(*loot.Award)
 		recipientChanged := old != nil && (old.AwardedToPlayerID != row.AwardedToPlayerID || !sameCharacter(old.AwardedToCharacterID, row.AwardedToCharacterID))
+		if recipientChanged {
+			row.AwardedToCharacterName = ""
+		} else if old != nil {
+			row.AwardedToCharacterName = old.AwardedToCharacterName
+		}
 		enteringEnhanced := old != nil && old.AwardMethod != loot.Enhanced && row.AwardMethod == loot.Enhanced
 		if !imported && (old == nil || recipientChanged || enteringEnhanced) {
 			if err := loot.ValidateRecipient(ctx, r.loot, row); err != nil {

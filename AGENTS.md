@@ -181,6 +181,9 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   Sheet ID `1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU`; fetched as CSV via
   `https://docs.google.com/spreadsheets/d/<id>/gviz/tq?tqx=out:csv&sheet=<escaped-name>`.
 - Sheet date format is German `DD.MM.YYYY`; raid IDs look like `ICC25-01`.
+- `Loot Archive`'s `Spieler` column contains character names, not player names (ADR 035).
+  Resolve the character's owner and persist the source character name on the loot award.
+  Loot alone never fabricates attendance; existing imports are not silently rewritten.
 - **Never overwrite existing data.** Import is dry-run first, merge only when explicitly requested,
   and always returns a report (ADR 008).
 - Imports are de-duplicated by `raw_hash`: an identical source is skipped and the previous report is

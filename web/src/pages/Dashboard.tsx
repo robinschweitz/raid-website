@@ -27,11 +27,17 @@ export function DashboardPage() {
   const [attendanceError, setAttendanceError] = useState('')
   const [pointsError, setPointsError] = useState('')
   const [votesError, setVotesError] = useState('')
-  const [now] = useState(() => Date.now())
-  const upcoming = raids.filter((r) => !r.archived_at && (r.status === 'PLANNED' || r.status === 'OPEN') && r.scheduled_start && Date.parse(r.scheduled_start) > now)
+  const [now, setNow] = useState(() => Date.now())
+  const scheduledRaids = raids.filter((r) => !r.archived_at && (r.status === 'PLANNED' || r.status === 'OPEN') && r.scheduled_start && Number.isFinite(Date.parse(r.scheduled_start)))
     .sort((a, b) => Date.parse(a.scheduled_start!) - Date.parse(b.scheduled_start!) || a.id - b.id)
-  const nextRaid = upcoming[0]
+  const nextRaid = scheduledRaids[0]
+  const isRunning = !!nextRaid && Date.parse(nextRaid.scheduled_start!) <= now
   const history = raids.filter((r) => r.archived_at).sort((a, b) => Date.parse(b.archived_at!) - Date.parse(a.archived_at!) || b.id - a.id).slice(0, 10)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -88,10 +94,10 @@ export function DashboardPage() {
 
     <RaidBanner catalogInstanceId={nextRaid?.catalog_instance_id}>
       <div className="raid-banner-content">
-        <p className="eyebrow">N&auml;chster geplanter Raid</p>
+        <p className="eyebrow">{isRunning ? 'Laufender Raid' : 'Nächster geplanter Raid'}</p>
         {loading ? <p role="status" className="muted">Raidplanung wird geladen&hellip;</p> : nextRaid ? <>
           <div className="actions">
-            <span className="badge info">{nextRaid.status === 'OPEN' ? 'Offen' : 'Geplant'}</span>
+            <span className="badge info">{isRunning ? 'Läuft' : nextRaid.status === 'OPEN' ? 'Offen' : 'Geplant'}</span>
             {nextRaid.raid_size && <span className="badge">{nextRaid.raid_size} Spieler</span>}
             <span className="muted">{new Date(nextRaid.scheduled_start!).toLocaleString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}</span>
           </div>
@@ -185,12 +191,12 @@ export function DashboardPage() {
 
       <section className="card widget-agenda">
         <div className="section-heading"><h2>Raidagenda</h2><span className="eyebrow">Gespeicherte Termine</span></div>
-        {upcoming.slice(0, 5).map((r) => <div className="agenda-row" key={r.id}>
+        {scheduledRaids.slice(0, 5).map((r) => <div className="agenda-row" key={r.id}>
           <time dateTime={r.scheduled_start!}><strong>{new Date(r.scheduled_start!).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</strong><span>{new Date(r.scheduled_start!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></time>
           <Link to={`/raids/${r.id}`}>{r.name}</Link>
-          <span className="badge">{r.status === 'OPEN' ? 'Offen' : 'Geplant'}</span>
+          <span className="badge">{Date.parse(r.scheduled_start!) <= now ? 'Läuft' : r.status === 'OPEN' ? 'Offen' : 'Geplant'}</span>
         </div>)}
-        {!loading && !error && upcoming.length === 0 && <p className="muted">Keine zuk&uuml;nftigen Termine gespeichert.</p>}
+        {!loading && !error && scheduledRaids.length === 0 && <p className="muted">Keine laufenden oder zuk&uuml;nftigen Termine gespeichert.</p>}
       </section>
     </div>
 

@@ -61,6 +61,7 @@ type LootPlan struct {
 	Fingerprint   string
 	RaidKey       string
 	PlayerName    string
+	CharacterName string
 	Item          string
 	ItemID        string
 	Priority      string
@@ -257,15 +258,21 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 			}
 			seenIDs[externalID] = true
 		}
-		player := strings.TrimSpace(row.Player)
+		characterName := strings.TrimSpace(row.Player)
 		item := strings.TrimSpace(row.Loot)
-		if player == "" || item == "" {
-			if player != "" || item != "" || externalID != "" {
-				p.Errors = append(p.Errors, fmt.Sprintf("loot row %d: missing player or item", i+2))
+		if characterName == "" || item == "" {
+			if characterName != "" || item != "" || externalID != "" {
+				p.Errors = append(p.Errors, fmt.Sprintf("loot row %d: missing character or item", i+2))
 			}
 			continue
 		}
-		ensurePlayer(player)
+		c := characters[characterName]
+		if c == nil {
+			c = &CharacterPlan{Name: characterName, PlayerName: characterName}
+			characters[characterName] = c
+			ensurePlayer(characterName)
+			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: character %q not in Charaktere or Raid Archive, created with own player", i+2, characterName))
+		}
 		key := strings.TrimSpace(row.RaidID)
 		if key == "" {
 			key = "LEGACY-LOOT"
@@ -290,7 +297,8 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 		if !isToken && strings.EqualFold(priority, "token") {
 			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: priority Token but %q is not an armor token; no token recorded", i+2, item))
 		}
-		content, _ := json.Marshal([]string{row.RaidID, row.TimestampRaw, player, item, row.ItemID, priority})
+		// Keep source fingerprints stable across recipient resolution changes.
+		content, _ := json.Marshal([]string{row.RaidID, row.TimestampRaw, characterName, item, row.ItemID, priority})
 		fingerprint := fmt.Sprintf("%x", sha256.Sum256(content))
 		var identity string
 		if externalID != "" {
@@ -302,13 +310,14 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 		p.Loot = append(p.Loot, LootPlan{
 			Date:       date,
 			ExternalID: externalID, Identity: identity, Fingerprint: fingerprint,
-			RaidKey:    key,
-			PlayerName: player,
-			Item:       item,
-			ItemID:     strings.TrimSpace(row.ItemID),
-			Priority:   priority,
-			IsToken:    isToken,
-			Method:     method,
+			RaidKey:       key,
+			PlayerName:    c.PlayerName,
+			CharacterName: characterName,
+			Item:          item,
+			ItemID:        strings.TrimSpace(row.ItemID),
+			Priority:      priority,
+			IsToken:       isToken,
+			Method:        method,
 		})
 	}
 

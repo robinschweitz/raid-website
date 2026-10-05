@@ -10,6 +10,12 @@ function setup(player = { id: 7, name: 'Real player', role: 'MEMBER' }) {
   const cache = new Map(), requests = [], slots = []
   let index = 0, effects = [], active = true, tree, component
   let fetchMock = () => { throw new Error('Unexpected fetch') }
+  let now = Date.parse('2026-10-04T12:00:00Z')
+  const timers = new Map()
+  const windowMock = {
+    setInterval(fn) { const id = timers.size + 1; timers.set(id, fn); return id },
+    clearInterval(id) { timers.delete(id) },
+  }
   const jsx = (type, props) => ({ type, props: props ?? {} })
   const react = {
     useState(initial) {
@@ -31,7 +37,7 @@ function setup(player = { id: 7, name: 'Real player', role: 'MEMBER' }) {
     },
   }
   react.useLayoutEffect = react.useEffect
-  class FixedDate extends Date { static now() { return Date.parse('2026-10-04T12:00:00Z') } }
+  class FixedDate extends Date { static now() { return now } }
   function load(relative) {
     const filename = path.resolve(__dirname, '../src', relative)
     if (cache.has(filename)) return cache.get(filename)
@@ -49,7 +55,7 @@ function setup(player = { id: 7, name: 'Real player', role: 'MEMBER' }) {
       const resolved = path.resolve(path.dirname(filename), name)
       return load(path.relative(path.resolve(__dirname, '../src'), resolved + (fs.existsSync(resolved + '.ts') ? '.ts' : '.tsx')))
     }
-    vm.runInThisContext(`(function(require,module,exports,Date,fetch){${source}\n})`, { filename })(requireLocal, module, module.exports, FixedDate, (...args) => fetchMock(...args))
+    vm.runInThisContext(`(function(require,module,exports,Date,fetch,window){${source}\n})`, { filename })(requireLocal, module, module.exports, FixedDate, (...args) => fetchMock(...args), windowMock)
     cache.set(filename, module.exports)
     return module.exports
   }
@@ -66,6 +72,8 @@ function setup(player = { id: 7, name: 'Real player', role: 'MEMBER' }) {
     mount(fn) { component = fn; return render() },
     get tree() { return tree },
     setFetch(fn) { fetchMock = fn },
+    advanceTo(date) { now = Date.parse(date); timers.forEach((fn) => fn()); render() },
+    timers,
     unmount() { slots.forEach((slot) => slot.cleanup?.()); active = false },
   }
 }
@@ -121,7 +129,7 @@ test('dashboard chooses earliest actual future active raid and fetches its compo
   s.mount(s.load('pages/Dashboard.tsx').DashboardPage)
   const raid = (id, name, date, status = 'PLANNED', archived_at = null) => ({ id, name, scheduled_start: date, status, archived_at, raid_leader_id: 2 })
   resolveOverview(s, [
-    raid(1, 'Old open raid', '2026-10-03T18:00:00Z', 'OPEN'),
+    raid(1, 'Old completed raid', '2026-10-03T18:00:00Z', 'COMPLETED'),
     raid(2, 'Later raid', '2026-10-09T18:00:00Z'),
     { ...raid(3, 'Real next raid', '2026-10-05T18:00:00Z', 'OPEN'), raid_size: 10 },
     raid(4, 'Cancelled raid', '2026-10-04T18:00:00Z', 'CANCELLED'),
@@ -147,6 +155,44 @@ test('dashboard chooses earliest actual future active raid and fetches its compo
     assert.equal(nodes(s.tree, (n) => n.props.className === `card ${className}`).length, 1)
   }
 })
+
+for (const status of ['PLANNED', 'OPEN']) {
+  test(`dashboard retains ${status} raids at and after start until finalization`, async () => {
+    const s = setup()
+    s.mount(s.load('pages/Dashboard.tsx').DashboardPage)
+    resolveOverview(s, [
+      { id: 2, name: 'Future raid', status: 'PLANNED', scheduled_start: '2026-10-05T18:00:00Z' },
+      { id: 1, name: 'Current raid', status, scheduled_start: '2026-10-04T12:00:01Z' },
+    ])
+    await flush(s)
+    const bannerText = () => text(nodes(s.tree, (n) => n.type?.name === 'RaidBanner')[0])
+    assert.match(bannerText(), /Nächster geplanter Raid/)
+    assert.match(bannerText(), /Current raid/)
+    s.advanceTo('2026-10-04T12:00:01Z')
+    assert.match(bannerText(), /Laufender Raid/)
+    assert.match(bannerText(), /Läuft/)
+    assert.match(bannerText(), /Current raid/)
+    s.advanceTo('2026-10-06T12:00:00Z')
+    assert.match(bannerText(), /Current raid/)
+    assert.deepEqual(s.requests.filter((r) => r.url.endsWith('/attendance')).map((r) => r.url), ['/api/v1/raids/1/attendance'])
+    assert.equal(s.requests.filter((r) => r.method !== 'get').length, 0)
+    s.unmount()
+    assert.equal(s.timers.size, 0)
+  })
+
+  test(`dashboard selects already started ${status} raids on initial load`, async () => {
+    const s = setup()
+    s.mount(s.load('pages/Dashboard.tsx').DashboardPage)
+    resolveOverview(s, [
+      { id: 2, name: 'Future raid', status: 'PLANNED', scheduled_start: '2026-10-05T18:00:00Z' },
+      { id: 1, name: 'Running raid', status, scheduled_start: '2026-10-03T18:00:00Z' },
+    ])
+    await flush(s)
+    const banner = nodes(s.tree, (n) => n.type?.name === 'RaidBanner')[0]
+    assert.match(text(banner), /Laufender Raid.*Läuft.*Running raid/)
+    s.unmount()
+  })
+}
 
 test('dashboard empty state invents no raid, capacity or statistics', async () => {
   const s = setup()

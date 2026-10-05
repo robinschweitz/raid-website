@@ -22,7 +22,7 @@ type LootArchiveRow struct {
 	ImportID     string
 	RaidID       string
 	TimestampRaw string
-	Player       string
+	Player       string // The sheet calls this column Spieler, but its values are character names.
 	Loot         string
 	Priority     string
 	ItemID       string

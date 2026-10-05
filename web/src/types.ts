@@ -168,6 +168,7 @@ export interface LootAward {
   item_name: string
   awarded_to_player_id: number
   awarded_to_character_id: number | null
+  awarded_to_character_name: string
   awarded_by_player_id: number
   source: string
   is_main_spec: boolean

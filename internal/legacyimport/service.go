@@ -258,7 +258,7 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 		if err != nil {
 			return err
 		}
-		if err := s.mergeLoot(ctx, source, sheetID, reason, raidIDs, playerIDs, actorID, p, now, &rep); err != nil {
+		if err := s.mergeLoot(ctx, source, sheetID, reason, raidIDs, playerIDs, charIDs, actorID, p, now, &rep); err != nil {
 			return err
 		}
 		if err := s.archiveImportedHistory(ctx, actorID, reason, p, now, &rep); err != nil {
@@ -463,7 +463,7 @@ func (s *Service) mergeRaids(ctx context.Context, source, sheetID, reason string
 	return ids, nil
 }
 
-func (s *Service) mergeLoot(ctx context.Context, source, sheetID, reason string, raidIDs, playerIDs map[string]int64, actorID int64, p Plan, now time.Time, rep *Report) error {
+func (s *Service) mergeLoot(ctx context.Context, source, sheetID, reason string, raidIDs, playerIDs, charIDs map[string]int64, actorID int64, p Plan, now time.Time, rep *Report) error {
 	existingRaids := map[string]bool{}
 	for _, rp := range p.Raids {
 		existingRaids[rp.Key] = rp.ExistingID != 0
@@ -471,22 +471,24 @@ func (s *Service) mergeLoot(ctx context.Context, source, sheetID, reason string,
 	for _, l := range p.Loot {
 		raidID := raidIDs[l.RaidKey]
 		pid := playerIDs[l.PlayerName]
-		if raidID == 0 || pid == 0 {
-			rep.Warnings = append(rep.Warnings, fmt.Sprintf("skipping loot %q for %q (missing raid/player)", l.Item, l.PlayerName))
-			continue
+		cid := charIDs[l.CharacterName]
+		if raidID == 0 || pid == 0 || cid == 0 {
+			return fmt.Errorf("loot %q for character %q references unknown raid/player/character", l.Item, l.CharacterName)
 		}
 		award := &loot.Award{
-			RaidID:            raidID,
-			Boss:              l.Boss,
-			ItemID:            l.ItemID,
-			ItemName:          l.Item,
-			AwardedToPlayerID: pid,
-			AwardedByPlayerID: actorID,
-			Source:            "legacy_import",
-			AwardMethod:       l.Method,
-			AwardedAt:         now,
-			CreatedAt:         now,
-			UpdatedAt:         now,
+			RaidID:                 raidID,
+			Boss:                   l.Boss,
+			ItemID:                 l.ItemID,
+			ItemName:               l.Item,
+			AwardedToPlayerID:      pid,
+			AwardedToCharacterID:   &cid,
+			AwardedToCharacterName: l.CharacterName,
+			AwardedByPlayerID:      actorID,
+			Source:                 "legacy_import",
+			AwardMethod:            l.Method,
+			AwardedAt:              now,
+			CreatedAt:              now,
+			UpdatedAt:              now,
 		}
 		if l.CatalogBossID != "" {
 			bossID := l.CatalogBossID

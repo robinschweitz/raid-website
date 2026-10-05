@@ -143,6 +143,76 @@ const flush = async (view) => { for (let i = 0; i < 8; i++) await Promise.resolv
 const writes = (s) => s.requests.filter((r) => r.method !== 'get')
 const raid = (id) => ({ id, name: `Raid ${id}`, status: 'OPEN' })
 
+test('roster combat groups use stored class/spec and preserve tank and healer roles', () => {
+  const { rosterGroup } = setup().load('raidRoster.ts')
+  for (const [characterClass, spec, expected] of [
+    ['Todesritter', 'Frost', 'MELEE'], ['Krieger', 'Furor', 'MELEE'],
+    ['Paladin', 'Vergeltung', 'MELEE'], ['Schurke', 'Kampf', 'MELEE'],
+    ['Jäger', 'Überleben', 'RANGED'], ['Magier', 'Frost', 'RANGED'],
+    ['Priester', 'Schatten', 'RANGED'], ['Hexer', 'Gebrechen', 'RANGED'],
+    ['Druide', 'Wilder Kampf (Cat)', 'MELEE'], ['Druide', 'Gleichgewicht (Eule)', 'RANGED'],
+    ['Schamane', 'Verstärkung', 'MELEE'], ['Schamane', 'Elementar', 'RANGED'],
+    ['Druide', '', 'UNKNOWN'], ['Schamane', 'Wiederherstellung', 'UNKNOWN'],
+    ['', '', 'UNKNOWN'], ['Unbekannt', 'Frost', 'UNKNOWN'],
+    [' Druide ', ' Gleichgewicht (Eule) ', 'RANGED'], ['Warlock', '', 'RANGED'],
+  ]) {
+    assert.equal(rosterGroup({ role: 'DD', class: characterClass, spec }), expected, `${characterClass}: ${spec}`)
+    for (const role of ['TANK', 'HEAL']) assert.equal(rosterGroup({ role, class: characterClass, spec }), role)
+  }
+})
+
+test('roster separates melee, ranged, unknown and bench while preserving inline editing', () => {
+  const s = setup()
+  const { RaidRosterBoard } = s.load('components/RaidRosterBoard.tsx')
+  const attendance = [
+    { id: 1, character_name: 'Katze', class: 'Druide', spec: 'Wilder Kampf (Cat)', role: 'DD' },
+    { id: 2, character_name: 'Eule', class: 'Druide', spec: 'Gleichgewicht (Eule)', role: 'DD' },
+    { id: 3, character_name: 'Altbestand', role: 'DD' },
+    { id: 4, character_name: 'Bankplatz', class: 'Schamane', spec: 'Elementar', role: 'DD', is_bench: true },
+    { id: 5, character_name: 'Bär', class: 'Druide', spec: 'Wächter (Tank / Bär)', role: 'TANK' },
+  ]
+  let edited
+  const props = { attendance, playerName: () => 'Besitzer', canWrite: false, pending: false, onEdit: (row) => { edited = row } }
+  const view = s.mount(RaidRosterBoard, props)
+  const section = (name) => nodes(view.tree, (n) => n.type === 'section' && n.props['aria-label'] === name)[0]
+  for (const [group, name] of [['Tanks', 'Bär'], ['Nahkampf', 'Katze'], ['Fernkampf', 'Eule'], ['Schaden · unklar', 'Altbestand'], ['Bank', 'Bankplatz']]) {
+    assert.match(text(section(group)), new RegExp(name))
+    assert.equal(nodes(section(group), (n) => n.type === 'li').length, 1)
+  }
+  assert.match(text(section('Bank')), /Fernkampf/)
+  assert.doesNotMatch(text(section('Fernkampf')), /Bankplatz/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'button').length, 0)
+  view.render({ ...props, canWrite: true })
+  nodes(section('Nahkampf'), (n) => n.type === 'button')[0].props.onClick()
+  assert.equal(edited, attendance[0])
+  view.render({ ...props, canWrite: true, editingID: 1, children: 'EDITOR' })
+  assert.match(text(section('Nahkampf')), /Katze\s+bearbeiten.*EDITOR/)
+  assert.doesNotMatch(text(section('Fernkampf')), /EDITOR/)
+  view.render({ ...props, attendance: [] })
+  assert.equal(section('Schaden · unklar'), undefined)
+  assert.equal(nodes(view.tree, (n) => n.props.className === 'setup-empty').length, 4)
+})
+
+test('every WotLK class has a distinct decorative SVG emblem and unknown classes fall back', () => {
+  const { ClassEmblem } = setup().load('components/ClassEmblem.tsx')
+  const classes = ['Todesritter', 'Druide', 'Jäger', 'Magier', 'Paladin', 'Priester', 'Schamane', 'Schurke', 'Hexer', 'Krieger']
+  const graphics = classes.map((characterClass) => {
+    const tree = ClassEmblem({ characterClass })
+    assert.equal(tree.type, 'svg')
+    assert.equal(tree.props['aria-hidden'], 'true')
+    return nodes(tree, (n) => n.type === 'path').map((n) => n.props.d).join(' ')
+  })
+  assert.equal(new Set(graphics).size, 10)
+  assert.ok(graphics.every(Boolean))
+  const fallback = ClassEmblem({ characterClass: '' })
+  assert.equal(nodes(fallback, (n) => n.type === 'path').length, 2)
+  const board = setup().load('components/RaidRosterBoard.tsx').RaidRosterBoard({
+    attendance: classes.map((characterClass, id) => ({ id, class: characterClass, role: 'DD' })),
+    playerName: () => '', canWrite: false, pending: false, onEdit: () => {},
+  })
+  assert.deepEqual(nodes(board, (n) => n.type?.name === 'ClassEmblem').map((n) => n.props.characterClass).sort(), [...classes].sort())
+})
+
 test('raid signups submit several own characters and guard duplicate submissions', async () => {
   const s = setup({ id: 1, role: 'MEMBER' })
   const { RaidSignups } = s.load('components/RaidSignups.tsx')

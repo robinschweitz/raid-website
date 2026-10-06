@@ -11,6 +11,9 @@ presentation data. Archived raids remain visible history (ADR 021-022). Raid sta
 archived roster and loot with a reason through `raidcorrection`; finalization stays fixed.
 Unarchived edits and live-character corrections remain audited without requiring a reason.
 Frontend editors are rendered inside the selected record (ADR 032).
+`raidcorrection` also owns atomic raid quick-add: staff may create a character and optional
+credential-free player together with audited attendance. Persisted retry receipts prevent
+duplicate onboarding, and the frontend selects existing characters directly (ADR 037).
 
 `legacyimport` permits provenance-checked, audited additions to archived historical imports.
 It imports the first roster block in `ICC25 Raidsetup` A–F and uses explicit administrator

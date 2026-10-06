@@ -16,6 +16,8 @@ import {
 } from '../types'
 import { EnhancePointsCard } from '../components/EnhancePointsCard'
 import { characterClassName } from '../characterTheme'
+import { canonicalClass, useCharacterOptions } from '../characterOptions'
+import { SpecSelect } from '../components/SpecSelect'
 
 const CLASSES = [
   'Todesritter',
@@ -61,6 +63,8 @@ function PlayerDetail({ playerID }: Props) {
   const [charName, setCharName] = useState('')
   const [charClass, setCharClass] = useState(CLASSES[0])
   const [charMainSpec, setCharMainSpec] = useState('')
+  const [charSecondSpec, setCharSecondSpec] = useState('')
+  const { options: classSpecs, error: optionsError, reload: reloadOptions } = useCharacterOptions()
   const [charIsMain, setCharIsMain] = useState(false)
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null)
   const [characterDraft, setCharacterDraft] = useState({ name: '', class: '', main_spec: '', second_spec: '', is_main: false, active: true })
@@ -131,11 +135,13 @@ function PlayerDetail({ playerID }: Props) {
           name: charName,
           class: charClass,
           main_spec: charMainSpec,
+          second_spec: charSecondSpec,
           is_main: charIsMain,
         })
         if (!isActive()) return
         setCharName('')
         setCharMainSpec('')
+        setCharSecondSpec('')
         setCharIsMain(false)
         await load()
       } catch (err) {
@@ -329,12 +335,12 @@ function PlayerDetail({ playerID }: Props) {
               <tr key={c.id} className={characterClassName(c.class)}>
                 {editingCharacter?.id === c.id ? <td colSpan={5}><form className="inline-form in-place-editor" onSubmit={saveCharacter}>
                   <label>Name<input autoFocus aria-label="Charakter bearbeiten: Name" disabled={pending} required value={characterDraft.name} onChange={(e) => changeCharacter({ name: e.target.value })} /></label>
-                  <label>Klasse<select disabled={pending} value={characterDraft.class} onChange={(e) => changeCharacter({ class: e.target.value })}>
+                  <label>Klasse<select disabled={pending} value={characterDraft.class} onChange={(e) => changeCharacter({ class: e.target.value, main_spec: '', second_spec: '' })}>
                     {!CLASSES.includes(characterDraft.class) && <option value={characterDraft.class}>{characterDraft.class}</option>}
                     {CLASSES.map((cl) => <option key={cl} value={cl}>{cl}</option>)}
                   </select></label>
-                  <label>Main-Spec<input disabled={pending} value={characterDraft.main_spec} onChange={(e) => changeCharacter({ main_spec: e.target.value })} /></label>
-                  <label>Second-Spec<input disabled={pending} value={characterDraft.second_spec} onChange={(e) => changeCharacter({ second_spec: e.target.value })} /></label>
+                  <SpecSelect label="Main-Spec" disabled={pending} value={characterDraft.main_spec} specs={classSpecs[canonicalClass(characterDraft.class)] ?? []} onChange={(value) => changeCharacter({ main_spec: value })} />
+                  <SpecSelect label="Second-Spec" disabled={pending} value={characterDraft.second_spec} specs={classSpecs[canonicalClass(characterDraft.class)] ?? []} onChange={(value) => changeCharacter({ second_spec: value })} />
                   <label className="check"><input type="checkbox" disabled={pending} checked={characterDraft.is_main} onChange={(e) => changeCharacter({ is_main: e.target.checked })} />Main</label>
                   <label className="check"><input type="checkbox" disabled={pending} checked={characterDraft.active} onChange={(e) => changeCharacter({ active: e.target.checked })} />Aktiv</label>
                   <button type="submit" disabled={pending || !characterDraft.name.trim()}>Charakter speichern</button>
@@ -381,16 +387,18 @@ function PlayerDetail({ playerID }: Props) {
         )}
         {isAdmin && (
           <details className="editor-disclosure"><summary>Charakter hinzufügen</summary>
+          {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
           <form className="inline-form" onSubmit={createCharacter}>
             <input aria-label="Charaktername" placeholder="Name" value={charName} onChange={(e) => setCharName(e.target.value)} required />
-            <select aria-label="Charakterklasse" value={charClass} onChange={(e) => setCharClass(e.target.value)}>
+            <select aria-label="Charakterklasse" disabled={pending} value={charClass} onChange={(e) => { setCharClass(e.target.value); setCharMainSpec(''); setCharSecondSpec('') }}>
               {CLASSES.map((cl) => (
                 <option key={cl} value={cl}>
                   {cl}
                 </option>
               ))}
             </select>
-            <input aria-label="Main-Spec" placeholder="Main-Spec" value={charMainSpec} onChange={(e) => setCharMainSpec(e.target.value)} />
+            <SpecSelect label="Main-Spec" disabled={pending} required value={charMainSpec} specs={classSpecs[charClass] ?? []} onChange={setCharMainSpec} />
+            <SpecSelect label="Second-Spec" disabled={pending} value={charSecondSpec} specs={classSpecs[charClass] ?? []} onChange={setCharSecondSpec} />
             <label className="check">
               <input type="checkbox" checked={charIsMain} onChange={(e) => setCharIsMain(e.target.checked)} /> Main
             </label>

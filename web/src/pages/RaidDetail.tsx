@@ -9,6 +9,9 @@ import { RaidRosterBoard } from '../components/RaidRosterBoard'
 import { RaidSignups } from '../components/RaidSignups'
 import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Attendance, type AttendanceRole, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
 import { catalogSourceLabels, matchesCatalogItem } from '../catalog'
+import { canonicalClass, useCharacterOptions } from '../characterOptions'
+import { SpecSelect } from '../components/SpecSelect'
+import { RaidQuickAdd } from '../components/RaidQuickAdd'
 
 interface Props {
   raidID: number
@@ -77,7 +80,6 @@ function RaidDetail({ raidID }: Props) {
   const { pending, submit, isActive, isPending } = useSubmission()
   const loadVersion = useRef(0)
   const characterVersion = useRef(0)
-  const snapshotDirty = useRef(new Set<SnapshotField>())
   const lootFormVersion = useRef(0)
   const lootEditorVersion = useRef(0)
   const lootRequest = useRef<{ payload: string; id: string } | null>(null)
@@ -100,6 +102,9 @@ function RaidDetail({ raidID }: Props) {
   const [attCharacter, setAttCharacter] = useState('')
   const [attRole, setAttRole] = useState<AttendanceRole>('DD')
   const [characters, setCharacters] = useState<Character[]>([])
+  const [characterSearch, setCharacterSearch] = useState('')
+  const [quickAdd, setQuickAdd] = useState(false)
+  const { options: classSpecs, error: optionsError, reload: reloadOptions } = useCharacterOptions()
   const [attEditing, setAttEditing] = useState<Attendance | null>(null)
   const [attDetails, setAttDetails] = useState({ is_substitute: false, is_bench: false, late_join: false, early_leave: false, notes: '' })
   const [attReason, setAttReason] = useState('')
@@ -161,12 +166,13 @@ function RaidDetail({ raidID }: Props) {
     const version = ++loadVersion.current
     setError('')
     try {
-      const [r, a, l, p, s] = await Promise.all([
+      const [r, a, l, p, s, cs] = await Promise.all([
         api.get<Raid>(`/api/v1/raids/${raidID}`),
         api.get<Attendance[]>(`/api/v1/raids/${raidID}/attendance`),
         api.get<RecordedLoot[]>(`/api/v1/raids/${raidID}/loot`),
         api.get<Player[]>('/api/v1/players'),
         api.get<RaidSeries[]>('/api/v1/raid-series'),
+        api.get<Character[]>('/api/v1/characters'),
       ])
       if (isActive() && version === loadVersion.current) {
         const context = JSON.stringify([r.catalog_instance_id ?? '', r.raid_size ?? null])
@@ -183,6 +189,7 @@ function RaidDetail({ raidID }: Props) {
         setAttendance(a)
         setLoot(l)
         setPlayers(p)
+        setCharacters(cs)
         setSeries(s)
         setSeriesID(r.series_id ? String(r.series_id) : '')
         setScheduled(localStart(r.scheduled_start))
@@ -239,53 +246,16 @@ function RaidDetail({ raidID }: Props) {
     return () => { obsolete = true }
   }, [raid?.catalog_instance_id, raid?.raid_size, catalogContext, canWrite, isActive, catalogRetry])
 
-  useEffect(() => {
-    let obsolete = false
-    const version = characterVersion.current
-    if (!attPlayer) {
-      setCharacters([])
-      return
-    }
-    api
-      .get<Character[]>(`/api/v1/players/${attPlayer}/characters`)
-      .then((cs) => {
-        if (!isActive() || obsolete || version !== characterVersion.current) return
-        setCharacters(cs)
-        setAttCharacter((selected) => selected || (cs.length > 0 ? String(cs[0].id) : ''))
-        if (!attEditing || attEditing.player_id !== Number(attPlayer)) {
-          const selected = cs[0]
-          if (selected) {
-            const defaults = { character_name: selected.name, class: selected.class, spec: selected.main_spec }
-            setAttSnapshot((previous) => {
-              if (version !== characterVersion.current) return previous
-              return {
-                character_name: snapshotDirty.current.has('character_name') ? previous.character_name : defaults.character_name,
-                class: snapshotDirty.current.has('class') ? previous.class : defaults.class,
-                spec: snapshotDirty.current.has('spec') ? previous.spec : defaults.spec,
-              }
-            })
-          }
-        }
-      })
-      .catch((err) => {
-        if (!isActive() || obsolete || version !== characterVersion.current) return
-        setCharacters([])
-        setAttCharacter('')
-        setError(err instanceof ApiError ? err.message : 'Charaktere laden fehlgeschlagen')
-      })
-    return () => { obsolete = true }
-  }, [attPlayer, attEditing, isActive])
-
   const playerName = (id: number) => players.find((p) => p.id === id)?.name ?? `#${id}`
 
   const editAttendance = (row: Attendance | null) => {
     if (isPending() || !isActive() || !canWrite || (row && row.raid_id !== raidID)) return
     ++characterVersion.current
-    snapshotDirty.current.clear()
     setAttEditing(row)
     setAttPlayer(row ? String(row.player_id) : '')
     setAttCharacter(row ? String(row.character_id) : '')
-    setCharacters([])
+    setCharacterSearch('')
+    setQuickAdd(false)
     setAttRole(row?.role ?? 'DD')
     setAttDetails({
       is_substitute: row?.is_substitute ?? false, is_bench: row?.is_bench ?? false,
@@ -297,7 +267,6 @@ function RaidDetail({ raidID }: Props) {
 
   const changeSnapshot = (field: SnapshotField, value: string) => {
     if (!canWrite || !isActive() || isPending() || renderedCharacterVersion !== characterVersion.current) return
-    snapshotDirty.current.add(field)
     setAttSnapshot((previous) => ({ ...previous, [field]: value }))
   }
 
@@ -393,9 +362,8 @@ function RaidDetail({ raidID }: Props) {
         }
         if (!isActive()) return
         ++characterVersion.current
-        snapshotDirty.current.clear()
         setAttPlayer('')
-        setCharacters([])
+        setCharacterSearch('')
         setAttCharacter('')
         setAttEditing(null)
         setAttRole('DD')
@@ -684,41 +652,33 @@ function RaidDetail({ raidID }: Props) {
         <RaidRosterBoard attendance={attendance} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id}>
         {canWrite && (
           <div>
+            {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
+            {!attEditing && !quickAdd && <button type="button" disabled={pending} onClick={() => setQuickAdd(true)}>Neuen Charakter anlegen</button>}
+            {quickAdd ? <RaidQuickAdd raidID={raidID} players={players} options={classSpecs} needsReason={attNeedsReason} pending={pending} submit={submit} isActive={isActive} onCancel={() => setQuickAdd(false)} onAdded={async () => { setQuickAdd(false); await load() }} /> :
             <form className="inline-form" onSubmit={addAttendance}>
-              <select aria-label="Teilnahme-Spieler" disabled={pending} value={attPlayer} onChange={(e) => {
-                if (!isActive() || isPending() || renderedCharacterVersion !== characterVersion.current) return
-                ++characterVersion.current
-                snapshotDirty.current.clear()
-                setAttPlayer(e.target.value)
-                setCharacters([])
-                setAttCharacter('')
-                setAttSnapshot({})
-              }} required>
-                <option value="">Spieler…</option>
-                {players.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <label>Charakter suchen<input type="search" disabled={pending} value={characterSearch} onChange={(event) => setCharacterSearch(event.target.value)} placeholder="Charaktername oder Spieler" /></label>
               <select aria-label="Teilnahme-Charakter" disabled={pending || characters.length === 0} value={attCharacter} onChange={(e) => {
                 if (!isActive() || isPending() || renderedCharacterVersion !== characterVersion.current) return
                 ++characterVersion.current
-                snapshotDirty.current.clear()
                 setAttCharacter(e.target.value)
                 const selected = characters.find((c) => c.id === Number(e.target.value))
+                setAttPlayer(selected ? String(selected.player_id) : '')
                 setAttSnapshot(selected ? { character_name: selected.name, class: selected.class, spec: selected.main_spec } : {})
               }} required>
                 <option value="">Charakter…</option>
-                {characters.map((c) => (
+                {characters.filter((c) => String(c.id) === attCharacter || `${c.name} ${playerName(c.player_id)}`.toLocaleLowerCase('de').includes(characterSearch.toLocaleLowerCase('de'))).map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {c.name} · {c.class} · {playerName(c.player_id)}{!c.active ? ' (inaktiv)' : ''}
                   </option>
                 ))}
               </select>
               <label>Gespeicherter Charaktername<input autoFocus={attEditing != null} disabled={pending} placeholder="Gespeicherter Charaktername" value={attSnapshot.character_name ?? ''} onChange={(e) => changeSnapshot('character_name', e.target.value)} /></label>
-              <label>Gespeicherte Klasse<input disabled={pending} placeholder="Gespeicherte Klasse" value={attSnapshot.class ?? ''} onChange={(e) => changeSnapshot('class', e.target.value)} /></label>
-              <label>Tatsächlicher Spec<input disabled={pending} placeholder="Tatsächlicher Spec" value={attSnapshot.spec ?? ''} onChange={(e) => changeSnapshot('spec', e.target.value)} /></label>
+              <label>Gespeicherte Klasse<select aria-label="Gespeicherte Klasse" disabled={pending} value={attSnapshot.class ?? ''} onChange={(e) => { changeSnapshot('class', e.target.value); changeSnapshot('spec', '') }}>
+                <option value="">Klasse wählen…</option>
+                {attSnapshot.class && !classSpecs[attSnapshot.class] && <option value={attSnapshot.class}>{attSnapshot.class} (gespeichert)</option>}
+                {Object.keys(classSpecs).sort().map((value) => <option key={value}>{value}</option>)}
+              </select></label>
+              <SpecSelect label="Tatsächlicher Spec" disabled={pending} value={attSnapshot.spec ?? ''} specs={classSpecs[canonicalClass(attSnapshot.class ?? '')] ?? []} onChange={(value) => changeSnapshot('spec', value)} />
               {characters.find((c) => c.id === Number(attCharacter))?.second_spec && <button disabled={pending} type="button" onClick={() => changeSnapshot('spec', characters.find((c) => c.id === Number(attCharacter))!.second_spec)}>Second-Spec übernehmen</button>}
               <select aria-label="Teilnahme-Rolle" disabled={pending} value={attRole} onChange={(e) => setAttRole(e.target.value as AttendanceRole)}>
                 <option value="TANK">Tank</option>
@@ -739,7 +699,7 @@ function RaidDetail({ raidID }: Props) {
               {attEditing && error && <p className="error" role="alert">{error}</p>}
               <button type="submit" disabled={pending || !hasAttCharacter || (attNeedsReason && !attReason.trim())}>{attEditing ? 'Teilnahme-Korrektur speichern' : 'Hinzufügen'}</button>
               {attEditing && <button type="button" disabled={pending} onClick={() => editAttendance(null)}>Bearbeitung abbrechen</button>}
-            </form>
+            </form>}
           </div>
         )}
         </RaidRosterBoard>

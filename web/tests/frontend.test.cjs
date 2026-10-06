@@ -122,14 +122,14 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
 function nodes(tree, predicate) {
   if (!tree || typeof tree !== 'object') return []
   if (Array.isArray(tree)) return tree.flatMap((child) => nodes(child, predicate))
-  if (typeof tree.type === 'function' && ['RaidRosterBoard', 'RaidLootList'].includes(tree.type.name)) return nodes(tree.type(tree.props), predicate)
+  if (typeof tree.type === 'function' && ['RaidRosterBoard', 'RaidLootList', 'SpecSelect'].includes(tree.type.name)) return nodes(tree.type(tree.props), predicate)
   return [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)]
 }
 function text(tree) {
   if (tree == null || typeof tree === 'boolean') return ''
   if (Array.isArray(tree)) return tree.map(text).join(' ')
   if (typeof tree !== 'object') return String(tree)
-  if (typeof tree.type === 'function' && ['RaidRosterBoard', 'RaidLootList'].includes(tree.type.name)) return text(tree.type(tree.props))
+  if (typeof tree.type === 'function' && ['RaidRosterBoard', 'RaidLootList', 'SpecSelect'].includes(tree.type.name)) return text(tree.type(tree.props))
   return text(tree.props?.children)
 }
 const button = (view, label) => nodes(view.tree, (n) => n.type === 'button' && text(n) === label)[0]
@@ -301,6 +301,8 @@ function resolveRaid(s, id, options = {}) {
     r.resolved = true
     r.resolve(r.url === `/api/v1/raids/${id}` ? { ...raid(id), ...options.raid }
       : r.url === '/api/v1/players' ? [player(1), player(2)]
+      : r.url === '/api/v1/characters' ? options.characters ?? [character(10, 1), character(11, 1), character(20, 2), character(21, 2)]
+      : r.url === '/api/v1/character-options' ? { Priester: ['Disziplin', 'Heilig', 'Schatten'], Magier: ['Feuer', 'Frost'] }
       : r.url.endsWith('/attendance') ? options.attendance ?? []
       : r.url.endsWith('/loot') ? options.loot ?? []
       : r.url === '/api/v1/loot-catalog' ? options.catalog ?? emptyCatalog() : [])
@@ -309,13 +311,76 @@ function resolveRaid(s, id, options = {}) {
 function resolvePlayer(s, id) {
   for (const r of s.requests.filter((r) => r.method === 'get' && !r.resolved)) {
     r.resolved = true
-    if (r.url.endsWith('/characters')) r.resolve([character(id * 10, id), character(id * 10 + 1, id)])
+    if (r.url === '/api/v1/character-options') r.resolve({ Todesritter: ['Frost', 'Unheilig'], Magier: ['Feuer', 'Frost'], Priester: ['Heilig', 'Schatten'] })
+    else if (r.url.endsWith('/characters')) r.resolve([character(id * 10, id), character(id * 10 + 1, id)])
     else if (r.url.endsWith('/points')) r.resolve({ balance: 200, transactions: [] })
     else if (r.url.endsWith('/tokens')) r.resolve({ total: 0, transactions: [] })
     else if (r.url.endsWith('/locks')) r.resolve([lock(id)])
     else r.resolve(player(id))
   }
 }
+
+for (const existingOwner of [false, true]) {
+  test(`raid quick creation uses ${existingOwner ? 'existing' : 'new'} owner and safely retries unknown results`, async () => {
+    const s = setup(player(1, 'RAIDASSISTENT'))
+    const { RaidQuickAdd } = s.load('components/RaidQuickAdd.tsx')
+    const { useSubmission } = s.load('useSubmission.ts')
+    let added = 0
+    const view = s.mount(() => RaidQuickAdd({
+      raidID: 5, players: [player(2)], options: { Magier: ['Feuer', 'Frost'], Krieger: ['Waffen'] },
+      needsReason: false, onAdded: async () => { added++ }, onCancel() {}, ...useSubmission(),
+    }))
+    const field = (label, type) => nodes(view.tree, (node) => node.type === 'label' && text(node).startsWith(label))
+      .flatMap((node) => nodes(node, (child) => child.type === type))[0]
+    field('Charaktername', 'input').props.onChange(change('Newmage'))
+    field('Klasse', 'select').props.onChange(change('Magier'))
+    view.render()
+    assert.equal(field('Spielername', 'input').props.value, 'Newmage')
+    assert.match(text(select(view, 'Main-Spec')), /Feuer/)
+    assert.doesNotMatch(text(select(view, 'Main-Spec')), /Waffen/)
+    select(view, 'Main-Spec').props.onChange(change('Feuer'))
+    select(view, 'Second-Spec').props.onChange(change('Frost'))
+    if (existingOwner) select(view, 'Charakter-Besitzer').props.onChange(change('2'))
+    view.render()
+    const first = form(view).props.onSubmit(event)
+    await form(view).props.onSubmit(event)
+    assert.equal(writes(s).length, 1)
+    const write = writes(s)[0]
+    assert.equal(write.url, '/api/v1/raids/5/quick-add')
+    assert.equal(write.body.player_id, existingOwner ? 2 : 0)
+    assert.equal(write.body.player_name, existingOwner ? '' : 'Newmage')
+    assert.equal(write.body.main_spec, 'Feuer')
+    assert.equal(write.body.second_spec, 'Frost')
+    assert.equal('username' in write.body, false)
+    write.reject(new Error('connection lost'))
+    await first
+    view.render()
+    assert.equal(nodes(view.tree, (node) => node.type === 'fieldset')[0].props.disabled, true)
+    const retry = form(view).props.onSubmit(event)
+    assert.deepEqual(writes(s)[1].body, write.body)
+    writes(s)[1].resolve({ id: 42 })
+    await retry
+    assert.equal(added, 1)
+  })
+}
+
+test('profile spec dropdowns clear incompatible choices on class change and preserve historical values', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
+  resolvePlayer(s, 1)
+  await flush(view)
+  select(view, 'Main-Spec').props.onChange(change('Unheilig'))
+  view.render()
+  select(view, 'Charakterklasse').props.onChange(change('Magier'))
+  view.render()
+  assert.equal(select(view, 'Main-Spec').props.value, '')
+  assert.match(text(select(view, 'Main-Spec')), /Feuer/)
+  assert.doesNotMatch(text(select(view, 'Main-Spec')), /Unheilig/)
+  button(view, 'Bearbeiten').props.onClick()
+  view.render()
+  assert.equal(select(view, 'Main-Spec').props.value, 'Shadow')
+  assert.match(text(select(view, 'Main-Spec')), /Shadow.*gespeichert/)
+})
 
 test('submission guard blocks same-tick duplicates and releases after failure', async () => {
   const s = setup()
@@ -366,43 +431,33 @@ test('raid switch resets drafts, ignores old requests and disables old handlers'
   assert.doesNotMatch(text(view.tree), /fehlgeschlagen/)
 })
 
-test('raid character selection clears synchronously and ignores obsolete success/failure', async () => {
+test('raid character selection resolves ownership directly and guards stale submits', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1)
   await flush(view)
-  const selects = () => nodes(form(view), (n) => n.type === 'select')
-  selects()[0].props.onChange(change('1'))
+  assert.equal(select(view, 'Teilnahme-Spieler'), undefined)
+  select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
   view.render()
-  const old = s.requests.at(-1)
-  selects()[0].props.onChange(change('2'))
+  const stale = form(view).props.onSubmit
+  select(view, 'Teilnahme-Charakter').props.onChange(change('20'))
+  await stale(event)
+  assert.equal(writes(s).length, 0)
   view.render()
-  const latest = s.requests.at(-1)
-  assert.equal(selects()[1].props.value, '')
-  assert.equal(button(view, 'Hinzufügen').props.disabled, true)
-  latest.resolve([character(20, 2)])
-  await flush(view)
-  old.resolve([character(10, 1)])
-  await flush(view)
-  assert.equal(selects()[1].props.value, '20')
+  assert.equal(select(view, 'Teilnahme-Charakter').props.value, '20')
   const submit = form(view).props.onSubmit
   const first = submit(event)
   await submit(event)
   assert.equal(writes(s).length, 1)
   assert.equal(writes(s)[0].body.character_id, 20)
+  assert.equal(writes(s)[0].body.player_id, 2)
   writes(s)[0].reject(new Error('offline'))
   await first
   view.render()
-  selects()[0].props.onChange(change('1'))
+  select(view, 'Teilnahme-Charakter').props.onChange(change(''))
   view.render()
-  const failure = s.requests.at(-1)
-  selects()[0].props.onChange(change('2'))
-  view.render()
-  s.requests.at(-1).resolve([character(21, 2)])
-  failure.reject(new Error('obsolete'))
-  await flush(view)
-  assert.equal(selects()[1].props.value, '21')
-  assert.doesNotMatch(text(view.tree), /Charaktere laden fehlgeschlagen/)
+  assert.equal(button(view, 'Hinzufügen').props.disabled, true)
+  assert.equal(s.requests.some((r) => /players\/\d+\/characters/.test(r.url)), false)
 })
 
 test('player EP is read-only and switching players resets account drafts', async () => {
@@ -421,20 +476,18 @@ test('player EP is read-only and switching players resets account drafts', async
   assert.equal(button(view, 'Enhance würfeln'), undefined)
 })
 
-test('character response is obsolete immediately on selection, before effect cleanup', async () => {
+test('character search preserves selected identity and displays the matching owner', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1)
   await flush(view)
-  const select = () => nodes(form(view), (n) => n.type === 'select')[0]
-  select().props.onChange(change('1'))
+  select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
   view.render()
-  const old = s.requests.at(-1)
-  select().props.onChange(change('2'))
-  old.resolve([character(10, 1)])
-  await flush(view)
-  assert.equal(nodes(form(view), (n) => n.type === 'select')[1].props.value, '')
-  assert.equal(button(view, 'Hinzufügen').props.disabled, true)
+  input(view, 'Charaktername oder Spieler').props.onChange(change('Spieler 2'))
+  view.render()
+  assert.equal(select(view, 'Teilnahme-Charakter').props.value, '10')
+  assert.match(text(select(view, 'Teilnahme-Charakter')), /Char 20.*Spieler 2/)
+  assert.doesNotMatch(text(select(view, 'Teilnahme-Charakter')), /Char 11/)
 })
 
 for (const [label, formIndex] of [['Lock anlegen', 1], ['Stornieren', null], ['Anlegen', 0], ['Speichern', 2]]) {
@@ -764,9 +817,8 @@ test('archived attendance additions require trimmed reason and send all form fie
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, completed)
   await flush(view)
-  select(view, 'Teilnahme-Spieler').props.onChange(change('2'))
+  select(view, 'Teilnahme-Charakter').props.onChange(change('20'))
   view.render()
-  s.requests.at(-1).resolve([character(20, 2)])
   await flush(view)
   input(view, 'Teilnahme-Begründung').props.onChange(change('   '))
   view.render()
@@ -806,7 +858,6 @@ test('archived attendance edits in place, prefills saved values and PATCHes with
   assert.equal(select(view, 'Teilnahme-Rolle').props.value, 'HEAL')
   assert.equal(checkbox(view, 'Ersatz').props.checked, true)
   assert.equal(input(view, 'Teilnahme-Begründung').props.value, '')
-  s.requests.at(-1).resolve([character(10, 1), character(11, 1)])
   await flush(view)
   assert.equal(select(view, 'Teilnahme-Charakter').props.value, '11')
   await form(view).props.onSubmit(event)
@@ -941,7 +992,7 @@ test('pending correction cannot switch to another record before the pending rend
   await pending
 })
 
-test('attendance correction row switch invalidates character requests and old submits', async () => {
+test('attendance correction row switch invalidates old submits', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, { ...completed, attendance: [attendanceRow, { ...attendanceRow, id: 9, player_id: 2, character_id: 20 }] })
@@ -949,18 +1000,15 @@ test('attendance correction row switch invalidates character requests and old su
   const buttons = nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Teilnahme korrigieren')
   buttons[0].props.onClick()
   view.render()
-  const oldCharacters = s.requests.at(-1)
   input(view, 'Teilnahme-Begründung').props.onChange(change('old reason'))
   view.render()
   const oldSubmit = form(view).props.onSubmit
   buttons[1].props.onClick()
-  oldCharacters.resolve([character(11, 1)])
   await oldSubmit(event)
   await flush(view)
   assert.equal(writes(s).length, 0)
   assert.equal(input(view, 'Teilnahme-Begründung').props.value, '')
   assert.equal(button(view, 'Teilnahme-Korrektur speichern').props.disabled, true)
-  s.requests.at(-1).resolve([character(20, 2)])
   await flush(view)
   input(view, 'Teilnahme-Begründung').props.onChange(change('new reason'))
   view.render()
@@ -980,7 +1028,6 @@ for (const kind of ['attendance', 'loot']) {
     button(view, kind === 'attendance' ? 'Teilnahme korrigieren' : 'Loot korrigieren').props.onClick()
     view.render()
     if (kind === 'attendance') {
-      s.requests.at(-1).resolve([character(11, 1)])
       await flush(view)
     }
     input(view, kind === 'attendance' ? 'Teilnahme-Begründung' : 'Loot-Begründung').props.onChange(change('reason for old raid'))
@@ -1110,7 +1157,6 @@ for (const status of ['PLANNED', 'OPEN', 'COMPLETED']) {
       button(view, kind === 'attendance' ? 'Teilnahme korrigieren' : 'Loot korrigieren').props.onClick()
       view.render()
       if (kind === 'attendance') {
-        s.requests.at(-1).resolve([character(11, 1)])
         await flush(view)
       }
       const index = kind === 'attendance' ? 0 : 1
@@ -1158,9 +1204,8 @@ for (const status of ['PLANNED', 'OPEN', 'COMPLETED']) {
     await flush(view)
     assert.equal(input(view, 'Teilnahme-Begründung'), undefined)
     assert.equal(input(view, 'Loot-Begründung'), undefined)
-    select(view, 'Teilnahme-Spieler').props.onChange(change('1'))
+    select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
     view.render()
-    s.requests.at(-1).resolve([character(10, 1)])
     await flush(view)
     const attendance = form(view).props.onSubmit(event)
     assert.equal(writes(s)[0].method, 'post')
@@ -1449,34 +1494,33 @@ test('archived attendance uses saved name, class and actual spec; missing histor
   assert.match(text(view.tree), /Holy/)
   assert.match(text(view.tree), /Name nicht gespeichert/)
   assert.doesNotMatch(text(view.tree), /#11/)
-  assert.equal(s.requests.some((r) => r.url.endsWith('/characters')), false)
+  assert.equal(s.requests.some((r) => /players\/\d+\/characters/.test(r.url)), false)
 })
 
 test('attendance defaults snapshot from selected character, allows actual spec and rejects explicit blanks', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
-  resolveRaid(s, 1)
+  resolveRaid(s, 1, { characters: [character(10, 1), { ...character(11, 1), main_spec: 'Discipline' }] })
   await flush(view)
-  select(view, 'Teilnahme-Spieler').props.onChange(change('1'))
+  select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
   view.render()
-  s.requests.at(-1).resolve([character(10, 1), { ...character(11, 1), main_spec: 'Discipline' }])
   await flush(view)
   assert.equal(input(view, 'Gespeicherter Charaktername').props.value, 'Char 10')
-  assert.equal(input(view, 'Tatsächlicher Spec').props.value, 'Shadow')
+  assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Shadow')
   button(view, 'Second-Spec übernehmen').props.onClick()
   view.render()
-  assert.equal(input(view, 'Tatsächlicher Spec').props.value, 'Holy')
+  assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Holy')
   select(view, 'Teilnahme-Charakter').props.onChange(change('11'))
   view.render()
-  assert.equal(input(view, 'Tatsächlicher Spec').props.value, 'Discipline')
-  input(view, 'Tatsächlicher Spec').props.onChange(change('  '))
+  assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Discipline')
+  select(view, 'Tatsächlicher Spec').props.onChange(change(''))
   view.render()
   await form(view).props.onSubmit(event)
   assert.equal(writes(s).length, 0)
-  input(view, 'Tatsächlicher Spec').props.onChange(change('Actual custom spec'))
+  select(view, 'Tatsächlicher Spec').props.onChange(change('Holy'))
   view.render()
   const first = form(view).props.onSubmit(event)
-  assert.equal(writes(s)[0].body.spec, 'Actual custom spec')
+  assert.equal(writes(s)[0].body.spec, 'Holy')
   assert.equal(writes(s)[0].body.character_name, 'Char 11')
   assert.equal(writes(s)[0].body.class, 'Priest')
   writes(s)[0].reject(new Error('offline'))
@@ -1490,20 +1534,22 @@ test('snapshot correction preserves saved details instead of current character d
   await flush(view)
   button(view, 'Teilnahme korrigieren').props.onClick()
   view.render()
-  s.requests.at(-1).resolve([character(11, 1)])
   await flush(view)
   assert.equal(input(view, 'Gespeicherter Charaktername').props.value, 'Old name')
-  assert.equal(input(view, 'Tatsächlicher Spec').props.value, 'Old spec')
+  assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Old spec')
   input(view, 'Gespeicherter Charaktername').props.onChange(change('Corrected name'))
   view.render()
-  input(view, 'Gespeicherte Klasse').props.onChange(change('Magier'))
+  select(view, 'Gespeicherte Klasse').props.onChange(change('Magier'))
+  view.render()
+  assert.equal(select(view, 'Tatsächlicher Spec').props.value, '')
+  select(view, 'Tatsächlicher Spec').props.onChange(change('Feuer'))
   view.render()
   assert.equal(input(view, 'Teilnahme-Begründung'), undefined)
   view.render()
   const first = form(view).props.onSubmit(event)
   assert.equal(writes(s)[0].body.character_name, 'Corrected name')
   assert.equal(writes(s)[0].body.class, 'Magier')
-  assert.equal('spec' in writes(s)[0].body, false)
+  assert.equal(writes(s)[0].body.spec, 'Feuer')
   assert.equal('reason' in writes(s)[0].body, false)
   writes(s)[0].reject(new Error('offline'))
   await first
@@ -1682,52 +1728,46 @@ test('time-only schedule repair without a series does not invent one', async () 
   assert.equal(button(view, 'Archivieren').props.disabled, true)
 })
 
-test('delayed character defaults preserve manually typed name and actual spec for the same selection', async () => {
+test('character selection allows a raid-specific name and spec without changing the live character', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1)
   await flush(view)
-  select(view, 'Teilnahme-Spieler').props.onChange(change('1'))
+  select(view, 'Teilnahme-Charakter').props.onChange(change('11'))
   view.render()
-  const request = s.requests.at(-1)
   input(view, 'Gespeicherter Charaktername').props.onChange(change('Manual raid name'))
-  input(view, 'Tatsächlicher Spec').props.onChange(change('Manual actual spec'))
+  select(view, 'Tatsächlicher Spec').props.onChange(change('Holy'))
   view.render()
-  request.resolve([character(11, 1)])
   await flush(view)
   assert.equal(input(view, 'Gespeicherter Charaktername').props.value, 'Manual raid name')
-  assert.equal(input(view, 'Tatsächlicher Spec').props.value, 'Manual actual spec')
-  assert.equal(input(view, 'Gespeicherte Klasse').props.value, 'Priest')
+  assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Holy')
+  assert.equal(select(view, 'Gespeicherte Klasse').props.value, 'Priest')
   const first = form(view).props.onSubmit(event)
   assert.equal(writes(s)[0].body.character_name, 'Manual raid name')
-  assert.equal(writes(s)[0].body.spec, 'Manual actual spec')
+  assert.equal(writes(s)[0].body.spec, 'Holy')
   writes(s)[0].reject(new Error('offline'))
   await first
 })
 
-test('changing player clears source snapshots and ignores obsolete snapshot handlers and defaults', async () => {
+test('changing character replaces snapshots and ignores obsolete snapshot handlers', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1)
   await flush(view)
-  select(view, 'Teilnahme-Spieler').props.onChange(change('1'))
+  select(view, 'Teilnahme-Charakter').props.onChange(change('11'))
   view.render()
-  const oldRequest = s.requests.at(-1)
   const oldName = input(view, 'Gespeicherter Charaktername').props.onChange
-  const oldSpec = input(view, 'Tatsächlicher Spec').props.onChange
+  const oldSpec = select(view, 'Tatsächlicher Spec').props.onChange
   oldSpec(change('Source spec'))
   view.render()
-  select(view, 'Teilnahme-Spieler').props.onChange(change('2'))
+  select(view, 'Teilnahme-Charakter').props.onChange(change('20'))
   oldName(change('Obsolete name'))
   oldSpec(change('Obsolete spec'))
   view.render()
-  assert.equal(input(view, 'Tatsächlicher Spec').props.value, '')
-  const latest = s.requests.at(-1)
-  latest.resolve([{ ...character(20, 2), main_spec: 'New default' }])
-  oldRequest.resolve([character(11, 1)])
+  assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Shadow')
   await flush(view)
   assert.equal(input(view, 'Gespeicherter Charaktername').props.value, 'Char 20')
-  assert.equal(input(view, 'Tatsächlicher Spec').props.value, 'New default')
+  assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Shadow')
 })
 
 test('notes-only historical PATCH omits untouched unknown and blank snapshots', async () => {
@@ -1737,9 +1777,8 @@ test('notes-only historical PATCH omits untouched unknown and blank snapshots', 
   await flush(view)
   button(view, 'Teilnahme korrigieren').props.onClick()
   view.render()
-  s.requests.at(-1).resolve([character(11, 1)])
   await flush(view)
-  assert.equal(input(view, 'Gespeicherte Klasse').props.value, 'Unknown imported class')
+  assert.equal(select(view, 'Gespeicherte Klasse').props.value, 'Unknown imported class')
   input(view, 'Teilnahme-Notizen').props.onChange(change('Corrected notes'))
   assert.equal(input(view, 'Teilnahme-Begründung'), undefined)
   view.render()
@@ -1750,26 +1789,24 @@ test('notes-only historical PATCH omits untouched unknown and blank snapshots', 
   await first
 })
 
-test('reference changes use new defaults while preserving manual snapshots entered during the new load', async () => {
+test('reference changes use selected character defaults and allow explicit spec changes', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, { attendance: [{ ...attendanceRow, character_name: 'Historic name', class: 'Unknown', spec: 'Historic spec' }] })
   await flush(view)
   button(view, 'Teilnahme korrigieren').props.onClick()
   view.render()
-  s.requests.at(-1).resolve([character(11, 1)])
   await flush(view)
-  select(view, 'Teilnahme-Spieler').props.onChange(change('2'))
+  select(view, 'Teilnahme-Charakter').props.onChange(change('20'))
   view.render()
-  input(view, 'Tatsächlicher Spec').props.onChange(change('Actual replacement spec'))
-  s.requests.at(-1).resolve([character(20, 2)])
+  select(view, 'Tatsächlicher Spec').props.onChange(change('Holy'))
   await flush(view)
   assert.equal(input(view, 'Teilnahme-Begründung'), undefined)
   view.render()
   const first = form(view).props.onSubmit(event)
   assert.equal(writes(s)[0].body.character_name, 'Char 20')
   assert.equal(writes(s)[0].body.class, 'Priest')
-  assert.equal(writes(s)[0].body.spec, 'Actual replacement spec')
+  assert.equal(writes(s)[0].body.spec, 'Holy')
   writes(s)[0].reject(new Error('offline'))
   await first
 })
@@ -1806,7 +1843,7 @@ for (const method of ['MAIN', 'SECOND', 'ENHANCED', 'BOE']) {
     assert.match(text(recipients), /Saved raid character/)
     assert.equal(recipients.some((n) => Number(n.props.value) === 99), false)
     assert.equal(recipients.some((n) => Number(n.props.value) === 1), false)
-    assert.equal(s.requests.some((r) => r.url.endsWith('/characters')), false)
+    assert.equal(s.requests.some((r) => /players\/\d+\/characters/.test(r.url)), false)
     await chooseSourceDrop(s, view)
     select(view, 'Loot-Empfänger').props.onChange(change('20'))
     select(view, 'Loot-Vergabemethode').props.onChange(change(method))

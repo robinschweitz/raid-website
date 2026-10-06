@@ -91,6 +91,10 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Character names are mutable because players rename in game. Therefore **no DB-level global
   `UNIQUE(name)`**; records are addressed by stable IDs and renames are recorded in name history
   (ADR 013).
+- Raid attendance selection is character-first. RAIDASSISTENT and higher may create a new
+  character and optionally its new player through atomic raid quick-add (ADR 037). New player
+  names default to the character name and are editable; these players use the existing GUEST
+  default without login credentials. General account administration remains Admin-only.
 
 ### 4.2 Raids
 - Lifecycle: `PLANNED` → `OPEN` → `COMPLETED`, with cancellation as `CANCELLED`.
@@ -260,7 +264,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   - **Config (`ADMIN`)** — create player; set account/credentials; create or update characters;
     guild ranks; raid groups; recurring raid series; list/import legacy data.
   - **Raid operations (`RAIDASSISTENT` and up, i.e. RA + RL)** — create raid; configure its
-    series/start; cancel; archive/finalize; attendance; loot; create and close polls.
+    series/start; cancel; archive/finalize; attendance; loot; create and close polls; create
+    character and optional player together with attendance through raid quick-add (ADR 037).
   - **Self-service (`MEMBER` and up)** — create and cancel **own** item locks;
     vote on polls.
 - The first admin is bootstrapped from `ADMIN_USERNAME` / `ADMIN_PASSWORD` at startup.

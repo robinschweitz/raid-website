@@ -74,6 +74,9 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/players/{id}/characters", RequireRole(validation.RoleAdmin, a.createCharacter))
 
 	mux.HandleFunc("GET /api/v1/characters/{id}", RequireAuth(a.getCharacter))
+	mux.HandleFunc("GET /api/v1/characters", RequireAuth(a.listCharacters))
+	mux.HandleFunc("GET /api/v1/character-options", RequireAuth(a.characterOptions))
+	mux.HandleFunc("POST /api/v1/raids/{id}/quick-add", RequireRole(validation.RoleRaidassistent, a.quickAddCharacter))
 	mux.HandleFunc("PATCH /api/v1/characters/{id}", RequireRole(validation.RoleAdmin, a.updateCharacter))
 	mux.HandleFunc("GET /api/v1/characters/{id}/name-history", RequireAuth(a.listCharacterNameHistory))
 

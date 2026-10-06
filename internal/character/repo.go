@@ -67,6 +67,13 @@ func (r *Repo) ListByPlayer(ctx context.Context, playerID int64) ([]Character, e
 	return cs, nil
 }
 
+// List returns the character directory, including inactive historical references.
+func (r *Repo) List(ctx context.Context) ([]Character, error) {
+	var rows []Character
+	err := r.db.NewSelect().Model(&rows).Order("name ASC", "id ASC").Scan(ctx)
+	return rows, err
+}
+
 func (r *Repo) InsertNameHistory(ctx context.Context, h *NameHistory) error {
 	_, err := r.db.NewInsert().Model(h).Exec(ctx)
 	return err

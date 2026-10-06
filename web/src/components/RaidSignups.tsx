@@ -5,13 +5,7 @@ import { characterClassName } from '../characterTheme'
 import { useSubmission } from '../useSubmission'
 import { atLeast, type Attendance, type Character, type Player, type Raid, type RaidSignup, type SignupOverview } from '../types'
 
-function canonicalClass(value: string): string {
-  const names: Record<string, string> = {
-    'Death Knight': 'Todesritter', Druid: 'Druide', Hunter: 'Jäger', Mage: 'Magier', Priest: 'Priester',
-    Shaman: 'Schamane', Rogue: 'Schurke', Warlock: 'Hexer', Warrior: 'Krieger',
-  }
-  return names[value] ?? value
-}
+import { canonicalClass } from '../characterOptions'
 
 interface Props {
   raid: Raid

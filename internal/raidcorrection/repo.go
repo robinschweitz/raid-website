@@ -34,6 +34,20 @@ func NewRepo(db bun.IDB) *Repo {
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo { return NewRepo(tx) }
 
+func (r *Repo) quickAddRequest(ctx context.Context, raidID, actor int64, requestID string) (string, int64, error) {
+	var row struct {
+		Payload      string
+		AttendanceID int64
+	}
+	err := r.db.NewSelect().TableExpr("raid_quick_add_requests").Column("payload", "attendance_id").Where("raid_id = ? AND actor_id = ? AND request_id = ?", raidID, actor, requestID).Scan(ctx, &row)
+	return row.Payload, row.AttendanceID, err
+}
+
+func (r *Repo) saveQuickAddRequest(ctx context.Context, raidID, actor int64, requestID, payload string, attendanceID int64) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO raid_quick_add_requests (raid_id, actor_id, request_id, payload, attendance_id) VALUES (?, ?, ?, ?, ?)", raidID, actor, requestID, payload, attendanceID)
+	return err
+}
+
 func (r *Repo) isImportedRaid(ctx context.Context, raidID int64) (bool, error) {
 	return r.db.NewSelect().TableExpr("legacy_raid_mappings").Where("raid_id = ?", raidID).Exists(ctx)
 }

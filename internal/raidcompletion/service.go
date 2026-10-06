@@ -109,10 +109,20 @@ func (s *Service) ArchiveRaid(ctx context.Context, raidID, actorID int64) (*raid
 			if err := raids.Catalog().ValidateAssociation(ctx, series.CatalogInstanceID, series.RaidSize); err != nil {
 				return err
 			}
-			next = &raid.Raid{Name: series.Name, RaidLeaderID: series.RaidLeaderID, SeriesID: rd.SeriesID, PreviousRaidID: &rd.ID, Status: validation.RaidStatusPlanned, ScheduledStart: &scheduled, CreatedAt: now, UpdatedAt: now}
+			successorName := series.Name
+			if series.NameTemplate != "" {
+				successorName = raidseries.EvaluateName(series.NameTemplate, series.NextRaidNumber, series.Name, scheduled)
+				series.NextRaidNumber++
+			}
+			next = &raid.Raid{Name: successorName, RaidLeaderID: series.RaidLeaderID, SeriesID: rd.SeriesID, PreviousRaidID: &rd.ID, Status: validation.RaidStatusPlanned, ScheduledStart: &scheduled, CreatedAt: now, UpdatedAt: now}
 			next.CatalogInstanceID, next.RaidSize = series.CatalogInstanceID, series.RaidSize
 			if err := raids.Create(ctx, next); err != nil {
 				return fmt.Errorf("create successor: %w", err)
+			}
+			if series.NameTemplate != "" {
+				if err := repo.series.Save(ctx, series); err != nil {
+					return fmt.Errorf("increment series counter: %w", err)
+				}
 			}
 		} else {
 			if next.ArchivedAt != nil || (next.Status != validation.RaidStatusPlanned && next.Status != validation.RaidStatusOpen) || (next.PreviousRaidID != nil && *next.PreviousRaidID != rd.ID) {

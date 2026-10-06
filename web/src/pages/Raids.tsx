@@ -19,6 +19,26 @@ function statusClass(status: Raid['status']): string {
   }
 }
 
+function isoWeek(date: Date): number {
+  const day = date.getUTCDay() || 7
+  const thursday = new Date(date)
+  thursday.setUTCDate(date.getUTCDate() + 4 - day)
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1))
+  return Math.ceil(((thursday.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+}
+
+function previewSeriesName(series: RaidSeries, scheduled: string): string {
+  const template = (series.name_template ?? '').trim()
+  if (!template) return series.name
+  const parsed = scheduled ? new Date(scheduled) : new Date()
+  const raidDate = Number.isNaN(parsed.getTime()) ? new Date() : parsed
+  return template
+    .replace(/\{number\}/g, String(series.next_raid_number ?? 1))
+    .replace(/\{name\}/g, series.name)
+    .replace(/\{date\}/g, raidDate.toISOString().slice(0, 10))
+    .replace(/\{week\}/g, String(isoWeek(raidDate)))
+}
+
 export function RaidsPage() {
   const { pending, submit, isActive, isPending } = useSubmission()
   const { player } = useAuth()
@@ -57,14 +77,14 @@ export function RaidsPage() {
 
   const onCreate = async (event: FormEvent) => {
     event.preventDefault()
-    if (!player || !canManage || !name.trim() || !leaderID || !scheduled || !selectedSeries || !associationValid || (!!selectedSeries.catalog_instance_id && !instanceID)) return
+    if (!player || !canManage || (!name.trim() && !selectedSeries) || !leaderID || !scheduled || !associationValid || (!!selectedSeries?.catalog_instance_id && !instanceID)) return
     await submit(async () => {
       setError('')
       try {
         const created = await api.post<Raid>('/api/v1/raids', {
-          name,
+          name: name.trim(),
           raid_leader_id: Number(leaderID),
-          series_id: selectedSeries.id,
+          ...(selectedSeries ? { series_id: selectedSeries.id } : {}),
           scheduled_start: new Date(scheduled).toISOString(),
           ...(instanceID ? { catalog_instance_id: instanceID, ...(raidSize ? { raid_size: Number(raidSize) } : {}) } : {}),
         })
@@ -122,25 +142,28 @@ export function RaidsPage() {
       {canManage && (
         <details className="card editor-disclosure"><summary>Neuer Raid</summary>
         <form className="card inline-form" onSubmit={onCreate}>
-          <label>Raidserie<select aria-label="Neue Raidserie" disabled={pending} value={seriesID} required onChange={(e) => {
+          <label>Raidserie<select aria-label="Neue Raidserie" disabled={pending} value={seriesID} onChange={(e) => {
             if (isPending() || !isActive()) return
             setSeriesID(e.target.value)
             const selected = series.find((s) => s.id === Number(e.target.value))
-            setName(selected?.name ?? '')
             setLeaderID(selected ? String(selected.raid_leader_id) : '')
             setInstanceID(selected?.catalog_instance_id ?? '')
             setRaidSize(selected?.raid_size == null ? '' : String(selected.raid_size))
-          }}><option value="">Serie auswählen</option>{series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-          <p className="muted">Bei Serienauswahl werden der gespeicherte Serienname und Raidleiter übernommen. {selectedSeries && `Wiederholung: ${selectedSeries.start_time}, ${selectedSeries.timezone}, alle ${selectedSeries.interval_weeks} Wochen.`}</p>
-          {series.length === 0 && <p className="muted">Ein Admin muss zuerst eine Raidserie konfigurieren.</p>}
+          }}><option value="">Keine Serie</option>{series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+          <p className="muted">Die Serie übernimmt Raidleiter und Katalog; der Raidname wird aus der Namensvorlage abgeleitet. {selectedSeries && `Wiederholung: ${selectedSeries.start_time}, ${selectedSeries.timezone}, alle ${selectedSeries.interval_weeks} Wochen.`}</p>
+          {series.length === 0 && <p className="muted">Keine Raidserie vorhanden — ein Raid ohne Serie benötigt einen eigenen Namen.</p>}
           <label>Raidleiter<select aria-label="Neuer Raidleiter" disabled={pending} required value={leaderID} onChange={(e) => setLeaderID(e.target.value)}><option value="">Raidleiter auswählen</option>{players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
           {catalogError && <p className="error" role="alert">{catalogError}</p>}
-          <CatalogAssociationFields catalog={catalog} instanceID={instanceID} raidSize={raidSize} disabled={pending} existingInstanceID={selectedSeries?.catalog_instance_id ?? ''} existingRaidSize={selectedSeries?.raid_size == null ? '' : String(selectedSeries.raid_size)} onChange={(instance, size) => { if (!isPending() && isActive()) { setInstanceID(instance); setRaidSize(size) } }} />
+          <CatalogAssociationFields catalog={catalog} instanceID={instanceID} raidSize={raidSize} disabled={pending} existingInstanceID={selectedSeries?.catalog_instance_id ?? ''} existingRaidSize={selectedSeries?.raid_size == null ? '' : String(selectedSeries?.raid_size)} onChange={(instance, size) => { if (!isPending() && isActive()) { setInstanceID(instance); setRaidSize(size) } }} />
           {!associationValid && <p className="error">Bitte eine durch lokale Drops belegte Raidgröße zur Instanz auswählen.</p>}
-          <label>
-            Name
-            <input value={name} onChange={(e) => setName(e.target.value)} required />
-          </label>
+          {selectedSeries ? (
+            <p className="muted">Name wird aus der Namensvorlage abgeleitet: {previewSeriesName(selectedSeries, scheduled)}</p>
+          ) : (
+            <label>
+              Name
+              <input aria-label="Neuer Raidname" value={name} onChange={(e) => setName(e.target.value)} required />
+            </label>
+          )}
           <label>
             Start ({Intl.DateTimeFormat().resolvedOptions().timeZone}, wird als UTC gespeichert)
             <input disabled={pending} required type="datetime-local" value={scheduled} onChange={(e) => setScheduled(e.target.value)} />

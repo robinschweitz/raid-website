@@ -135,6 +135,15 @@ func (r *Repo) Update(ctx context.Context, rd *Raid) error {
 	return err
 }
 
+func (r *Repo) ListBySeries(ctx context.Context, seriesID int64) ([]Raid, error) {
+	var rs []Raid
+	err := r.db.NewSelect().Model(&rs).Where("series_id = ?", seriesID).Order("scheduled_start ASC").Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
 func (r *Repo) FindByName(ctx context.Context, name string) (*Raid, error) {
 	rd := new(Raid)
 	err := r.db.NewSelect().Model(rd).Where("name = ?", name).Order("id ASC").Limit(1).Scan(ctx)

@@ -50,10 +50,6 @@ func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	if req.Name == "" {
-		BadRequest(w, "name is required")
-		return
-	}
 	if req.RaidLeaderID <= 0 {
 		BadRequest(w, "raid_leader_id is required")
 		return
@@ -93,6 +89,10 @@ func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:         now,
 	}
 	if err := raid.NewService(a.Raids).CreateRaid(r.Context(), rd); err != nil {
+		if errors.Is(err, raid.ErrNameRequired) {
+			WriteError(w, http.StatusBadRequest, "name_required", "name is required")
+			return
+		}
 		if writeSeriesError(w, err) {
 			return
 		}

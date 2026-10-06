@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	_ "time/tzdata"
@@ -64,6 +65,8 @@ type Changes struct {
 	CatalogInstanceID *string
 	RaidSize          *int
 	Name              *string
+	NameTemplate      *string
+	NextRaidNumber    *int
 	RaidLeaderID      *int64
 	Weekdays          *[]int
 	IntervalWeeks     *int64
@@ -85,6 +88,12 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		}
 		if changes.Name != nil {
 			series.Name = *changes.Name
+		}
+		if changes.NameTemplate != nil {
+			series.NameTemplate = *changes.NameTemplate
+		}
+		if changes.NextRaidNumber != nil {
+			series.NextRaidNumber = *changes.NextRaidNumber
 		}
 		if changes.RaidLeaderID != nil {
 			series.RaidLeaderID = *changes.RaidLeaderID
@@ -237,4 +246,16 @@ func localOccurrences(wall time.Time, location *time.Location) []time.Time {
 		cursor = bound
 	}
 	return matches
+}
+
+// EvaluateName renders a naming template with the given counter and raid date.
+// Supported variables: {number}, {name}, {date}, {week}.
+func EvaluateName(template string, number int, seriesName string, raidDate time.Time) string {
+	result := template
+	result = strings.ReplaceAll(result, "{number}", strconv.Itoa(number))
+	result = strings.ReplaceAll(result, "{name}", seriesName)
+	result = strings.ReplaceAll(result, "{date}", raidDate.Format("2006-01-02"))
+	_, week := raidDate.ISOWeek()
+	result = strings.ReplaceAll(result, "{week}", strconv.Itoa(week))
+	return result
 }

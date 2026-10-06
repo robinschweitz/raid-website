@@ -58,6 +58,7 @@ func TestSeriesMigrationPreservesLegacyHistoryWithoutDefaults(t *testing.T) {
 	for pass := 0; pass < 2; pass++ {
 		apply("004_raid_series.up.sql")
 		apply("007_loot_catalog.up.sql")
+		apply("014_raid_series_naming.up.sql")
 		series, err := raidseries.NewRepo(database.DB).List(ctx)
 		if err != nil || len(series) != 0 {
 			t.Fatalf("migration seeded guild defaults: %+v %v", series, err)
@@ -82,6 +83,7 @@ func TestSeriesMigrationPreservesLegacyHistoryWithoutDefaults(t *testing.T) {
 			t.Fatalf("migration wrote rewards: %d %v", balance, err)
 		}
 		if pass == 0 {
+			apply("014_raid_series_naming.down.sql")
 			apply("007_loot_catalog.down.sql")
 			apply("004_raid_series.down.sql")
 		}

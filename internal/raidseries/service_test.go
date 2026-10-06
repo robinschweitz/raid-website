@@ -80,3 +80,29 @@ func TestValidateRequiresExplicitConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEvaluateName(t *testing.T) {
+	date := instant(t, "2026-10-08T18:00:00Z")
+	for _, tc := range []struct {
+		name     string
+		template string
+		number   int
+		series   string
+		want     string
+	}{
+		{"number_only", "{number}", 34, "icc25", "34"},
+		{"prefix_with_number", "icc25-{number}", 34, "icc25", "icc25-34"},
+		{"name_variable", "{name}-{number}", 10, "icc25", "icc25-10"},
+		{"date_variable", "{name}-{date}", 1, "icc25", "icc25-2026-10-08"},
+		{"week_variable", "{name}-W{week}", 1, "icc25", "icc25-W41"},
+		{"all_variables", "{name}-{number}-{date}-W{week}", 34, "icc25", "icc25-34-2026-10-08-W41"},
+		{"no_variables", "static-name", 1, "icc25", "static-name"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := EvaluateName(tc.template, tc.number, tc.series, date)
+			if got != tc.want {
+				t.Fatalf("want %q got %q", tc.want, got)
+			}
+		})
+	}
+}

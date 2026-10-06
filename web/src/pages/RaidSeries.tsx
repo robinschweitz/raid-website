@@ -7,7 +7,7 @@ import { useSubmission } from '../useSubmission'
 import { CatalogAssociationFields } from '../components/CatalogAssociationFields'
 
 const weekdays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
-const emptySchedule = { name: '', raid_leader_id: '', weekdays: [] as number[], interval_weeks: '', start_time: '', timezone: '', catalog_instance_id: '', raid_size: '' }
+const emptySchedule = { name: '', name_template: '', next_raid_number: '1', raid_leader_id: '', weekdays: [] as number[], interval_weeks: '', start_time: '', timezone: '', catalog_instance_id: '', raid_size: '' }
 
 export function RaidSeriesPage() {
   const { player } = useAuth()
@@ -42,7 +42,7 @@ export function RaidSeriesPage() {
     if (!isAdmin || isPending() || !isActive()) return
     ++editVersion.current
     setEditingID(row?.id ?? null)
-    setSchedule(row ? { name: row.name, raid_leader_id: String(row.raid_leader_id), weekdays: [...row.weekdays], interval_weeks: String(row.interval_weeks), start_time: row.start_time, timezone: row.timezone, catalog_instance_id: row.catalog_instance_id ?? '', raid_size: row.raid_size == null ? '' : String(row.raid_size) } : emptySchedule)
+    setSchedule(row ? { name: row.name, name_template: row.name_template ?? '', next_raid_number: String(row.next_raid_number ?? 1), raid_leader_id: String(row.raid_leader_id), weekdays: [...row.weekdays], interval_weeks: String(row.interval_weeks), start_time: row.start_time, timezone: row.timezone, catalog_instance_id: row.catalog_instance_id ?? '', raid_size: row.raid_size == null ? '' : String(row.raid_size) } : emptySchedule)
     setError('')
   }
 
@@ -55,8 +55,10 @@ export function RaidSeriesPage() {
     await submit(async () => {
       setError('')
       try {
-        const { catalog_instance_id, raid_size, ...fields } = schedule
+        const { catalog_instance_id, raid_size, name_template, next_raid_number, ...fields } = schedule
+        const trimmedTemplate = name_template.trim()
         const body = { ...fields, name: schedule.name.trim(), raid_leader_id: Number(schedule.raid_leader_id), interval_weeks: Number(schedule.interval_weeks), timezone: schedule.timezone.trim(),
+          ...(trimmedTemplate || (editingID !== null && !!existing?.name_template) ? { name_template: trimmedTemplate, next_raid_number: Number(next_raid_number) } : {}),
           ...(!associationUnchanged && catalog_instance_id ? { catalog_instance_id, raid_size: Number(raid_size) } : {}),
         }
         const saved = editingID === null
@@ -75,6 +77,9 @@ export function RaidSeriesPage() {
 
   const editorForm = <form className="inline-form" onSubmit={save}>
       <label>Name<input disabled={pending} required placeholder="Serienname" value={schedule.name} onChange={(e) => setSchedule({ ...schedule, name: e.target.value })} /></label>
+      <label>Namensvorlage<input disabled={pending} placeholder="z.B. icc25-{number}" value={schedule.name_template} onChange={(e) => setSchedule({ ...schedule, name_template: e.target.value })} /></label>
+      <label>Nächste Nummer<input disabled={pending} required type="number" min="1" step="1" value={schedule.next_raid_number} onChange={(e) => setSchedule({ ...schedule, next_raid_number: e.target.value })} /></label>
+      <p className="muted">Variablen: {'{number}'}, {'{name}'}, {'{date}'}, {'{week}'}</p>
       <label>Raidleiter<select aria-label="Serien-Raidleiter" disabled={pending} required value={schedule.raid_leader_id} onChange={(e) => setSchedule({ ...schedule, raid_leader_id: e.target.value })}>
         <option value="">Raidleiter auswählen</option>{players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select></label>
@@ -101,6 +106,7 @@ export function RaidSeriesPage() {
       {isAdmin && editingID === s.id ? editorForm : <>
         <p>{s.weekdays.map((day) => weekdays[day]).join(', ')} · {s.start_time}</p>
         <p className="muted">Alle {s.interval_weeks} Wochen · {s.timezone}</p>
+        {s.name_template && <p className="muted">Namensvorlage: {s.name_template} · Nächste Nummer: {s.next_raid_number}</p>}
         <p className="muted">Raidleitung: {players.find((p) => p.id === s.raid_leader_id)?.name ?? 'Nicht verfügbar'}{s.catalog_instance_id && ` · ${catalog?.instances.find((instance) => instance.id === s.catalog_instance_id)?.name ?? `Instanz #${s.catalog_instance_id}`}${s.raid_size ? ` · ${s.raid_size} Spieler` : ''}`}</p>
         {isAdmin && <button disabled={pending} onClick={() => edit(s)}>Serie bearbeiten</button>}
       </>}

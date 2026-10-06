@@ -1558,7 +1558,7 @@ test('snapshot correction preserves saved details instead of current character d
 test('raid list includes archived raids, filters history and creates with configured leader and UTC start', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/Raids.tsx').RaidsPage)
-  s.requests.forEach((r) => r.resolve(r.url === '/api/v1/loot-catalog' ? catalogFixture() : r.url === '/api/v1/raid-series' ? [seriesRow] : r.url === '/api/v1/players' ? [player(1), player(2)] : [raid(1), { ...raid(2), archived_at: '2026-10-04T19:00:00Z' }]))
+  s.requests.forEach((r) => r.resolve(r.url === '/api/v1/loot-catalog' ? catalogFixture() : r.url === '/api/v1/raid-series' ? [{ ...seriesRow, name_template: 'ICC-{number}', next_raid_number: 7 }] : r.url === '/api/v1/players' ? [player(1), player(2)] : [raid(1), { ...raid(2), archived_at: '2026-10-04T19:00:00Z' }]))
   await flush(view)
   assert.equal(s.requests[0].url, '/api/v1/raids?include_archived=true')
   assert.match(text(view.tree), /Raid 2/)
@@ -1573,11 +1573,41 @@ test('raid list includes archived raids, filters history and creates with config
   nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'datetime-local')[0].props.onChange(change('2026-10-05T20:00'))
   view.render()
   assert.equal(select(view, 'Neuer Raidleiter').props.value, '2')
+  assert.match(text(view.tree), /Name wird aus der Namensvorlage abgeleitet:\s+ICC-7/)
+  const nameInput = nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Neuer Raidname')[0]
+  assert.equal(nameInput, undefined)
   const first = form(view).props.onSubmit(event)
-  assert.equal(writes(s)[0].body.name, seriesRow.name)
+  assert.equal(writes(s)[0].body.name, '')
   assert.equal(writes(s)[0].body.series_id, 3)
   assert.equal(writes(s)[0].body.raid_leader_id, 2)
   assert.equal(writes(s)[0].body.scheduled_start, new Date('2026-10-05T20:00').toISOString())
+  writes(s)[0].resolve(raid(3))
+  await first
+  assert.deepEqual(s.navigations, ['/raids/3'])
+})
+
+test('raid creation without a series requires an explicit name', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/Raids.tsx').RaidsPage)
+  s.requests.forEach((r) => r.resolve(r.url === '/api/v1/loot-catalog' ? catalogFixture() : r.url === '/api/v1/raid-series' ? [] : r.url === '/api/v1/players' ? [player(1), player(2)] : [raid(1)]))
+  await flush(view)
+  assert.match(text(view.tree), /Keine Raidserie vorhanden/)
+  assert.doesNotMatch(text(view.tree), /Name folgt der Namensvorlage/)
+  select(view, 'Neuer Raidleiter').props.onChange(change('2'))
+  const fields = nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'CatalogAssociationFields')[0]
+  fields.props.onChange('map:631', '25')
+  nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'datetime-local')[0].props.onChange(change('2026-10-05T20:00'))
+  view.render()
+  const nameInput = nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Neuer Raidname')[0]
+  assert.equal(nameInput.props.required, true)
+  form(view).props.onSubmit(event)
+  assert.equal(writes(s).length, 0)
+  nameInput.props.onChange(change('Einzelner Raid'))
+  view.render()
+  const first = form(view).props.onSubmit(event)
+  assert.equal(writes(s).length, 1)
+  assert.equal(writes(s)[0].body.name, 'Einzelner Raid')
+  assert.equal('series_id' in writes(s)[0].body, false)
   writes(s)[0].resolve(raid(3))
   await first
   assert.deepEqual(s.navigations, ['/raids/3'])

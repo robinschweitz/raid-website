@@ -111,6 +111,8 @@ export interface Attendance {
 export interface RaidSeries {
   id: number
   name: string
+  name_template: string
+  next_raid_number: number
   raid_leader_id: number
   weekdays: number[]
   interval_weeks: number

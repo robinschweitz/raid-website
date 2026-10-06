@@ -410,3 +410,44 @@ func TestSuccessorLinkAndOccurrenceUniqueness(t *testing.T) {
 		t.Fatalf("duplicate successor link accepted: %v", err)
 	}
 }
+
+func TestSuccessorUsesNameTemplate(t *testing.T) {
+	ctx := context.Background()
+	db := setupDB(t)
+	actor := seedPlayer(t, ctx, player.NewRepo(db), "Actor")
+	charID := seedCharacter(t, ctx, character.NewRepo(db), actor, "Actorchar")
+	raids := raid.NewRepo(db)
+	now := time.Now().UTC()
+	rd := &raid.Raid{Name: "icc25-33", RaidLeaderID: actor, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
+	seedSchedule(t, ctx, db, rd)
+	series, err := raidseries.NewRepo(db).Get(ctx, *rd.SeriesID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	series.NameTemplate = "icc25-{number}"
+	series.NextRaidNumber = 34
+	if err := raidseries.NewRepo(db).Save(ctx, series); err != nil {
+		t.Fatal(err)
+	}
+	if err := raids.Create(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	a := &attendance.Attendance{RaidID: rd.ID, PlayerID: actor, CharacterID: charID, CharacterName: "Actorchar", Class: "Krieger", Spec: "Waffen", Role: validation.RoleDD, IsBench: true, CreatedAt: now, UpdatedAt: now}
+	if err := attendance.NewRepo(db).Create(ctx, a); err != nil {
+		t.Fatal(err)
+	}
+	_, next, err := NewService(NewRepo(db)).ArchiveRaid(ctx, rd.ID, actor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Name != "icc25-34" {
+		t.Fatalf("want successor name icc25-34, got %s", next.Name)
+	}
+	updated, err := raidseries.NewRepo(db).Get(ctx, *rd.SeriesID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.NextRaidNumber != 35 {
+		t.Fatalf("want next raid number 35, got %d", updated.NextRaidNumber)
+	}
+}

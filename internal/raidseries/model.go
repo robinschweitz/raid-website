@@ -8,6 +8,8 @@ type Series struct {
 	CatalogInstanceID *string   `json:"catalog_instance_id"`
 	RaidSize          *int      `json:"raid_size"`
 	Name              string    `json:"name"`
+	NameTemplate      string    `json:"name_template"`
+	NextRaidNumber    int       `json:"next_raid_number"`
 	RaidLeaderID      int64     `json:"raid_leader_id"`
 	Weekdays          []int     `json:"weekdays"`
 	IntervalWeeks     int64     `json:"interval_weeks"`

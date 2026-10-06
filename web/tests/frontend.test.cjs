@@ -175,11 +175,11 @@ test('roster separates melee, ranged, unknown and bench while preserving inline 
   const props = { attendance, playerName: () => 'Besitzer', canWrite: false, pending: false, onEdit: (row) => { edited = row } }
   const view = s.mount(RaidRosterBoard, props)
   const section = (name) => nodes(view.tree, (n) => n.type === 'section' && n.props['aria-label'] === name)[0]
-  for (const [group, name] of [['Tanks', 'Bär'], ['Nahkampf', 'Katze'], ['Fernkampf', 'Eule'], ['Schaden · unklar', 'Altbestand'], ['Bank', 'Bankplatz']]) {
+  for (const [group, name] of [['Tanks', 'Bär'], ['Nahkampf', 'Katze'], ['Fernkampf', 'Eule'], ['Schaden · unklar', 'Altbestand'], ['Ersatzbank', 'Bankplatz']]) {
     assert.match(text(section(group)), new RegExp(name))
     assert.equal(nodes(section(group), (n) => n.type === 'li').length, 1)
   }
-  assert.match(text(section('Bank')), /Fernkampf/)
+  assert.match(text(section('Ersatzbank')), /Fernkampf/)
   assert.doesNotMatch(text(section('Fernkampf')), /Bankplatz/)
   assert.equal(nodes(view.tree, (n) => n.type === 'button').length, 0)
   view.render({ ...props, canWrite: true })
@@ -193,19 +193,21 @@ test('roster separates melee, ranged, unknown and bench while preserving inline 
   assert.equal(nodes(view.tree, (n) => n.props.className === 'setup-empty').length, 4)
 })
 
-test('every WotLK class has a distinct decorative SVG emblem and unknown classes fall back', () => {
+test('every WotLK class has a distinct class icon and unknown classes fall back', () => {
   const { ClassEmblem } = setup().load('components/ClassEmblem.tsx')
   const classes = ['Todesritter', 'Druide', 'Jäger', 'Magier', 'Paladin', 'Priester', 'Schamane', 'Schurke', 'Hexer', 'Krieger']
   const graphics = classes.map((characterClass) => {
     const tree = ClassEmblem({ characterClass })
-    assert.equal(tree.type, 'svg')
+    assert.equal(tree.type, 'img')
     assert.equal(tree.props['aria-hidden'], 'true')
-    return nodes(tree, (n) => n.type === 'path').map((n) => n.props.d).join(' ')
+    assert.match(tree.props.src, /^https:\/\/wow\.zamimg\.com\/images\/wow\/icons\/large\/classicon_[a-z]+\.jpg$/)
+    return tree.props.src
   })
   assert.equal(new Set(graphics).size, 10)
   assert.ok(graphics.every(Boolean))
   const fallback = ClassEmblem({ characterClass: '' })
-  assert.equal(nodes(fallback, (n) => n.type === 'path').length, 2)
+  assert.equal(fallback.type, 'span')
+  assert.equal(fallback.props['aria-hidden'], 'true')
   const board = setup().load('components/RaidRosterBoard.tsx').RaidRosterBoard({
     attendance: classes.map((characterClass, id) => ({ id, class: characterClass, role: 'DD' })),
     playerName: () => '', canWrite: false, pending: false, onEdit: () => {},
@@ -828,8 +830,7 @@ test('archived attendance additions require trimmed reason and send all form fie
   assert.equal(button(view, 'Hinzufügen').props.disabled, true)
   assert.match(text(view.tree), /nichtleere Begründung/)
   input(view, 'Teilnahme-Begründung').props.onChange(change('  missed participant  '))
-  checkbox(view, 'Bank').props.onChange({ target: { checked: true } })
-  input(view, 'Teilnahme-Notizen').props.onChange(change('bench note'))
+  checkbox(view, 'Ersatzbank').props.onChange({ target: { checked: true } })
   view.render()
   const submit = form(view).props.onSubmit
   const first = submit(event)
@@ -841,7 +842,8 @@ test('archived attendance additions require trimmed reason and send all form fie
   assert.equal(write.body.reason, 'missed participant')
   assert.equal(write.body.character_id, 20)
   assert.equal(write.body.is_bench, true)
-  assert.equal(write.body.notes, 'bench note')
+  assert.equal('notes' in write.body, false)
+  assert.equal('is_substitute' in write.body, false)
   write.reject(new Error('offline'))
   await first
 })
@@ -853,10 +855,9 @@ test('archived attendance edits in place, prefills saved values and PATCHes with
   await flush(view)
   button(view, 'Teilnahme korrigieren').props.onClick()
   view.render()
-  assert.equal(input(view, 'Teilnahme-Notizen').props.value, 'old attendance note')
   assert.ok(nodes(view.tree, (n) => n.type === 'li' && /is-editing/.test(n.props.className ?? '') && nodes(n, (child) => child.type === 'form').length === 1).length)
   assert.equal(select(view, 'Teilnahme-Rolle').props.value, 'HEAL')
-  assert.equal(checkbox(view, 'Ersatz').props.checked, true)
+  assert.equal(checkbox(view, 'Ersatzbank').props.checked, false)
   assert.equal(input(view, 'Teilnahme-Begründung').props.value, '')
   await flush(view)
   assert.equal(select(view, 'Teilnahme-Charakter').props.value, '11')
@@ -871,7 +872,9 @@ test('archived attendance edits in place, prefills saved values and PATCHes with
   assert.equal(write.url, '/api/v1/raids/1/attendance/7')
   assert.equal(write.body.role, 'TANK')
   assert.equal(write.body.character_id, 11)
-  assert.equal(write.body.is_substitute, true)
+  assert.equal('is_substitute' in write.body, false)
+  assert.equal(write.body.is_bench, false)
+  assert.equal('notes' in write.body, false)
   assert.equal(write.body.late_join, true)
   assert.equal(write.body.reason, 'role correction')
   assert.equal('raid_id' in write.body, false)
@@ -1505,7 +1508,9 @@ test('attendance defaults snapshot from selected character, allows actual spec a
   select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
   view.render()
   await flush(view)
-  assert.equal(input(view, 'Gespeicherter Charaktername').props.value, 'Char 10')
+  assert.equal(input(view, 'Gespeicherter Charaktername'), undefined)
+  assert.equal(select(view, 'Gespeicherte Klasse').props.disabled, true)
+  assert.equal(select(view, 'Tatsächlicher Spec').props.disabled, false)
   assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Shadow')
   button(view, 'Second-Spec übernehmen').props.onClick()
   view.render()
@@ -1527,7 +1532,7 @@ test('attendance defaults snapshot from selected character, allows actual spec a
   await first
 })
 
-test('snapshot correction preserves saved details instead of current character defaults', async () => {
+test('attendance correction keeps the saved class locked and changes only the spec', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, { attendance: [{ ...attendanceRow, character_name: 'Old name', class: 'Priester', spec: 'Old spec' }] })
@@ -1535,21 +1540,18 @@ test('snapshot correction preserves saved details instead of current character d
   button(view, 'Teilnahme korrigieren').props.onClick()
   view.render()
   await flush(view)
-  assert.equal(input(view, 'Gespeicherter Charaktername').props.value, 'Old name')
+  assert.equal(input(view, 'Gespeicherter Charaktername'), undefined)
+  assert.equal(select(view, 'Gespeicherte Klasse').props.value, 'Priester')
+  assert.equal(select(view, 'Gespeicherte Klasse').props.disabled, true)
   assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Old spec')
-  input(view, 'Gespeicherter Charaktername').props.onChange(change('Corrected name'))
-  view.render()
-  select(view, 'Gespeicherte Klasse').props.onChange(change('Magier'))
-  view.render()
-  assert.equal(select(view, 'Tatsächlicher Spec').props.value, '')
-  select(view, 'Tatsächlicher Spec').props.onChange(change('Feuer'))
+  select(view, 'Tatsächlicher Spec').props.onChange(change('Schatten'))
   view.render()
   assert.equal(input(view, 'Teilnahme-Begründung'), undefined)
   view.render()
   const first = form(view).props.onSubmit(event)
-  assert.equal(writes(s)[0].body.character_name, 'Corrected name')
-  assert.equal(writes(s)[0].body.class, 'Magier')
-  assert.equal(writes(s)[0].body.spec, 'Feuer')
+  assert.equal('character_name' in writes(s)[0].body, false)
+  assert.equal('class' in writes(s)[0].body, false)
+  assert.equal(writes(s)[0].body.spec, 'Schatten')
   assert.equal('reason' in writes(s)[0].body, false)
   writes(s)[0].reject(new Error('offline'))
   await first
@@ -1758,22 +1760,25 @@ test('time-only schedule repair without a series does not invent one', async () 
   assert.equal(button(view, 'Archivieren').props.disabled, true)
 })
 
-test('character selection allows a raid-specific name and spec without changing the live character', async () => {
+test('selecting an existing character locks name and class while the spec stays editable', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1)
   await flush(view)
   select(view, 'Teilnahme-Charakter').props.onChange(change('11'))
   view.render()
-  input(view, 'Gespeicherter Charaktername').props.onChange(change('Manual raid name'))
+  await flush(view)
+  assert.equal(input(view, 'Gespeicherter Charaktername'), undefined)
+  assert.equal(select(view, 'Gespeicherte Klasse').props.value, 'Priest')
+  assert.equal(select(view, 'Gespeicherte Klasse').props.disabled, true)
   select(view, 'Tatsächlicher Spec').props.onChange(change('Holy'))
   view.render()
   await flush(view)
-  assert.equal(input(view, 'Gespeicherter Charaktername').props.value, 'Manual raid name')
   assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Holy')
   assert.equal(select(view, 'Gespeicherte Klasse').props.value, 'Priest')
   const first = form(view).props.onSubmit(event)
-  assert.equal(writes(s)[0].body.character_name, 'Manual raid name')
+  assert.equal(writes(s)[0].body.character_name, 'Char 11')
+  assert.equal(writes(s)[0].body.class, 'Priest')
   assert.equal(writes(s)[0].body.spec, 'Holy')
   writes(s)[0].reject(new Error('offline'))
   await first
@@ -1786,21 +1791,22 @@ test('changing character replaces snapshots and ignores obsolete snapshot handle
   await flush(view)
   select(view, 'Teilnahme-Charakter').props.onChange(change('11'))
   view.render()
-  const oldName = input(view, 'Gespeicherter Charaktername').props.onChange
+  const oldClass = select(view, 'Gespeicherte Klasse').props.onChange
   const oldSpec = select(view, 'Tatsächlicher Spec').props.onChange
   oldSpec(change('Source spec'))
   view.render()
   select(view, 'Teilnahme-Charakter').props.onChange(change('20'))
-  oldName(change('Obsolete name'))
+  oldClass(change('Magier'))
   oldSpec(change('Obsolete spec'))
   view.render()
   assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Shadow')
   await flush(view)
-  assert.equal(input(view, 'Gespeicherter Charaktername').props.value, 'Char 20')
+  assert.equal(input(view, 'Gespeicherter Charaktername'), undefined)
+  assert.equal(select(view, 'Gespeicherte Klasse').props.value, 'Priest')
   assert.equal(select(view, 'Tatsächlicher Spec').props.value, 'Shadow')
 })
 
-test('notes-only historical PATCH omits untouched unknown and blank snapshots', async () => {
+test('role-only historical PATCH omits untouched unknown and blank snapshots', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, { attendance: [{ ...attendanceRow, character_name: '', class: 'Unknown imported class', spec: '' }] })
@@ -1809,12 +1815,14 @@ test('notes-only historical PATCH omits untouched unknown and blank snapshots', 
   view.render()
   await flush(view)
   assert.equal(select(view, 'Gespeicherte Klasse').props.value, 'Unknown imported class')
-  input(view, 'Teilnahme-Notizen').props.onChange(change('Corrected notes'))
+  assert.equal(input(view, 'Gespeicherter Charaktername'), undefined)
+  select(view, 'Teilnahme-Rolle').props.onChange(change('TANK'))
   assert.equal(input(view, 'Teilnahme-Begründung'), undefined)
   view.render()
   const first = form(view).props.onSubmit(event)
   for (const field of ['character_name', 'class', 'spec']) assert.equal(field in writes(s)[0].body, false)
-  assert.equal(writes(s)[0].body.notes, 'Corrected notes')
+  assert.equal('notes' in writes(s)[0].body, false)
+  assert.equal(writes(s)[0].body.role, 'TANK')
   writes(s)[0].reject(new Error('offline'))
   await first
 })
@@ -2385,7 +2393,7 @@ test('raid workspace opens on roster, preserves drafts between views and resets 
   assert.equal(panel('raid-roster').props.hidden, false)
   assert.equal(panel('raid-loot').props.hidden, true)
   assert.equal(panel('raid-planning').props.hidden, true)
-  input(view, 'Teilnahme-Notizen').props.onChange(change('Keep this draft'))
+  input(view, 'Charaktername oder Spieler').props.onChange(change('Keep this draft'))
   nodes(view.tree, (n) => n.type === 'button' && n.props['aria-controls'] === 'raid-loot')[0].props.onClick()
   view.render()
   assert.equal(panel('raid-roster').props.hidden, true)
@@ -2393,15 +2401,15 @@ test('raid workspace opens on roster, preserves drafts between views and resets 
   button(view, 'Planung & Details').props.onClick()
   view.render()
   assert.equal(panel('raid-planning').props.hidden, false)
-  assert.equal(input(view, 'Teilnahme-Notizen').props.value, 'Keep this draft')
+  assert.equal(input(view, 'Charaktername oder Spieler').props.value, 'Keep this draft')
   view.render({ raidID: 2 })
   resolveRaid(s, 2)
   await flush(view)
   assert.equal(panel('raid-roster').props.hidden, false)
-  assert.equal(input(view, 'Teilnahme-Notizen').props.value, '')
+  assert.equal(input(view, 'Charaktername oder Spieler').props.value, '')
 })
 
-test('roster board groups saved roles, separates bench, preserves substitute and note details', () => {
+test('roster board groups saved roles, separates the Ersatzbank and preserves note details', () => {
   const s = setup()
   const Board = s.load('components/RaidRosterBoard.tsx').RaidRosterBoard
   const attendance = [
@@ -2416,8 +2424,8 @@ test('roster board groups saved roles, separates bench, preserves substitute and
   const group = (label) => nodes(tree, (n) => n.props['aria-label'] === label)[0]
   assert.match(text(group('Tanks')), /Saved tank/)
   assert.doesNotMatch(text(group('Tanks')), /Bench tank/)
-  assert.match(text(group('Bank')), /Bench tank/)
-  assert.match(text(group('Heilung')), /Saved healer.*Ersatz.*Assignment note/)
+  assert.match(text(group('Ersatzbank')), /Bench tank/)
+  assert.match(text(group('Heilung')), /Saved healer.*Assignment note/)
   assert.equal(nodes(tree, (n) => n.type === 'li').length, 4)
   nodes(tree, (n) => n.type === 'button')[0].props.onClick()
   assert.equal(edited.id, 1)

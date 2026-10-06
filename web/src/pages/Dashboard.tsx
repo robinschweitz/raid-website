@@ -79,7 +79,7 @@ export function DashboardPage() {
     return () => { active = false }
   }, [polls])
 
-  const confirmedCount = attendance?.filter((a) => !a.is_substitute).length ?? 0
+  const confirmedCount = attendance?.filter((a) => !a.is_bench).length ?? 0
   const totalCount = attendance?.length ?? 0
 
   return <div className="dashboard">
@@ -129,8 +129,7 @@ export function DashboardPage() {
           <AttendanceRing confirmed={confirmedCount} total={totalCount} />
           <div className="attendance-details">
             <div className="attendance-detail-row"><span className="muted">Best&auml;tigt</span><strong>{confirmedCount}</strong></div>
-            <div className="attendance-detail-row"><span className="muted">Ersatz</span><strong>{attendance.filter((a) => a.is_substitute).length}</strong></div>
-            <div className="attendance-detail-row"><span className="muted">Bank</span><strong>{attendance.filter((a) => a.is_bench).length}</strong></div>
+            <div className="attendance-detail-row"><span className="muted">Ersatzbank</span><strong>{attendance.filter((a) => a.is_bench).length}</strong></div>
             <div className="attendance-detail-row"><span className="muted">Gesamt</span><strong>{totalCount}</strong></div>
           </div>
         </div> : <p className="muted">Keine Daten verf&uuml;gbar.</p>}

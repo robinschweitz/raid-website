@@ -24,8 +24,7 @@ const awardLabels: Record<AwardMethod, string> = { MAIN: 'Main-Spec', SECOND: 'S
 const awardMethod = (row: RecordedLoot): AwardMethod => row.award_method ?? (row.is_main_spec ? 'MAIN' : 'SECOND')
 
 const attendanceFlags = [
-  { key: 'is_substitute', label: 'Ersatz' },
-  { key: 'is_bench', label: 'Bank' },
+  { key: 'is_bench', label: 'Ersatzbank' },
   { key: 'late_join', label: 'Später dabei' },
   { key: 'early_leave', label: 'Früher gegangen' },
 ] as const
@@ -106,7 +105,7 @@ function RaidDetail({ raidID }: Props) {
   const [quickAdd, setQuickAdd] = useState(false)
   const { options: classSpecs, error: optionsError, reload: reloadOptions } = useCharacterOptions()
   const [attEditing, setAttEditing] = useState<Attendance | null>(null)
-  const [attDetails, setAttDetails] = useState({ is_substitute: false, is_bench: false, late_join: false, early_leave: false, notes: '' })
+  const [attDetails, setAttDetails] = useState({ is_bench: false, late_join: false, early_leave: false })
   const [attReason, setAttReason] = useState('')
   const [attSnapshot, setAttSnapshot] = useState<{ character_name?: string; class?: string; spec?: string }>({})
 
@@ -258,8 +257,8 @@ function RaidDetail({ raidID }: Props) {
     setQuickAdd(false)
     setAttRole(row?.role ?? 'DD')
     setAttDetails({
-      is_substitute: row?.is_substitute ?? false, is_bench: row?.is_bench ?? false,
-      late_join: row?.late_join ?? false, early_leave: row?.early_leave ?? false, notes: row?.notes ?? '',
+      is_bench: row?.is_bench ?? false,
+      late_join: row?.late_join ?? false, early_leave: row?.early_leave ?? false,
     })
     setAttReason('')
     setAttSnapshot(row ? { character_name: row.character_name || undefined, class: row.class || undefined, spec: row.spec || undefined } : {})
@@ -341,7 +340,7 @@ function RaidDetail({ raidID }: Props) {
       }
     }
     if (Object.values(snapshotChanges).some((value) => !value.trim())) {
-      setError('Gespeicherter Charaktername, Klasse und tatsächlicher Spec dürfen nicht leer sein.')
+      setError('Klasse und tatsächlicher Spec dürfen nicht leer sein.')
       return
     }
     await submit(async () => {
@@ -367,7 +366,7 @@ function RaidDetail({ raidID }: Props) {
         setAttCharacter('')
         setAttEditing(null)
         setAttRole('DD')
-        setAttDetails({ is_substitute: false, is_bench: false, late_join: false, early_leave: false, notes: '' })
+        setAttDetails({ is_bench: false, late_join: false, early_leave: false })
         setAttReason('')
         setAttSnapshot({})
         await load()
@@ -648,7 +647,7 @@ function RaidDetail({ raidID }: Props) {
       </section>
 
       <section id="raid-roster" hidden={view !== 'roster'} className="card raid-roster" aria-label="Raidroster">
-        <div className="section-heading"><h2>Raidaufstellung</h2><span className="muted">{attendance.filter((row) => !row.is_bench).length} im Raid · {attendance.filter((row) => row.is_bench).length} auf der Bank</span></div>
+        <div className="section-heading"><h2>Raidaufstellung</h2><span className="muted">{attendance.filter((row) => !row.is_bench).length} im Raid · {attendance.filter((row) => row.is_bench).length} auf der Ersatzbank</span></div>
         <RaidRosterBoard attendance={attendance} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id}>
         {canWrite && (
           <div>
@@ -656,7 +655,7 @@ function RaidDetail({ raidID }: Props) {
             {!attEditing && !quickAdd && <button type="button" disabled={pending} onClick={() => setQuickAdd(true)}>Neuen Charakter anlegen</button>}
             {quickAdd ? <RaidQuickAdd raidID={raidID} players={players} options={classSpecs} needsReason={attNeedsReason} pending={pending} submit={submit} isActive={isActive} onCancel={() => setQuickAdd(false)} onAdded={async () => { setQuickAdd(false); await load() }} /> :
             <form className="inline-form" onSubmit={addAttendance}>
-              <label>Charakter suchen<input type="search" disabled={pending} value={characterSearch} onChange={(event) => setCharacterSearch(event.target.value)} placeholder="Charaktername oder Spieler" /></label>
+              <label>Charakter suchen<input type="search" autoFocus={attEditing != null} disabled={pending} value={characterSearch} onChange={(event) => setCharacterSearch(event.target.value)} placeholder="Charaktername oder Spieler" /></label>
               <select aria-label="Teilnahme-Charakter" disabled={pending || characters.length === 0} value={attCharacter} onChange={(e) => {
                 if (!isActive() || isPending() || renderedCharacterVersion !== characterVersion.current) return
                 ++characterVersion.current
@@ -672,8 +671,7 @@ function RaidDetail({ raidID }: Props) {
                   </option>
                 ))}
               </select>
-              <label>Gespeicherter Charaktername<input autoFocus={attEditing != null} disabled={pending} placeholder="Gespeicherter Charaktername" value={attSnapshot.character_name ?? ''} onChange={(e) => changeSnapshot('character_name', e.target.value)} /></label>
-              <label>Gespeicherte Klasse<select aria-label="Gespeicherte Klasse" disabled={pending} value={attSnapshot.class ?? ''} onChange={(e) => { changeSnapshot('class', e.target.value); changeSnapshot('spec', '') }}>
+              <label>Gespeicherte Klasse<select aria-label="Gespeicherte Klasse" disabled={pending || hasAttCharacter} value={attSnapshot.class ?? ''} onChange={(e) => { changeSnapshot('class', e.target.value); changeSnapshot('spec', '') }}>
                 <option value="">Klasse wählen…</option>
                 {attSnapshot.class && !classSpecs[attSnapshot.class] && <option value={attSnapshot.class}>{attSnapshot.class} (gespeichert)</option>}
                 {Object.keys(classSpecs).sort().map((value) => <option key={value}>{value}</option>)}
@@ -691,10 +689,6 @@ function RaidDetail({ raidID }: Props) {
                   setAttDetails((previous) => ({ ...previous, [key]: checked }))
                 }} /> {label}
               </label>)}
-              <label>Notizen<input disabled={pending} placeholder="Teilnahme-Notizen" value={attDetails.notes} onChange={(e) => {
-                const notes = e.target.value
-                setAttDetails((previous) => ({ ...previous, notes }))
-              }} /></label>
               {attNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Teilnahme-Begründung" value={attReason} onChange={(e) => setAttReason(e.target.value)} required /></label>}
               {attEditing && error && <p className="error" role="alert">{error}</p>}
               <button type="submit" disabled={pending || !hasAttCharacter || (attNeedsReason && !attReason.trim())}>{attEditing ? 'Teilnahme-Korrektur speichern' : 'Hinzufügen'}</button>
@@ -703,7 +697,7 @@ function RaidDetail({ raidID }: Props) {
           </div>
         )}
         </RaidRosterBoard>
-        <p className="muted setup-caption">Gespeicherte Aufstellung dieses Raids. Bank und Ersatz folgen derselben EP-Regel.</p>
+        <p className="muted setup-caption">Gespeicherte Aufstellung dieses Raids. Die Ersatzbank folgt derselben EP-Regel.</p>
       </section>
 
       <section id="raid-loot" hidden={view !== 'loot'} className="card raid-loot" aria-label="Raidloot">

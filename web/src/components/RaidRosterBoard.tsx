@@ -25,7 +25,6 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
         <small>{playerName(row.player_id)}</small>
         <div className="setup-flags">
           {row.is_bench && <span className="badge">{rosterGroups.find((group) => group.role === rosterGroup(row))?.label}</span>}
-          {row.is_substitute && <span className="badge">Ersatz</span>}
           {row.late_join && <span className="badge">Später dabei</span>}
           {row.early_leave && <span className="badge">Früher gegangen</span>}
         </div>
@@ -54,9 +53,9 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
         </section>
       })}
     </div>
-    <section className="setup-bench" aria-label="Bank">
-      <header><h3>Bank</h3><span className="badge">{bench.length}</span></header>
-      {bench.length ? <ul>{bench.map(member)}</ul> : <p className="muted">Keine Teilnehmer auf der Bank.</p>}
+    <section className="setup-bench" aria-label="Ersatzbank">
+      <header><h3>Ersatzbank</h3><span className="badge">{bench.length}</span></header>
+      {bench.length ? <ul>{bench.map(member)}</ul> : <p className="muted">Keine Teilnehmer auf der Ersatzbank.</p>}
     </section>
     {canWrite && editingID == null && <details className="editor-disclosure"><summary>Teilnahme hinzufügen</summary>{children}</details>}
   </>

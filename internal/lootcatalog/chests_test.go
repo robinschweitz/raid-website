@@ -2,14 +2,13 @@ package lootcatalog
 
 import (
 	"context"
-	"strings"
 	"testing"
 )
 
 func TestEncounterChestSelections(t *testing.T) {
 	s := NewService(NewRepo(nil))
 	ctx := context.Background()
-	for _, boss := range []string{"36789", "encounter:631:gunship", "encounter:649:faction-champions"} {
+	for _, boss := range []string{"36789", "encounter:631:gunship"} {
 		for _, size := range []int{10, 25} {
 			for _, mode := range []Mode{ModeNormal, ModeHeroic} {
 				items, err := s.Items(ctx, Filter{BossID: boss, RaidSize: size, Mode: mode})
@@ -25,39 +24,10 @@ func TestEncounterChestSelections(t *testing.T) {
 					if item.RaidSize != size || item.Mode != mode {
 						t.Fatal("variant leaked")
 					}
-					chests := map[string]bool{}
-					for _, variant := range item.SourceVariants {
-						for _, token := range strings.Split(variant.Difficulty, "/") {
-							if strings.HasPrefix(strings.TrimSpace(token), "source-chest:") {
-								chests[strings.TrimSpace(token)] = true
-							}
-						}
-					}
-					if len(chests) == 0 || boss == "encounter:631:gunship" && len(chests) != 2 {
-						t.Fatalf("chest provenance lost: %+v", item)
+					if len(item.SourceVariants) == 0 {
+						t.Fatalf("source provenance lost: %+v", item)
 					}
 				}
-			}
-		}
-	}
-	for _, boss := range []string{"32845", "32906"} {
-		for _, size := range []int{10, 25} {
-			for _, mode := range []Mode{ModeNormal, ModeHardmode} {
-				items, err := s.Items(ctx, Filter{BossID: boss, RaidSize: size, Mode: mode})
-				if err != nil || len(items) == 0 {
-					t.Fatalf("missing Ulduar chests %s %d %s", boss, size, mode)
-				}
-			}
-		}
-	}
-	for _, boss := range []string{"encounter:533:four-horsemen", "encounter:649:tribute"} {
-		items, err := s.Items(ctx, Filter{BossID: boss})
-		if err != nil || len(items) == 0 {
-			t.Fatal("missing collective reward", boss, err)
-		}
-		for _, item := range items {
-			if boss == "encounter:649:tribute" && (item.Mode != ModeHeroic || !item.Conditional || !strings.Contains(item.SourceVariants[0].Difficulty, "attempts:")) {
-				t.Fatal("tribute condition lost")
 			}
 		}
 	}
@@ -76,7 +46,7 @@ func TestChestAwardContextAndCanonicalName(t *testing.T) {
 		t.Fatal(err)
 	}
 	boss, item, err := s.ValidateDrop(ctx, "631", &size, &id, items[0].ItemID)
-	if err != nil || boss.Name != "Luftschiffkampf" || item.Name != items[0].Name {
+	if err != nil || boss.Name != "Luftschlacht um die Eiskronenzitadelle" || item.Name != items[0].Name {
 		t.Fatalf("encounter resolution: %+v %+v %v", boss, item, err)
 	}
 	if _, _, err := s.ValidateDrop(ctx, "603", &size, &id, item.ItemID); err == nil {

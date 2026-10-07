@@ -135,16 +135,28 @@ export interface CatalogBoss { id: string; instance_id: string; name: string }
 export interface CatalogItem {
   item_id: string;
   name: string;
+  icon?: string;
   display_id?: number;
   icon_name?: string;
   binding?: number;
+  binding_type?: string;
   quality?: number;
   item_level?: number;
+  required_level?: number;
   slot?: string;
+  type?: string;
   class_mask?: number;
   subclass?: number;
   set_name?: string;
   armor?: number;
+  stats?: Record<string, number>;
+  sockets?: string[];
+  socket_bonus?: { text: string; stats?: Record<string, number> };
+  effects?: string[];
+  requirements?: string[];
+  unique?: boolean;
+  weapon?: { min_damage?: number; max_damage?: number; speed?: number; dps?: number };
+  locales?: Record<string, { name: string; icon?: string; tooltip_html?: string; tooltip_text?: string; fallback_locale?: string; fetch_error?: string }>;
   stamina?: number;
   strength?: number;
   agility?: number;

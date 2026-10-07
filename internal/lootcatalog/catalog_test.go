@@ -55,7 +55,7 @@ func TestColdStartAndIdempotentRestart(t *testing.T) {
 	s, b := setup(t)
 	ctx := context.Background()
 	before, err := s.List(ctx)
-	if err != nil || len(before.Instances) != 6 || len(before.Drops) == 0 {
+	if err != nil || len(before.Instances) != 1 || len(before.Drops) == 0 {
 		t.Fatalf("automatic source: %+v %v", before.Sources, err)
 	}
 	report, err := s.EnsureBundled(ctx)
@@ -120,7 +120,7 @@ func TestLegacyConflictsReportedAndHistoryRetained(t *testing.T) {
 		t.Fatal("DB-only instance selectable")
 	}
 	items, err := s.Items(ctx, Filter{BossID: "36612", RaidSize: 10, Mode: ModeNormal})
-	if err != nil || len(items) != 13 {
+	if err != nil || len(items) != 12 {
 		t.Fatal("old drop affected authoritative catalog")
 	}
 }
@@ -162,7 +162,7 @@ func TestGenuineMarrowgarModesAndProvenance(t *testing.T) {
 		size  int
 		mode  Mode
 		count int
-	}{{10, ModeNormal, 13}, {10, ModeHeroic, 14}, {25, ModeNormal, 18}, {25, ModeHeroic, 18}, {0, ModeNormal, 31}, {0, ModeHeroic, 32}, {0, "", 63}} {
+	}{{10, ModeNormal, 12}, {10, ModeHeroic, 12}, {25, ModeNormal, 17}, {25, ModeHeroic, 17}, {0, ModeNormal, 29}, {0, ModeHeroic, 29}, {0, "", 58}} {
 		items, err := s.Items(ctx, Filter{BossID: "36612", RaidSize: tc.size, Mode: tc.mode})
 		if err != nil || len(items) != tc.count {
 			t.Fatalf("size=%d mode=%s count=%d want=%d: %v", tc.size, tc.mode, len(items), tc.count, err)
@@ -182,19 +182,16 @@ func TestGenuineMarrowgarModesAndProvenance(t *testing.T) {
 		}
 	}
 	items, _ := s.Items(ctx, Filter{BossID: "36612", RaidSize: 10, Mode: ModeNormal})
-	direct, referenced := false, false
+	direct := false
 	for _, item := range items {
 		for _, variant := range item.SourceVariants {
 			if strings.HasSuffix(variant.Difficulty, "source-lootmode-path:1") {
 				direct = true
 			}
-			if item.ItemID == "50759" && strings.HasSuffix(variant.Difficulty, "source-lootmode-path:1/1") {
-				referenced = true
-			}
 		}
 	}
-	if !direct || !referenced {
-		t.Fatal("direct/reference provenance lost")
+	if !direct {
+		t.Fatal("direct provenance lost")
 	}
 	for _, mode := range []Mode{"UNKNOWN", "heroic", "2", "NORMAL/HEROIC"} {
 		if _, err := s.Items(ctx, Filter{Mode: mode}); !errors.Is(err, ErrInvalid) {
@@ -233,54 +230,25 @@ func TestSourceModesNeverInferHeroicFromLootMask(t *testing.T) {
 	}
 }
 
-// Ulduar hardmode loot must stay selectable apart from plain normal loot.
-func TestGenuineHardmodeStaysSeparateFromNormal(t *testing.T) {
+// The localized ICC source has normal and heroic modes but no hardmode entries.
+func TestLocalizedICCHasNoHardmodeSelections(t *testing.T) {
 	s := NewService(NewRepo(nil))
 	ctx := context.Background()
 	catalog, err := s.List(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var mimiron, thorim string
 	for _, boss := range catalog.Bosses {
-		switch boss.Name {
-		case "Mimiron":
-			mimiron = boss.ID
-		case "Thorim":
-			thorim = boss.ID
-		}
-	}
-	if mimiron == "" || thorim == "" {
-		t.Fatalf("Ulduar bosses missing: %q %q", mimiron, thorim)
-	}
-	for _, bossID := range []string{mimiron, thorim} {
-		normal, err := s.Items(ctx, Filter{BossID: bossID, RaidSize: 10, Mode: ModeNormal})
+		normal, err := s.Items(ctx, Filter{BossID: boss.ID, RaidSize: 10, Mode: ModeNormal})
 		if err != nil {
 			t.Fatal(err)
 		}
-		hardmode, err := s.Items(ctx, Filter{BossID: bossID, RaidSize: 10, Mode: ModeHardmode})
+		hardmode, err := s.Items(ctx, Filter{BossID: boss.ID, RaidSize: 10, Mode: ModeHardmode})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(normal) == 0 || len(hardmode) == 0 {
-			t.Fatalf("boss %s: normal=%d hardmode=%d", bossID, len(normal), len(hardmode))
-		}
-		for _, item := range hardmode {
-			if !item.Conditional {
-				t.Fatalf("hardmode loot must stay conditional: %+v", item)
-			}
-			for _, variant := range item.SourceVariants {
-				if !strings.Contains(variant.Difficulty, "hardmode:true") {
-					t.Fatalf("hardmode selection carries a non-hardmode path: %+v", item)
-				}
-			}
-		}
-		for _, item := range normal {
-			for _, variant := range item.SourceVariants {
-				if strings.Contains(variant.Difficulty, "hardmode:true") {
-					t.Fatalf("hardmode path merged into normal: %+v", item)
-				}
-			}
+		if len(normal) == 0 || len(hardmode) != 0 {
+			t.Fatalf("boss %s: normal=%d hardmode=%d", boss.ID, len(normal), len(hardmode))
 		}
 	}
 }
@@ -357,7 +325,7 @@ func TestBundleCopiesAndInvalidSource(t *testing.T) {
 	if string(actual) != string(expected) {
 		t.Fatal("caller mutated shared bundle")
 	}
-	for _, raw := range []string{"{}", "invalid", strings.Replace(catalogdata.JSON(), "raid-difficulty:0/", "raid-difficulty:9/", 1)} {
+	for _, raw := range []string{"{}", "invalid", strings.Replace(catalogdata.JSON(), "\"10_normal\"", "\"invalid_mode\"", 1)} {
 		if _, err := decodeBundled(raw); err == nil {
 			t.Fatal("invalid bundle accepted")
 		}

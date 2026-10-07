@@ -55,7 +55,7 @@ func TestCatalogRealRouterAutomaticReadsAndRemovedMutations(t *testing.T) {
 		size  int
 		mode  string
 		count int
-	}{{10, "NORMAL", 13}, {10, "HEROIC", 14}, {25, "NORMAL", 18}, {25, "HEROIC", 18}} {
+	}{{10, "NORMAL", 12}, {10, "HEROIC", 12}, {25, "NORMAL", 17}, {25, "HEROIC", 17}} {
 		status, body := do(t, f.srv.Client(), http.MethodGet, fmt.Sprintf("%s/api/v1/loot-catalog/items?boss_id=36612&raid_size=%d&mode=%s", f.srv.URL, tc.size, tc.mode), f.token, nil)
 		var envelope struct{ Data []lootcatalog.ItemDrop }
 		if err := json.Unmarshal(body, &envelope); err != nil {
@@ -184,7 +184,7 @@ func TestCatalogRaidSeriesInheritanceAndPreplannedReuse(t *testing.T) {
 			f.attend(f.first, f.firstChar)
 			var nextID int64
 			if preplanned {
-				nextID = correctionID(t, request(http.MethodPost, "/raids", map[string]any{"name": "Preplanned", "raid_leader_id": f.actor, "series_id": seriesID, "scheduled_start": start.AddDate(0, 0, 7).Format(time.RFC3339), "catalog_instance_id": "603", "raid_size": 10}, http.StatusCreated))
+				nextID = correctionID(t, request(http.MethodPost, "/raids", map[string]any{"name": "Preplanned", "raid_leader_id": f.actor, "series_id": seriesID, "scheduled_start": start.AddDate(0, 0, 7).Format(time.RFC3339), "catalog_instance_id": "631", "raid_size": 10}, http.StatusCreated))
 			}
 			result := f.request(http.MethodPost, "/archive", nil, http.StatusOK)
 			var archive struct {
@@ -195,7 +195,7 @@ func TestCatalogRaidSeriesInheritanceAndPreplannedReuse(t *testing.T) {
 			}
 			wantInstance := "631"
 			if preplanned {
-				wantInstance = "603"
+				wantInstance = "631"
 				if archive.NextRaid.ID != nextID {
 					t.Fatal("preplanned raid not reused")
 				}

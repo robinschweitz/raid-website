@@ -123,7 +123,8 @@ func (r *Repo) EnsureBundled(ctx context.Context) (InitializationReport, error) 
 		}
 	}
 	for _, item := range catalog.Items {
-		err := apply("item", item.ItemID, item, "INSERT INTO loot_catalog_items (item_id, name, binding, quality, source_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(item_id) DO UPDATE SET name = excluded.name, binding = excluded.binding, quality = excluded.quality, source_id = excluded.source_id", item.ItemID, item.Name, item.Binding, item.Quality, provenance.Source.ID)
+		mirrorItem := Item{ItemID: item.ItemID, Name: item.Name, Binding: item.Binding, Quality: item.Quality}
+		err := apply("item", item.ItemID, mirrorItem, "INSERT INTO loot_catalog_items (item_id, name, binding, quality, source_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(item_id) DO UPDATE SET name = excluded.name, binding = excluded.binding, quality = excluded.quality, source_id = excluded.source_id", item.ItemID, item.Name, item.Binding, item.Quality, provenance.Source.ID)
 		if err != nil {
 			return InitializationReport{}, err
 		}

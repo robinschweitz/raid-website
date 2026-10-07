@@ -34,25 +34,59 @@ type Boss struct {
 
 // Item retains the game item key and a consistent display-name field.
 type Item struct {
-	ItemID     string   `json:"item_id"`
-	Name       string   `json:"name"`
-	Binding    *int     `json:"binding,omitempty"`
-	Quality    *int     `json:"quality,omitempty"`
-	ItemLevel  *int     `json:"item_level,omitempty"`
-	Slot       string   `json:"slot,omitempty"`
-	ClassMask  *int64   `json:"class_mask,omitempty"`
-	Subclass   *int     `json:"subclass,omitempty"`
-	SetName    string   `json:"set_name,omitempty"`
-	Armor      *int     `json:"armor,omitempty"`
-	Stamina    *int     `json:"stamina,omitempty"`
-	Strength   *int     `json:"strength,omitempty"`
-	Agility    *int     `json:"agility,omitempty"`
-	Intellect  *int     `json:"intellect,omitempty"`
-	Spirit     *int     `json:"spirit,omitempty"`
-	SpellPower *int     `json:"spell_power,omitempty"`
-	MinDamage  *float64 `json:"min_damage,omitempty"`
-	MaxDamage  *float64 `json:"max_damage,omitempty"`
-	DPS        *float64 `json:"dps,omitempty"`
+	ItemID        string                       `json:"item_id"`
+	Name          string                       `json:"name"`
+	Icon          string                       `json:"icon,omitempty"`
+	DisplayID     *int                         `json:"display_id,omitempty"`
+	Binding       *int                         `json:"binding,omitempty"`
+	BindingType   string                       `json:"binding_type,omitempty"`
+	Quality       *int                         `json:"quality,omitempty"`
+	ItemLevel     *int                         `json:"item_level,omitempty"`
+	RequiredLevel *int                         `json:"required_level,omitempty"`
+	Slot          string                       `json:"slot,omitempty"`
+	Type          string                       `json:"type,omitempty"`
+	ClassMask     *int64                       `json:"class_mask,omitempty"`
+	Subclass      *int                         `json:"subclass,omitempty"`
+	SetName       string                       `json:"set_name,omitempty"`
+	Armor         *int                         `json:"armor,omitempty"`
+	Stats         map[string]int               `json:"stats,omitempty"`
+	Sockets       []string                     `json:"sockets,omitempty"`
+	SocketBonus   *SocketBonus                 `json:"socket_bonus,omitempty"`
+	Effects       []string                     `json:"effects,omitempty"`
+	Requirements  []string                     `json:"requirements,omitempty"`
+	Unique        bool                         `json:"unique,omitempty"`
+	Weapon        *Weapon                      `json:"weapon,omitempty"`
+	Locales       map[string]LocalizedItemView `json:"locales,omitempty"`
+	Stamina       *int                         `json:"stamina,omitempty"`
+	Strength      *int                         `json:"strength,omitempty"`
+	Agility       *int                         `json:"agility,omitempty"`
+	Intellect     *int                         `json:"intellect,omitempty"`
+	Spirit        *int                         `json:"spirit,omitempty"`
+	SpellPower    *int                         `json:"spell_power,omitempty"`
+	MinDamage     *float64                     `json:"min_damage,omitempty"`
+	MaxDamage     *float64                     `json:"max_damage,omitempty"`
+	DPS           *float64                     `json:"dps,omitempty"`
+}
+
+type Weapon struct {
+	MinDamage *float64 `json:"min_damage,omitempty"`
+	MaxDamage *float64 `json:"max_damage,omitempty"`
+	Speed     *float64 `json:"speed,omitempty"`
+	DPS       *float64 `json:"dps,omitempty"`
+}
+
+type SocketBonus struct {
+	Text  string         `json:"text"`
+	Stats map[string]int `json:"stats,omitempty"`
+}
+
+type LocalizedItemView struct {
+	Name           string `json:"name"`
+	Icon           string `json:"icon,omitempty"`
+	TooltipHTML    string `json:"tooltip_html,omitempty"`
+	TooltipText    string `json:"tooltip_text,omitempty"`
+	FallbackLocale string `json:"fallback_locale,omitempty"`
+	FetchError     string `json:"fetch_error,omitempty"`
 }
 
 // Drop preserves opaque source mode metadata rather than assuming normal/heroic.

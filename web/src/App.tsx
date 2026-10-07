@@ -77,11 +77,12 @@ function Layout() {
           <Link className={path.startsWith('/raids') ? 'nav-link active' : 'nav-link'} to="/raids"><NavIcon name="raids" />Raids</Link>
           <Link className={path.startsWith('/players') ? 'nav-link active' : 'nav-link'} to="/players"><NavIcon name="players" />Spieler</Link>
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
-          {atLeast(player.role, 'ADMIN') && <><p className="sidebar-caption">Administration</p>
+          <p className="sidebar-caption">Administration</p>
+          <Link className={path === '/loot-catalog' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/loot-catalog"><NavIcon name="settings" />Beutekatalog</Link>
+          {atLeast(player.role, 'ADMIN') && <>
             <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
             <Link className={path === '/raid-series' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/raid-series"><NavIcon name="series" />Raidserien</Link>
             <Link className={path === '/imports' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/imports"><NavIcon name="import" />Importe</Link>
-            <Link className={path === '/loot-catalog' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/loot-catalog"><NavIcon name="settings" />Beutekatalog</Link>
           </>}
         </nav>
       </aside>

@@ -132,7 +132,27 @@ export interface CatalogSource {
 
 export interface CatalogInstance { id: string; name: string }
 export interface CatalogBoss { id: string; instance_id: string; name: string }
-export interface CatalogItem { item_id: string; name: string; binding?: number; quality?: number }
+export interface CatalogItem {
+  item_id: string;
+  name: string;
+  binding?: number;
+  quality?: number;
+  item_level?: number;
+  slot?: string;
+  class_mask?: number;
+  subclass?: number;
+  set_name?: string;
+  armor?: number;
+  stamina?: number;
+  strength?: number;
+  agility?: number;
+  intellect?: number;
+  spirit?: number;
+  spell_power?: number;
+  min_damage?: number;
+  max_damage?: number;
+  dps?: number;
+}
 export type CatalogMode = 'NORMAL' | 'HEROIC' | 'HARDMODE'
 export const catalogModeLabels: Record<CatalogMode, string> = { NORMAL: 'Normal', HEROIC: 'Heroisch', HARDMODE: 'Hardmode' }
 export interface CatalogItemDrop extends CatalogItem {
@@ -272,6 +292,32 @@ export interface Poll {
   created_at: string
   updated_at: string
 }
+
+export interface WishlistWish {
+  id: number
+  player_id: number
+  character_id: number
+  item_id: string
+  item_name: string
+  priority: number
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WishlistCharacterInterest {
+  character_id: number
+  character_name: string
+  player_id: number
+  player_name: string
+}
+
+export interface RaidWishlistItem {
+  item_id: string
+  characters: WishlistCharacterInterest[]
+  count: number
+}
+
 
 export interface Vote {
   id: number

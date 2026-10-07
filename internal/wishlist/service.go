@@ -1,0 +1,104 @@
+package wishlist
+
+import (
+	"context"
+	"errors"
+
+	"github.com/uptrace/bun"
+	"raid-website/internal/character"
+)
+
+// Service provides wishlist operations.
+type Service struct {
+	repo       *Repo
+	characters *character.Repo
+}
+
+// NewService constructs a wishlist service.
+func NewService(db bun.IDB) *Service {
+	return &Service{
+		repo:       NewRepo(db),
+		characters: character.NewRepo(db),
+	}
+}
+
+// WithTx binds the service to a transaction.
+func (s *Service) WithTx(tx bun.Tx) *Service {
+	return &Service{
+		repo:       s.repo.WithTx(tx),
+		characters: character.NewRepo(tx),
+	}
+}
+
+func (s *Service) charOwner(ctx context.Context, charID int64) (playerID int64, err error) {
+	ch, err := s.characters.Get(ctx, charID)
+	if err != nil {
+		if errors.Is(err, character.ErrNotFound) {
+			return 0, ErrCharacterNotFound
+		}
+		return 0, err
+	}
+	if ch == nil {
+		return 0, ErrCharacterNotFound
+	}
+	return ch.PlayerID, nil
+}
+
+// ListByCharacter returns the wishlist for a character.
+func (s *Service) ListByCharacter(ctx context.Context, charID int64) ([]Wish, error) {
+	if charID <= 0 {
+		return nil, ErrInvalid
+	}
+	return s.repo.listByCharacter(ctx, charID)
+}
+
+// Add adds an item to a character's wishlist (actor must own the character).
+func (s *Service) Add(ctx context.Context, actorID, charID int64, itemID, itemName string, priority int, notes string) (*Wish, error) {
+	if charID <= 0 || itemID == "" || itemName == "" {
+		return nil, ErrInvalid
+	}
+	owner, err := s.charOwner(ctx, charID)
+	if err != nil {
+		return nil, err
+	}
+	if owner != actorID {
+		return nil, ErrNotOwner
+	}
+	w := &Wish{
+		PlayerID:    owner,
+		CharacterID: charID,
+		ItemID:      itemID,
+		ItemName:    itemName,
+		Priority:    priority,
+		Notes:       notes,
+	}
+	if err := s.repo.add(ctx, w); err != nil {
+		return nil, err
+	}
+	return w, nil
+}
+
+// Remove removes an item from a character's wishlist (actor must own the character).
+func (s *Service) Remove(ctx context.Context, actorID, charID int64, itemID string) error {
+	if charID <= 0 || itemID == "" {
+		return ErrInvalid
+	}
+	owner, err := s.charOwner(ctx, charID)
+	if err != nil {
+		return err
+	}
+	if owner != actorID {
+		return ErrNotOwner
+	}
+	return s.repo.remove(ctx, charID, itemID)
+}
+
+// BulkByItemForRaid returns interests for a single item in a raid.
+func (s *Service) BulkByItemForRaid(ctx context.Context, raidID int64, itemID string) ([]RaidWishlistInterest, error) {
+	return s.repo.BulkByItemForRaid(ctx, raidID, itemID)
+}
+
+// BulkByItemsForRaid returns all interests for a raid (grouped by item_id on read).
+func (s *Service) BulkByItemsForRaid(ctx context.Context, raidID int64) ([]RaidWishlistInterest, error) {
+	return s.repo.BulkByItemsForRaid(ctx, raidID)
+}

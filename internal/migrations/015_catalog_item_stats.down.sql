@@ -1,0 +1,15 @@
+ALTER TABLE loot_catalog_items DROP COLUMN item_level;
+ALTER TABLE loot_catalog_items DROP COLUMN slot;
+ALTER TABLE loot_catalog_items DROP COLUMN subclass;
+ALTER TABLE loot_catalog_items DROP COLUMN set_name;
+ALTER TABLE loot_catalog_items DROP COLUMN armor;
+ALTER TABLE loot_catalog_items DROP COLUMN stamina;
+ALTER TABLE loot_catalog_items DROP COLUMN strength;
+ALTER TABLE loot_catalog_items DROP COLUMN agility;
+ALTER TABLE loot_catalog_items DROP COLUMN intellect;
+ALTER TABLE loot_catalog_items DROP COLUMN spirit;
+ALTER TABLE loot_catalog_items DROP COLUMN spell_power;
+ALTER TABLE loot_catalog_items DROP COLUMN min_damage;
+ALTER TABLE loot_catalog_items DROP COLUMN max_damage;
+ALTER TABLE loot_catalog_items DROP COLUMN dps;
+ALTER TABLE loot_catalog_items DROP COLUMN class_mask;

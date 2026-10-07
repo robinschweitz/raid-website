@@ -1,0 +1,15 @@
+ALTER TABLE loot_catalog_items ADD COLUMN item_level INTEGER;
+ALTER TABLE loot_catalog_items ADD COLUMN slot TEXT;
+ALTER TABLE loot_catalog_items ADD COLUMN subclass INTEGER;
+ALTER TABLE loot_catalog_items ADD COLUMN set_name TEXT;
+ALTER TABLE loot_catalog_items ADD COLUMN armor INTEGER;
+ALTER TABLE loot_catalog_items ADD COLUMN stamina INTEGER;
+ALTER TABLE loot_catalog_items ADD COLUMN strength INTEGER;
+ALTER TABLE loot_catalog_items ADD COLUMN agility INTEGER;
+ALTER TABLE loot_catalog_items ADD COLUMN intellect INTEGER;
+ALTER TABLE loot_catalog_items ADD COLUMN spirit INTEGER;
+ALTER TABLE loot_catalog_items ADD COLUMN spell_power INTEGER;
+ALTER TABLE loot_catalog_items ADD COLUMN min_damage REAL;
+ALTER TABLE loot_catalog_items ADD COLUMN max_damage REAL;
+ALTER TABLE loot_catalog_items ADD COLUMN dps REAL;
+ALTER TABLE loot_catalog_items ADD COLUMN class_mask INTEGER;

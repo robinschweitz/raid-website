@@ -25,6 +25,7 @@ import (
 	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
+	"raid-website/internal/wishlist"
 )
 
 // Deps holds the dependencies shared by the v1 HTTP handlers.
@@ -124,6 +125,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/polls/{id}/vote", RequireRole(validation.RoleMember, a.votePoll))
 	mux.HandleFunc("GET /api/v1/polls/{id}/votes", RequireAuth(a.listPollVotes))
 	mux.HandleFunc("POST /api/v1/polls/{id}/close", RequireRole(validation.RoleRaidassistent, a.closePoll))
+
+	WishlistHandlers{Wishlist: wishlist.NewService(a.DB)}.Register(mux)
 
 	mux.HandleFunc("GET /api/v1/imports", RequireRole(validation.RoleAdmin, a.listImports))
 	mux.HandleFunc("POST /api/v1/imports/dry-run", RequireRole(validation.RoleAdmin, a.dryRunImport))

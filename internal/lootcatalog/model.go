@@ -34,10 +34,25 @@ type Boss struct {
 
 // Item retains the game item key and a consistent display-name field.
 type Item struct {
-	ItemID  string `json:"item_id"`
-	Name    string `json:"name"`
-	Binding *int   `json:"binding,omitempty"`
-	Quality *int   `json:"quality,omitempty"`
+	ItemID     string   `json:"item_id"`
+	Name       string   `json:"name"`
+	Binding    *int     `json:"binding,omitempty"`
+	Quality    *int     `json:"quality,omitempty"`
+	ItemLevel  *int     `json:"item_level,omitempty"`
+	Slot       string   `json:"slot,omitempty"`
+	ClassMask  *int64   `json:"class_mask,omitempty"`
+	Subclass   *int     `json:"subclass,omitempty"`
+	SetName    string   `json:"set_name,omitempty"`
+	Armor      *int     `json:"armor,omitempty"`
+	Stamina    *int     `json:"stamina,omitempty"`
+	Strength   *int     `json:"strength,omitempty"`
+	Agility    *int     `json:"agility,omitempty"`
+	Intellect  *int     `json:"intellect,omitempty"`
+	Spirit     *int     `json:"spirit,omitempty"`
+	SpellPower *int     `json:"spell_power,omitempty"`
+	MinDamage  *float64 `json:"min_damage,omitempty"`
+	MaxDamage  *float64 `json:"max_damage,omitempty"`
+	DPS        *float64 `json:"dps,omitempty"`
 }
 
 // Drop preserves opaque source mode metadata rather than assuming normal/heroic.

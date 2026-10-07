@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../api'
-import { catalogModeLabels, type CatalogItemDrop, type LootCatalog } from '../types'
+import { catalogModeLabels, type CatalogItemDrop, type LootCatalog, type Character } from '../types'
 import { catalogSourceLabels, matchesCatalogItem } from '../catalog'
 import { useSubmission } from '../useSubmission'
+import { useAuth } from '../auth'
 
 export function LootCatalogPage() {
   const { isActive } = useSubmission()
@@ -17,6 +18,9 @@ export function LootCatalogPage() {
   const [mode, setMode] = useState('')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(0)
+  const { player: me } = useAuth()
+  const [ownChars, setOwnChars] = useState<Character[]>([])
+  const [charWishes, setCharWishes] = useState<Record<number, Set<string>>>({})
   const load = useCallback(async () => {
     if (!isActive()) return
     const version = ++loadVersion.current
@@ -35,6 +39,30 @@ export function LootCatalogPage() {
     }
   }, [isActive])
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    if (!me) { setOwnChars([]); setCharWishes({}); return; }
+    api.get<Character[]>(`/api/v1/players/${me.id}/characters`).catch(() => []).then((v) => setOwnChars(v ?? []))
+  }, [me])
+
+  async function toggleWish(char: Character, item: CatalogItemDrop) {
+    const key = char.id
+    const set = charWishes[key] ?? new Set<string>()
+    if (set.has(item.item_id)) {
+      try {
+        await api.del(`/api/v1/characters/${char.id}/wishlist/items/${item.item_id}`)
+        const next = new Set(set)
+        next.delete(item.item_id)
+        setCharWishes((s) => ({ ...s, [key]: next }))
+      } catch { /* ignore */ }
+    } else {
+      try {
+        await api.post(`/api/v1/characters/${char.id}/wishlist/items`, { item_id: item.item_id, item_name: item.name, priority: 0, notes: '' })
+        const next = new Set(set)
+        next.add(item.item_id)
+        setCharWishes((s) => ({ ...s, [key]: next }))
+      } catch { /* ignore */ }
+    }
+  }
 
   const bosses = (catalog?.bosses ?? []).filter((boss) => !instanceID || boss.instance_id === instanceID)
   const eligibleBosses = new Set(bosses.map((boss) => boss.id))
@@ -64,7 +92,16 @@ export function LootCatalogPage() {
         <div className="catalog-results">{results.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((item) => <article className="subcard" key={JSON.stringify([item.boss_id, item.item_id, item.raid_size, item.mode])}>
           <h3>{item.name}</h3>
           <p>{names.get(item.boss_id)} · {item.raid_size} Spieler · {catalogModeLabels[item.mode]}</p>
-          <p className="muted">Item #{item.item_id}{item.conditional ? ' · Bedingte Beute' : ''}</p>
+          <p className="muted">Item #{item.item_id}{item.conditional ? ' · Bedingte Beute' : ''}{item.item_level ? ` · iLvl ${item.item_level}` : ''}{item.slot ? ` · ${item.slot}` : ''}{item.set_name ? ` · Set: ${item.set_name}` : ''}</p>
+          {(item.armor || item.stamina || item.strength || item.agility || item.intellect || item.spirit || item.spell_power || item.dps || item.min_damage) && <p className="muted">
+            {item.armor ? `Rüstung ${item.armor} · ` : ''}{(item.stamina||item.strength||item.agility||item.intellect||item.spirit)?`Sta/Str/Agi/Int/Spi: ${item.stamina??'-'}/${item.strength??'-'}/${item.agility??'-'}/${item.intellect??'-'}/${item.spirit??'-'} · `:''}{item.spell_power ? `SpellPower ${item.spell_power} · ` : ''}{item.dps != null ? `DPS ${item.dps.toFixed(2)} · ` : (item.min_damage != null && item.max_damage != null ? `Schaden ${item.min_damage.toFixed(1)}–${item.max_damage.toFixed(1)} · ` : '')}
+          </p>}
+          {me && ownChars.length > 0 && <div style={{marginTop:6,display:'flex',gap:8,flexWrap:'wrap'}}>
+            {ownChars.map(c => <label key={c.id} style={{display:'flex',gap:4,alignItems:'center'}}>
+              <input type="checkbox" checked={charWishes[c.id]?.has(item.item_id) ?? false} onChange={() => toggleWish(c, item)} />
+              <small>{c.name}</small>
+            </label>)}
+          </div>}
           <ul>{catalogSourceLabels(item).map((label) => <li key={label}>{label}</li>)}</ul>
           <details><summary>Quelldetails</summary>{item.source_variants.map((variant) => <p className="catalog-source-path" key={`${variant.difficulty}/${variant.loot_mode}`}>{variant.difficulty} · Lootmaske {variant.loot_mode}</p>)}</details>
         </article>)}</div>

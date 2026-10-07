@@ -51,6 +51,10 @@ function wowheadItemURL(itemID: string): string {
   return `https://www.wowhead.com/wotlk/item=${encodeURIComponent(itemID)}`
 }
 
+function itemIconURL(item: CatalogItemDrop): string {
+  return item.icon_name ? `https://wow.zamimg.com/images/wow/icons/large/${item.icon_name}.jpg` : ''
+}
+
 export function LootCatalogPage() {
   const { isActive } = useSubmission()
   const loadVersion = useRef(0)
@@ -150,7 +154,7 @@ export function LootCatalogPage() {
         {results.length === 0 && <p className="muted">Keine passenden Drops im gebündelten Bestand. Filter ändern oder Quellenabdeckung prüfen.</p>}
         <div className="catalog-results">{results.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((item) => <article className="subcard catalog-item-card" key={JSON.stringify([item.boss_id, item.item_id, item.raid_size, item.mode])}>
           <div className="catalog-item-main">
-            <a className="catalog-item-art" href={wowheadItemURL(item.item_id)} target="_blank" rel="noreferrer" aria-label={`${item.name} bei Wowhead öffnen`}><NavIcon name="package" /></a>
+            <a className="catalog-item-art" href={wowheadItemURL(item.item_id)} target="_blank" rel="noreferrer" aria-label={`${item.name} bei Wowhead öffnen`}>{itemIconURL(item) ? <img src={itemIconURL(item)} alt="" /> : <NavIcon name="package" />}</a>
             <div>
               <h3 className={item.quality ? `item-quality-${qualityClasses[item.quality] ?? 'common'}` : undefined}>{item.name}</h3>
               <p>{names.get(item.boss_id)} · {item.raid_size} Spieler · {catalogModeLabels[item.mode]}</p>

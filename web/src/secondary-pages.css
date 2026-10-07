@@ -175,6 +175,7 @@
 .secondary-page .catalog-item-main h3 { margin-bottom: 6px; }
 .secondary-page .catalog-item-art { display: grid; place-items: center; width: 54px; height: 54px; color: #bce9ff; background: radial-gradient(circle at 35% 25%, #254f68, #081827 72%); border: 1px solid #5b7f92; border-radius: 8px; box-shadow: inset 0 0 18px #7ad7ff26, 0 0 14px #0008; }
 .secondary-page .catalog-item-art svg { width: 30px; height: 30px; }
+.secondary-page .catalog-item-art img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; }
 .secondary-page .catalog-quality { display: inline-flex; width: fit-content; padding: 2px 8px; color: #d8eef8; background: #071523; border: 1px solid #284356; border-radius: 999px; font-size: 12px; }
 .secondary-page .item-quality-uncommon { color: #62ff62; }
 .secondary-page .item-quality-rare { color: #6aa7ff; }

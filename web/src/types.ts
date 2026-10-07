@@ -135,6 +135,8 @@ export interface CatalogBoss { id: string; instance_id: string; name: string }
 export interface CatalogItem {
   item_id: string;
   name: string;
+  display_id?: number;
+  icon_name?: string;
   binding?: number;
   quality?: number;
   item_level?: number;

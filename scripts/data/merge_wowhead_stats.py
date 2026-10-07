@@ -2,7 +2,9 @@
 """
 Merge Wowhead WotLK item stats into the bundled loot catalog.
 
-Uses the nether.wowhead.com tooltip API (XML feeds are blocked by CloudFront).
+Uses the nether.wowhead.com tooltip API (normal Wowhead pages are blocked by CloudFront).
+Reads the existing catalog for boss/drop structure, fetches stats for each item,
+and writes the updated catalog.
 
 Usage:
     python scripts/data/merge_wowhead_stats.py [--delay 0.3] [--retries 3]

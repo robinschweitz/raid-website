@@ -170,6 +170,26 @@
 .secondary-page .catalog-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 14px; }
 .secondary-page .catalog-results article { min-width: 0; margin: 0; }
 .secondary-page .catalog-results h3 { color: #bce9ff; margin-top: 0; }
+.secondary-page .catalog-item-card { display: grid; gap: 14px; }
+.secondary-page .catalog-item-main { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; }
+.secondary-page .catalog-item-main h3 { margin-bottom: 6px; }
+.secondary-page .catalog-item-art { display: grid; place-items: center; width: 54px; height: 54px; color: #bce9ff; background: radial-gradient(circle at 35% 25%, #254f68, #081827 72%); border: 1px solid #5b7f92; border-radius: 8px; box-shadow: inset 0 0 18px #7ad7ff26, 0 0 14px #0008; }
+.secondary-page .catalog-item-art svg { width: 30px; height: 30px; }
+.secondary-page .catalog-quality { display: inline-flex; width: fit-content; padding: 2px 8px; color: #d8eef8; background: #071523; border: 1px solid #284356; border-radius: 999px; font-size: 12px; }
+.secondary-page .item-quality-uncommon { color: #62ff62; }
+.secondary-page .item-quality-rare { color: #6aa7ff; }
+.secondary-page .item-quality-epic { color: #c47dff; }
+.secondary-page .item-quality-legendary { color: #ff9d3b; }
+.secondary-page .catalog-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 0; }
+.secondary-page .catalog-stat-grid div { padding: 8px 10px; background: #07152399; border: 1px solid #284356; border-radius: 6px; }
+.secondary-page .catalog-stat-grid dt { color: #8fb6c9; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.secondary-page .catalog-stat-grid dd { margin: 2px 0 0; color: #e7f8ff; font-weight: 700; }
+.secondary-page .catalog-wishlist { display: grid; gap: 8px; padding: 10px; background: #07152380; border: 1px solid #284356; border-radius: 6px; }
+.secondary-page .catalog-wishlist > strong { color: #d8eef8; font-size: 13px; }
+.secondary-page .catalog-wishlist > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.secondary-page .wishlist-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; }
+.secondary-page .wishlist-toggle svg { width: 14px; height: 14px; }
+.secondary-page .wishlist-toggle.active { color: #06111c; background: linear-gradient(135deg, #7ad7ff, #d7f4ff); border-color: #d7f4ff; }
 .secondary-page .catalog-source-path { overflow-wrap: anywhere; font-size: 12px; }
 .secondary-page .catalog-pagination { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 16px; margin-block: 20px; }
 

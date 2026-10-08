@@ -167,24 +167,41 @@
 .secondary-page .import-workflow > fieldset > p { grid-column: 1 / -1; margin-top: 0; }
 .secondary-page .import-workflow > .actions { border-top: 1px solid #284356; padding-top: 18px; margin-top: 18px; }
 .secondary-page .catalog-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; padding: 18px; margin: 20px 0; background: #07152380; border: 1px solid #284356; border-radius: 4px; }
-.secondary-page .catalog-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 14px; }
+.secondary-page .catalog-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 16px; }
 .secondary-page .catalog-results article { min-width: 0; margin: 0; }
 .secondary-page .catalog-results h3 { color: #bce9ff; margin-top: 0; }
 .secondary-page .catalog-item-card { display: grid; gap: 14px; }
+.secondary-page .catalog-tooltip-card { position: relative; display: grid; gap: 14px; padding: 16px; overflow: hidden; background: radial-gradient(circle at 18% 0%, #1b4a63a6, transparent 36%), linear-gradient(155deg, #08131f, #0d2133 58%, #07111d); border: 1px solid #456f88; border-radius: 12px; box-shadow: inset 0 0 0 1px #7ad7ff14, inset 0 0 32px #7ad7ff12, 0 18px 35px #0008; }
+.secondary-page .catalog-tooltip-card::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent, #d7f4ff18 45%, transparent 70%); opacity: .45; transform: translateX(-55%); }
 .secondary-page .catalog-item-main { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; }
-.secondary-page .catalog-item-main h3 { margin-bottom: 6px; }
-.secondary-page .catalog-item-art { display: grid; place-items: center; width: 54px; height: 54px; color: #bce9ff; background: radial-gradient(circle at 35% 25%, #254f68, #081827 72%); border: 1px solid #5b7f92; border-radius: 8px; box-shadow: inset 0 0 18px #7ad7ff26, 0 0 14px #0008; }
+.secondary-page .catalog-item-main h3 { margin-bottom: 6px; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(18px, 2vw, 22px); letter-spacing: .01em; text-shadow: 0 0 14px currentColor; }
+.secondary-page .catalog-item-main p { margin-block: 4px; color: #aac4d3; }
+.secondary-page .catalog-item-art { display: grid; place-items: center; width: 64px; height: 64px; color: #bce9ff; background: radial-gradient(circle at 35% 25%, #254f68, #081827 72%); border: 1px solid #8ab7ca; border-radius: 10px; box-shadow: inset 0 0 18px #7ad7ff26, 0 0 18px #7ad7ff22, 0 0 14px #0008; }
 .secondary-page .catalog-item-art svg { width: 30px; height: 30px; }
-.secondary-page .catalog-item-art img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; }
+.secondary-page .catalog-item-art img { width: 56px; height: 56px; border-radius: 7px; object-fit: cover; }
 .secondary-page .catalog-quality { display: inline-flex; width: fit-content; padding: 2px 8px; color: #d8eef8; background: #071523; border: 1px solid #284356; border-radius: 999px; font-size: 12px; }
 .secondary-page .item-quality-uncommon { color: #62ff62; }
 .secondary-page .item-quality-rare { color: #6aa7ff; }
 .secondary-page .item-quality-epic { color: #c47dff; }
 .secondary-page .item-quality-legendary { color: #ff9d3b; }
-.secondary-page .catalog-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 0; }
-.secondary-page .catalog-stat-grid div { padding: 8px 10px; background: #07152399; border: 1px solid #284356; border-radius: 6px; }
+.secondary-page .catalog-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.secondary-page .catalog-pills span { display: inline-flex; width: fit-content; padding: 3px 8px; color: #d8eef8; background: #061421cc; border: 1px solid #31536a; border-radius: 999px; font-size: 11px; line-height: 1.4; }
+.secondary-page .catalog-tooltip-lines { display: grid; gap: 4px; padding: 10px 12px; color: #d8eef8; background: #06142180; border: 1px solid #284356; border-radius: 8px; }
+.secondary-page .catalog-tooltip-lines p { margin: 0; }
+.secondary-page .catalog-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin: 0; }
+.secondary-page .catalog-stat-grid div { padding: 9px 10px; background: linear-gradient(180deg, #0a1b2ac7, #061421c7); border: 1px solid #31536a; border-radius: 8px; }
 .secondary-page .catalog-stat-grid dt { color: #8fb6c9; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
 .secondary-page .catalog-stat-grid dd { margin: 2px 0 0; color: #e7f8ff; font-weight: 700; }
+.secondary-page .catalog-sockets { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.secondary-page .catalog-sockets span { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 9px; color: #06111c; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.secondary-page .catalog-sockets strong { color: #d8eef8; font-size: 12px; }
+.secondary-page .socket-red { background: linear-gradient(135deg, #ff7777, #8f1e2f); }
+.secondary-page .socket-blue { background: linear-gradient(135deg, #7ad7ff, #1e5c8f); }
+.secondary-page .socket-yellow { background: linear-gradient(135deg, #ffe27a, #9a7218); }
+.secondary-page .socket-meta { color: #e7f8ff !important; background: linear-gradient(135deg, #b58cff, #59318f); }
+.secondary-page .socket-prismatic { background: linear-gradient(135deg, #ff8ad8, #7ad7ff 50%, #ffe27a); }
+.secondary-page .catalog-effects { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; color: #7ad7ff; }
+.secondary-page .catalog-effects li { padding-left: 12px; border-left: 2px solid #7ad7ff80; }
 .secondary-page .catalog-wishlist { display: grid; gap: 8px; padding: 10px; background: #07152380; border: 1px solid #284356; border-radius: 6px; }
 .secondary-page .catalog-wishlist > strong { color: #d8eef8; font-size: 13px; }
 .secondary-page .catalog-wishlist > div { display: flex; gap: 8px; flex-wrap: wrap; }

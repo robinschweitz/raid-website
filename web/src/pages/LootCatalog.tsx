@@ -25,21 +25,58 @@ const qualityLabels: Record<number, string> = {
 function itemMeta(item: CatalogItemDrop): string[] {
   const values = [`Item #${item.item_id}`]
   if (item.item_level) values.push(`iLvl ${item.item_level}`)
+  if (item.required_level) values.push(`Stufe ${item.required_level}`)
   if (item.slot) values.push(item.slot)
+  if (item.type) values.push(item.type)
   if (item.set_name) values.push(`Set: ${item.set_name}`)
   if (item.conditional) values.push('Bedingte Beute')
   return values
 }
 
+const statLabels: Record<string, string> = {
+  stamina: 'Ausdauer',
+  strength: 'Stärke',
+  agility: 'Beweglichkeit',
+  intellect: 'Intelligenz',
+  spirit: 'Willenskraft',
+  spell_power: 'Zaubermacht',
+  attack_power: 'Angriffskraft',
+  hit_rating: 'Trefferwertung',
+  haste_rating: 'Tempowertung',
+  critical_strike_rating: 'Kritische Trefferwertung',
+  expertise_rating: 'Waffenkundewertung',
+  armor_penetration_rating: 'Rüstungsdurchschlag',
+  defense_rating: 'Verteidigungswertung',
+  dodge_rating: 'Ausweichwertung',
+  parry_rating: 'Parierwertung',
+  block_rating: 'Blockwertung',
+  mana_per_5: 'Mana pro 5 Sek.',
+  spell_penetration: 'Zauberdurchschlag',
+  shield_block_value: 'Blockwert',
+}
+
+const bindingLabels: Record<string, string> = {
+  bind_on_pickup: 'Wird beim Aufheben gebunden',
+  bind_on_equip: 'Wird beim Anlegen gebunden',
+  bind_to_account: 'Accountgebunden',
+  bind_to_bnet_account: 'Battle.net-accountgebunden',
+}
+
 function itemStats(item: CatalogItemDrop): { label: string; value: string }[] {
   const values: { label: string; value: string }[] = []
   if (item.armor) values.push({ label: 'Rüstung', value: String(item.armor) })
-  if (item.stamina) values.push({ label: 'Ausdauer', value: `+${item.stamina}` })
-  if (item.strength) values.push({ label: 'Stärke', value: `+${item.strength}` })
-  if (item.agility) values.push({ label: 'Beweglichkeit', value: `+${item.agility}` })
-  if (item.intellect) values.push({ label: 'Intelligenz', value: `+${item.intellect}` })
-  if (item.spirit) values.push({ label: 'Willenskraft', value: `+${item.spirit}` })
-  if (item.spell_power) values.push({ label: 'Zaubermacht', value: `+${item.spell_power}` })
+  const stats = item.stats ?? {}
+  for (const [key, value] of Object.entries(stats)) {
+    values.push({ label: statLabels[key] ?? key.replace(/_/g, ' '), value: `+${value}` })
+  }
+  if (!item.stats) {
+    if (item.stamina) values.push({ label: 'Ausdauer', value: `+${item.stamina}` })
+    if (item.strength) values.push({ label: 'Stärke', value: `+${item.strength}` })
+    if (item.agility) values.push({ label: 'Beweglichkeit', value: `+${item.agility}` })
+    if (item.intellect) values.push({ label: 'Intelligenz', value: `+${item.intellect}` })
+    if (item.spirit) values.push({ label: 'Willenskraft', value: `+${item.spirit}` })
+    if (item.spell_power) values.push({ label: 'Zaubermacht', value: `+${item.spell_power}` })
+  }
   if (item.dps != null) values.push({ label: 'DPS', value: item.dps.toFixed(2) })
   if (item.dps == null && item.min_damage != null && item.max_damage != null) {
     values.push({ label: 'Schaden', value: `${item.min_damage.toFixed(1)}-${item.max_damage.toFixed(1)}` })
@@ -52,7 +89,31 @@ function wowheadItemURL(itemID: string): string {
 }
 
 function itemIconURL(item: CatalogItemDrop): string {
-  return item.icon_name ? `https://wow.zamimg.com/images/wow/icons/large/${item.icon_name}.jpg` : ''
+  const icon = item.icon ?? item.icon_name
+  return icon ? `https://wow.zamimg.com/images/wow/icons/large/${icon}.jpg` : ''
+}
+
+function itemWeaponLine(item: CatalogItemDrop): string {
+  const weapon = item.weapon
+  const min = weapon?.min_damage ?? item.min_damage
+  const max = weapon?.max_damage ?? item.max_damage
+  const speed = weapon?.speed
+  const dps = weapon?.dps ?? item.dps
+  const parts = []
+  if (min != null && max != null) parts.push(`${min.toFixed(0)}-${max.toFixed(0)} Schaden`)
+  if (speed != null) parts.push(`Tempo ${speed.toFixed(2)}`)
+  if (dps != null) parts.push(`${dps.toFixed(2)} DPS`)
+  return parts.join(' · ')
+}
+
+function localizedTooltipLines(item: CatalogItemDrop): string[] {
+  const text = item.locales?.deDE?.tooltip_text ?? item.locales?.enUS?.tooltip_text ?? ''
+  if (!text) return item.effects ?? []
+  return text.split('\n').map((line) => line.trim()).filter((line) => {
+    if (!line || line === item.name || line.startsWith('Item Level') || line.startsWith('Gegenstandsstufe')) return false
+    if (line.startsWith('Verkaufspreis') || line.startsWith('Sell Price') || line.startsWith('Dropchance') || line.startsWith('Drop Chance')) return false
+    return /^(Anlegen:|Benutzen:|Chance|Erhöht|Verbessert|Benötigt|Equip:|Use:|Requires)/.test(line)
+  }).slice(0, 5)
 }
 
 export function LootCatalogPage() {
@@ -153,16 +214,30 @@ export function LootCatalogPage() {
         <p role="status">{results.length} Dropvarianten gefunden</p>
         {results.length === 0 && <p className="muted">Keine passenden Drops im gebündelten Bestand. Filter ändern oder Quellenabdeckung prüfen.</p>}
         <div className="catalog-results">{results.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((item) => <article className="subcard catalog-item-card" key={JSON.stringify([item.boss_id, item.item_id, item.raid_size, item.mode])}>
-          <div className="catalog-item-main">
-            <a className="catalog-item-art" href={wowheadItemURL(item.item_id)} target="_blank" rel="noreferrer" aria-label={`${item.name} bei Wowhead öffnen`}>{itemIconURL(item) ? <img src={itemIconURL(item)} alt="" /> : <NavIcon name="package" />}</a>
-            <div>
-              <h3 className={item.quality ? `item-quality-${qualityClasses[item.quality] ?? 'common'}` : undefined}>{item.name}</h3>
-              <p>{names.get(item.boss_id)} · {item.raid_size} Spieler · {catalogModeLabels[item.mode]}</p>
-              <p className="muted">{itemMeta(item).join(' · ')}</p>
-              {item.quality != null && <span className="catalog-quality">{qualityLabels[item.quality] ?? `Qualität ${item.quality}`}</span>}
+          <div className="catalog-tooltip-card">
+            <div className="catalog-item-main">
+              <a className="catalog-item-art" href={wowheadItemURL(item.item_id)} target="_blank" rel="noreferrer" aria-label={`${item.name} bei Wowhead öffnen`}>{itemIconURL(item) ? <img src={itemIconURL(item)} alt="" /> : <NavIcon name="package" />}</a>
+              <div>
+                <h3 className={item.quality ? `item-quality-${qualityClasses[item.quality] ?? 'common'}` : undefined}>{item.name}</h3>
+                <p>{names.get(item.boss_id)} · {item.raid_size} Spieler · {catalogModeLabels[item.mode]}</p>
+                <div className="catalog-pills">
+                  {item.quality != null && <span>{qualityLabels[item.quality] ?? `Qualität ${item.quality}`}</span>}
+                  {itemMeta(item).map((value) => <span key={value}>{value}</span>)}
+                </div>
+              </div>
             </div>
+            {(item.binding_type || item.unique || itemWeaponLine(item)) && <div className="catalog-tooltip-lines">
+              {item.binding_type && <p>{bindingLabels[item.binding_type] ?? item.binding_type}</p>}
+              {item.unique && <p>Einzigartig</p>}
+              {itemWeaponLine(item) && <p>{itemWeaponLine(item)}</p>}
+            </div>}
+            {itemStats(item).length > 0 && <dl className="catalog-stat-grid">{itemStats(item).map((stat) => <div key={stat.label}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl>}
+            {(item.sockets?.length || item.socket_bonus) && <div className="catalog-sockets">
+              {item.sockets?.map((socket, index) => <span key={`${socket}-${index}`} className={`socket-${socket}`}>{socket}</span>)}
+              {item.socket_bonus && <strong>Sockelbonus: {item.socket_bonus.text}</strong>}
+            </div>}
+            {localizedTooltipLines(item).length > 0 && <ul className="catalog-effects">{localizedTooltipLines(item).map((line) => <li key={line}>{line}</li>)}</ul>}
           </div>
-          {itemStats(item).length > 0 && <dl className="catalog-stat-grid">{itemStats(item).map((stat) => <div key={stat.label}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl>}
           {me && ownChars.length > 0 && <div className="catalog-wishlist"><strong>Wunschliste</strong><div>
             {ownChars.map((char) => {
               const wished = charWishes[char.id]?.has(item.item_id) ?? false

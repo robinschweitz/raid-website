@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../api'
 import { catalogModeLabels, type CatalogItemDrop, type LootCatalog, type Character, type WishlistWish } from '../types'
-import { catalogSourceLabels, matchesCatalogItem } from '../catalog'
+import { matchesCatalogItem } from '../catalog'
 import { useSubmission } from '../useSubmission'
 import { useAuth } from '../auth'
 import { NavIcon } from '../components/NavIcon'
@@ -23,7 +23,7 @@ const qualityLabels: Record<number, string> = {
 }
 
 function itemMeta(item: CatalogItemDrop): string[] {
-  const values = [`Item #${item.item_id}`]
+  const values: string[] = []
   if (item.item_level) values.push(`iLvl ${item.item_level}`)
   if (item.required_level) values.push(`Stufe ${item.required_level}`)
   if (item.slot) values.push(item.slot)
@@ -247,8 +247,6 @@ export function LootCatalogPage() {
               </button>
             })}
           </div></div>}
-          <ul>{catalogSourceLabels(item).map((label) => <li key={label}>{label}</li>)}</ul>
-          <details><summary>Quelldetails</summary>{item.source_variants.map((variant) => <p className="catalog-source-path" key={`${variant.difficulty}/${variant.loot_mode}`}>{variant.difficulty} · Lootmaske {variant.loot_mode}</p>)}</details>
         </article>)}</div>
         {results.length > pageSize && <div className="catalog-pagination"><button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Zurück</button><span>Seite {currentPage + 1} / {lastPage + 1}</span><button type="button" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>Weiter</button></div>}
         <details className="subcard"><summary>Abdeckung und Quellen</summary>

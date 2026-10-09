@@ -1,7 +1,7 @@
 # ADR 014: Tokens Derived From Token Loot Items
 
 ## Decision
-Create token transactions when awarding the three specific token items (Beschützer, Bezwinger, Eroberer). Sheet "Tokens gesammelt" is reconciliation-only in dry-run.
+Tokens are identified by the three specific token items (Beschützer, Bezwinger, Eroberer). ADR 041 supersedes the former transaction-creation behavior; sheet "Tokens gesammelt" is reconciliation-only in dry-run.
 
 ## Consequences
-Append-only, avoids overwrite.
+Token information follows from loot awards and avoids overwriting sheet totals.

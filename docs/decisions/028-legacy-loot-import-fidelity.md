@@ -17,9 +17,9 @@ recorded award method: `Main` → `MAIN`, `Second` → `SECOND`, `Enhanced` → 
 reported as a warning, never silently treated as main-spec loot.
 
 An armor token never blocks the +10 EP archive reward (ADR 004), whatever priority the sheet
-recorded, so a token award is stored with a non-main method and a warning. The token ledger stays
-derived from the awarded item (ADR 014); a `Token` priority on an item that is not one of the three
-badges derives no token and is reported.
+recorded, so a token award is stored with a non-main method and a warning. Token visibility stays
+derived from the awarded item (ADR 014, ADR 041); a `Token` priority on an item that is not one of
+the three badges derives no token and is reported.
 
 An imported `ENHANCED` award keeps its method and counts as main-spec loot, but never charges EP:
 the historical cost is zero and no enhanced-cost transaction is appended.

@@ -13,7 +13,6 @@ import (
 	"raid-website/internal/audit"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
-	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
@@ -392,9 +391,6 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		if err := r.loot.Update(ctx, row); err != nil {
 			return err
 		}
-		if err := s.reconcileTokens(ctx, r, row, actor, reason); err != nil {
-			return err
-		}
 		if completed {
 			if err := s.reconcilePoints(ctx, r, row.RaidID, actor, reason, eligibilityBefore); err != nil {
 				return err
@@ -450,32 +446,6 @@ func (s *Service) reconcilePoints(ctx context.Context, r *Repo, raidID, actor in
 			continue
 		}
 		if err := r.points.InsertTransaction(ctx, &enhancepoints.Transaction{PlayerID: playerID, RaidID: &raidID, Amount: amount, Type: "correction_no_mainspec_loot", Reason: strings.TrimSpace(reason), RefType: "raid", RefID: strconv.FormatInt(raidID, 10), ActorID: actor, CreatedAt: time.Now().UTC()}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *Service) reconcileTokens(ctx context.Context, r *Repo, row *loot.Award, actor int64, reason string) error {
-	nets, err := r.tokenNets(ctx, row.ID)
-	if err != nil {
-		return err
-	}
-	desired := make(map[int64]int)
-	if tokens.IsTokenAward(row.ItemName) {
-		desired[row.AwardedToPlayerID] = tokens.DeriveTokenAmount(1)
-	}
-	for playerID := range desired {
-		if _, ok := nets[playerID]; !ok {
-			nets[playerID] = 0
-		}
-	}
-	for playerID, net := range nets {
-		amount := desired[playerID] - net
-		if amount == 0 {
-			continue
-		}
-		if err := r.tokens.InsertTransaction(ctx, &tokens.Transaction{PlayerID: playerID, RaidID: &row.RaidID, LootAwardID: &row.ID, Amount: amount, Type: "correction", Reason: strings.TrimSpace(reason), RefType: "loot_award", RefID: strconv.FormatInt(row.ID, 10), ActorID: actor, CreatedAt: time.Now().UTC()}); err != nil {
 			return err
 		}
 	}

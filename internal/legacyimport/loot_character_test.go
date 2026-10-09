@@ -47,9 +47,8 @@ func TestLootArchiveRecipientIsCharacter(t *testing.T) {
 	if err != nil || c.Name != "Opinoid" || c.PlayerID != owner.ID {
 		t.Fatalf("character: %+v %v", c, err)
 	}
-	transactions, err := s.tokens.ListByPlayer(ctx, owner.ID)
-	if err != nil || len(transactions) != 1 {
-		t.Fatalf("token must belong to the character owner: %+v %v", transactions, err)
+	if !loot.IsTokenAward(award.ItemName) || award.AwardedToPlayerID != owner.ID {
+		t.Fatalf("token loot must belong to the character owner: %+v", award)
 	}
 	c.Name = "Renamed"
 	if err := s.chars.Update(ctx, c); err != nil {

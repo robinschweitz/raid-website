@@ -169,7 +169,7 @@ func TestIncrementalCorrectionReasonEPAndAudit(t *testing.T) {
 	if err != nil || len(awards) != 3 {
 		t.Fatalf("awards: %+v %v", awards, err)
 	}
-	var tokenAwardID int64
+	tokenLoot := 0
 	for _, award := range awards {
 		if award.AwardedToPlayerID != Amisu.ID {
 			continue
@@ -181,8 +181,11 @@ func TestIncrementalCorrectionReasonEPAndAudit(t *testing.T) {
 			if award.AwardMethod != loot.Second || award.IsMainSpec {
 				t.Fatalf("token counted as main-spec loot: %+v", award)
 			}
-			tokenAwardID = award.ID
+			tokenLoot++
 		}
+	}
+	if tokenLoot != 1 {
+		t.Fatalf("token loot: got %d", tokenLoot)
 	}
 	var logs []struct {
 		ActorID    int64
@@ -195,10 +198,6 @@ func TestIncrementalCorrectionReasonEPAndAudit(t *testing.T) {
 	}
 	if len(logs) != 2 || logs[0].ActorID != actor || logs[0].Reason != reason || logs[0].BeforeJSON != "null" || !json.Valid([]byte(logs[0].AfterJSON)) {
 		t.Fatalf("audit: %+v", logs)
-	}
-	txns, err := s.tokens.ListByPlayer(ctx, Amisu.ID)
-	if err != nil || len(txns) != 1 || txns[0].LootAwardID == nil || *txns[0].LootAwardID != tokenAwardID {
-		t.Fatalf("tokens: %+v %v", txns, err)
 	}
 	history, err := s.List(ctx)
 	if err != nil || history[0].Notes != reason {
@@ -297,7 +296,7 @@ func TestIncrementalAttendanceIsAudited(t *testing.T) {
 	}
 }
 
-func TestCorrectionTokenFailureRollsBackWholeImport(t *testing.T) {
+func TestCorrectionAuditFailureRollsBackWholeImport(t *testing.T) {
 	s, actor := importFixture(t)
 	ctx := context.Background()
 	raidID := seedImportedRaid(t, s, actor)
@@ -308,11 +307,11 @@ func TestCorrectionTokenFailureRollsBackWholeImport(t *testing.T) {
 	data.Raid = append(data.Raid, []byte("ICC25-01,09.02.2026,3,Newchar,Heiler,Priester,Disziplin,\n")...)
 	s.fetcher = fakeFetcher{data: data}
 	previewImport(t, s, "source", "sheet")
-	if _, err := s.imports.db.ExecContext(ctx, "CREATE TRIGGER reject_import_token BEFORE INSERT ON token_transactions BEGIN SELECT RAISE(ABORT, 'token failure'); END"); err != nil {
+	if _, err := s.imports.db.ExecContext(ctx, "CREATE TRIGGER reject_import_audit BEFORE INSERT ON audit_log BEGIN SELECT RAISE(ABORT, 'audit failure'); END"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Merge(ctx, actor, "source", "sheet", "rollback", "missing rows"); err == nil {
-		t.Fatal("expected token failure")
+		t.Fatal("expected audit failure")
 	}
 	if _, err := s.players.FindByName(ctx, "Newplayer"); err == nil {
 		t.Fatal("player survived rollback")

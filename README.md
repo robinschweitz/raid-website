@@ -29,7 +29,7 @@ and a real-data dashboard. No external artwork, fake progression, or new UI depe
 - SQLite foreign keys are enabled automatically. Back up an existing database before
   deployment; migration `003_import_identity` adds import provenance and preview metadata.
 - Attendance and loot edits require a reason and write an audit trail. Completed-raid
-  additions also require a reason. EP and token corrections append compensating entries.
+  additions also require a reason. EP corrections append compensating entries; tokens derive from loot awards.
 - `Archivieren` is the single finalization action: it awards EP, expires unused locks,
   and schedules the next future raid atomically. Archived history remains visible.
 - Configure recurring raid series under Roster: name, leader, weekdays, week interval,
@@ -55,8 +55,8 @@ Second and player BoE do not. Enhanced costs are computed server-side, with no a
 
 Corrections preserve a same-winner enhanced cost on unrelated edits. Changing away from
 Enhanced refunds it; changing the enhanced recipient refunds the old winner and charges
-the new winner's current capped balance. The award, compensating entries, tokens, and
-audit commit together. Archived/cancelled raids remain read-only.
+the new winner's current capped balance. The award, compensating entries, derived token
+visibility, and audit commit together. Archived/cancelled raids remain read-only.
 
 New enhanced POSTs require a stable, nonblank `request_id`; identical retries return the
 same award instead of charging again. Loot DTOs use `award_method`, not a caller-controlled

@@ -316,7 +316,7 @@ function resolvePlayer(s, id) {
     if (r.url === '/api/v1/character-options') r.resolve({ Todesritter: ['Frost', 'Unheilig'], Magier: ['Feuer', 'Frost'], Priester: ['Heilig', 'Schatten'] })
     else if (r.url.endsWith('/characters')) r.resolve([character(id * 10, id), character(id * 10 + 1, id)])
     else if (r.url.endsWith('/points')) r.resolve({ balance: 200, transactions: [] })
-    else if (r.url.endsWith('/tokens')) r.resolve({ total: 0, transactions: [] })
+    else if (r.url.endsWith('/loot')) r.resolve([])
     else if (r.url.endsWith('/locks')) r.resolve([lock(id)])
     else r.resolve(player(id))
   }

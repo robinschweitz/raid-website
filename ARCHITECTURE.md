@@ -1,6 +1,6 @@
 # Architecture
 
-Modular monolith. Domains: players/characters, raids/attendance, loot, enhancepoints (ledger), tokens (ledger), roster (configurable ranks/groups), audit, legacyimport/export, httpapi (v1). `raidcompletion` and `raidcorrection` coordinate cross-domain writes through repository-owned transactions.
+Modular monolith. Domains: players/characters, raids/attendance, loot, enhancepoints (ledger), roster (configurable ranks/groups), audit, legacyimport/export, httpapi (v1). Armor tokens are derived from loot awards. `raidcompletion` and `raidcorrection` coordinate cross-domain writes through repository-owned transactions.
 
 `raidseries` owns explicit recurring schedule configuration and local-calendar calculations.
 `raidsignup` owns future-raid signup availability, player-owned character/spec alternatives,
@@ -30,7 +30,7 @@ supported data (ADR 026).
 
 Principles:
 - Domain-first, boring/explicit/predictable
-- Append-only ledgers for EP/tokens/audit
+- Append-only ledgers for EP/audit
 - Archive by default, explicit delete only (Admin)
 - Edits with audit trail
 - UTC storage, client TZ display

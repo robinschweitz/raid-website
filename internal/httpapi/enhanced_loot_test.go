@@ -16,7 +16,6 @@ import (
 	"raid-website/internal/loot"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcorrection"
-	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
@@ -143,10 +142,6 @@ func TestNewEnhancedLootRequiresRequestIDWithoutSideEffects(t *testing.T) {
 					if err != nil || len(entries) != 1 {
 						t.Fatalf("ledger escaped rejection: %v %v", entries, err)
 					}
-					tokenEntries, err := tokens.NewRepo(f.db).ListByPlayer(context.Background(), f.first)
-					if err != nil || len(tokenEntries) != 0 {
-						t.Fatalf("tokens escaped rejection: %v %v", tokenEntries, err)
-					}
 					var count int
 					if err := f.db.NewSelect().TableExpr("audit_log").ColumnExpr("COUNT(*)").Scan(context.Background(), &count); err != nil || count != 0 {
 						t.Fatalf("audit escaped rejection: %d %v", count, err)
@@ -212,17 +207,10 @@ func TestEnteringEnhancedRequiresHistoricalRecipientInRoster(t *testing.T) {
 			if err := loot.NewRepo(f.db).CreateAward(context.Background(), old); err != nil {
 				t.Fatal(err)
 			}
-			if err := tokens.NewRepo(f.db).InsertTransaction(context.Background(), &tokens.Transaction{PlayerID: f.first, RaidID: &f.raidID, LootAwardID: &old.ID, Amount: 1, Type: "award", Reason: "original history", ActorID: f.actor, CreatedAt: now}); err != nil {
-				t.Fatal(err)
-			}
 			suffix := fmt.Sprintf("/loot/%d", old.ID)
 			f.request(http.MethodPatch, suffix, map[string]any{"notes": "harmless historical note", "reason": "clarify"}, http.StatusOK)
 			before := f.award(old.ID)
 			pointsBefore, err := enhancepoints.NewRepo(f.db).ListByPlayer(context.Background(), f.first)
-			if err != nil {
-				t.Fatal(err)
-			}
-			tokensBefore, err := tokens.NewRepo(f.db).ListByPlayer(context.Background(), f.first)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -238,15 +226,11 @@ func TestEnteringEnhancedRequiresHistoricalRecipientInRoster(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			tokensAfter, err := tokens.NewRepo(f.db).ListByPlayer(context.Background(), f.first)
-			if err != nil {
-				t.Fatal(err)
-			}
 			logsAfter, err := audit.NewRepo(f.db).ListByEntity(context.Background(), "loot_award", fmt.Sprint(old.ID))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(before, f.award(old.ID)) || !reflect.DeepEqual(pointsBefore, pointsAfter) || !reflect.DeepEqual(tokensBefore, tokensAfter) || !reflect.DeepEqual(logsBefore, logsAfter) {
+			if !reflect.DeepEqual(before, f.award(old.ID)) || !reflect.DeepEqual(pointsBefore, pointsAfter) || !reflect.DeepEqual(logsBefore, logsAfter) {
 				t.Fatal("failed enhanced transition changed history")
 			}
 			f.request(http.MethodPost, "/attendance", map[string]any{"player_id": f.first, "character_id": f.firstChar, "role": "DD", "reason": "actual historical participant"}, http.StatusCreated)
@@ -331,7 +315,7 @@ func TestEnhancedLootCoupledCorrections(t *testing.T) {
 }
 
 func TestEnhancedLootFailedRecipientAndAtomicRollback(t *testing.T) {
-	for _, failure := range []string{"insufficient", "audit", "tokens", "ledger"} {
+	for _, failure := range []string{"insufficient", "audit", "ledger"} {
 		t.Run(failure, func(t *testing.T) {
 			f := newCorrectionFixture(t)
 			f.attend(f.first, f.firstChar)
@@ -341,7 +325,7 @@ func TestEnhancedLootFailedRecipientAndAtomicRollback(t *testing.T) {
 			want := http.StatusUnprocessableEntity
 			if failure != "insufficient" {
 				f.seedPoints(f.second, 30)
-				table := map[string]string{"audit": "audit_log", "tokens": "token_transactions", "ledger": "enhance_point_transactions"}[failure]
+				table := map[string]string{"audit": "audit_log", "ledger": "enhance_point_transactions"}[failure]
 				if _, err := f.db.ExecContext(context.Background(), "CREATE TRIGGER fail_enhanced BEFORE INSERT ON "+table+" BEGIN SELECT RAISE(ABORT, 'injected failure'); END"); err != nil {
 					t.Fatal(err)
 				}
@@ -431,7 +415,7 @@ func TestEnhancedCompletedCorrectionEligibilityDelta(t *testing.T) {
 }
 
 func TestEnhancedNewAwardRollbackAndRetry(t *testing.T) {
-	for _, table := range []string{"audit_log", "token_transactions", "enhance_point_transactions"} {
+	for _, table := range []string{"audit_log", "enhance_point_transactions"} {
 		t.Run(table, func(t *testing.T) {
 			f := newCorrectionFixture(t)
 			f.attend(f.first, f.firstChar)

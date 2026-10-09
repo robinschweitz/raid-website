@@ -24,7 +24,6 @@ import (
 	"raid-website/internal/raidsignup"
 	"raid-website/internal/registration"
 	"raid-website/internal/roster"
-	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 	"raid-website/internal/wishlist"
 )
@@ -42,7 +41,6 @@ type Deps struct {
 	Loot         *loot.Service
 	LootRepo     *loot.Repo
 	Points       *enhancepoints.Repo
-	Tokens       *tokens.Repo
 	Polls        *poll.Repo
 	Roster       *roster.Repo
 	Audit        *audit.Repo
@@ -118,7 +116,6 @@ func (a *API) Register(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/players/{id}/points", RequireAuth(a.getPoints))
 	mux.HandleFunc("GET /api/v1/players/{id}/loot", RequireAuth(a.listPlayerLoot))
-	mux.HandleFunc("GET /api/v1/players/{id}/tokens", RequireAuth(a.getTokens))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/locks", RequireAuth(a.listLocks))
 	mux.HandleFunc("POST /api/v1/players/{id}/locks", RequireRole(validation.RoleMember, a.createLock))

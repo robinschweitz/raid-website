@@ -12,7 +12,6 @@ import (
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
-	"raid-website/internal/tokens"
 )
 
 type Repo struct {
@@ -25,12 +24,11 @@ type awardRepositories struct {
 	characters *character.Repo
 	attendance *attendance.Repo
 	points     *enhancepoints.Repo
-	tokens     *tokens.Repo
 	audit      *audit.Repo
 }
 
 func (r *Repo) awardRepositories() awardRepositories {
-	return awardRepositories{raids: raid.NewRepo(r.db), players: player.NewRepo(r.db), characters: character.NewRepo(r.db), attendance: attendance.NewRepo(r.db), points: enhancepoints.NewRepo(r.db), tokens: tokens.NewRepo(r.db), audit: audit.NewRepo(r.db)}
+	return awardRepositories{raids: raid.NewRepo(r.db), players: player.NewRepo(r.db), characters: character.NewRepo(r.db), attendance: attendance.NewRepo(r.db), points: enhancepoints.NewRepo(r.db), audit: audit.NewRepo(r.db)}
 }
 
 func NewRepo(db bun.IDB) *Repo {
@@ -46,7 +44,7 @@ func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
 }
 
-// InTransaction keeps loot, derived tokens, and lock consumption atomic.
+// InTransaction keeps loot and lock consumption atomic.
 func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		repo := r.WithTx(tx)

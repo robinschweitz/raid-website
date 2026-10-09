@@ -19,7 +19,6 @@ import (
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
-	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
@@ -52,7 +51,7 @@ func TestImportSetupAndArchivedAdditionsAreAdminOnly(t *testing.T) {
 		Points:    []byte("Spieler,Punkte\nOxora,20\n"),
 		Setup:     []byte(",Charakter,Spieler,Klasse,Spec,Rolle\n1,Oxora,Oxora,Paladin,Vergeltung,Mdd\n"), Hash: "first",
 	}}
-	svc := legacyimport.NewService(legacyimport.NewRepo(bdb.DB), players, character.NewRepo(bdb.DB), raid.NewRepo(bdb.DB), attendance.NewRepo(bdb.DB), loot.NewRepo(bdb.DB), enhancepoints.NewRepo(bdb.DB), tokens.NewRepo(bdb.DB), raidseries.NewRepo(bdb.DB), fetcher)
+	svc := legacyimport.NewService(legacyimport.NewRepo(bdb.DB), players, character.NewRepo(bdb.DB), raid.NewRepo(bdb.DB), attendance.NewRepo(bdb.DB), loot.NewRepo(bdb.DB), enhancepoints.NewRepo(bdb.DB), raidseries.NewRepo(bdb.DB), fetcher)
 	mux := http.NewServeMux()
 	v1.NewAPI(v1.Deps{Imports: svc}).Register(mux)
 	config := &legacyimport.SetupConfig{Name: "ICC25", Leader: "Oxora", FirstDate: "2026-10-05", StartTime: "19:00", Timezone: "Europe/Berlin", Weekdays: []int{1}, IntervalWeeks: 1}

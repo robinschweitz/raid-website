@@ -582,7 +582,7 @@ function RaidDetail({ raidID }: Props) {
       {archiveResult && <p role="status">Raid archiviert und weiterhin in der Historie sichtbar. {archiveResult.next_raid
         ? <Link to={`/raids/${archiveResult.next_raid.id}`}>Nächster Raid: {archiveResult.next_raid.name}{archiveResult.next_raid.scheduled_start ? ` (${new Date(archiveResult.next_raid.scheduled_start).toLocaleString()})` : ''}</Link>
         : 'Kein Nachfolger erstellt.'}</p>}
-      {canWrite && <p className="muted">Änderungen werden mit Vorher/Nachher protokolliert. Nur im Archiv ist eine Begründung erforderlich; betroffene EP und Tokens werden automatisch ausgeglichen.</p>}
+      {canWrite && <p className="muted">Änderungen werden mit Vorher/Nachher protokolliert. Nur im Archiv ist eine Begründung erforderlich; betroffene EP werden automatisch ausgeglichen; Tokens folgen dem Loot.</p>}
 
       {canManage && isActiveRaid && <section className="card">
         <h2>Raidplanung</h2>
@@ -744,7 +744,7 @@ function RaidDetail({ raidID }: Props) {
                 {Object.entries(awardLabels).map(([method, label]) => <option key={method} value={method}>{label}</option>)}
               </select></label>
               {lootMethod === 'ENHANCED' && <p className="muted">Betrag wird aus dem aktuellen EP-Stand ermittelt, maximal 50 EP; nur der Gewinner zahlt. Ein positiver EP-Stand ist erforderlich. Der Server prüft und bucht atomar beim Speichern.</p>}
-              {lootEditing && <p className="muted">Unveränderter Enhanced-Gewinner behält seine historischen Kosten. Ein Methoden- oder Empfängerwechsel wird vom Server samt EP, Tokens und Audit atomar ausgeglichen.</p>}
+              {lootEditing && <p className="muted">Unveränderter Enhanced-Gewinner behält seine historischen Kosten. Ein Methoden- oder Empfängerwechsel wird vom Server samt EP, abgeleiteter Token-Sicht und Audit atomar ausgeglichen.</p>}
               <label>Notizen<input disabled={pending} placeholder="Loot-Notizen" value={lootNotes} onChange={(e) => changeLoot(() => setLootNotes(e.target.value))} /></label>
               {lootNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Loot-Begründung" value={lootReason} onChange={(e) => changeLoot(() => setLootReason(e.target.value))} required /></label>}
               {lootEditing && error && <p className="error" role="alert">{error}</p>}

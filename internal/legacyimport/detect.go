@@ -3,7 +3,7 @@ package legacyimport
 import (
 	"strings"
 
-	"raid-website/internal/tokens"
+	"raid-website/internal/loot"
 )
 
 // DetectTokenItems returns true if any of the three token item names appear (normalized)
@@ -12,7 +12,7 @@ func DetectTokenItems(items ...string) bool {
 		if it == "" {
 			continue
 		}
-		if tokens.IsTokenItem(it) {
+		if loot.IsTokenItem(it) {
 			return true
 		}
 	}

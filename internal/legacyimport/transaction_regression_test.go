@@ -11,7 +11,7 @@ import (
 )
 
 func TestImportSeriesUsesTransactionAndRollsBack(t *testing.T) {
-	_, svc, players, _, _, _, _ := setup(t)
+	_, svc, players, _, _, _ := setup(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	now := time.Now().UTC()
@@ -39,7 +39,7 @@ func TestImportSeriesUsesTransactionAndRollsBack(t *testing.T) {
 }
 
 func TestChangedSnapshotDoesNotBootstrapAnotherSeries(t *testing.T) {
-	_, svc, players, _, _, _, raids := setup(t)
+	_, svc, players, _, _, raids := setup(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	now := time.Now().UTC()

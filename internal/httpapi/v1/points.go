@@ -28,27 +28,3 @@ func (a *API) getPoints(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
-
-func (a *API) getTokens(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(r, "id")
-	if !ok {
-		BadRequest(w, "invalid player id")
-		return
-	}
-	txs, err := a.Tokens.ListByPlayer(r.Context(), id)
-	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal", "could not load tokens")
-		return
-	}
-	total := 0
-	for _, t := range txs {
-		total += t.Amount
-	}
-	WriteJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"player_id":    id,
-			"total":        total,
-			"transactions": nonNil(txs),
-		},
-	})
-}

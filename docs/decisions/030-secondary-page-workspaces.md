@@ -15,7 +15,7 @@ mounted to preserve drafts when switching views. Creation forms are disclosed on
 correction actions open their corresponding editor. Catalog provenance is secondary detail.
 Archived and cancelled permissions continue to follow the existing server rules.
 
-Player profiles separate EP/tokens, characters, locks, and administrator account controls.
+Player profiles separate EP, loot, characters, locks, and administrator account controls. Armor tokens are shown by filtering profile loot.
 Directories emphasize existing records ahead of creation forms. Configuration and poll
 panels use consistent spacing, compact headings, and responsive grids. Styling is scoped
 to secondary pages. No dependency or business-rule change is introduced.

@@ -305,22 +305,6 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("rewarded balance: want 0 got %d", pointsOut.Data.Balance)
 	}
 
-	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/tokens", srv.URL, plain), token, nil)
-	if status != http.StatusOK {
-		t.Fatalf("get tokens: status %d body %s", status, body)
-	}
-	var tokensOut struct {
-		Data struct {
-			Total int `json:"total"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(body, &tokensOut); err != nil {
-		t.Fatalf("decode tokens: %v", err)
-	}
-	if tokensOut.Data.Total != 1 {
-		t.Fatalf("token total: want 1 got %d", tokensOut.Data.Total)
-	}
-
 	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/loot", srv.URL, plain), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("get player loot: status %d body %s", status, body)
@@ -598,7 +582,6 @@ func TestListEndpointsReturnEmptyArrays(t *testing.T) {
 
 	for _, path := range []string{
 		fmt.Sprintf("/api/v1/players/%d/points", adminID),
-		fmt.Sprintf("/api/v1/players/%d/tokens", adminID),
 	} {
 		status, body := do(t, client, http.MethodGet, srv.URL+path, token, nil)
 		if status != http.StatusOK {

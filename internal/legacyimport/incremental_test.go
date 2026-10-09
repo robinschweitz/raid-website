@@ -18,7 +18,7 @@ const stableDrop = "ICC25-01,09.02.2026,Nylama,Blutfall,Main,50178,"
 
 func importFixture(t *testing.T) (*Service, int64) {
 	t.Helper()
-	_, svc, players, _, _, _, _ := setup(t)
+	_, svc, players, _, _, _ := setup(t)
 	actor := &player.Player{Name: "Importer", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 	if err := players.Create(context.Background(), actor); err != nil {
 		t.Fatal(err)

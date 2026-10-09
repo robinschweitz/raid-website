@@ -42,9 +42,9 @@ wins and the difference is fixed here first.
    the repository layer (ADR 002).
 3. **"Do not guess. Ask."** If a business rule is ambiguous, stop and ask the owner. Never invent
    numbers, thresholds, statuses, or workflows.
-4. **Append-only ledgers.** Enhance Points, Armor Tokens, and the audit log are append-only.
-   Balances are computed by summing transactions. Never `UPDATE` or delete history; a correction is
-   a new, compensating entry (ADR 004, ADR 005).
+4. **Append-only ledgers.** Enhance Points and the audit log are append-only.
+   EP balances are computed by summing transactions. Never `UPDATE` or delete history; a correction is
+   a new, compensating entry (ADR 004). Armor Tokens are derived from loot awards, not tracked in a ledger (ADR 041).
 5. **Never silently overwrite.** Legacy import and any bulk write must produce a report and must not
    clobber existing data (ADR 008).
 6. **Archive by default.** History-affecting records are archived (`archived_at`), never deleted.
@@ -165,7 +165,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Tokens are derived from awarding the three specific loot items
   `Weiheabzeichen des Beschützers`, `Weiheabzeichen des Bezwingers`,
   `Weiheabzeichen des Eroberers` (ADR 014).
-- Each such award appends a token transaction; the token ledger is append-only (ADR 005).
+- There is no token ledger or separate token balance. Token information is a filtered view of loot awards (ADR 041 supersedes ADR 005).
 - The legacy sheet's "Tokens gesammelt" total is **reconciliation-only** and must never be written
   over derived data.
 
@@ -214,8 +214,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   Cancelled and inconsistently archived active raids remain blocked. Archived corrections and
   additions require a nonblank reason; unarchived writes do not (ADR 032).
 - Completed corrections append only the before/after EP eligibility difference. This preserves
-  imported opening balances and never recreates historical raid rewards. Token corrections
-  append compensating entries; consumed locks are not implicitly revived.
+  imported opening balances and never recreates historical raid rewards. Token visibility follows
+  the corrected loot award; consumed locks are not implicitly revived.
 - Incremental loot imports use an optional permanent, unique `Import ID` source column.
   Edited IDs, duplicate IDs, and ambiguous no-ID changes are conflicts, not overwrites.
   A conflict rejects the entire merge with a report and no domain writes.

@@ -12,7 +12,6 @@ import (
 
 	"raid-website/internal/audit"
 	"raid-website/internal/enhancepoints"
-	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
@@ -164,26 +163,6 @@ func AwardInTransaction(ctx context.Context, awards *Repo, a *Award, reason stri
 	}
 	if err := awards.Update(ctx, a); err != nil {
 		return err
-	}
-
-	if tokens.IsTokenAward(a.ItemName) {
-		raidID := a.RaidID
-		awardID := a.ID
-		t := &tokens.Transaction{
-			PlayerID:    a.AwardedToPlayerID,
-			RaidID:      &raidID,
-			LootAwardID: &awardID,
-			Amount:      tokens.DeriveTokenAmount(1),
-			Type:        "award",
-			Reason:      a.ItemName,
-			RefType:     "loot_award",
-			RefID:       fmt.Sprintf("%d", a.ID),
-			ActorID:     a.AwardedByPlayerID,
-			CreatedAt:   a.AwardedAt,
-		}
-		if err := repositories.tokens.InsertTransaction(ctx, t); err != nil {
-			return fmt.Errorf("derive token: %w", err)
-		}
 	}
 
 	if a.AwardMethod == Enhanced {

@@ -26,7 +26,6 @@ import (
 	"raid-website/internal/raidsignup"
 	"raid-website/internal/registration"
 	"raid-website/internal/roster"
-	"raid-website/internal/tokens"
 	"raid-website/internal/webui"
 )
 
@@ -51,7 +50,6 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	raids := raid.NewRepo(db)
 	att := attendance.NewRepo(db)
 	lootRepo := loot.NewRepo(db)
-	tokenRepo := tokens.NewRepo(db)
 	points := enhancepoints.NewRepo(db)
 	rosterRepo := roster.NewRepo(db)
 	polls := poll.NewRepo(db)
@@ -68,7 +66,6 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		att,
 		lootRepo,
 		points,
-		tokenRepo,
 		raidseries.NewRepo(db),
 		legacyimport.GoogleFetcher{},
 	)
@@ -89,7 +86,6 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Loot:         loot.NewService(lootRepo),
 		LootRepo:     lootRepo,
 		Points:       points,
-		Tokens:       tokenRepo,
 		Polls:        polls,
 		Roster:       rosterRepo,
 		Audit:        audits,

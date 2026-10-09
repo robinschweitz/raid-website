@@ -12,7 +12,6 @@ import (
 	"raid-website/internal/loot"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
-	"raid-website/internal/tokens"
 )
 
 // Repo owns the transaction boundary for cross-domain corrections.
@@ -24,12 +23,11 @@ type Repo struct {
 	players    *player.Repo
 	characters *character.Repo
 	points     *enhancepoints.Repo
-	tokens     *tokens.Repo
 	audit      *audit.Repo
 }
 
 func NewRepo(db bun.IDB) *Repo {
-	return &Repo{db: db, attendance: attendance.NewRepo(db), loot: loot.NewRepo(db), raids: raid.NewRepo(db), players: player.NewRepo(db), characters: character.NewRepo(db), points: enhancepoints.NewRepo(db), tokens: tokens.NewRepo(db), audit: audit.NewRepo(db)}
+	return &Repo{db: db, attendance: attendance.NewRepo(db), loot: loot.NewRepo(db), raids: raid.NewRepo(db), players: player.NewRepo(db), characters: character.NewRepo(db), points: enhancepoints.NewRepo(db), audit: audit.NewRepo(db)}
 }
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo { return NewRepo(tx) }
@@ -66,17 +64,4 @@ func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
 		}
 		return fn(repo)
 	})
-}
-
-func (r *Repo) tokenNets(ctx context.Context, awardID int64) (map[int64]int, error) {
-	var rows []struct {
-		PlayerID int64
-		Amount   int
-	}
-	err := r.db.NewSelect().TableExpr("token_transactions").Column("player_id").ColumnExpr("SUM(amount) AS amount").Where("loot_award_id = ?", awardID).Group("player_id").Scan(ctx, &rows)
-	nets := make(map[int64]int)
-	for _, row := range rows {
-		nets[row.PlayerID] = row.Amount
-	}
-	return nets, err
 }

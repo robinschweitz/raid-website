@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"raid-website/internal/tokens"
+	"raid-website/internal/loot"
 )
 
 type DryRunReport struct {
@@ -20,7 +20,7 @@ type DryRunReport struct {
 func BuildDryRun(rows []LootRow) DryRunReport {
 	rep := DryRunReport{RowsRead: len(rows)}
 	for i, r := range rows {
-		if tokens.IsTokenAward(r.Item) {
+		if loot.IsTokenAward(r.Item) {
 			rep.TokenItems++
 		}
 		if r.CurrentRaidPlayer == "" && r.Item != "" {

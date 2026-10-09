@@ -97,7 +97,6 @@ func TestLegacyConflictsReportedAndHistoryRetained(t *testing.T) {
 	exec(t, b, "INSERT INTO raids (id,name,raid_leader_id,status,catalog_instance_id,created_at,updated_at) VALUES (1,'History',1,'COMPLETED','999999','2020-01-01','2020-01-01')")
 	exec(t, b, "INSERT INTO loot_awards (id,raid_id,boss,item_id,item_name,awarded_to_player_id,awarded_by_player_id,source,catalog_boss_id,awarded_at,created_at,updated_at) VALUES (1,1,'Historical snapshot','50759','Historical item',1,1,'manual','36612','2020-01-01','2020-01-01','2020-01-01')")
 	exec(t, b, "INSERT INTO enhance_point_transactions (player_id,raid_id,amount,type,reason,actor_id,created_at) VALUES (1,1,91,'ADJUSTMENT','opening',1,'2020-01-01')")
-	exec(t, b, "INSERT INTO token_transactions (player_id,raid_id,loot_award_id,amount,type,reason,actor_id,created_at) VALUES (1,1,1,2,'ADJUSTMENT','opening',1,'2020-01-01')")
 	report, err := s.EnsureBundled(ctx)
 	if err != nil || report.Updated != 3 || report.Retained != 2 {
 		t.Fatalf("legacy initialization: updates=%d retained=%d err=%v", report.Updated, report.Retained, err)
@@ -112,7 +111,7 @@ func TestLegacyConflictsReportedAndHistoryRetained(t *testing.T) {
 	if count(t, b, "SELECT COUNT(*) FROM loot_catalog_sources WHERE raw_hash='old-different-hash' AND metadata='{\"old\":\"unchanged\"}'") != 1 {
 		t.Fatal("source history overwritten")
 	}
-	if count(t, b, "SELECT COUNT(*) FROM raids WHERE name='History' AND catalog_instance_id='999999' AND status='COMPLETED'") != 1 || count(t, b, "SELECT COUNT(*) FROM loot_awards WHERE boss='Historical snapshot' AND item_name='Historical item'") != 1 || count(t, b, "SELECT SUM(amount) FROM enhance_point_transactions") != 91 || count(t, b, "SELECT SUM(amount) FROM token_transactions") != 2 {
+	if count(t, b, "SELECT COUNT(*) FROM raids WHERE name='History' AND catalog_instance_id='999999' AND status='COMPLETED'") != 1 || count(t, b, "SELECT COUNT(*) FROM loot_awards WHERE boss='Historical snapshot' AND item_name='Historical item'") != 1 || count(t, b, "SELECT SUM(amount) FROM enhance_point_transactions") != 91 {
 		t.Fatal("guild history changed")
 	}
 	extra := "999999"

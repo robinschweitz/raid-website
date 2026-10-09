@@ -285,30 +285,10 @@ export interface PointTransaction {
   created_at: string
 }
 
-export interface TokenTransaction {
-  id: number
-  player_id: number
-  raid_id: number | null
-  loot_award_id: number | null
-  amount: number
-  type: string
-  reason: string
-  ref_type: string
-  ref_id: string
-  actor_id: number
-  created_at: string
-}
-
 export interface PointsResponse {
   player_id: number
   balance: number
   transactions: PointTransaction[]
-}
-
-export interface TokensResponse {
-  player_id: number
-  total: number
-  transactions: TokenTransaction[]
 }
 
 export type LockStatus = 'ACTIVE' | 'USED' | 'EXPIRED' | 'CANCELLED'

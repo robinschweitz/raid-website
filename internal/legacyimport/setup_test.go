@@ -205,7 +205,7 @@ func TestSetupWriteFailureRollsBackHistoryAndSeries(t *testing.T) {
 	if _, err := s.MergeWithSetup(ctx, actor, "source", "sheet", preview.RawHash, "", setupConfig()); err == nil {
 		t.Fatal("expected injected failure")
 	}
-	for _, table := range []string{"raids", "raid_series", "raid_attendance", "loot_awards", "enhance_point_transactions", "token_transactions", "legacy_imports", "legacy_setup_mappings"} {
+	for _, table := range []string{"raids", "raid_series", "raid_attendance", "loot_awards", "enhance_point_transactions", "legacy_imports", "legacy_setup_mappings"} {
 		var count int
 		if err := s.imports.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table).Scan(&count); err != nil || count != 0 {
 			t.Fatalf("rollback %s count %d: %v", table, count, err)

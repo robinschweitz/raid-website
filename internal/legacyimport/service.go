@@ -18,7 +18,6 @@ import (
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidseries"
-	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
@@ -66,15 +65,14 @@ type Service struct {
 	att         *attendance.Repo
 	loot        *loot.Repo
 	points      *enhancepoints.Repo
-	tokens      *tokens.Repo
 	series      *raidseries.Repo
 	fetcher     Fetcher
 	corrections *raidcorrection.Service
 }
 
 // NewService constructs an importer with explicit repositories and source fetching.
-func NewService(imports *Repo, players *player.Repo, chars *character.Repo, raids *raid.Repo, att *attendance.Repo, lootRepo *loot.Repo, points *enhancepoints.Repo, tokenRepo *tokens.Repo, series *raidseries.Repo, fetcher Fetcher) *Service {
-	return &Service{imports: imports, players: players, chars: chars, raids: raids, att: att, loot: lootRepo, points: points, tokens: tokenRepo, series: series, fetcher: fetcher}
+func NewService(imports *Repo, players *player.Repo, chars *character.Repo, raids *raid.Repo, att *attendance.Repo, lootRepo *loot.Repo, points *enhancepoints.Repo, series *raidseries.Repo, fetcher Fetcher) *Service {
+	return &Service{imports: imports, players: players, chars: chars, raids: raids, att: att, loot: lootRepo, points: points, series: series, fetcher: fetcher}
 }
 
 func planFromSheet(data SheetData) (Plan, int, error) {
@@ -511,26 +509,7 @@ func (s *Service) mergeLoot(ctx context.Context, source, sheetID, reason string,
 			return err
 		}
 
-		if l.IsToken && existingRaids[l.RaidKey] {
-			rep.Created.Tokens++
-		} else if l.IsToken {
-			raidIDCopy := raidID
-			awardID := award.ID
-			txn := &tokens.Transaction{
-				PlayerID:    pid,
-				RaidID:      &raidIDCopy,
-				LootAwardID: &awardID,
-				Amount:      1,
-				Type:        "award",
-				Reason:      l.Item,
-				RefType:     "loot_award",
-				RefID:       fmt.Sprintf("%d", award.ID),
-				ActorID:     actorID,
-				CreatedAt:   now,
-			}
-			if err := s.tokens.InsertTransaction(ctx, txn); err != nil {
-				return fmt.Errorf("derive token for %q: %w", l.Item, err)
-			}
+		if l.IsToken {
 			rep.Created.Tokens++
 		}
 	}

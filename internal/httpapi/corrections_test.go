@@ -18,7 +18,6 @@ import (
 	"raid-website/internal/loot"
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/raid"
-	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
@@ -84,7 +83,7 @@ func bundledICCDrops(t *testing.T, db *bun.DB) (tokenBoss, tokenItem, ordinaryBo
 		}
 		if names[drop.ItemID] == "Weiheabzeichen des Eroberers" {
 			tokenBoss, tokenItem = drop.BossID, drop.ItemID
-		} else if !tokens.IsTokenAward(names[drop.ItemID]) {
+		} else if !loot.IsTokenAward(names[drop.ItemID]) {
 			ordinaryBoss, ordinaryItem = drop.BossID, drop.ItemID
 		}
 	}
@@ -176,13 +175,15 @@ func (f *correctionFixture) archiveHistory() {
 
 func (f *correctionFixture) tokenBalance(playerID int64, want int) {
 	f.t.Helper()
-	rows, err := tokens.NewRepo(f.db).ListByPlayer(context.Background(), playerID)
+	rows, err := loot.NewRepo(f.db).ListByPlayer(context.Background(), playerID)
 	if err != nil {
 		f.t.Fatal(err)
 	}
 	net := 0
 	for _, row := range rows {
-		net += row.Amount
+		if loot.IsTokenAward(row.ItemName) {
+			net++
+		}
 	}
 	if net != want {
 		f.t.Fatalf("tokens player %d: got %d want %d", playerID, net, want)
@@ -249,13 +250,7 @@ func TestLegacyCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
 	if len(initialEP) == 0 || initialEP[0].Type != "award_no_mainspec_loot" || initialEP[0].Amount != 10 {
 		t.Fatal("initial EP transaction was changed")
 	}
-	initialTokens, err := tokens.NewRepo(f.db).ListByPlayer(context.Background(), f.first)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(initialTokens) == 0 || initialTokens[0].Type != "award" || initialTokens[0].Amount != 1 {
-		t.Fatal("initial token transaction was changed")
-	}
+	f.tokenBalance(f.first, 1)
 }
 
 func TestLegacyCorrectionsAttendanceAndCompletedAdditions(t *testing.T) {
@@ -421,7 +416,7 @@ func TestOrdinaryLootAmbiguousAndInvalidLocks(t *testing.T) {
 	}
 }
 
-func TestOrdinaryLootTokenFailureRollsBackLockAndAward(t *testing.T) {
+func TestOrdinaryLootTokenLockFallback(t *testing.T) {
 	f := newCorrectionFixture(t)
 	f.attend(f.first, f.firstChar)
 	now := time.Now().UTC()
@@ -429,28 +424,7 @@ func TestOrdinaryLootTokenFailureRollsBackLockAndAward(t *testing.T) {
 	if err := enhancepoints.NewRepo(f.db).CreateLock(context.Background(), lock); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.db.ExecContext(context.Background(), "CREATE TRIGGER fail_loot_token BEFORE INSERT ON token_transactions BEGIN SELECT RAISE(ABORT, 'token ledger unavailable'); END"); err != nil {
-		t.Fatal(err)
-	}
 	body := f.selection(map[string]any{"award_method": "SECOND", "item_lock_id": lock.ID, "awarded_to_player_id": f.second}, true)
-	f.request(http.MethodPost, "/loot", body, http.StatusInternalServerError)
-	stored, err := enhancepoints.NewRepo(f.db).GetLock(context.Background(), lock.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if stored.Status != validation.LockStatusActive || stored.UsedAt != nil {
-		t.Fatal("failed token derivation consumed lock")
-	}
-	awards, err := loot.NewRepo(f.db).ListByRaid(context.Background(), f.raidID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(awards) != 0 {
-		t.Fatal("failed token derivation persisted award")
-	}
-	if _, err := f.db.ExecContext(context.Background(), "DROP TRIGGER fail_loot_token"); err != nil {
-		t.Fatal(err)
-	}
 	id := correctionID(t, f.request(http.MethodPost, "/loot", body, http.StatusCreated))
 	award, err := loot.NewRepo(f.db).Get(context.Background(), id)
 	if err != nil {

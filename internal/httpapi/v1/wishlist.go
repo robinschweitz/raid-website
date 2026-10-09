@@ -148,9 +148,9 @@ func (h WishlistHandlers) removeItem(w http.ResponseWriter, r *http.Request) {
 }
 
 type raidWishlistItem struct {
-	ItemID     string                        `json:"item_id"`
+	ItemID     string                          `json:"item_id"`
 	Characters []raidWishlistCharacterInterest `json:"characters"`
-	Count      int                           `json:"count"`
+	Count      int                             `json:"count"`
 }
 
 type raidWishlistCharacterInterest struct {

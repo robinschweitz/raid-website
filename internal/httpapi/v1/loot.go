@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"raid-website/internal/loot"
-	"raid-website/internal/tokens"
 )
 
 type lootAwardResponse struct {
@@ -17,7 +16,7 @@ type lootAwardResponse struct {
 func lootAwardResponses(awards []loot.Award) []lootAwardResponse {
 	rows := make([]lootAwardResponse, 0, len(awards))
 	for _, award := range awards {
-		rows = append(rows, lootAwardResponse{Award: award, TokenAward: tokens.IsTokenAward(award.ItemName)})
+		rows = append(rows, lootAwardResponse{Award: award, TokenAward: loot.IsTokenAward(award.ItemName)})
 	}
 	return rows
 }
@@ -185,6 +184,6 @@ func (a *API) createLoot(w http.ResponseWriter, r *http.Request) {
 	}
 	WriteJSON(w, http.StatusCreated, map[string]any{
 		"data":        award,
-		"token_award": tokens.IsTokenAward(award.ItemName),
+		"token_award": loot.IsTokenAward(award.ItemName),
 	})
 }

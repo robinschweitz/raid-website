@@ -158,7 +158,6 @@ func (s *Service) transaction(ctx context.Context, commit bool, fn func(*Service
 	bound.att = s.att.WithTx(tx)
 	bound.loot = s.loot.WithTx(tx)
 	bound.points = s.points.WithTx(tx)
-	bound.tokens = s.tokens.WithTx(tx)
 	bound.series = s.series.WithTx(tx)
 	bound.corrections = raidcorrection.NewService(raidcorrection.NewRepo(tx))
 	if err := fn(&bound); err != nil {

@@ -28,7 +28,7 @@ func TestSheetPriorityMapsToAwardMethod(t *testing.T) {
 		{priority: "Main", item: "Weiheabzeichen des Eroberers", want: loot.Second, wantToken: true, warn: true},
 		{priority: "", item: "Blutfall", want: loot.Second},
 		{priority: "Sonderpreis", item: "Blutfall", want: loot.Second, warn: true},
-		// A Token priority on a real item derives no token; the token ledger follows items.
+		// A Token priority on a real item derives no token; token visibility follows items.
 		{priority: "Token", item: "Blutfall", want: loot.Second, warn: true},
 	}
 	for _, c := range cases {

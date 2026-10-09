@@ -12,7 +12,6 @@ import (
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
 	"raid-website/internal/raid"
-	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
@@ -108,18 +107,11 @@ func TestLegacyUnassociatedLootNotesAndEnhancedTransition(t *testing.T) {
 	if err := loot.NewRepo(f.db).CreateAward(ctx, old); err != nil {
 		t.Fatal(err)
 	}
-	if err := tokens.NewRepo(f.db).InsertTransaction(ctx, &tokens.Transaction{PlayerID: f.first, RaidID: &f.raidID, LootAwardID: &old.ID, Amount: 1, Type: "award", Reason: "original external history", ActorID: f.actor, CreatedAt: now}); err != nil {
-		t.Fatal(err)
-	}
 	suffix := fmt.Sprintf("/loot/%d", old.ID)
 	f.request(http.MethodPatch, suffix, map[string]any{"notes": "clarification", "reason": "notes only"}, http.StatusOK)
 	stored := f.award(old.ID)
 	if stored.Boss != old.Boss || stored.ItemID != old.ItemID || stored.ItemName != old.ItemName || stored.CatalogBossID != nil || stored.Source != old.Source || !stored.AwardedAt.Equal(old.AwardedAt) {
 		t.Fatalf("history rewritten: %+v", stored)
-	}
-	tokenBefore, err := tokens.NewRepo(f.db).ListByPlayer(ctx, f.first)
-	if err != nil {
-		t.Fatal(err)
 	}
 	for _, patch := range []map[string]any{
 		{"award_method": "ENHANCED", "reason": "new spending"},
@@ -136,10 +128,7 @@ func TestLegacyUnassociatedLootNotesAndEnhancedTransition(t *testing.T) {
 	if !reflect.DeepEqual(stored, f.award(old.ID)) {
 		t.Fatal("rejection changed award")
 	}
-	tokenAfter, err := tokens.NewRepo(f.db).ListByPlayer(ctx, f.first)
-	if err != nil || !reflect.DeepEqual(tokenBefore, tokenAfter) {
-		t.Fatalf("token history changed: %v", err)
-	}
+	f.tokenBalance(f.first, 1)
 }
 
 func TestHistoricalEnhancedRefundPreservesUnassociatedIdentity(t *testing.T) {

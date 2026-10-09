@@ -18,7 +18,6 @@ import (
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
-	"raid-website/internal/tokens"
 )
 
 const raidCSV = `"Raid ID","Timestamp","Position","Charakter","Rolle","Klasse","Spec","Spalte 1"
@@ -60,7 +59,7 @@ func sampleSheet() SheetData {
 	}
 }
 
-func setup(t *testing.T) (*bun.DB, *Service, *player.Repo, *enhancepoints.Repo, *tokens.Repo, *loot.Repo, *raid.Repo) {
+func setup(t *testing.T) (*bun.DB, *Service, *player.Repo, *enhancepoints.Repo, *loot.Repo, *raid.Repo) {
 	t.Helper()
 	ctx := context.Background()
 	dsn := "file:" + filepath.Join(t.TempDir(), "imp.db") + "?_pragma=foreign_keys(1)"
@@ -86,12 +85,11 @@ func setup(t *testing.T) (*bun.DB, *Service, *player.Repo, *enhancepoints.Repo, 
 	if _, err := lootcatalog.NewService(lootcatalog.NewRepo(bdb.DB)).EnsureBundled(ctx); err != nil {
 		t.Fatalf("catalog: %v", err)
 	}
-	tokenRepo := tokens.NewRepo(bdb.DB)
 	points := enhancepoints.NewRepo(bdb.DB)
 	imports := NewRepo(bdb.DB)
 
-	svc := NewService(imports, players, chars, raids, att, lootRepo, points, tokenRepo, raidseries.NewRepo(bdb.DB), fakeFetcher{data: sampleSheet()})
-	return bdb.DB, svc, players, points, tokenRepo, lootRepo, raids
+	svc := NewService(imports, players, chars, raids, att, lootRepo, points, raidseries.NewRepo(bdb.DB), fakeFetcher{data: sampleSheet()})
+	return bdb.DB, svc, players, points, lootRepo, raids
 }
 
 func TestBuildPlan(t *testing.T) {
@@ -130,7 +128,7 @@ func TestBuildPlan(t *testing.T) {
 
 func TestMergeThenIdempotent(t *testing.T) {
 	ctx := context.Background()
-	bdb, svc, players, points, tokenRepo, lootRepo, raids := setup(t)
+	bdb, svc, players, points, lootRepo, raids := setup(t)
 
 	now := time.Now().UTC()
 	actor := &player.Player{Name: "Importer", Active: true, CreatedAt: now, UpdatedAt: now}
@@ -189,18 +187,6 @@ func TestMergeThenIdempotent(t *testing.T) {
 		t.Fatalf("amisu balance: want 30 got %d", amisuBal)
 	}
 
-	txns, err := tokenRepo.ListByPlayer(ctx, amisu.ID)
-	if err != nil {
-		t.Fatalf("tokens: %v", err)
-	}
-	total := 0
-	for _, tx := range txns {
-		total += tx.Amount
-	}
-	if total != 1 {
-		t.Fatalf("amisu token total: want 1 got %d", total)
-	}
-
 	rd, err := raids.FindByName(ctx, "ICC25-01")
 	if err != nil {
 		t.Fatalf("find raid: %v", err)
@@ -211,6 +197,15 @@ func TestMergeThenIdempotent(t *testing.T) {
 	}
 	if len(awards) != 2 {
 		t.Fatalf("raid loot: want 2 got %d", len(awards))
+	}
+	tokenLoot := 0
+	for _, award := range awards {
+		if loot.IsTokenAward(award.ItemName) && award.AwardedToPlayerID == amisu.ID {
+			tokenLoot++
+		}
+	}
+	if tokenLoot != 1 {
+		t.Fatalf("amisu token loot: want 1 got %d", tokenLoot)
 	}
 	_ = bdb
 

@@ -3,7 +3,6 @@ DROP TABLE IF EXISTS legacy_imports;
 DROP TABLE IF EXISTS poll_votes;
 DROP TABLE IF EXISTS polls;
 DROP TABLE IF EXISTS item_locks;
-DROP TABLE IF EXISTS token_transactions;
 DROP TABLE IF EXISTS enhance_point_transactions;
 DROP TABLE IF EXISTS loot_awards;
 DROP TABLE IF EXISTS raid_attendance;

@@ -13,7 +13,6 @@ import (
 
 	"raid-website/internal/attendance"
 	"raid-website/internal/loot"
-	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
 )
 
@@ -289,7 +288,7 @@ func BuildPlan(raidRows []RaidArchiveRow, lootRows []LootArchiveRow, charRows []
 		if !known {
 			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: unknown priority %q for item %q; recorded as SECOND, which never blocks +10 EP", i+2, priority, item))
 		}
-		isToken := tokens.IsTokenAward(item)
+		isToken := loot.IsTokenAward(item)
 		if isToken && method != loot.Second {
 			p.Warnings = append(p.Warnings, fmt.Sprintf("loot row %d: armor token %q recorded with priority %q; tokens never block +10 EP, recorded as SECOND", i+2, item, priority))
 			method = loot.Second

@@ -24,6 +24,7 @@ type createRaidRequest struct {
 }
 
 type configureRaidScheduleRequest struct {
+	Name              *string         `json:"name"`
 	CatalogInstanceID *string         `json:"catalog_instance_id"`
 	RaidSize          *int            `json:"raid_size"`
 	SeriesID          *int64          `json:"series_id"`
@@ -199,7 +200,7 @@ func (a *API) configureRaidSchedule(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	changes := raid.ScheduleChanges{SeriesID: req.SeriesID, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize}
+	changes := raid.ScheduleChanges{Name: req.Name, SeriesID: req.SeriesID, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize}
 	if req.ScheduledStart != nil {
 		var raw string
 		if err := json.Unmarshal(req.ScheduledStart, &raw); err != nil {
@@ -225,6 +226,10 @@ func (a *API) configureRaidSchedule(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "raid actor not found")
 		case errors.Is(err, raid.ErrScheduleNotEditable):
 			WriteError(w, http.StatusConflict, "schedule_not_editable", "finalized, cancelled or archived raid schedule cannot be changed")
+		case errors.Is(err, raid.ErrNameRequired):
+			WriteError(w, http.StatusBadRequest, "name_required", "name is required")
+		case errors.Is(err, raid.ErrNameNotEditable):
+			WriteError(w, http.StatusConflict, "name_not_editable", "raid name can only be changed for raids without series")
 		default:
 			WriteError(w, http.StatusInternalServerError, "internal", "could not configure raid schedule")
 		}

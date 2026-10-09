@@ -35,7 +35,7 @@ export function RaidSeriesPage() {
   useEffect(() => {
     api.get<LootCatalog>('/api/v1/loot-catalog')
       .then((value) => { if (isActive()) setCatalog(value) })
-      .catch((err) => { if (isActive()) setCatalogError(err instanceof ApiError ? err.message : 'Beutekatalog konnte nicht geladen werden. Bestehende Zuordnungen bleiben unverändert.') })
+      .catch((err) => { if (isActive()) setCatalogError(err instanceof ApiError ? err.message : 'Beuteauswahl konnte nicht geladen werden. Bestehende Zuordnungen bleiben unverändert.') })
   }, [isActive])
 
   const edit = (row: RaidSeries | null) => {
@@ -91,7 +91,7 @@ export function RaidSeriesPage() {
       <label>IANA-Zeitzone<input disabled={pending} required placeholder="IANA-Zeitzone" value={schedule.timezone} onChange={(e) => setSchedule({ ...schedule, timezone: e.target.value })} /></label>
       {catalogError && <p className="error" role="alert">{catalogError}</p>}
       <CatalogAssociationFields catalog={catalog} instanceID={schedule.catalog_instance_id} raidSize={schedule.raid_size} disabled={pending} existingInstanceID={existing?.catalog_instance_id ?? ''} existingRaidSize={existing?.raid_size == null ? '' : String(existing.raid_size)} onChange={(instance, size) => { if (!isPending() && isActive()) setSchedule({ ...schedule, catalog_instance_id: instance, raid_size: size }) }} />
-      {!associationValid && <p className="error">Bitte eine durch lokale Drops belegte Raidgröße zur Instanz auswählen.</p>}
+      {!associationValid && <p className="error">Bitte eine verfügbare Raidgröße zur Raidinstanz auswählen.</p>}
       <button disabled={pending || schedule.weekdays.length === 0 || !associationValid} type="submit">Serie speichern</button>
       {editingID !== null && <button disabled={pending} type="button" onClick={() => edit(null)}>Bearbeitung abbrechen</button>}
     </form>

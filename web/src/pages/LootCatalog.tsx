@@ -145,7 +145,7 @@ export function LootCatalogPage() {
       ])
       if (isActive() && version === loadVersion.current) { setCatalog(value); setDrops(items); setPage(0) }
     } catch (err) {
-      if (isActive() && version === loadVersion.current) setError(err instanceof ApiError ? err.message : 'Beutekatalog konnte nicht geladen werden. Bitte erneut versuchen; kein Ersatzdatensatz wird verwendet.')
+      if (isActive() && version === loadVersion.current) setError(err instanceof ApiError ? err.message : 'Beute konnte nicht geladen werden. Bitte erneut versuchen.')
     } finally {
       if (isActive() && version === loadVersion.current) setLoading(false)
     }
@@ -199,11 +199,11 @@ export function LootCatalogPage() {
   const names = new Map((catalog?.bosses ?? []).map((boss) => [boss.id, boss.name]))
 
   return <div>
-    <div className="page-heading"><div><p className="eyebrow">Bosse · Begegnungen · Truhen</p><h1>Beutekatalog</h1></div></div>
+    <div className="page-heading"><div><p className="eyebrow">Bosse · Begegnungen · Truhen</p><h1>Beute</h1></div></div>
     <section className="card"><h2>Beute finden</h2>
-      <p className="muted">Truhenbeute ist direkt der Begegnung zugeordnet – etwa dem Luftschiffkampf oder Valithria. Suche nach Gegenstand oder Item-ID.</p>
+      <p className="muted">Truhenbeute ist direkt der Begegnung zugeordnet, etwa dem Luftschiffkampf oder Valithria. Suche nach Gegenstand oder Item-ID.</p>
       {error && <p className="error" role="alert">{error}</p>}
-      {loading ? <p className="muted" role="status">Beutekatalog wird geladen…</p> : catalog && <>
+      {loading ? <p className="muted" role="status">Beute wird geladen…</p> : catalog && <>
         <div className="catalog-filters">
           <label>Instanz<select value={instanceID} onChange={(e) => { setInstanceID(e.target.value); setBossID(''); setPage(0) }}><option value="">Alle Instanzen</option>{catalog.instances.map((instance) => <option key={instance.id} value={instance.id}>{instance.name}</option>)}</select></label>
           <label>Boss / Begegnung<select value={bossID} onChange={(e) => { setBossID(e.target.value); setPage(0) }}><option value="">Alle Begegnungen</option>{bosses.map((boss) => <option key={boss.id} value={boss.id}>{boss.name}</option>)}</select></label>
@@ -211,8 +211,8 @@ export function LootCatalogPage() {
           <label>Modus<select value={mode} onChange={(e) => { setMode(e.target.value); setPage(0) }}><option value="">Alle Modi</option>{Object.entries(catalogModeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
           <label>Gegenstand suchen<input type="search" value={query} placeholder="Name oder Item-ID" onChange={(e) => { setQuery(e.target.value); setPage(0) }} /></label>
         </div>
-        <p role="status">{results.length} Dropvarianten gefunden</p>
-        {results.length === 0 && <p className="muted">Keine passenden Drops im gebündelten Bestand. Filter ändern oder Quellenabdeckung prüfen.</p>}
+        <p role="status">{results.length} Beutevarianten gefunden</p>
+        {results.length === 0 && <p className="muted">Keine passende Beute gefunden. Filter ändern oder später erneut versuchen.</p>}
         <div className="catalog-results">{results.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((item) => <article className="subcard catalog-item-card" key={JSON.stringify([item.boss_id, item.item_id, item.raid_size, item.mode])}>
           <div className="catalog-tooltip-card">
             <div className="catalog-item-main">
@@ -249,25 +249,8 @@ export function LootCatalogPage() {
           </div></div>}
         </article>)}</div>
         {results.length > pageSize && <div className="catalog-pagination"><button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Zurück</button><span>Seite {currentPage + 1} / {lastPage + 1}</span><button type="button" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>Weiter</button></div>}
-        <details className="subcard"><summary>Abdeckung und Quellen</summary>
-        <p>{catalog.instances.length} Instanzen · {catalog.bosses.length} Begegnungs-/Teilnehmereinträge · {catalog.items.length} Items</p>
-        <p className="muted">Teilbestand: Fehlende Drops bedeuten nicht, dass eine Begegnung keine Beute hat. Manche Kreaturen-Hardmodes sind nur als bedingte Quellpfade belegt.</p>
-        {catalog.instances.length === 0 && <p className="muted">Keine geprüften Dropdaten verfügbar.</p>}
-        {catalog.sources.map((entry) => <details className="subcard" key={`${entry.source.id}-${entry.raw_hash}`}>
-          <summary>Quelle: {entry.source.id} · {entry.source.license}</summary>
-          <dl style={{ overflowWrap: 'anywhere' }}>
-            <dt>Quelldatei / Quelle</dt><dd>{entry.source.id}</dd>
-            <dt>Version</dt><dd>{entry.source.revision}</dd>
-            <dt>Quellenadresse</dt><dd>{entry.source.url}</dd>
-            <dt>Lizenz</dt><dd>{entry.source.license}</dd>
-            <dt>Attribution</dt><dd>{entry.source.attribution}</dd>
-            <dt>JSON-Prüfsumme</dt><dd>{entry.raw_hash}</dd>
-          </dl>
-          <ul>{entry.notices.map((notice, index) => <li key={index} style={{ overflowWrap: 'anywhere' }}>{notice}</li>)}</ul>
-        </details>)}
-        </details>
       </>}
-      <button type="button" disabled={loading} onClick={() => void load()}>Bestand neu laden</button>
+      <button type="button" disabled={loading} onClick={() => void load()}>Beute neu laden</button>
     </section>
   </div>
 }

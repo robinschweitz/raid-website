@@ -72,7 +72,7 @@ export function RaidsPage() {
   useEffect(() => {
     api.get<LootCatalog>('/api/v1/loot-catalog')
       .then((value) => { if (isActive()) setCatalog(value) })
-      .catch((err) => { if (isActive()) setCatalogError(err instanceof ApiError ? err.message : 'Beutekatalog konnte nicht geladen werden. Neue Raids benötigen eine geprüfte Instanz und Raidgröße.') })
+      .catch((err) => { if (isActive()) setCatalogError(err instanceof ApiError ? err.message : 'Beuteauswahl konnte nicht geladen werden. Neue Raids benötigen eine Raidinstanz und Raidgröße.') })
   }, [isActive])
 
   const onCreate = async (event: FormEvent) => {
@@ -150,12 +150,12 @@ export function RaidsPage() {
             setInstanceID(selected?.catalog_instance_id ?? '')
             setRaidSize(selected?.raid_size == null ? '' : String(selected.raid_size))
           }}><option value="">Keine Serie</option>{series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-          <p className="muted">Die Serie übernimmt Raidleiter und Katalog; der Raidname wird aus der Namensvorlage abgeleitet. {selectedSeries && `Wiederholung: ${selectedSeries.start_time}, ${selectedSeries.timezone}, alle ${selectedSeries.interval_weeks} Wochen.`}</p>
+          <p className="muted">Die Serie übernimmt Raidleiter, Raidinstanz und Raidgröße; der Raidname wird aus der Namensvorlage abgeleitet. {selectedSeries && `Wiederholung: ${selectedSeries.start_time}, ${selectedSeries.timezone}, alle ${selectedSeries.interval_weeks} Wochen.`}</p>
           {series.length === 0 && <p className="muted">Keine Raidserie vorhanden — ein Raid ohne Serie benötigt einen eigenen Namen.</p>}
           <label>Raidleiter<select aria-label="Neuer Raidleiter" disabled={pending} required value={leaderID} onChange={(e) => setLeaderID(e.target.value)}><option value="">Raidleiter auswählen</option>{players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
           {catalogError && <p className="error" role="alert">{catalogError}</p>}
           <CatalogAssociationFields catalog={catalog} instanceID={instanceID} raidSize={raidSize} disabled={pending} existingInstanceID={selectedSeries?.catalog_instance_id ?? ''} existingRaidSize={selectedSeries?.raid_size == null ? '' : String(selectedSeries?.raid_size)} onChange={(instance, size) => { if (!isPending() && isActive()) { setInstanceID(instance); setRaidSize(size) } }} />
-          {!associationValid && <p className="error">Bitte eine durch lokale Drops belegte Raidgröße zur Instanz auswählen.</p>}
+          {!associationValid && <p className="error">Bitte eine verfügbare Raidgröße zur Raidinstanz auswählen.</p>}
           {selectedSeries ? (
             <p className="muted">Name wird aus der Namensvorlage abgeleitet: {previewSeriesName(selectedSeries, scheduled)}</p>
           ) : (

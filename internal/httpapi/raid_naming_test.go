@@ -3,10 +3,12 @@ package httpapi_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
+	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/validation"
 )
@@ -79,5 +81,60 @@ func TestCreateRaidDerivesNameFromSeriesOrRequiresExplicitName(t *testing.T) {
 	missingName := create(map[string]any{"raid_leader_id": actor, "scheduled_start": start.Format(time.RFC3339)})
 	if missingName.status != http.StatusBadRequest || missingName.code != "name_required" {
 		t.Fatalf("missing name without series: %+v", missingName)
+	}
+}
+
+func TestRaidWithoutSeriesCanBeRenamedWhileActive(t *testing.T) {
+	srv, database := setupServer(t)
+	actor := seedAccount(t, database, "rename-assistant", "password", validation.RoleRaidassistent)
+	token := login(t, srv.Client(), srv, "rename-assistant", "password")
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	raids := raid.NewRepo(database)
+
+	standalone := &raid.Raid{Name: "Alter Einzelraid", RaidLeaderID: actor, Status: validation.RaidStatusPlanned, CreatedAt: now, UpdatedAt: now}
+	if err := raids.Create(ctx, standalone); err != nil {
+		t.Fatal(err)
+	}
+	status, body := do(t, srv.Client(), http.MethodPatch, fmt.Sprintf("%s/api/v1/raids/%d", srv.URL, standalone.ID), token, map[string]any{"name": " Neuer Einzelraid "})
+	if status != http.StatusOK {
+		t.Fatalf("rename standalone raid: %d %s", status, body)
+	}
+	var renamed struct {
+		Data raid.Raid `json:"data"`
+	}
+	if err := json.Unmarshal(body, &renamed); err != nil {
+		t.Fatal(err)
+	}
+	if renamed.Data.Name != "Neuer Einzelraid" || !renamed.Data.UpdatedAt.After(now) {
+		t.Fatalf("unexpected renamed raid: %+v", renamed.Data)
+	}
+
+	status, body = do(t, srv.Client(), http.MethodPatch, fmt.Sprintf("%s/api/v1/raids/%d", srv.URL, standalone.ID), token, map[string]any{"name": " "})
+	var blankName struct{ Error struct{ Code string } }
+	if err := json.Unmarshal(body, &blankName); err != nil {
+		t.Fatal(err)
+	}
+	if status != http.StatusBadRequest || blankName.Error.Code != "name_required" {
+		t.Fatalf("blank name: %d %s", status, body)
+	}
+	stored, err := raids.Get(ctx, standalone.ID)
+	if err != nil || stored.Name != "Neuer Einzelraid" {
+		t.Fatalf("blank rename changed raid: %+v %v", stored, err)
+	}
+
+	series := &raidseries.Series{Name: "Serienraid", RaidLeaderID: actor, Weekdays: []int{1}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "Europe/Berlin"}
+	if err := raidseries.NewRepo(database).Save(ctx, series); err != nil {
+		t.Fatal(err)
+	}
+	seriesRaid := &raid.Raid{Name: "Serienraid", RaidLeaderID: actor, Status: validation.RaidStatusOpen, SeriesID: &series.ID, CreatedAt: now, UpdatedAt: now}
+	if err := raids.Create(ctx, seriesRaid); err != nil {
+		t.Fatal(err)
+	}
+	status, body = do(t, srv.Client(), http.MethodPatch, fmt.Sprintf("%s/api/v1/raids/%d", srv.URL, seriesRaid.ID), token, map[string]any{"name": "Direkter Serienname"})
+	assertArchiveCode(t, status, body, "name_not_editable")
+	stored, err = raids.Get(ctx, seriesRaid.ID)
+	if err != nil || stored.Name != "Serienraid" {
+		t.Fatalf("series rename changed raid: %+v %v", stored, err)
 	}
 }

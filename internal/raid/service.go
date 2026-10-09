@@ -16,6 +16,7 @@ var (
 	ErrNameRequired        = errors.New("raid name is required")
 	ErrNotCancellable      = errors.New("raid is not cancellable")
 	ErrScheduleNotEditable = errors.New("finalized, cancelled or archived raid schedule cannot be changed")
+	ErrNameNotEditable     = errors.New("raid name can only be changed for raids without series")
 	ErrOccurrenceConflict  = errors.New("raid series occurrence or successor already exists")
 )
 
@@ -52,6 +53,7 @@ func (s *Service) CancelRaid(ctx context.Context, raidID, actorID int64) (*Raid,
 
 // ScheduleChanges contains only explicitly supplied scheduling prerequisites.
 type ScheduleChanges struct {
+	Name              *string
 	CatalogInstanceID *string
 	RaidSize          *int
 	SeriesID          *int64
@@ -94,6 +96,16 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 			start := changes.ScheduledStart.UTC()
 			rd.ScheduledStart = &start
 		}
+		if changes.Name != nil {
+			name := strings.TrimSpace(*changes.Name)
+			if name == "" {
+				return ErrNameRequired
+			}
+			if rd.SeriesID != nil {
+				return ErrNameNotEditable
+			}
+			rd.Name = name
+		}
 		if changes.CatalogInstanceID != nil {
 			rd.CatalogInstanceID = changes.CatalogInstanceID
 		}
@@ -103,7 +115,7 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 		if err := repo.Catalog().ValidateAssociation(ctx, rd.CatalogInstanceID, rd.RaidSize); err != nil {
 			return err
 		}
-		if changes.SeriesID == nil && changes.ScheduledStart == nil && changes.CatalogInstanceID == nil && changes.RaidSize == nil {
+		if changes.Name == nil && changes.SeriesID == nil && changes.ScheduledStart == nil && changes.CatalogInstanceID == nil && changes.RaidSize == nil {
 			return nil
 		}
 		now := time.Now().UTC()

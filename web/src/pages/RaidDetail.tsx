@@ -131,8 +131,6 @@ function RaidDetail({ raidID }: Props) {
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogDifficulty, setCatalogDifficulty] = useState('')
   const [catalogStatus, setCatalogStatus] = useState('')
-  const [catalogSourceStatus, setCatalogSourceStatus] = useState('Beuteauswahl wird geladen.')
-  const [catalogRetry, setCatalogRetry] = useState(0)
 
   const canManage = me ? atLeast(me.role, 'RAIDASSISTENT') : false
   const isActiveRaid = !!raid && !raid.archived_at && (raid.status === 'PLANNED' || raid.status === 'OPEN')
@@ -211,12 +209,9 @@ function RaidDetail({ raidID }: Props) {
     api.get<LootCatalog>('/api/v1/loot-catalog').then((value) => {
       if (!isActive() || obsolete) return
       setCatalog(value)
-      setCatalogSourceStatus(value.instances.length ? '' : 'Beuteauswahl ist derzeit nicht verfügbar.')
-    }).catch(() => {
-      if (isActive() && !obsolete) setCatalogSourceStatus('Beuteauswahl ist derzeit nicht verfügbar. Bitte später erneut versuchen.')
-    })
+    }).catch(() => undefined)
     return () => { obsolete = true }
-  }, [isActive, catalogRetry])
+  }, [isActive])
 
   useEffect(() => {
     let obsolete = false
@@ -247,7 +242,7 @@ function RaidDetail({ raidID }: Props) {
       if (isActive() && !obsolete && context === persistedCatalogContext.current) setCatalogStatus('Bosse konnten nicht geladen werden. Bitte später erneut versuchen; historische Einträge bleiben erhalten.')
     })
     return () => { obsolete = true }
-  }, [raid?.catalog_instance_id, raid?.raid_size, catalogContext, canWrite, isActive, catalogRetry])
+  }, [raid?.catalog_instance_id, raid?.raid_size, catalogContext, canWrite, isActive])
 
   const playerName = (id: number) => players.find((p) => p.id === id)?.name ?? `#${id}`
 
@@ -582,16 +577,7 @@ function RaidDetail({ raidID }: Props) {
       {view === 'signups' && <div id="raid-signups"><RaidSignups raid={raid} attendance={attendance} players={players} onRosterChange={load} /></div>}
       <section id="raid-planning" hidden={view !== 'planning'} className="card raid-summary" aria-label="Raidübersicht">
       <h2>Übersicht</h2>
-      <p>{attendance.length} gespeicherte Teilnehmer · {loot.length} aufgezeichnete Loot-Vergaben</p>
       {raid.archived_at && <p className="muted">Archivierte Historie: Änderungen erfordern eine Begründung und werden protokolliert.</p>}
-      <p>Geplanter Start: {raid.scheduled_start ? new Date(raid.scheduled_start).toLocaleString() : 'Nicht verfügbar'}. Serie: {series.find((s) => s.id === raid.series_id)?.name ?? 'Nicht verfügbar'}.</p>
-      <p>Raidinstanz: {raid.catalog_instance_id ? catalogInstances.find((instance) => instance.id === raid.catalog_instance_id)?.name ?? raid.catalog_instance_id : 'Nicht zugeordnet'}. Raidgröße: {raid.raid_size == null ? 'Nicht zugeordnet' : `${raid.raid_size} Spieler`}.</p>
-      <details aria-label="Beuteauswahl" className="subcard catalog-sources">
-        <summary>Beuteauswahl</summary>
-        {catalogSourceStatus && <p className="muted" role="status">{catalogSourceStatus}</p>}
-        {catalog && !catalogSourcesAvailable && <p className="muted">Beuteauswahl ist derzeit nicht verfügbar. Neue Zuordnungen und neue Loot-Vergaben sind erst danach möglich.</p>}
-        <button type="button" disabled={pending} onClick={() => { if (isActive() && !isPending()) setCatalogRetry((value) => value + 1) }}>Beuteauswahl erneut laden</button>
-      </details>
       {raid.previous_raid_id && <p><Link to={`/raids/${raid.previous_raid_id}`}>Vorheriger Raid</Link></p>}
       {archiveResult && <p role="status">Raid archiviert und weiterhin in der Historie sichtbar. {archiveResult.next_raid
         ? <Link to={`/raids/${archiveResult.next_raid.id}`}>Nächster Raid: {archiveResult.next_raid.name}{archiveResult.next_raid.scheduled_start ? ` (${new Date(archiveResult.next_raid.scheduled_start).toLocaleString()})` : ''}</Link>

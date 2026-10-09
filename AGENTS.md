@@ -16,7 +16,7 @@ Authoritative sources, in order of precedence:
 
 ---
 
-## 1. What this project is
+## What this project is
 
 A WoW WotLK guild raid-management website: raids, attendance, loot, Enhance Points, Armor Tokens,
 polls, roster configuration, and a one-off import of a legacy Google Sheet.
@@ -26,7 +26,7 @@ TypeScript frontend built with Vite. One binary serves both the JSON API and the
 
 ---
 
-## 2. Non-negotiable engineering rules
+## Non-negotiable engineering rules
 
 These came from a strict, German-language engineering-standards document that governs the whole
 codebase. They are not stylistic preferences.
@@ -67,7 +67,7 @@ wins and the difference is fixed here first.
 
 ---
 
-## 3. Stack (fixed — do not substitute)
+## Stack (fixed — do not substitute)
 
 - Go 1.26, `net/http` with the Go 1.22+ method-pattern `ServeMux` (`mux.HandleFunc("GET /api/v1/...")`).
 - Bun ORM v1.3 with the SQLite dialect (`sqlitedialect` + `sqliteshim` + `modernc.org/sqlite`).
@@ -80,7 +80,7 @@ wins and the difference is fixed here first.
 
 ---
 
-## 4. Domain rules the owner confirmed
+## Domain rules the owner confirmed
 
 Every item here was explicitly decided by the owner. Do not "improve" on them.
 
@@ -96,7 +96,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   names default to the character name and are editable; these players use the existing GUEST
   default without login credentials. General account administration remains Admin-only.
 
-### 4.2 Raids
+### Raids
 - Lifecycle: `PLANNED` → `OPEN` → `COMPLETED`, with cancellation as `CANCELLED`.
   `Archivieren` is the single final action: it sets completed and archived timestamps together.
   There is no separate completion action (ADR 021 supersedes the former raid archive semantics).
@@ -114,7 +114,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Existing stored completed raids are historical: archival never recreates their EP or starts
   a new recurrence chain. Existing active raids can be assigned a series and scheduled start.
 
-### 4.2.1 Future raid signups (ADR 033)
+#### Future raid signups (ADR 033)
 - RAIDASSISTENT and higher explicitly open/close signups independently of raid lifecycle.
 - MEMBER and higher may submit multiple own characters, each with any valid class spec.
 - Pending choices can be edited/withdrawn while open; accepted choices are staff-managed.
@@ -123,14 +123,14 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Signups close at the scheduled start (server-enforced) or manually earlier. Staff may
   continue accepting choices in active raids after closing. All changes are audited.
 
-### 4.3 Enhance Points (EP) — the core rule
+### Enhance Points (EP) — the core rule
 - **+10 EP** for a player who received **no main-spec loot** in that raid.
 - Awarded **only by final archiving**, which moves the raid to `COMPLETED` (ADR 021).
 - **No EP at all if the raid is `CANCELLED`** (ADR 015).
 - One award per (player, raid) — idempotent.
 - Balance is `SUM(amount)` over the append-only `enhance_point_transactions` (ADR 004).
 
-### 4.4 Recorded enhanced loot (ADR 023-024)
+### Recorded enhanced loot (ADR 023-024)
 - The website tracks EP and outside raid outcomes; it never generates a roll or exposes a
   player spend button, amount selector, or standalone EP-use action.
 - The actual outside roll is a shifted 1-100 roll: `1 + X` through `100 + X`, with
@@ -146,13 +146,13 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   All corrections are actor-audited, require a reason for archived raids, and append compensating transactions atomically.
 - Existing ledger history is retained, not recalculated under the revised rules.
 
-### 4.5 Item locks
+### Item locks
 - A lock requires `balance >= 150` but **costs 0 EP** (ADR 012).
 - A player may hold **multiple** simultaneous locks.
 - If the locked item drops in that raid, it is auto-awarded to the locker **as a main-spec award**.
 - If it does not drop, the lock **expires at raid completion** with no loss (ADR 012).
 
-### 4.6 Attendance
+### Attendance
 - A **substitute** is a normal player; substitute and regular participants are treated identically.
 - **Bench** participants follow the **same EP rule** as raiders: they earn +10 if they got no
   main-spec loot (ADR 016).
@@ -161,7 +161,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Archive rejects an incomplete active roster. Legacy unknown snapshots are not fabricated;
   new sheet imports preserve Raid Archive's own character name, role, class, and spec.
 
-### 4.7 Armor Tokens
+### Armor Tokens
 - Tokens are derived from awarding the three specific loot items
   `Weiheabzeichen des Beschützers`, `Weiheabzeichen des Bezwingers`,
   `Weiheabzeichen des Eroberers` (ADR 014).
@@ -169,15 +169,15 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - The legacy sheet's "Tokens gesammelt" total is **reconciliation-only** and must never be written
   over derived data.
 
-### 4.8 Loot, attendance, and character corrections
+### Loot, attendance, and character corrections
 - Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived
   raid history only; live-character changes never rewrite raid snapshots (ADR 032).
 
-### 4.9 Roster configuration
+### Roster configuration
 - Guild ranks and raid groups are configurable rows in the database, not hard-coded constants
   (ADR 009).
 
-### 4.10 Legacy Google Sheet import
+### Legacy Google Sheet import
 - Source tabs: `Raid Archive`, `Loot Archive`, `Charaktere`, `Punkte`.
   Current setup additionally reads `ICC25 Raidsetup` A–F (ADR 029): the first numbered
   roster block, with explicit administrator-supplied schedule and leader. One source/sheet
@@ -205,7 +205,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - The sheet raid key is the catalog context: `ICC25-01` → instance `631`, `raid_size` `25`, applied
   only to raids this import creates.
 
-### 4.11 Core hardening decisions (ADR 017-020)
+### Core hardening decisions (ADR 017-020)
 - Only one matching active item lock may exist per raid. Competing locks are rejected;
   one player may still lock multiple different items. Item IDs are authoritative when both
   records have IDs; otherwise matching uses the trimmed item name.
@@ -231,7 +231,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Production requires explicit nondefault bootstrap credentials. Configuration, migrations,
   and bootstrap failures stop startup. SQLite foreign keys are enabled on every connection.
 
-### 4.12 Loot catalog is bundled and read-only (ADR 027)
+### Loot catalog is bundled and read-only (ADR 027)
 - `scripts/data/catalog-wotlk335.json` is the sole catalog authority. It is embedded with
   `go:embed` and mirrored into the catalog tables at startup. There is no upload, preview, or
   merge; updating the catalog means committing a new file. An invalid source or a failed mirror
@@ -249,7 +249,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 
 ---
 
-## 5. Authentication and permissions (ADR 010)
+## Authentication and permissions (ADR 010)
 
 - Local accounts. `username` + bcrypt `password_hash` live on the player row.
 - Login returns an opaque random session token, stored sha256-hashed, in the `sessions` table and
@@ -272,7 +272,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 
 ---
 
-## 6. API conventions
+## API conventions
 
 - All endpoints live under `/api/v1`. Version changes go in a new package, not in place.
 - Success envelope: `{"data": ...}`. Errors: `{"error": {"code": "...", "message": "..."}}`.
@@ -287,7 +287,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 
 ---
 
-## 7. Frontend conventions
+## Frontend conventions
 
 - Sessions travel in the `raid_session` cookie, so all API calls must use `credentials: 'include'`.
   In dev, Vite proxies `/api` to `http://localhost:8080` so the browser stays same-origin.
@@ -306,7 +306,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 
 ---
 
-## 8. Commands and configuration
+## Commands and configuration
 
 | Purpose | Command |
 | --- | --- |
@@ -325,29 +325,31 @@ Build order matters: `make build` runs the frontend build first, then `go build`
 
 ---
 
-## 9. Toolchain traps on the owner's machine (read before running commands)
+## Toolchain notes
 
-These cost real time to rediscover:
+Prefer the documented repo commands and avoid machine-specific assumptions.
 
-- The shell is **Windows PowerShell 5.1**, not bash. No `&&` chaining — use `;` and
-  `if ($?) { ... }`. Heredocs (`<< EOF`) do not work; use
-  `Set-Content -LiteralPath ... -Value @'...'@`.
-- **`Set-Content` must be given `-Encoding UTF8`**, otherwise German umlauts are destroyed. This
-  already corrupted ADRs 005 and 014 once (now repaired). Go rejects invalid UTF-8 sources, which is
-  how the corruption would show up in code.
-- `rg` and `sqlite3` are not installed. Use the editor's search tool or `Select-String`.
-- `make` may not be on `PATH` (an MSYS2 copy exists at `C:\msys64\usr\bin\make.exe`), and that copy's
-  bash cannot resolve `npm` under `C:\Program Files`. If `make` misbehaves, run the underlying
-  `npm` / `go` commands directly.
-- **Tool output is unreliable for formatting.** File contents shown back after a write can appear
-  duplicated, reordered, or mangled. Treat that as a display artifact only. Verify with a read of the
-  exact line range, or better, with `go build` / `tsc`, which are authoritative.
-- The console code page renders `ü` and other non-ASCII characters as `?` or `�`. Confirm the real
-  bytes (e.g. compare character code points) before "fixing" an encoding problem that isn't one.
+### Linux / NixOS
+
+- Use normal POSIX shell command chaining (`cmd && next`) when commands depend on prior success.
+- `make build` is the preferred full build when `make`, Go, Node, and npm are available in the
+  active shell or development environment.
+- If using a Nix shell/dev environment, enter it before running Go, npm, or Python catalog commands.
+
+### Windows
+
+- PowerShell 5.1 does not support `&&`; use `cmd; if ($?) { next }` for dependent commands.
+- When writing UTF-8 files with PowerShell cmdlets, specify UTF-8 explicitly to preserve German text.
+- If `make` is unavailable or resolves to an incompatible shell, run the underlying `npm` and `go`
+  commands directly.
+
+Build order matters: run the frontend build before the Go binary when producing an embedded SPA.
+Verify generated or formatted output with the relevant build/test command instead of trusting
+terminal rendering alone.
 
 ---
 
-## 10. Definition of done
+## Definition of done
 
 A change is done when:
 
@@ -360,7 +362,7 @@ A change is done when:
 
 ---
 
-## 11. Known gaps — do not assume these exist
+## Known gaps — do not assume these exist
 
 - No `DELETE` endpoint is exposed. Archive/expire flows only (ADR 007 remains the intent).
 - `internal/export` is an empty directory; exporting is not implemented.

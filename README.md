@@ -90,8 +90,8 @@ prefix. There are no catalog write endpoints.
 
 To regenerate the catalog from the checked-in generator config, run:
 
-```powershell
-python scripts\build_loot_db_localized.py scripts\lootcatalog.localized.json
+```sh
+python scripts/build_loot_db_localized.py scripts/lootcatalog.localized.json
 ```
 
 ## Correction API

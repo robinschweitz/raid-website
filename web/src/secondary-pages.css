@@ -208,7 +208,6 @@
 .secondary-page .wishlist-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; }
 .secondary-page .wishlist-toggle svg { width: 14px; height: 14px; }
 .secondary-page .wishlist-toggle.active { color: #06111c; background: linear-gradient(135deg, #7ad7ff, #d7f4ff); border-color: #d7f4ff; }
-.secondary-page .catalog-source-path { overflow-wrap: anywhere; font-size: 12px; }
 .secondary-page .catalog-pagination { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 16px; margin-block: 20px; }
 
 @media (min-width: 1250px) {

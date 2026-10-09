@@ -8,7 +8,7 @@ import { RaidBanner } from '../components/RaidBanner'
 import { RaidRosterBoard } from '../components/RaidRosterBoard'
 import { RaidSignups } from '../components/RaidSignups'
 import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Attendance, type AttendanceRole, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
-import { catalogSourceLabels, matchesCatalogItem } from '../catalog'
+import { matchesCatalogItem } from '../catalog'
 import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
 import { RaidQuickAdd } from '../components/RaidQuickAdd'
@@ -738,11 +738,7 @@ function RaidDetail({ raidID }: Props) {
                   <option value="">Item und Variante wählen</option>
                   {visibleCatalogItems.map((item) => <option key={dropKey(item)} value={dropKey(item)}>{item.name} · {item.raid_size} Spieler · {catalogModeLabels[item.mode]}{item.conditional ? ' · Bedingter Drop' : ''}</option>)}
                 </select></label>
-                {selectedDrop && <details><summary>Dropquelle und Bedingungen</summary>
-                  <ul>{catalogSourceLabels(selectedDrop).map((label) => <li key={label}>{label}</li>)}</ul>
-                  {selectedDrop.conditional && <p className="muted">Bedingte Beute. Quellen können zusätzliche, nicht vollständig aufgeschlüsselte Bedingungen enthalten.</p>}
-                  <ul>{selectedDrop.source_variants.map((variant, index) => <li key={index} style={{ overflowWrap: 'anywhere' }}>Quellpfad: {variant.difficulty} · Roh-Lootmodus: {variant.loot_mode}</li>)}</ul>
-                </details>}
+                {selectedDrop?.conditional && <p className="muted">Bedingte Beute. Quellen können zusätzliche, nicht vollständig aufgeschlüsselte Bedingungen enthalten.</p>}
               </> : <>
               {lootEditing && <p>Gespeicherte Identität: {lootBoss || 'Boss historisch nicht gespeichert'} · {lootItem} · Item-ID {lootItemID || 'historisch nicht gespeichert'}</p>}
               </>}

@@ -21,8 +21,8 @@ Important design rule:
     presentation data, so adding a language never changes canonical stats.
 
 Usage:
-    python build_loot_db_localized.py config.json
-    python build_loot_db_localized.py config.json --refresh
+    python scripts/build_loot_db_localized.py scripts/lootcatalog.localized.json
+    python scripts/build_loot_db_localized.py scripts/lootcatalog.localized.json --refresh
 
 Python:
     3.10+
@@ -1654,7 +1654,7 @@ def main() -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    output_path = Path(config.get("output", "loot.localized.json"))
+    output_path = Path(config.get("output", "scripts/data/catalog-wotlk335.json"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(db, ensure_ascii=False, indent=2),

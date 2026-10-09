@@ -57,7 +57,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.setSessionCookie(w, token, sessionMaxAgeSeconds)
-	WriteJSON(w, http.StatusOK, map[string]any{"data": p})
+	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(p, p)})
 }
 
 func (a *API) logout(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +77,7 @@ func (a *API) me(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusUnauthorized, "unauthenticated", "login required")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": p})
+	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(p, p)})
 }
 
 func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
@@ -109,5 +109,6 @@ func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusUnprocessableEntity, "invalid_request", err.Error())
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": p})
+	actor, _ := CurrentPlayer(r)
+	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(actor, p)})
 }

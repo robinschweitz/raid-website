@@ -23,6 +23,13 @@ export interface Player {
   updated_at: string
 }
 
+export interface PlayerSummary {
+  id: number
+  name: string
+  guild_rank_id: number | null
+  active: boolean
+}
+
 export interface Character {
   id: number
   player_id: number

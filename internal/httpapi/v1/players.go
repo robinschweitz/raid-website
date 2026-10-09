@@ -8,6 +8,58 @@ import (
 	"raid-website/internal/validation"
 )
 
+type playerListResponse struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	GuildRankID *int64 `json:"guild_rank_id"`
+	Active      bool   `json:"active"`
+}
+
+type playerResponse struct {
+	ID          int64            `json:"id"`
+	Name        string           `json:"name"`
+	GuildRankID *int64           `json:"guild_rank_id"`
+	Username    *string          `json:"username,omitempty"`
+	Role        *validation.Role `json:"role,omitempty"`
+	Active      bool             `json:"active"`
+	CreatedAt   *time.Time       `json:"created_at,omitempty"`
+	UpdatedAt   *time.Time       `json:"updated_at,omitempty"`
+}
+
+func listedPlayer(p player.Player) playerListResponse {
+	return playerListResponse{ID: p.ID, Name: p.Name, GuildRankID: p.GuildRankID, Active: p.Active}
+}
+
+func visiblePlayer(actor *player.Player, p player.Player) playerResponse {
+	username := p.Username
+	role := &p.Role
+	createdAt := &p.CreatedAt
+	updatedAt := &p.UpdatedAt
+	if actor == nil || (!actor.Role.AtLeast(validation.RoleAdmin) && actor.ID != p.ID) {
+		username = nil
+		role = nil
+		createdAt = nil
+		updatedAt = nil
+	}
+	return playerResponse{
+		ID:          p.ID,
+		Name:        p.Name,
+		GuildRankID: p.GuildRankID,
+		Username:    username,
+		Role:        role,
+		Active:      p.Active,
+		CreatedAt:   createdAt,
+		UpdatedAt:   updatedAt,
+	}
+}
+
+func visiblePlayerPtr(actor *player.Player, p *player.Player) playerResponse {
+	if p == nil {
+		return playerResponse{}
+	}
+	return visiblePlayer(actor, *p)
+}
+
 type createPlayerRequest struct {
 	Name        string `json:"name"`
 	GuildRankID *int64 `json:"guild_rank_id"`
@@ -21,7 +73,11 @@ func (a *API) listPlayers(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list players")
 		return
 	}
-	writeListJSON(w, ps)
+	result := make([]playerListResponse, 0, len(ps))
+	for _, p := range ps {
+		result = append(result, listedPlayer(p))
+	}
+	writeListJSON(w, result)
 }
 
 func (a *API) createPlayer(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +119,8 @@ func (a *API) createPlayer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not create player")
 		return
 	}
-	WriteJSON(w, http.StatusCreated, map[string]any{"data": p})
+	actor, _ := CurrentPlayer(r)
+	WriteJSON(w, http.StatusCreated, map[string]any{"data": visiblePlayerPtr(actor, p)})
 }
 
 func (a *API) getPlayer(w http.ResponseWriter, r *http.Request) {
@@ -81,5 +138,6 @@ func (a *API) getPlayer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not load player")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": p})
+	actor, _ := CurrentPlayer(r)
+	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(actor, p)})
 }

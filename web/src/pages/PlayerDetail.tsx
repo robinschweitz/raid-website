@@ -102,7 +102,7 @@ function PlayerDetail({ playerID }: Props) {
         setTokens(tks)
         setLocks(lk)
         setAccUser(p.username ?? '')
-        setAccRole(p.role)
+        if (p.role) setAccRole(p.role)
       }
     } catch (err) {
       if (isActive() && version === loadVersion.current) {
@@ -282,7 +282,7 @@ function PlayerDetail({ playerID }: Props) {
       </p>
       <header className={`card profile-header ${characterClassName(preferredCharacter?.class ?? '')}`}>
         <div className="profile-sigil" aria-hidden="true">{preferredCharacter?.name.slice(0, 1) ?? player.name.slice(0, 1)}</div>
-        <div><p className="eyebrow">Spielerprofil</p><h1>{player.name} <span className="badge">{player.role}</span></h1>
+        <div><p className="eyebrow">Spielerprofil</p><h1>{player.name} {player.role && <span className="badge">{player.role}</span>}</h1>
           {preferredCharacter ? <p><strong className="character-name">{preferredCharacter.name}</strong> · {preferredCharacter.class}{preferredCharacter.main_spec && ` · ${preferredCharacter.main_spec}`} {preferredCharacter.is_main && <span className="badge">Main</span>}</p> : <p className="muted">Noch keine eigenen Charaktere.</p>}
           {player.guild_rank_id != null && <p className="muted">Gildenrang: {ranks.find((r) => r.id === player.guild_rank_id)?.name ?? (rankError || (rankLoading ? 'Wird geladen…' : 'Nicht verfügbar'))}</p>}
         </div>

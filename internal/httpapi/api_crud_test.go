@@ -280,3 +280,102 @@ func TestAccountProvisioning(t *testing.T) {
 		t.Fatalf("logout: want 204 got %d", status)
 	}
 }
+
+func TestPlayerListSummaryAndAccountVisibility(t *testing.T) {
+	srv, bdb := setupServer(t)
+	client := srv.Client()
+	seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	adminToken := login(t, client, srv, "admin", "pw")
+
+	firstID := createPlayer(t, client, srv, adminToken, "First")
+	secondID := createPlayer(t, client, srv, adminToken, "Second")
+	for id, username := range map[int64]string{firstID: "first-login", secondID: "second-login"} {
+		status, body := do(t, client, http.MethodPut, fmt.Sprintf("%s/api/v1/players/%d/account", srv.URL, id), adminToken, map[string]any{
+			"username": username,
+			"password": "secret",
+			"role":     "MEMBER",
+		})
+		if status != http.StatusOK {
+			t.Fatalf("set account %s: status %d body %s", username, status, body)
+		}
+	}
+
+	status, body := do(t, client, http.MethodGet, srv.URL+"/api/v1/players", adminToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("admin list players: status %d body %s", status, body)
+	}
+	var adminList struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(body, &adminList); err != nil {
+		t.Fatalf("decode admin players: %v", err)
+	}
+	for _, row := range adminList.Data {
+		if _, ok := row["username"]; ok {
+			t.Fatalf("admin player list includes username: %s", body)
+		}
+		if _, ok := row["role"]; ok {
+			t.Fatalf("admin player list includes role: %s", body)
+		}
+		if _, ok := row["created_at"]; ok {
+			t.Fatalf("admin player list includes created_at: %s", body)
+		}
+		if _, ok := row["updated_at"]; ok {
+			t.Fatalf("admin player list includes updated_at: %s", body)
+		}
+	}
+
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d", srv.URL, firstID), adminToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("admin get player: status %d body %s", status, body)
+	}
+	var adminDetail struct {
+		Data struct {
+			Username string `json:"username"`
+			Role     string `json:"role"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &adminDetail); err != nil {
+		t.Fatalf("decode admin player detail: %v", err)
+	}
+	if adminDetail.Data.Username != "first-login" || adminDetail.Data.Role != "MEMBER" {
+		t.Fatalf("admin account fields not visible on detail: %s", body)
+	}
+
+	firstToken := login(t, client, srv, "first-login", "secret")
+	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/players", firstToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("member list players: status %d body %s", status, body)
+	}
+	var memberList struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(body, &memberList); err != nil {
+		t.Fatalf("decode member players: %v", err)
+	}
+	for _, row := range memberList.Data {
+		if _, ok := row["username"]; ok {
+			t.Fatalf("member player list includes username: %s", body)
+		}
+		if _, ok := row["role"]; ok {
+			t.Fatalf("member player list includes role: %s", body)
+		}
+	}
+
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d", srv.URL, secondID), firstToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("member get other player: status %d body %s", status, body)
+	}
+	var other struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(body, &other); err != nil {
+		t.Fatalf("decode other player: %v", err)
+	}
+	if _, ok := other.Data["username"]; ok {
+		t.Fatalf("other detail username visible to member: %s", body)
+	}
+	if _, ok := other.Data["role"]; ok {
+		t.Fatalf("other detail role visible to member: %s", body)
+	}
+}

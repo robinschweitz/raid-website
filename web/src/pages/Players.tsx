@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
-import { atLeast, type Player, type Role } from '../types'
+import { atLeast, type Player, type PlayerSummary, type Role } from '../types'
 import { useSubmission } from '../useSubmission'
 
 const ROLES: Role[] = ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN']
@@ -10,7 +10,7 @@ const ROLES: Role[] = ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN'
 export function PlayersPage() {
   const { pending, submit, isActive } = useSubmission()
   const { player: me } = useAuth()
-  const [players, setPlayers] = useState<Player[]>([])
+  const [players, setPlayers] = useState<PlayerSummary[]>([])
   const [error, setError] = useState('')
   const [name, setName] = useState('')
   const [role, setRole] = useState<Role>('GUEST')
@@ -19,7 +19,7 @@ export function PlayersPage() {
 
   const load = () => {
     api
-      .get<Player[]>('/api/v1/players')
+      .get<PlayerSummary[]>('/api/v1/players')
       .then(setPlayers)
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Laden fehlgeschlagen'))
   }
@@ -51,8 +51,6 @@ export function PlayersPage() {
         <thead>
           <tr>
             <th>Name</th>
-            <th>Rolle</th>
-            <th>Login</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -62,14 +60,10 @@ export function PlayersPage() {
               <td>
                 <Link to={`/players/${p.id}`}>{p.name}</Link>
               </td>
-              <td>
-                <span className="badge">{p.role}</span>
-              </td>
-              <td>{p.username ?? '—'}</td>
               <td>{p.active ? 'aktiv' : 'inaktiv'}</td>
             </tr>
           ))}
-          {players.length === 0 && <tr><td colSpan={4} className="muted">Keine Spieler geladen.</td></tr>}
+          {players.length === 0 && <tr><td colSpan={2} className="muted">Keine Spieler geladen.</td></tr>}
         </tbody>
       </table></div>
 

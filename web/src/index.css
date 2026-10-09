@@ -260,6 +260,19 @@ table.table.small {
   margin: 0.5rem 0;
 }
 
+.option-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+}
+
+label.inline-choice {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .inline-form {
   display: flex;
   gap: 0.5rem;

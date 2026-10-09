@@ -181,6 +181,55 @@ func TestPollLifecycle(t *testing.T) {
 		t.Fatalf("expected single updated vote 'no', body %s", body)
 	}
 
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/polls", token, map[string]any{
+		"title":          "Welche Bosse?",
+		"poll_type":      "CHOICE",
+		"allow_multiple": true,
+		"options":        []string{"Marrowgar", "Saurfang", "Sindragosa"},
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("create choice poll: status %d body %s", status, body)
+	}
+	var choicePollOut struct {
+		Data struct {
+			ID            int64  `json:"id"`
+			PollType      string `json:"poll_type"`
+			AllowMultiple bool   `json:"allow_multiple"`
+			Options       []struct {
+				Label string `json:"label"`
+			} `json:"options"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &choicePollOut); err != nil {
+		t.Fatalf("decode choice poll: %v", err)
+	}
+	if choicePollOut.Data.PollType != "CHOICE" || !choicePollOut.Data.AllowMultiple || len(choicePollOut.Data.Options) != 3 {
+		t.Fatalf("unexpected choice poll body %s", body)
+	}
+	choicePollID := choicePollOut.Data.ID
+
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/vote", srv.URL, choicePollID), token, map[string]any{"choices": []string{"Marrowgar", "Sindragosa"}})
+	if status != http.StatusOK {
+		t.Fatalf("choice vote: status %d body %s", status, body)
+	}
+	var choiceVoteOut struct {
+		Data struct {
+			Choice  string   `json:"choice"`
+			Choices []string `json:"choices"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &choiceVoteOut); err != nil {
+		t.Fatalf("decode choice vote: %v", err)
+	}
+	if choiceVoteOut.Data.Choice != "Marrowgar, Sindragosa" || len(choiceVoteOut.Data.Choices) != 2 {
+		t.Fatalf("unexpected choice vote body %s", body)
+	}
+
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/vote", srv.URL, choicePollID), token, map[string]any{"choices": []string{"Putricide"}})
+	if status != http.StatusBadRequest {
+		t.Fatalf("invalid choice vote: want 400 got %d body %s", status, body)
+	}
+
 	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/polls/%d/close", srv.URL, pollID), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("close: status %d body %s", status, body)

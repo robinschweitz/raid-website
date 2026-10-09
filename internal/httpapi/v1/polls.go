@@ -2,6 +2,7 @@ package v1
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"raid-website/internal/poll"
@@ -9,13 +10,17 @@ import (
 )
 
 type createPollRequest struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	ClosesAt    string `json:"closes_at"`
+	Title         string   `json:"title"`
+	Description   string   `json:"description"`
+	ClosesAt      string   `json:"closes_at"`
+	PollType      string   `json:"poll_type"`
+	AllowMultiple bool     `json:"allow_multiple"`
+	Options       []string `json:"options"`
 }
 
 type votePollRequest struct {
-	Choice string `json:"choice"`
+	Choice  string   `json:"choice"`
+	Choices []string `json:"choices"`
 }
 
 func (a *API) listPolls(w http.ResponseWriter, r *http.Request) {
@@ -42,14 +47,39 @@ func (a *API) createPoll(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "title is required")
 		return
 	}
+	pollType := strings.TrimSpace(req.PollType)
+	if pollType == "" {
+		pollType = "TEXT"
+	}
+	if pollType != "TEXT" && pollType != "CHOICE" {
+		BadRequest(w, "poll_type must be TEXT or CHOICE")
+		return
+	}
+	options := normalizePollOptions(req.Options)
+	if pollType == "TEXT" {
+		if req.AllowMultiple {
+			BadRequest(w, "allow_multiple is only valid for choice polls")
+			return
+		}
+		if len(options) > 0 {
+			BadRequest(w, "options are only valid for choice polls")
+			return
+		}
+	}
+	if pollType == "CHOICE" && len(options) < 2 {
+		BadRequest(w, "choice polls require at least two options")
+		return
+	}
 	now := time.Now().UTC()
 	p := &poll.Poll{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      validation.PollStatusOpen,
-		CreatedBy:   actor,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		Title:         req.Title,
+		Description:   req.Description,
+		PollType:      pollType,
+		AllowMultiple: req.AllowMultiple,
+		Status:        validation.PollStatusOpen,
+		CreatedBy:     actor,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	if req.ClosesAt != "" {
 		t, err := time.Parse(time.RFC3339, req.ClosesAt)
@@ -60,7 +90,7 @@ func (a *API) createPoll(w http.ResponseWriter, r *http.Request) {
 		t = t.UTC()
 		p.ClosesAt = &t
 	}
-	if err := a.Polls.CreatePoll(r.Context(), p); err != nil {
+	if err := a.Polls.CreatePollWithOptions(r.Context(), p, options); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not create poll")
 		return
 	}
@@ -101,10 +131,6 @@ func (a *API) votePoll(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	if req.Choice == "" {
-		BadRequest(w, "choice is required")
-		return
-	}
 	p, err := a.Polls.GetPoll(r.Context(), id)
 	if err != nil {
 		if isNotFound(err) {
@@ -123,8 +149,12 @@ func (a *API) votePoll(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusConflict, "poll_closed", "poll has passed its closing time")
 		return
 	}
-	v := &poll.Vote{PollID: id, PlayerID: actor, Choice: req.Choice, VotedAt: now}
-	if err := a.Polls.UpsertVote(r.Context(), v); err != nil {
+	choices, optionIDsByLabel, ok := validatePollVoteRequest(w, p, req)
+	if !ok {
+		return
+	}
+	v := &poll.Vote{PollID: id, PlayerID: actor, Choice: strings.Join(choices, ", "), Choices: choices, VotedAt: now}
+	if err := a.Polls.UpsertVoteWithChoices(r.Context(), v, optionIDsByLabel); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not record vote")
 		return
 	}
@@ -180,4 +210,70 @@ func (a *API) closePoll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": p})
+}
+
+func normalizePollOptions(raw []string) []string {
+	seen := make(map[string]bool, len(raw))
+	options := make([]string, 0, len(raw))
+	for _, value := range raw {
+		label := strings.TrimSpace(value)
+		if label == "" || seen[label] {
+			continue
+		}
+		seen[label] = true
+		options = append(options, label)
+	}
+	return options
+}
+
+func validatePollVoteRequest(w http.ResponseWriter, p *poll.Poll, req votePollRequest) ([]string, map[string]int64, bool) {
+	if p.PollType == "" || p.PollType == "TEXT" {
+		choice := strings.TrimSpace(req.Choice)
+		if choice == "" {
+			BadRequest(w, "choice is required")
+			return nil, nil, false
+		}
+		if len(req.Choices) > 0 {
+			BadRequest(w, "choices are only valid for choice polls")
+			return nil, nil, false
+		}
+		return []string{choice}, nil, true
+	}
+
+	choices := req.Choices
+	if len(choices) == 0 && strings.TrimSpace(req.Choice) != "" {
+		choices = []string{req.Choice}
+	}
+	if len(choices) == 0 {
+		BadRequest(w, "at least one choice is required")
+		return nil, nil, false
+	}
+	if !p.AllowMultiple && len(choices) != 1 {
+		BadRequest(w, "this poll allows only one choice")
+		return nil, nil, false
+	}
+	optionIDsByLabel := make(map[string]int64, len(p.Options))
+	for _, opt := range p.Options {
+		optionIDsByLabel[opt.Label] = opt.ID
+	}
+	seen := make(map[string]bool, len(choices))
+	normalized := make([]string, 0, len(choices))
+	for _, value := range choices {
+		label := strings.TrimSpace(value)
+		if label == "" {
+			BadRequest(w, "choice is required")
+			return nil, nil, false
+		}
+		if seen[label] {
+			BadRequest(w, "duplicate choice")
+			return nil, nil, false
+		}
+		if optionIDsByLabel[label] == 0 {
+			BadRequest(w, "choice must match a poll option")
+			return nil, nil, false
+		}
+		seen[label] = true
+		normalized = append(normalized, label)
+	}
+	return normalized, optionIDsByLabel, true
 }

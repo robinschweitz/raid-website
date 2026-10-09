@@ -141,7 +141,10 @@ export function DashboardPage() {
         {polls.map((p) => {
           const pollVotes = votes[p.id]
           const choiceCounts: Record<string, number> = {}
-          if (pollVotes) pollVotes.forEach((v) => { choiceCounts[v.choice] = (choiceCounts[v.choice] ?? 0) + 1 })
+          if (pollVotes) pollVotes.forEach((v) => {
+            const labels = v.choices?.length ? v.choices : [v.choice]
+            labels.forEach((label) => { choiceCounts[label] = (choiceCounts[label] ?? 0) + 1 })
+          })
           const totalVotes = pollVotes?.length ?? 0
           return <div className="poll-preview" key={p.id}>
             <h3>{p.title}</h3>

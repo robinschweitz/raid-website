@@ -14,7 +14,7 @@
   "faction": "A",
   "request_delay_seconds": 0.1,
   "cache_dir": ".cache/wowhead",
-  "output": "loot.localized.de.json",
+  "output": "scripts/data/catalog-wotlk335.json",
   "include_localized_tooltips": true,
   "include_raw_payload": false,
   "localized_fetch_policy": "best_effort",

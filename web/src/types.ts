@@ -295,16 +295,27 @@ export interface RaidGroup {
 }
 
 export type PollStatus = 'OPEN' | 'CLOSED' | 'ARCHIVED'
+export type PollType = 'TEXT' | 'CHOICE'
+
+export interface PollOption {
+  id: number
+  poll_id: number
+  label: string
+  sort_order: number
+}
 
 export interface Poll {
   id: number
   title: string
   description: string
+  poll_type: PollType
+  allow_multiple: boolean
   status: PollStatus
   closes_at: string | null
   created_by: number
   created_at: string
   updated_at: string
+  options: PollOption[]
 }
 
 export interface WishlistWish {
@@ -338,6 +349,7 @@ export interface Vote {
   poll_id: number
   player_id: number
   choice: string
+  choices: string[]
   voted_at: string
 }
 

@@ -16,6 +16,7 @@ import { RaidsPage } from './pages/Raids'
 import { GuildCrest } from './components/GuildCrest'
 import { NavIcon } from './components/NavIcon'
 import { LootCatalogPage } from './pages/LootCatalog'
+import { RegistrationRequestsPage } from './pages/RegistrationRequests'
 
 function Routes() {
   const path = useRoute()
@@ -44,6 +45,7 @@ function Routes() {
   if (parts[0] === 'imports') {
     return <ImportsPage />
   }
+  if (parts[0] === 'registration-requests') return <RegistrationRequestsPage />
   return <p className="muted">Seite nicht gefunden.</p>
 }
 
@@ -83,6 +85,7 @@ function Layout() {
             <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
             <Link className={path === '/raid-series' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/raid-series"><NavIcon name="series" />Raidserien</Link>
             <Link className={path === '/imports' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/imports"><NavIcon name="import" />Importe</Link>
+            <Link className={path === '/registration-requests' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/registration-requests"><NavIcon name="players" />Registrierung</Link>
           </>}
         </nav>
       </aside>

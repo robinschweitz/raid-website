@@ -23,10 +23,15 @@ import (
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
+	"raid-website/internal/registration"
 	"raid-website/internal/validation"
 )
 
 func setupServer(t *testing.T) (*httptest.Server, *bun.DB) {
+	return setupServerWithOptions(t, httpapi.Options{})
+}
+
+func setupServerWithOptions(t *testing.T, opts httpapi.Options) (*httptest.Server, *bun.DB) {
 	t.Helper()
 	ctx := context.Background()
 	dsn := "file:" + filepath.Join(t.TempDir(), "api.db") + "?_pragma=foreign_keys(1)"
@@ -42,13 +47,35 @@ func setupServer(t *testing.T) (*httptest.Server, *bun.DB) {
 	if _, err := m.Migrate(ctx); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	handler, err := httpapi.New(bdb.DB, httpapi.Options{})
+	handler, err := httpapi.New(bdb.DB, opts)
 	if err != nil {
 		t.Fatalf("create handler: %v", err)
 	}
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 	return srv, bdb.DB
+}
+
+type fakeRegistrationFeed struct {
+	characters map[string]registration.ExternalCharacter
+}
+
+func (f fakeRegistrationFeed) SearchCharacters(ctx context.Context, query string) ([]registration.ExternalCharacter, error) {
+	var rows []registration.ExternalCharacter
+	for _, row := range f.characters {
+		if strings.Contains(strings.ToLower(row.Name), strings.ToLower(query)) {
+			rows = append(rows, row)
+		}
+	}
+	return rows, nil
+}
+
+func (f fakeRegistrationFeed) LoadCharacter(ctx context.Context, profileID string) (registration.ExternalCharacter, string, error) {
+	row, ok := f.characters[profileID]
+	if !ok {
+		return registration.ExternalCharacter{}, "", registration.ErrExternalNotFound
+	}
+	return row, `{"fixture":true}`, nil
 }
 
 func seedAccount(t *testing.T, bdb *bun.DB, username, password string, role validation.Role) int64 {
@@ -292,6 +319,24 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	}
 	if tokensOut.Data.Total != 1 {
 		t.Fatalf("token total: want 1 got %d", tokensOut.Data.Total)
+	}
+
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/loot", srv.URL, plain), token, nil)
+	if status != http.StatusOK {
+		t.Fatalf("get player loot: status %d body %s", status, body)
+	}
+	var lootOut struct {
+		Data []struct {
+			RaidID     int64  `json:"raid_id"`
+			ItemID     string `json:"item_id"`
+			TokenAward bool   `json:"token_award"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &lootOut); err != nil {
+		t.Fatalf("decode player loot: %v", err)
+	}
+	if len(lootOut.Data) != 1 || lootOut.Data[0].RaidID != raidID || lootOut.Data[0].ItemID != tokenItem || !lootOut.Data[0].TokenAward {
+		t.Fatalf("player loot token row mismatch: %+v", lootOut.Data)
 	}
 
 	// The removed roll endpoint must not debit the existing balance.
@@ -544,6 +589,7 @@ func TestListEndpointsReturnEmptyArrays(t *testing.T) {
 		"/api/v1/imports",
 		fmt.Sprintf("/api/v1/players/%d/characters", adminID),
 		fmt.Sprintf("/api/v1/players/%d/locks", adminID),
+		fmt.Sprintf("/api/v1/players/%d/loot", adminID),
 		fmt.Sprintf("/api/v1/raids/%d/attendance", raidID),
 		fmt.Sprintf("/api/v1/raids/%d/loot", raidID),
 	} {

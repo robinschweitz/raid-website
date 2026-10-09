@@ -44,6 +44,53 @@ export interface Character {
   updated_at: string
 }
 
+export interface ExternalCharacter {
+  profile_id: string
+  name: string
+  class: string
+  main_spec: string
+  second_spec: string
+  level: number
+  race: string
+  faction: string
+  profile_url: string
+}
+
+export interface RegistrationRequest {
+  id: number
+  requester_player_id: number | null
+  status: string
+  purpose: string
+  external_source: string
+  external_profile_id: string
+  external_profile_url: string
+  character_name: string
+  class: string
+  main_spec: string
+  second_spec: string
+  level: number
+  race: string
+  faction: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RegistrationCode {
+  id: number
+  request_id: number
+  created_by_player_id: number
+  created_at: string
+  expires_at: string
+  used_at: string | null
+  used_by_player_id: number | null
+  revoked_at: string | null
+}
+
+export interface GeneratedRegistrationCode {
+  code_record: RegistrationCode
+  code: string
+}
+
 export interface NameHistory {
   id: number
   character_id: number
@@ -215,6 +262,8 @@ export interface LootAward {
   awarded_by_player_id: number
   source: string
   is_main_spec: boolean
+  award_method?: 'MAIN' | 'SECOND' | 'ENHANCED' | 'BOE'
+  enhanced_cost?: number | null
   item_lock_id: number | null
   notes: string
   awarded_at: string

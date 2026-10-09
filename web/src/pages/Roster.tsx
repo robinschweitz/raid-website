@@ -92,7 +92,7 @@ export function RosterPage() {
   return (
     <div>
       <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Gildenkonfiguration</h1></div></div>
-      {isAdmin && <div className="actions"><Link to="/raid-series">Raidserien konfigurieren</Link><Link to="/loot-catalog">Beute anzeigen</Link></div>}
+      {isAdmin && <div className="actions"><Link to="/raid-series">Raidserien konfigurieren</Link><Link to="/loot-catalog">Beute anzeigen</Link><Link to="/registration-requests">Registrierungsanfragen</Link></div>}
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 

@@ -9,6 +9,19 @@ import (
 	"raid-website/internal/tokens"
 )
 
+type lootAwardResponse struct {
+	loot.Award
+	TokenAward bool `json:"token_award"`
+}
+
+func lootAwardResponses(awards []loot.Award) []lootAwardResponse {
+	rows := make([]lootAwardResponse, 0, len(awards))
+	for _, award := range awards {
+		rows = append(rows, lootAwardResponse{Award: award, TokenAward: tokens.IsTokenAward(award.ItemName)})
+	}
+	return rows
+}
+
 type createLootRequest struct {
 	CatalogBossID        *string     `json:"catalog_boss_id"`
 	Boss                 string      `json:"boss"`
@@ -110,7 +123,21 @@ func (a *API) listLoot(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list loot")
 		return
 	}
-	writeListJSON(w, awards)
+	writeListJSON(w, lootAwardResponses(awards))
+}
+
+func (a *API) listPlayerLoot(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid player id")
+		return
+	}
+	awards, err := a.LootRepo.ListByPlayer(r.Context(), id)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not list loot")
+		return
+	}
+	writeListJSON(w, lootAwardResponses(awards))
 }
 
 func (a *API) createLoot(w http.ResponseWriter, r *http.Request) {

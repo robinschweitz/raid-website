@@ -1,0 +1,75 @@
+package registration
+
+import (
+	"context"
+	"time"
+
+	"github.com/uptrace/bun"
+)
+
+type Repo struct {
+	db bun.IDB
+}
+
+func NewRepo(db bun.IDB) *Repo { return &Repo{db: db} }
+
+func (r *Repo) WithTx(tx bun.Tx) *Repo { return &Repo{db: tx} }
+
+func (r *Repo) CreateRequest(ctx context.Context, req *Request) error {
+	_, err := r.db.NewInsert().Model(req).Exec(ctx)
+	return err
+}
+
+func (r *Repo) UpdateRequest(ctx context.Context, req *Request) error {
+	_, err := r.db.NewUpdate().Model(req).WherePK().Exec(ctx)
+	return err
+}
+
+func (r *Repo) GetRequest(ctx context.Context, id int64) (*Request, error) {
+	req := new(Request)
+	err := r.db.NewSelect().Model(req).Where("id = ?", id).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return req, nil
+}
+
+func (r *Repo) ListRequests(ctx context.Context) ([]Request, error) {
+	var rows []Request
+	err := r.db.NewSelect().Model(&rows).Order("created_at DESC", "id DESC").Scan(ctx)
+	return rows, err
+}
+
+func (r *Repo) CreateCode(ctx context.Context, code *Code) error {
+	_, err := r.db.NewInsert().Model(code).Exec(ctx)
+	return err
+}
+
+func (r *Repo) UpdateCode(ctx context.Context, code *Code) error {
+	_, err := r.db.NewUpdate().Model(code).WherePK().Exec(ctx)
+	return err
+}
+
+func (r *Repo) GetCode(ctx context.Context, id int64) (*Code, error) {
+	code := new(Code)
+	err := r.db.NewSelect().Model(code).Where("id = ?", id).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return code, nil
+}
+
+func (r *Repo) FindActiveCodeByHash(ctx context.Context, hash string, now time.Time) (*CodeWithRequest, error) {
+	row := new(CodeWithRequest)
+	err := r.db.NewSelect().Model(row).Relation("Request").Where("code_hash = ?", hash).Where("used_at IS NULL").Where("revoked_at IS NULL").Where("expires_at > ?", now).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return row, nil
+}
+
+func (r *Repo) ListCodesByRequest(ctx context.Context, requestID int64) ([]Code, error) {
+	var rows []Code
+	err := r.db.NewSelect().Model(&rows).Where("request_id = ?", requestID).Order("created_at DESC", "id DESC").Scan(ctx)
+	return rows, err
+}

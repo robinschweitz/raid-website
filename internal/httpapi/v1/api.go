@@ -22,6 +22,7 @@ import (
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/raidsignup"
+	"raid-website/internal/registration"
 	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
 	"raid-website/internal/validation"
@@ -49,6 +50,7 @@ type Deps struct {
 	Corrections  *raidcorrection.Service
 	Imports      *legacyimport.Service
 	Signups      *raidsignup.Service
+	Registration *registration.Service
 }
 
 // API holds the dependencies shared by the v1 HTTP handlers.
@@ -66,6 +68,16 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/login", a.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", RequireAuth(a.logout))
 	mux.HandleFunc("GET /api/v1/auth/me", RequireAuth(a.me))
+	mux.HandleFunc("GET /api/v1/external/rising-gods/characters", a.searchRisingGodsCharacters)
+	mux.HandleFunc("POST /api/v1/auth/registration-requests", a.createRegistrationRequest)
+	mux.HandleFunc("POST /api/v1/auth/register-with-code", a.registerWithCode)
+	mux.HandleFunc("GET /api/v1/registration-requests", RequireRole(validation.RoleAdmin, a.listRegistrationRequests))
+	mux.HandleFunc("GET /api/v1/registration-requests/{id}/codes", RequireRole(validation.RoleAdmin, a.listRegistrationCodes))
+	mux.HandleFunc("POST /api/v1/registration-requests/{id}/code", RequireRole(validation.RoleAdmin, a.createRegistrationCode))
+	mux.HandleFunc("POST /api/v1/registration-requests/{id}/reject", RequireRole(validation.RoleAdmin, a.rejectRegistrationRequest))
+	mux.HandleFunc("POST /api/v1/registration-codes/{id}/revoke", RequireRole(validation.RoleAdmin, a.revokeRegistrationCode))
+	mux.HandleFunc("POST /api/v1/characters/claim-requests", RequireAuth(a.createCharacterClaimRequest))
+	mux.HandleFunc("POST /api/v1/characters/claim-with-code", RequireAuth(a.claimCharacterWithCode))
 
 	mux.HandleFunc("GET /api/v1/players", RequireAuth(a.listPlayers))
 	mux.HandleFunc("POST /api/v1/players", RequireRole(validation.RoleAdmin, a.createPlayer))
@@ -105,6 +117,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/raids/{id}/loot/{recordID}", RequireRole(validation.RoleRaidassistent, a.correctLoot))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/points", RequireAuth(a.getPoints))
+	mux.HandleFunc("GET /api/v1/players/{id}/loot", RequireAuth(a.listPlayerLoot))
 	mux.HandleFunc("GET /api/v1/players/{id}/tokens", RequireAuth(a.getTokens))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/locks", RequireAuth(a.listLocks))

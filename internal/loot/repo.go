@@ -104,6 +104,18 @@ func (r *Repo) ListByRaid(ctx context.Context, raidID int64) ([]Award, error) {
 	return as, nil
 }
 
+func (r *Repo) ListByPlayer(ctx context.Context, playerID int64) ([]Award, error) {
+	var as []Award
+	err := r.db.NewSelect().Model(&as).
+		Where("awarded_to_player_id = ?", playerID).
+		Order("awarded_at DESC", "id DESC").
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return as, nil
+}
+
 func (r *Repo) PlayerHasMainSpecAward(ctx context.Context, raidID, playerID int64) (bool, error) {
 	count, err := r.db.NewSelect().Model((*Award)(nil)).
 		Where("raid_id = ?", raidID).

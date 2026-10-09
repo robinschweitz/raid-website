@@ -24,6 +24,7 @@ import (
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/raidsignup"
+	"raid-website/internal/registration"
 	"raid-website/internal/roster"
 	"raid-website/internal/tokens"
 	"raid-website/internal/webui"
@@ -31,9 +32,10 @@ import (
 
 // Options controls optional runtime behaviour of the HTTP layer.
 type Options struct {
-	CookieSecure  bool
-	AdminUsername string
-	AdminPassword string
+	CookieSecure     bool
+	AdminUsername    string
+	AdminPassword    string
+	RegistrationFeed registration.ExternalClient
 }
 
 // New constructs the HTTP handler tree with all v1 dependencies wired.
@@ -56,6 +58,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	audits := audit.NewRepo(db)
 
 	authSvc := auth.NewService(players, auth.NewRepo(db))
+	registrationSvc := registration.NewService(db, players, chars, audits, authSvc, opts.RegistrationFeed)
 
 	importsSvc := legacyimport.NewService(
 		legacyimport.NewRepo(db),
@@ -94,6 +97,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Corrections:  raidcorrection.NewService(raidcorrection.NewRepo(db)),
 		Imports:      importsSvc,
 		Signups:      raidsignup.NewService(raidsignup.NewRepo(db)),
+		Registration: registrationSvc,
 	})
 
 	mux := http.NewServeMux()

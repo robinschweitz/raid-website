@@ -7,6 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"raid-website/internal/character"
+	"raid-website/internal/httpapi"
+	"raid-website/internal/registration"
 	"raid-website/internal/validation"
 )
 
@@ -377,5 +380,113 @@ func TestPlayerListSummaryAndAccountVisibility(t *testing.T) {
 	}
 	if _, ok := other.Data["role"]; ok {
 		t.Fatalf("other detail role visible to member: %s", body)
+	}
+}
+
+func TestRegistrationWithRisingGodsCode(t *testing.T) {
+	feed := fakeRegistrationFeed{characters: map[string]registration.ExternalCharacter{
+		"9390923": {ProfileID: "9390923", Name: "Bigdevil", Class: "Krieger", MainSpec: "Schutz (Tank)", SecondSpec: "Furor", Level: 80, ProfileURL: "https://db.rising-gods.de/?profile=load&id=9390923"},
+	}}
+	srv, bdb := setupServerWithOptions(t, httpapi.Options{RegistrationFeed: feed})
+	client := srv.Client()
+	seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	adminToken := login(t, client, srv, "admin", "pw")
+
+	status, body := do(t, client, http.MethodGet, srv.URL+"/api/v1/external/rising-gods/characters?q=Big", "", nil)
+	if status != http.StatusOK {
+		t.Fatalf("search: status %d body %s", status, body)
+	}
+
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/registration-requests", "", map[string]any{"profile_id": "9390923"})
+	if status != http.StatusCreated {
+		t.Fatalf("create request: status %d body %s", status, body)
+	}
+	var requestOut struct {
+		Data registration.Request `json:"data"`
+	}
+	if err := json.Unmarshal(body, &requestOut); err != nil {
+		t.Fatalf("decode request: %v", err)
+	}
+	if requestOut.Data.CharacterName != "Bigdevil" || requestOut.Data.MainSpec != "Schutz (Tank)" || requestOut.Data.SecondSpec != "Furor" {
+		t.Fatalf("unexpected request: %s", body)
+	}
+
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/registration-requests/%d/code", srv.URL, requestOut.Data.ID), adminToken, nil)
+	if status != http.StatusCreated {
+		t.Fatalf("create code: status %d body %s", status, body)
+	}
+	var codeOut struct {
+		Data struct {
+			Code string `json:"code"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &codeOut); err != nil {
+		t.Fatalf("decode code: %v", err)
+	}
+	if codeOut.Data.Code == "" {
+		t.Fatalf("empty code: %s", body)
+	}
+
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": codeOut.Data.Code, "username": "bigdevil", "password": "secret"})
+	if status != http.StatusOK {
+		t.Fatalf("redeem: status %d body %s", status, body)
+	}
+	if token := login(t, client, srv, "bigdevil", "secret"); token == "" {
+		t.Fatal("new account cannot log in")
+	}
+
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": codeOut.Data.Code, "username": "again", "password": "secret"})
+	if status != http.StatusBadRequest {
+		t.Fatalf("reuse code: want 400 got %d body %s", status, body)
+	}
+}
+
+func TestCharacterClaimWithRisingGodsCode(t *testing.T) {
+	feed := fakeRegistrationFeed{characters: map[string]registration.ExternalCharacter{
+		"42": {ProfileID: "42", Name: "Claimme", Class: "Magier", MainSpec: "Arkan", SecondSpec: "Frost", Level: 80, ProfileURL: "https://db.rising-gods.de/?profile=load&id=42"},
+	}}
+	srv, bdb := setupServerWithOptions(t, httpapi.Options{RegistrationFeed: feed})
+	client := srv.Client()
+	seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	seedAccount(t, bdb, "member", "pw", validation.RoleGuest)
+	adminToken := login(t, client, srv, "admin", "pw")
+	memberToken := login(t, client, srv, "member", "pw")
+
+	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/characters/claim-requests", memberToken, map[string]any{"profile_id": "42"})
+	if status != http.StatusCreated {
+		t.Fatalf("claim request: status %d body %s", status, body)
+	}
+	var reqOut struct {
+		Data registration.Request `json:"data"`
+	}
+	if err := json.Unmarshal(body, &reqOut); err != nil {
+		t.Fatalf("decode claim request: %v", err)
+	}
+
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/registration-requests/%d/code", srv.URL, reqOut.Data.ID), adminToken, nil)
+	if status != http.StatusCreated {
+		t.Fatalf("claim code: status %d body %s", status, body)
+	}
+	var codeOut struct {
+		Data struct {
+			Code string `json:"code"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &codeOut); err != nil {
+		t.Fatalf("decode code: %v", err)
+	}
+
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/characters/claim-with-code", memberToken, map[string]any{"code": codeOut.Data.Code})
+	if status != http.StatusOK {
+		t.Fatalf("claim redeem: status %d body %s", status, body)
+	}
+	var charOut struct {
+		Data character.Character `json:"data"`
+	}
+	if err := json.Unmarshal(body, &charOut); err != nil {
+		t.Fatalf("decode character: %v", err)
+	}
+	if charOut.Data.Name != "Claimme" || charOut.Data.Class != "Magier" || charOut.Data.MainSpec != "Arkan" || charOut.Data.SecondSpec != "Frost" {
+		t.Fatalf("unexpected claimed character: %s", body)
 	}
 }

@@ -6,13 +6,14 @@ import { Link } from '../router'
 import {
   atLeast,
   type Character,
+  type ExternalCharacter,
   type ItemLock,
   type NameHistory,
   type Player,
   type PointsResponse,
   type GuildRank,
+  type LootAward,
   type Role,
-  type TokensResponse,
 } from '../types'
 import { EnhancePointsCard } from '../components/EnhancePointsCard'
 import { characterClassName } from '../characterTheme'
@@ -33,6 +34,7 @@ const CLASSES = [
 ]
 
 const ROLES: Role[] = ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN']
+const LOOT_METHOD_LABELS = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
 
 interface Props {
   playerID: number
@@ -50,7 +52,7 @@ function PlayerDetail({ playerID }: Props) {
   const [player, setPlayer] = useState<Player | null>(null)
   const [characters, setCharacters] = useState<Character[]>([])
   const [points, setPoints] = useState<PointsResponse | null>(null)
-  const [tokens, setTokens] = useState<TokensResponse | null>(null)
+  const [loot, setLoot] = useState<LootAward[]>([])
   const [locks, setLocks] = useState<ItemLock[]>([])
   const [history, setHistory] = useState<NameHistory[] | null>(null)
   const [historyChar, setHistoryChar] = useState<number | null>(null)
@@ -58,7 +60,8 @@ function PlayerDetail({ playerID }: Props) {
   const [rankError, setRankError] = useState('')
   const [rankLoading, setRankLoading] = useState(true)
   const [error, setError] = useState('')
-  const [view, setView] = useState<'points' | 'characters' | 'locks' | 'account'>('points')
+  const [view, setView] = useState<'points' | 'loot' | 'characters' | 'locks' | 'account'>('points')
+  const [lootFilter, setLootFilter] = useState<'all' | 'tokens'>('all')
 
   const [charName, setCharName] = useState('')
   const [charClass, setCharClass] = useState(CLASSES[0])
@@ -76,30 +79,37 @@ function PlayerDetail({ playerID }: Props) {
   const [lockItemID, setLockItemID] = useState('')
   const [lockBoss, setLockBoss] = useState('')
 
+  const [claimQuery, setClaimQuery] = useState('')
+  const [claimResults, setClaimResults] = useState<ExternalCharacter[]>([])
+  const [claimSelected, setClaimSelected] = useState<ExternalCharacter | null>(null)
+  const [claimCode, setClaimCode] = useState('')
+  const [claimStatus, setClaimStatus] = useState('')
+
   const [accUser, setAccUser] = useState('')
   const [accPass, setAccPass] = useState('')
   const [accRole, setAccRole] = useState<Role>('MEMBER')
 
   const isAdmin = me ? atLeast(me.role, 'ADMIN') : false
-  const isOwnMember = me ? me.id === playerID && atLeast(me.role, 'MEMBER') : false
+  const isOwnProfile = me ? me.id === playerID : false
+  const isOwnMember = me ? isOwnProfile && atLeast(me.role, 'MEMBER') : false
 
   const load = useCallback(async () => {
     if (!isActive()) return
     const version = ++loadVersion.current
     setError('')
     try {
-      const [p, cs, pts, tks, lk] = await Promise.all([
+      const [p, cs, pts, playerLoot, lk] = await Promise.all([
         api.get<Player>(`/api/v1/players/${playerID}`),
         api.get<Character[]>(`/api/v1/players/${playerID}/characters`),
         api.get<PointsResponse>(`/api/v1/players/${playerID}/points`),
-        api.get<TokensResponse>(`/api/v1/players/${playerID}/tokens`),
+        api.get<LootAward[]>(`/api/v1/players/${playerID}/loot`),
         api.get<ItemLock[]>(`/api/v1/players/${playerID}/locks`),
       ])
       if (isActive() && version === loadVersion.current) {
         setPlayer(p)
         setCharacters(cs)
         setPoints(pts)
-        setTokens(tks)
+        setLoot(playerLoot)
         setLocks(lk)
         setAccUser(p.username ?? '')
         if (p.role) setAccRole(p.role)
@@ -124,6 +134,7 @@ function PlayerDetail({ playerID }: Props) {
   const ownedCharacters = characters.filter((c) => c.player_id === playerID)
     .sort((a, b) => Number(b.is_main) - Number(a.is_main) || a.name.localeCompare(b.name, 'de') || a.id - b.id)
   const preferredCharacter = ownedCharacters[0]
+  const visibleLoot = lootFilter === 'tokens' ? loot.filter((row) => row.token_award) : loot
 
   const createCharacter = async (event: FormEvent) => {
     event.preventDefault()
@@ -244,6 +255,55 @@ function PlayerDetail({ playerID }: Props) {
     })
   }
 
+  const searchClaimCharacters = async () => {
+    if (!isOwnProfile || claimQuery.trim().length < 3) { setError('Bitte mindestens 3 Zeichen eingeben.'); return }
+    await submit(async () => {
+      setError('')
+      setClaimStatus('')
+      setClaimSelected(null)
+      try {
+        const rows = await api.get<ExternalCharacter[]>(`/api/v1/external/rising-gods/characters?q=${encodeURIComponent(claimQuery.trim())}`)
+        if (isActive()) setClaimResults(rows)
+        if (isActive() && rows.length === 0) setError('Charakter nicht gefunden. Nur aktive Rising-Gods-Charaktere können beansprucht werden.')
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Charaktersuche fehlgeschlagen')
+      }
+    })
+  }
+
+  const requestClaim = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isOwnProfile || !claimSelected) return
+    await submit(async () => {
+      setError('')
+      setClaimStatus('')
+      try {
+        await api.post('/api/v1/characters/claim-requests', { profile_id: claimSelected.profile_id })
+        if (isActive()) setClaimStatus(`Anfrage für ${claimSelected.name} erstellt. Ein Admin sendet dir den Code ingame an diesen Charakter.`)
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anfrage fehlgeschlagen')
+      }
+    })
+  }
+
+  const redeemClaim = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isOwnProfile || !claimCode.trim()) return
+    await submit(async () => {
+      setError('')
+      setClaimStatus('')
+      try {
+        await api.post('/api/v1/characters/claim-with-code', { code: claimCode })
+        if (!isActive()) return
+        setClaimCode('')
+        setClaimStatus('Charakter wurde beansprucht.')
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Code konnte nicht eingelöst werden')
+      }
+    })
+  }
+
   const setAccount = async (event: FormEvent) => {
     event.preventDefault()
     if (!isAdmin) return
@@ -291,32 +351,42 @@ function PlayerDetail({ playerID }: Props) {
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
       <nav className="workspace-tabs" aria-label="Profilbereiche">
-        <button type="button" aria-pressed={view === 'points'} aria-controls="profile-points" onClick={() => setView('points')}>EP & Tokens</button>
+        <button type="button" aria-pressed={view === 'points'} aria-controls="profile-points" onClick={() => setView('points')}>EP</button>
+        <button type="button" aria-pressed={view === 'loot'} aria-controls="profile-loot" onClick={() => setView('loot')}>Loot ({loot.length})</button>
         <button type="button" aria-pressed={view === 'characters'} aria-controls="profile-characters" onClick={() => setView('characters')}>Charaktere ({ownedCharacters.length})</button>
         <button type="button" aria-pressed={view === 'locks'} aria-controls="profile-locks" onClick={() => setView('locks')}>Item-Locks</button>
         {isAdmin && <button type="button" aria-pressed={view === 'account'} aria-controls="profile-account" onClick={() => setView('account')}>Konto</button>}
       </nav>
-      <div id="profile-points" hidden={view !== 'points'} className="grid profile-ledgers">
+      <div id="profile-points" hidden={view !== 'points'}>
         <EnhancePointsCard points={points} showHistory />
-
-        <section className="card">
-          <h2>Armor Tokens</h2>
-          <p className="stat">{tokens?.total ?? '—'}</p>
-          <div className="table-scroll"><table className="table small">
-            <thead><tr><th>Tokens</th><th>Buchung / Begründung</th><th>Raid</th></tr></thead>
-            <tbody>
-              {tokens?.transactions.map((t) => (
-                <tr key={t.id}>
-                  <td className={t.amount > 0 ? 'positive' : t.amount < 0 ? 'negative' : 'muted'}>{t.amount > 0 ? `+${t.amount}` : t.amount}</td>
-                  <td><strong>{t.amount < 0 ? 'Tokenkorrektur' : 'Tokenbuchung'}</strong><div className="muted">{t.reason}</div><small className="muted">Akteur #{t.actor_id} · {new Date(t.created_at).toLocaleString('de-DE')}</small></td>
-                  <td>{t.raid_id && <Link to={`/raids/${t.raid_id}`}>Raid #{t.raid_id}</Link>}</td>
-                </tr>
-              ))}
-              {tokens && tokens.transactions.length === 0 && <tr><td colSpan={3} className="muted">Noch keine Tokenbuchungen.</td></tr>}
-            </tbody>
-          </table></div>
-        </section>
       </div>
+
+      <section id="profile-loot" hidden={view !== 'loot'} className="card">
+        <div className="section-heading">
+          <div><h2>Loot</h2><p className="muted">Tokens sind normale Loot-Einträge und können hier gefiltert werden.</p></div>
+          <label>Filter<select value={lootFilter} onChange={(event) => setLootFilter(event.target.value as 'all' | 'tokens')}>
+            <option value="all">Alles</option>
+            <option value="tokens">Nur Tokens</option>
+          </select></label>
+        </div>
+        <div className="table-scroll"><table className="table">
+          <thead><tr><th>Item</th><th>Boss</th><th>Charakter</th><th>Methode</th><th>Raid</th><th>Datum</th></tr></thead>
+          <tbody>
+            {visibleLoot.map((row) => {
+              const method = row.award_method ?? (row.is_main_spec ? 'MAIN' : 'SECOND')
+              return <tr key={row.id}>
+                <td>{row.item_name}{row.token_award && <span className="badge">Token</span>}</td>
+                <td>{row.boss || '—'}</td>
+                <td className="character-name">{row.awarded_to_character_name || '—'}</td>
+                <td>{LOOT_METHOD_LABELS[method]}</td>
+                <td><Link to={`/raids/${row.raid_id}`}>Raid #{row.raid_id}</Link></td>
+                <td>{new Date(row.awarded_at).toLocaleDateString('de-DE')}</td>
+              </tr>
+            })}
+            {visibleLoot.length === 0 && <tr><td colSpan={6} className="muted">{lootFilter === 'tokens' ? 'Keine Tokens gefunden.' : 'Noch kein Loot.'}</td></tr>}
+          </tbody>
+        </table></div>
+      </section>
 
       <section id="profile-characters" hidden={view !== 'characters'} className="card">
         <h2>Charaktere</h2>
@@ -404,6 +474,25 @@ function PlayerDetail({ playerID }: Props) {
             </label>
             <button type="submit" disabled={pending}>Anlegen</button>
           </form>
+          </details>
+        )}
+        {isOwnProfile && (
+          <details className="editor-disclosure"><summary>Charakter beanspruchen</summary>
+          <p className="muted">Suche deinen Rising-Gods-Charakter. Ein Admin sendet dir den Code ingame an diesen Charakter.</p>
+          <div className="inline-form">
+            <label>Charakter suchen<input value={claimQuery} onChange={(e) => setClaimQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
+            <button type="button" disabled={pending || claimQuery.trim().length < 3} onClick={() => void searchClaimCharacters()}>Suchen</button>
+          </div>
+          {claimResults.length > 0 && <div className="plain-list">{claimResults.map((row) => <button key={row.profile_id} type="button" className={claimSelected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setClaimSelected(row)}>{row.name} · {row.class} · Stufe {row.level || '—'}</button>)}</div>}
+          <form className="inline-form" onSubmit={requestClaim}>
+            <button type="submit" disabled={pending || !claimSelected}>Anfrage erstellen</button>
+            {claimSelected && <p className="muted">Ausgewählt: {claimSelected.name} · {claimSelected.class}</p>}
+          </form>
+          <form className="inline-form" onSubmit={redeemClaim}>
+            <label>Code<input value={claimCode} onChange={(e) => setClaimCode(e.target.value)} /></label>
+            <button type="submit" disabled={pending || !claimCode.trim()}>Code einlösen</button>
+          </form>
+          {claimStatus && <p className="muted" role="status">{claimStatus}</p>}
           </details>
         )}
       </section>

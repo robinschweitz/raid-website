@@ -254,10 +254,17 @@ table.table.small {
 }
 
 .actions {
+  display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
   align-items: center;
   margin: 0.5rem 0;
+}
+
+.addon-code-export {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  resize: vertical;
 }
 
 .option-stack {

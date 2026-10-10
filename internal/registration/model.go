@@ -49,6 +49,7 @@ type Code struct {
 	CreatedByPlayerID int64      `bun:"created_by_player_id,notnull" json:"created_by_player_id"`
 	CreatedAt         time.Time  `bun:"created_at,notnull" json:"created_at"`
 	ExpiresAt         time.Time  `bun:"expires_at,notnull" json:"expires_at"`
+	SentAt            *time.Time `bun:"sent_at,nullzero" json:"sent_at"`
 	UsedAt            *time.Time `bun:"used_at,nullzero" json:"used_at"`
 	UsedByPlayerID    *int64     `bun:"used_by_player_id,nullzero" json:"used_by_player_id"`
 	RevokedAt         *time.Time `bun:"revoked_at,nullzero" json:"revoked_at"`

@@ -81,6 +81,7 @@ export interface RegistrationCode {
   created_by_player_id: number
   created_at: string
   expires_at: string
+  sent_at: string | null
   used_at: string | null
   used_by_player_id: number | null
   revoked_at: string | null

@@ -417,7 +417,8 @@ func TestRegistrationWithRisingGodsCode(t *testing.T) {
 	}
 	var codeOut struct {
 		Data struct {
-			Code string `json:"code"`
+			CodeRecord registration.Code `json:"code_record"`
+			Code       string            `json:"code"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &codeOut); err != nil {
@@ -425,6 +426,37 @@ func TestRegistrationWithRisingGodsCode(t *testing.T) {
 	}
 	if codeOut.Data.Code == "" {
 		t.Fatalf("empty code: %s", body)
+	}
+	if codeOut.Data.CodeRecord.SentAt != nil {
+		t.Fatalf("new code is already sent: %s", body)
+	}
+
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/registration-codes/%d/sent", srv.URL, codeOut.Data.CodeRecord.ID), adminToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("mark sent: status %d body %s", status, body)
+	}
+	var sentOut struct {
+		Data registration.Code `json:"data"`
+	}
+	if err := json.Unmarshal(body, &sentOut); err != nil {
+		t.Fatalf("decode sent code: %v", err)
+	}
+	if sentOut.Data.SentAt == nil {
+		t.Fatalf("missing sent_at: %s", body)
+	}
+
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/registration-requests/%d/codes", srv.URL, requestOut.Data.ID), adminToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("list codes: status %d body %s", status, body)
+	}
+	var codesOut struct {
+		Data []registration.Code `json:"data"`
+	}
+	if err := json.Unmarshal(body, &codesOut); err != nil {
+		t.Fatalf("decode codes: %v", err)
+	}
+	if len(codesOut.Data) != 1 || codesOut.Data[0].SentAt == nil {
+		t.Fatalf("listed code missing sent_at: %s", body)
 	}
 
 	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": codeOut.Data.Code, "username": "bigdevil", "password": "secret"})

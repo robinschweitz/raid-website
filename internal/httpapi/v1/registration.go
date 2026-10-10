@@ -157,6 +157,20 @@ func (a *API) revokeRegistrationCode(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]any{"data": code})
 }
 
+func (a *API) markRegistrationCodeSent(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid code id")
+		return
+	}
+	code, err := a.Registration.MarkCodeSent(r.Context(), id)
+	if err != nil {
+		registrationError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": code})
+}
+
 func (a *API) registerWithCode(w http.ResponseWriter, r *http.Request) {
 	var req redeemRequest
 	if err := DecodeJSON(r, &req); err != nil {

@@ -137,6 +137,24 @@ func (s *Service) RevokeCode(ctx context.Context, codeID int64) (*Code, error) {
 	return code, nil
 }
 
+func (s *Service) MarkCodeSent(ctx context.Context, codeID int64) (*Code, error) {
+	code, err := s.repo.GetCode(ctx, codeID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrCodeNotFound
+		}
+		return nil, err
+	}
+	if code.SentAt == nil {
+		now := time.Now().UTC()
+		code.SentAt = &now
+		if err := s.repo.UpdateCode(ctx, code); err != nil {
+			return nil, err
+		}
+	}
+	return code, nil
+}
+
 func (s *Service) RejectRequest(ctx context.Context, requestID int64) (*Request, error) {
 	req, err := s.repo.GetRequest(ctx, requestID)
 	if err != nil {

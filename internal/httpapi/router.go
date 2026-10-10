@@ -56,7 +56,11 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	audits := audit.NewRepo(db)
 
 	authSvc := auth.NewService(players, auth.NewRepo(db))
-	registrationSvc := registration.NewService(db, players, chars, audits, authSvc, opts.RegistrationFeed)
+	registrationFeed := opts.RegistrationFeed
+	if registrationFeed == nil {
+		registrationFeed = registration.RisingGodsClient{}
+	}
+	registrationSvc := registration.NewService(db, players, chars, audits, authSvc, registrationFeed)
 
 	importsSvc := legacyimport.NewService(
 		legacyimport.NewRepo(db),
@@ -69,6 +73,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		raidseries.NewRepo(db),
 		legacyimport.GoogleFetcher{},
 	)
+	importsSvc.WithExternalClient(registrationFeed)
 
 	if err := authSvc.BootstrapAdmin(context.Background(), opts.AdminUsername, opts.AdminPassword); err != nil {
 		return nil, fmt.Errorf("bootstrap admin: %w", err)
@@ -90,7 +95,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Roster:       rosterRepo,
 		Audit:        audits,
 		Completion:   raidcompletion.NewService(raidcompletion.NewRepo(db)),
-		Corrections:  raidcorrection.NewService(raidcorrection.NewRepo(db)),
+		Corrections:  raidcorrection.NewService(raidcorrection.NewRepo(db)).WithExternalClient(registrationFeed),
 		Imports:      importsSvc,
 		Signups:      raidsignup.NewService(raidsignup.NewRepo(db)),
 		Registration: registrationSvc,

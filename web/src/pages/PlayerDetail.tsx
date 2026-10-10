@@ -63,10 +63,9 @@ function PlayerDetail({ playerID }: Props) {
   const [view, setView] = useState<'points' | 'loot' | 'characters' | 'locks' | 'account'>('points')
   const [lootFilter, setLootFilter] = useState<'all' | 'tokens'>('all')
 
-  const [charName, setCharName] = useState('')
-  const [charClass, setCharClass] = useState(CLASSES[0])
-  const [charMainSpec, setCharMainSpec] = useState('')
-  const [charSecondSpec, setCharSecondSpec] = useState('')
+  const [charQuery, setCharQuery] = useState('')
+  const [charResults, setCharResults] = useState<ExternalCharacter[]>([])
+  const [charSelected, setCharSelected] = useState<ExternalCharacter | null>(null)
   const { options: classSpecs, error: optionsError, reload: reloadOptions } = useCharacterOptions()
   const [charIsMain, setCharIsMain] = useState(false)
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null)
@@ -138,25 +137,37 @@ function PlayerDetail({ playerID }: Props) {
 
   const createCharacter = async (event: FormEvent) => {
     event.preventDefault()
-    if (!isAdmin) return
+    if (!isAdmin || !charSelected) return
     await submit(async () => {
       setError('')
       try {
         await api.post<Character>(`/api/v1/players/${playerID}/characters`, {
-          name: charName,
-          class: charClass,
-          main_spec: charMainSpec,
-          second_spec: charSecondSpec,
+          profile_id: charSelected.profile_id,
           is_main: charIsMain,
         })
         if (!isActive()) return
-        setCharName('')
-        setCharMainSpec('')
-        setCharSecondSpec('')
+        setCharQuery('')
+        setCharResults([])
+        setCharSelected(null)
         setCharIsMain(false)
         await load()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Charakter anlegen fehlgeschlagen')
+      }
+    })
+  }
+
+  const searchNewCharacters = async () => {
+    if (!isAdmin || charQuery.trim().length < 3) { setError('Bitte mindestens 3 Zeichen eingeben.'); return }
+    await submit(async () => {
+      setError('')
+      setCharSelected(null)
+      try {
+        const rows = await api.get<ExternalCharacter[]>(`/api/v1/external/rising-gods/characters?q=${encodeURIComponent(charQuery.trim())}`)
+        if (isActive()) setCharResults(rows)
+        if (isActive() && rows.length === 0) setError('Charakter nicht gefunden. Nur aktive Rising-Gods-Charaktere können angelegt werden.')
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Charaktersuche fehlgeschlagen')
       }
     })
   }
@@ -396,6 +407,7 @@ function PlayerDetail({ playerID }: Props) {
               <th>Name</th>
               <th>Klasse</th>
               <th>Main-Spec</th>
+              <th>Rising Gods</th>
               <th>Main</th>
               <th></th>
             </tr>
@@ -403,7 +415,7 @@ function PlayerDetail({ playerID }: Props) {
           <tbody>
             {ownedCharacters.map((c) => (
               <tr key={c.id} className={characterClassName(c.class)}>
-                {editingCharacter?.id === c.id ? <td colSpan={5}><form className="inline-form in-place-editor" onSubmit={saveCharacter}>
+                {editingCharacter?.id === c.id ? <td colSpan={6}><form className="inline-form in-place-editor" onSubmit={saveCharacter}>
                   <label>Name<input autoFocus aria-label="Charakter bearbeiten: Name" disabled={pending} required value={characterDraft.name} onChange={(e) => changeCharacter({ name: e.target.value })} /></label>
                   <label>Klasse<select disabled={pending} value={characterDraft.class} onChange={(e) => changeCharacter({ class: e.target.value, main_spec: '', second_spec: '' })}>
                     {!CLASSES.includes(characterDraft.class) && <option value={characterDraft.class}>{characterDraft.class}</option>}
@@ -420,6 +432,7 @@ function PlayerDetail({ playerID }: Props) {
                 <td className="character-name">{c.name}</td>
                 <td>{c.class}</td>
                 <td>{c.main_spec || '—'}</td>
+                <td>{c.external_profile_url ? <a href={c.external_profile_url} target="_blank" rel="noreferrer">verknüpft</a> : <span className="muted">—</span>}</td>
                 <td>{c.is_main ? '★' : ''}</td>
                 <td className="actions">
                   {isAdmin && (
@@ -435,7 +448,7 @@ function PlayerDetail({ playerID }: Props) {
             ))}
             {ownedCharacters.length === 0 && (
               <tr>
-                <td colSpan={5} className="muted">
+                <td colSpan={6} className="muted">
                   Keine Charaktere.
                 </td>
               </tr>
@@ -459,21 +472,15 @@ function PlayerDetail({ playerID }: Props) {
           <details className="editor-disclosure"><summary>Charakter hinzufügen</summary>
           {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
           <form className="inline-form" onSubmit={createCharacter}>
-            <input aria-label="Charaktername" placeholder="Name" value={charName} onChange={(e) => setCharName(e.target.value)} required />
-            <select aria-label="Charakterklasse" disabled={pending} value={charClass} onChange={(e) => { setCharClass(e.target.value); setCharMainSpec(''); setCharSecondSpec('') }}>
-              {CLASSES.map((cl) => (
-                <option key={cl} value={cl}>
-                  {cl}
-                </option>
-              ))}
-            </select>
-            <SpecSelect label="Main-Spec" disabled={pending} required value={charMainSpec} specs={classSpecs[charClass] ?? []} onChange={setCharMainSpec} />
-            <SpecSelect label="Second-Spec" disabled={pending} value={charSecondSpec} specs={classSpecs[charClass] ?? []} onChange={setCharSecondSpec} />
+            <label>Rising-Gods-Charakter<input value={charQuery} onChange={(e) => setCharQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
+            <button type="button" disabled={pending || charQuery.trim().length < 3} onClick={() => void searchNewCharacters()}>Suchen</button>
             <label className="check">
               <input type="checkbox" checked={charIsMain} onChange={(e) => setCharIsMain(e.target.checked)} /> Main
             </label>
-            <button type="submit" disabled={pending}>Anlegen</button>
+            <button type="submit" disabled={pending || !charSelected}>Anlegen</button>
+            {charSelected && <p className="muted">Ausgewählt: {charSelected.name} · {charSelected.class} · {charSelected.main_spec}</p>}
           </form>
+          {charResults.length > 0 && <div className="plain-list">{charResults.map((row) => <button key={row.profile_id} type="button" className={charSelected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setCharSelected(row)}>{row.name} · {row.class} · {row.main_spec || 'Spec unbekannt'} · Stufe {row.level || '—'}</button>)}</div>}
           </details>
         )}
         {isOwnProfile && (

@@ -17,6 +17,8 @@ export function ImportsPage() {
   const [includeSetup, setIncludeSetup] = useState(true)
   const [setup, setSetup] = useState({ name: 'ICC25', leader: 'Oxora', first_date: '2026-10-05', start_time: '19:00', timezone: 'Europe/Berlin', weekdays: [1], interval_weeks: 1 })
   const [error, setError] = useState('')
+  const [operation, setOperation] = useState<{ mode: 'dry-run' | 'merge'; startedAt: number } | null>(null)
+  const [now, setNow] = useState(Date.now())
   const { pending: busy, submit: submitRequest, isActive } = useSubmission()
   const [previewSheet, setPreviewSheet] = useState<string | null>(null)
   const sourceVersion = useRef(0)
@@ -24,6 +26,17 @@ export function ImportsPage() {
   const needsReason = report?.warnings?.some((warning) => warning.includes('reason_required')) ?? false
   const canMerge = previewSheet === sheetID && report?.mode === 'dry_run' && !!report.raw_hash?.trim()
     && !report.errors?.length && (!needsReason || !!reason.trim())
+  const elapsedSeconds = operation ? Math.max(0, Math.floor((now - operation.startedAt) / 1000)) : 0
+  const operationText = operation?.mode === 'dry-run'
+    ? elapsedSeconds < 5 ? 'Vorschau laedt Google-Sheet und prueft die Daten...'
+      : elapsedSeconds < 15 ? 'Vorschau analysiert Raids, Charaktere, Loot und Punkte...'
+        : 'Vorschau laeuft noch. Grosse Sheets koennen etwas dauern; bitte nicht neu starten.'
+    : operation?.mode === 'merge'
+      ? elapsedSeconds < 5 ? 'Zusammenfuehrung laedt Quelle und prueft Vorschau-Hash...'
+        : elapsedSeconds < 10 ? 'Rising-Gods-Verknuepfungen werden kurz vorbereitet...'
+          : elapsedSeconds < 25 ? 'Datenbank schreibt Spieler, Charaktere, Raids, Loot und EP...'
+            : 'Zusammenfuehrung laeuft noch. Bitte warten; der Server schreibt atomar und verhindert doppelte Imports.'
+      : ''
 
   const invalidatePreview = () => {
     ++sourceVersion.current
@@ -41,11 +54,19 @@ export function ImportsPage() {
 
   useEffect(load, [load])
 
+  useEffect(() => {
+    if (!operation) return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [operation])
+
   const run = async (mode: 'dry-run' | 'merge') => {
     if (renderedSourceVersion !== sourceVersion.current || (mode === 'merge' && !canMerge)) return
     await submitRequest(async () => {
       const source = sheetID
       const version = sourceVersion.current
+      setOperation({ mode, startedAt: Date.now() })
+      setNow(Date.now())
       setPreviewSheet(null)
       setError('')
       setReport(null)
@@ -68,6 +89,8 @@ export function ImportsPage() {
             ? 'Die Quelle hat sich geändert oder die Vorschau ist nicht mehr gültig. Bitte eine neue Vorschau erstellen.'
             : err instanceof ApiError ? err.message : 'Import fehlgeschlagen')
         }
+      } finally {
+        if (isActive() && version === sourceVersion.current) setOperation(null)
       }
     })
   }
@@ -124,7 +147,11 @@ export function ImportsPage() {
         <p className="muted">Ergänzungen zu bereits importierten Raids sind auch im Archiv mit ausdrücklicher Begründung möglich. Bestehende Zeilen bleiben erhalten; Änderungen werden auditiert und EP-/Token-Differenzen als neue Buchungen erfasst. Abgesagte Raids bleiben gesperrt. Beim Erstimport darf die Begründung leer bleiben.</p>
         <p className="muted">Für neue Loot-Zeilen nach einem Import bitte im Loot Archive die optionale Spalte „Import ID“ verwenden: pro neuer Zeile eine eindeutige, dauerhaft unveränderte ID. Bereits importierte Zeilen unverändert lassen; IDs nicht wiederverwenden oder ändern. Neue Zeilen ohne stabile ID werden nach einem früheren Import als mehrdeutig abgelehnt. Konflikte stehen im Bericht, bestehende Daten werden nicht überschrieben.</p>
         </details>
-        {busy && <p className="muted" role="status">Import wird verarbeitet…</p>}
+        {busy && operation && <div className="subcard" role="status" aria-live="polite">
+          <h3>{operation.mode === 'dry-run' ? 'Vorschau laeuft' : 'Zusammenfuehrung laeuft'}</h3>
+          <p className="muted">{operationText}</p>
+          <p className="muted">Dauer bisher: {elapsedSeconds}s</p>
+        </div>}
       </form>
 
       {report && (

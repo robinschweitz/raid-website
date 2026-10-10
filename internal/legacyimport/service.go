@@ -8,16 +8,19 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"raid-website/internal/attendance"
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
+	"raid-website/internal/logger"
 	"raid-website/internal/loot"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidseries"
+	"raid-website/internal/registration"
 	"raid-website/internal/validation"
 )
 
@@ -68,11 +71,105 @@ type Service struct {
 	series      *raidseries.Repo
 	fetcher     Fetcher
 	corrections *raidcorrection.Service
+	external    registration.ExternalClient
+}
+
+type characterLink struct {
+	Profile registration.ExternalCharacter
+	Raw     string
 }
 
 // NewService constructs an importer with explicit repositories and source fetching.
 func NewService(imports *Repo, players *player.Repo, chars *character.Repo, raids *raid.Repo, att *attendance.Repo, lootRepo *loot.Repo, points *enhancepoints.Repo, series *raidseries.Repo, fetcher Fetcher) *Service {
 	return &Service{imports: imports, players: players, chars: chars, raids: raids, att: att, loot: lootRepo, points: points, series: series, fetcher: fetcher}
+}
+
+func (s *Service) WithExternalClient(external registration.ExternalClient) *Service {
+	s.external = external
+	return s
+}
+
+func (s *Service) prepareCharacterLinks(ctx context.Context, source, sheetID string, data SheetData, expectedHash string) (map[string]characterLink, []string) {
+	if s.external == nil || expectedHash == "" || setupHash(data.Hash, nil) != expectedHash {
+		return nil, nil
+	}
+	p, _, err := planFromSheet(data)
+	if err != nil {
+		return nil, nil
+	}
+	logger.Info("legacy import rising-gods linking started source=%s sheet=%s characters=%d", source, sheetID, len(p.Characters))
+	links := make(map[string]characterLink)
+	seen := make(map[string]CharacterPlan)
+	for _, planned := range p.Characters {
+		name := strings.TrimSpace(planned.Name)
+		if len([]rune(name)) < 3 {
+			continue
+		}
+		if _, exists := seen[strings.ToLower(name)]; !exists {
+			seen[strings.ToLower(name)] = planned
+		}
+	}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 6)
+	for _, planned := range seen {
+		if ctx.Err() != nil {
+			break
+		}
+		planned := planned
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
+			link, ok := s.lookupCharacterLink(ctx, planned)
+			if !ok {
+				return
+			}
+			mu.Lock()
+			links[planned.Name] = link
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	if ctx.Err() != nil {
+		logger.Warn("legacy import rising-gods linking cancelled source=%s sheet=%s linked=%d", source, sheetID, len(links))
+		return links, nil
+	}
+	logger.Info("legacy import rising-gods linking finished source=%s sheet=%s linked=%d", source, sheetID, len(links))
+	return links, nil
+}
+
+func (s *Service) lookupCharacterLink(ctx context.Context, planned CharacterPlan) (characterLink, bool) {
+	name := strings.TrimSpace(planned.Name)
+	if len([]rune(name)) < 3 {
+		return characterLink{}, false
+	}
+	results, err := s.external.SearchCharacters(ctx, name)
+	if err != nil {
+		return characterLink{}, false
+	}
+	exactMatches := make([]registration.ExternalCharacter, 0, 1)
+	for _, result := range results {
+		if strings.EqualFold(strings.TrimSpace(result.Name), name) {
+			exactMatches = append(exactMatches, result)
+		}
+	}
+	if len(exactMatches) != 1 {
+		return characterLink{}, false
+	}
+	profile := exactMatches[0]
+	if profile.ProfileID == "" || profile.Name == "" || profile.Class == "" {
+		return characterLink{}, false
+	}
+	if planned.Class != "" && validation.NormalizeClassName(planned.Class) != validation.NormalizeClassName(profile.Class) {
+		return characterLink{}, false
+	}
+	return characterLink{Profile: profile}, true
 }
 
 func planFromSheet(data SheetData) (Plan, int, error) {
@@ -147,26 +244,37 @@ func (s *Service) DryRun(ctx context.Context, source, sheetID string) (Report, e
 }
 
 func (s *Service) DryRunWithSetup(ctx context.Context, source, sheetID string, config *SetupConfig) (Report, error) {
+	started := time.Now()
+	logger.Info("legacy import dry-run started source=%s sheet=%s setup=%t", source, sheetID, config != nil)
+	defer func() {
+		logger.Info("legacy import dry-run finished source=%s sheet=%s duration=%s", source, sheetID, time.Since(started))
+	}()
+	logger.Info("legacy import dry-run fetching source=%s sheet=%s", source, sheetID)
 	data, err := s.fetcher.Fetch(ctx, sheetID)
 	if err != nil {
+		logger.Error("legacy import dry-run fetch failed source=%s sheet=%s err=%v", source, sheetID, err)
 		return Report{}, err
 	}
 	data.Hash = setupHash(data.Hash, config)
 	var rep Report
 	err = s.transaction(ctx, true, func(bound *Service) error {
+		logger.Info("legacy import dry-run planning source=%s sheet=%s hash=%s", source, sheetID, data.Hash)
 		p, rows, setupReport, err := bound.planWithSetup(ctx, source, sheetID, data, config)
 		if err != nil {
 			return err
 		}
 		rep = reportFromPlan("dry_run", source, data, p, rows)
 		rep.Setup = setupReport
+		logger.Info("legacy import dry-run reviewing source=%s sheet=%s rows=%d players=%d characters=%d raids=%d loot=%d", source, sheetID, rows, rep.Players, rep.Characters, rep.Raids, rep.Loot)
 		_, err = bound.review(ctx, source, sheetID, p, &rep)
 		if err != nil {
 			return err
 		}
 		if len(rep.Errors) > 0 {
+			logger.Warn("legacy import dry-run completed with errors source=%s sheet=%s errors=%d warnings=%d", source, sheetID, len(rep.Errors), len(rep.Warnings))
 			return nil
 		}
+		logger.Info("legacy import dry-run recording preview source=%s sheet=%s hash=%s warnings=%d", source, sheetID, data.Hash, len(rep.Warnings))
 		return bound.imports.recordPreview(ctx, source, sheetID, data.Hash)
 	})
 	return rep, err
@@ -178,24 +286,49 @@ func (s *Service) Merge(ctx context.Context, actorID int64, source, sheetID, exp
 }
 
 func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, sheetID, expectedHash, reason string, config *SetupConfig) (Report, error) {
+	started := time.Now()
+	logger.Info("legacy import merge started source=%s sheet=%s actor=%d setup=%t", source, sheetID, actorID, config != nil)
+	defer func() {
+		logger.Info("legacy import merge finished source=%s sheet=%s duration=%s", source, sheetID, time.Since(started))
+	}()
+	logger.Info("legacy import merge fetching source=%s sheet=%s", source, sheetID)
 	data, err := s.fetcher.Fetch(ctx, sheetID)
 	if err != nil {
+		logger.Error("legacy import merge fetch failed source=%s sheet=%s err=%v", source, sheetID, err)
 		return Report{}, err
 	}
 
 	data.Hash = setupHash(data.Hash, config)
 	rep := Report{Mode: "merge", Source: source, RawHash: data.Hash, Warnings: []string{}, Errors: []string{}}
+	characterLinks, characterLinkWarnings := s.prepareCharacterLinks(ctx, source, sheetID, data, expectedHash)
 
 	err = s.transaction(ctx, true, func(s *Service) error {
+		logger.Info("legacy import merge transaction started source=%s sheet=%s hash=%s", source, sheetID, data.Hash)
 		if existing, err := s.imports.FindByHash(ctx, source, sheetID, data.Hash); err == nil {
 			if existing.DryRunReport != "" {
 				if err := json.Unmarshal([]byte(existing.DryRunReport), &rep); err != nil {
 					return fmt.Errorf("decode saved report: %w", err)
 				}
+				rep.Warnings = withoutStaleRisingGodsTimeout(rep.Warnings)
 			} else {
 				rep.Warnings = append(rep.Warnings, "legacy provenance missing: original report unavailable; no created counts reconstructed")
 			}
+			if len(characterLinks) > 0 {
+				p, _, planErr := planFromSheet(data)
+				if planErr != nil {
+					return planErr
+				}
+				linked, linkErr := s.linkExistingImportedCharacters(ctx, p, characterLinks, time.Now().UTC())
+				if linkErr != nil {
+					return linkErr
+				}
+				if linked > 0 {
+					rep.Warnings = append(rep.Warnings, fmt.Sprintf("Rising-Gods-Verknuepfung: %d bestehende Charaktere nachtraeglich verknuepft", linked))
+				}
+				logger.Info("legacy import merge skipped hash linked existing characters source=%s sheet=%s linked=%d", source, sheetID, linked)
+			}
 			rep.Skipped = true
+			logger.Info("legacy import merge skipped existing hash source=%s sheet=%s hash=%s", source, sheetID, data.Hash)
 			return nil
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err
@@ -218,7 +351,9 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 			return err
 		}
 		rep = reportFromPlan("merge", source, data, p, rows)
+		rep.Warnings = append(rep.Warnings, characterLinkWarnings...)
 		rep.Setup = setupReport
+		logger.Info("legacy import merge planned source=%s sheet=%s rows=%d players=%d characters=%d raids=%d loot=%d", source, sheetID, rows, rep.Players, rep.Characters, rep.Raids, rep.Loot)
 		if _, err := s.players.Get(ctx, actorID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrActorNotFound
@@ -235,6 +370,7 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 		if len(rep.Errors) > 0 {
 			rep.Created = Counts{}
 			rep.ArchivedRaids = 0
+			logger.Warn("legacy import merge stopped by report errors source=%s sheet=%s errors=%d warnings=%d", source, sheetID, len(rep.Errors), len(rep.Warnings))
 			return nil
 		}
 		rep.Created = Counts{}
@@ -248,23 +384,29 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 		if err != nil {
 			return err
 		}
-		charIDs, err := s.mergeCharacters(ctx, playerIDs, p, now, &rep)
+		logger.Info("legacy import merge players done source=%s sheet=%s created=%d", source, sheetID, rep.Created.Players)
+		charIDs, err := s.mergeCharacters(ctx, playerIDs, p, now, characterLinks, &rep)
 		if err != nil {
 			return err
 		}
+		logger.Info("legacy import merge characters done source=%s sheet=%s created=%d linked=%d", source, sheetID, rep.Created.Characters, len(characterLinks))
 		raidIDs, err := s.mergeRaids(ctx, source, sheetID, reason, charIDs, playerIDs, actorID, p, now, &rep)
 		if err != nil {
 			return err
 		}
+		logger.Info("legacy import merge raids done source=%s sheet=%s created=%d attendance=%d", source, sheetID, rep.Created.Raids, rep.Created.Attendance)
 		if err := s.mergeLoot(ctx, source, sheetID, reason, raidIDs, playerIDs, charIDs, actorID, p, now, &rep); err != nil {
 			return err
 		}
+		logger.Info("legacy import merge loot done source=%s sheet=%s created=%d tokens=%d", source, sheetID, rep.Created.Loot, rep.Created.Tokens)
 		if err := s.archiveImportedHistory(ctx, actorID, reason, p, now, &rep); err != nil {
 			return err
 		}
+		logger.Info("legacy import merge archive classification done source=%s sheet=%s archived=%d", source, sheetID, rep.ArchivedRaids)
 		if err := s.mergeSetup(ctx, source, sheetID, p, charIDs, playerIDs, now, &rep); err != nil {
 			return err
 		}
+		logger.Info("legacy import merge setup done source=%s sheet=%s series=%d", source, sheetID, rep.Created.Series)
 		pointsAfter, err := s.imports.pointTransactionCount(ctx)
 		if err != nil {
 			return err
@@ -296,9 +438,24 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 		if err := s.imports.Insert(ctx, imp); err != nil {
 			return fmt.Errorf("record import: %w", err)
 		}
+		logger.Info("legacy import merge recorded source=%s sheet=%s created_total=%d warnings=%d", source, sheetID, imp.CreatedCount, imp.WarningsCount)
 		return nil
 	})
 	return rep, err
+}
+
+func withoutStaleRisingGodsTimeout(warnings []string) []string {
+	if len(warnings) == 0 {
+		return warnings
+	}
+	filtered := warnings[:0]
+	for _, warning := range warnings {
+		if strings.Contains(warning, "Rising-Gods-Verknuepfung: Zeitlimit erreicht") {
+			continue
+		}
+		filtered = append(filtered, warning)
+	}
+	return filtered
 }
 
 func mergePlayers(ctx context.Context, players *player.Repo, points *enhancepoints.Repo, actorID int64, p Plan, now time.Time, rep *Report) (map[string]int64, error) {
@@ -349,7 +506,7 @@ func mergePlayers(ctx context.Context, players *player.Repo, points *enhancepoin
 	return ids, nil
 }
 
-func (s *Service) mergeCharacters(ctx context.Context, playerIDs map[string]int64, p Plan, now time.Time, rep *Report) (map[string]int64, error) {
+func (s *Service) mergeCharacters(ctx context.Context, playerIDs map[string]int64, p Plan, now time.Time, links map[string]characterLink, rep *Report) (map[string]int64, error) {
 	ids := make(map[string]int64, len(p.Characters))
 	for _, c := range p.Characters {
 		matches, err := s.imports.charactersByName(ctx, c.Name)
@@ -360,6 +517,9 @@ func (s *Service) mergeCharacters(ctx context.Context, playerIDs map[string]int6
 		for _, existing := range matches {
 			if existing.PlayerID == pid {
 				ids[c.Name] = existing.ID
+				if err := s.linkImportedCharacter(ctx, &existing, &c, links[c.Name], now); err != nil {
+					return nil, err
+				}
 			}
 		}
 		if ids[c.Name] != 0 {
@@ -378,6 +538,9 @@ func (s *Service) mergeCharacters(ctx context.Context, playerIDs map[string]int6
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		}
+		if err := s.linkImportedCharacter(ctx, row, &c, links[c.Name], now); err != nil {
+			return nil, err
+		}
 		if err := s.chars.Create(ctx, row); err != nil {
 			return nil, fmt.Errorf("create character %q: %w", c.Name, err)
 		}
@@ -385,6 +548,54 @@ func (s *Service) mergeCharacters(ctx context.Context, playerIDs map[string]int6
 		rep.Created.Characters++
 	}
 	return ids, nil
+}
+
+func (s *Service) linkExistingImportedCharacters(ctx context.Context, p Plan, links map[string]characterLink, now time.Time) (int, error) {
+	linked := 0
+	for _, planned := range p.Characters {
+		link := links[planned.Name]
+		if link.Profile.ProfileID == "" {
+			continue
+		}
+		matches, err := s.imports.charactersByName(ctx, planned.Name)
+		if err != nil {
+			return 0, fmt.Errorf("find character %q: %w", planned.Name, err)
+		}
+		for _, existing := range matches {
+			before := existing.ExternalProfileID
+			if err := s.linkImportedCharacter(ctx, &existing, &planned, link, now); err != nil {
+				return 0, err
+			}
+			if before == "" && existing.ExternalProfileID != "" {
+				linked++
+			}
+		}
+	}
+	return linked, nil
+}
+
+func (s *Service) linkImportedCharacter(ctx context.Context, row *character.Character, planned *CharacterPlan, link characterLink, now time.Time) error {
+	if row.ExternalProfileID != "" || link.Profile.ProfileID == "" {
+		return nil
+	}
+	profile := link.Profile
+	if planned != nil && planned.Class != "" && validation.NormalizeClassName(planned.Class) != validation.NormalizeClassName(profile.Class) {
+		return nil
+	}
+	if linked, err := s.chars.FindByExternalProfile(ctx, registration.ExternalSourceRisingGods, profile.ProfileID); err == nil && linked.ID != row.ID {
+		return nil
+	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	row.ExternalSource = registration.ExternalSourceRisingGods
+	row.ExternalProfileID = profile.ProfileID
+	row.ExternalProfileURL = profile.ProfileURL
+	row.ExternalProfileJSON = link.Raw
+	row.UpdatedAt = now
+	if row.ID != 0 {
+		return s.chars.Update(ctx, row)
+	}
+	return nil
 }
 
 func (s *Service) mergeRaids(ctx context.Context, source, sheetID, reason string, charIDs, playerIDs map[string]int64, actorID int64, p Plan, now time.Time, rep *Report) (map[string]int64, error) {

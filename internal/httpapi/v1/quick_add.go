@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"raid-website/internal/raidcorrection"
+	"raid-website/internal/registration"
 	"raid-website/internal/validation"
 )
 
@@ -44,6 +45,10 @@ func (a *API) quickAddCharacter(w http.ResponseWriter, r *http.Request) {
 	}
 	if errors.Is(err, raidcorrection.ErrQuickAddForbidden) {
 		WriteError(w, http.StatusForbidden, "forbidden", "Raidpersonal erforderlich.")
+		return
+	}
+	if errors.Is(err, registration.ErrProfileLinked) || errors.Is(err, registration.ErrProfileRequired) || errors.Is(err, registration.ErrProfileUnusable) {
+		registrationError(w, err)
 		return
 	}
 	if err != nil {

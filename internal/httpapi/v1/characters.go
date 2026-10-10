@@ -3,18 +3,15 @@ package v1
 import (
 	"errors"
 	"net/http"
-	"time"
 
 	"raid-website/internal/character"
+	"raid-website/internal/registration"
 	"raid-website/internal/validation"
 )
 
 type createCharacterRequest struct {
-	Name       string `json:"name"`
-	Class      string `json:"class"`
-	MainSpec   string `json:"main_spec"`
-	SecondSpec string `json:"second_spec"`
-	IsMain     *bool  `json:"is_main"`
+	ProfileID string `json:"profile_id"`
+	IsMain    *bool  `json:"is_main"`
 }
 
 func validClass(class string) bool {
@@ -37,8 +34,9 @@ func (a *API) listPlayerCharacters(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) createCharacter(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "authentication required")
 		return
 	}
 	playerID, ok := pathID(r, "id")
@@ -59,33 +57,17 @@ func (a *API) createCharacter(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	if req.Name == "" {
-		BadRequest(w, "name is required")
-		return
-	}
-	class := validation.NormalizeClassName(req.Class)
-	if class == "" || !validClass(class) {
-		BadRequest(w, "unknown class")
+	if req.ProfileID == "" {
+		BadRequest(w, "profile_id is required")
 		return
 	}
 	isMain := false
 	if req.IsMain != nil {
 		isMain = *req.IsMain
 	}
-	now := time.Now().UTC()
-	c := &character.Character{
-		PlayerID:   playerID,
-		Name:       req.Name,
-		Class:      class,
-		MainSpec:   req.MainSpec,
-		SecondSpec: req.SecondSpec,
-		IsMain:     isMain,
-		Active:     true,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	}
-	if err := a.Characters.Create(r.Context(), c); err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal", "could not create character")
+	c, err := a.Registration.CreateLinkedCharacter(r.Context(), registration.LinkedCharacterInput{PlayerID: playerID, ProfileID: req.ProfileID, IsMain: isMain, ActorID: &actor, Reason: "admin linked Rising-Gods character"})
+	if err != nil {
+		registrationError(w, err)
 		return
 	}
 	WriteJSON(w, http.StatusCreated, map[string]any{"data": c})

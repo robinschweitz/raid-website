@@ -3,6 +3,7 @@ package legacyimport
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
+	"raid-website/internal/registration"
 )
 
 const raidCSV = `"Raid ID","Timestamp","Position","Charakter","Rolle","Klasse","Spec","Spalte 1"
@@ -47,6 +49,28 @@ type fakeFetcher struct {
 
 func (f fakeFetcher) Fetch(_ context.Context, _ string) (SheetData, error) {
 	return f.data, f.err
+}
+
+type fakeExternal struct {
+	characters map[string]registration.ExternalCharacter
+}
+
+func (f fakeExternal) SearchCharacters(_ context.Context, query string) ([]registration.ExternalCharacter, error) {
+	var rows []registration.ExternalCharacter
+	for _, row := range f.characters {
+		if strings.Contains(strings.ToLower(row.Name), strings.ToLower(query)) {
+			rows = append(rows, row)
+		}
+	}
+	return rows, nil
+}
+
+func (f fakeExternal) LoadCharacter(_ context.Context, profileID string) (registration.ExternalCharacter, string, error) {
+	row, ok := f.characters[profileID]
+	if !ok {
+		return registration.ExternalCharacter{}, "", registration.ErrExternalNotFound
+	}
+	return row, `{"fixture":true}`, nil
 }
 
 func sampleSheet() SheetData {
@@ -221,4 +245,69 @@ func TestMergeThenIdempotent(t *testing.T) {
 	if bal2 != 170 {
 		t.Fatalf("re-merge changed balance: want 170 got %d", bal2)
 	}
+}
+
+func TestMergeLinksImportedCharacterWhenRisingGodsProfileMatches(t *testing.T) {
+	ctx := context.Background()
+	_, svc, players, _, _, _ := setup(t)
+	svc.WithExternalClient(fakeExternal{characters: map[string]registration.ExternalCharacter{
+		"9001": {ProfileID: "9001", Name: "Nylama", Class: "Todesritter", MainSpec: "Blut (Tank)", Level: 80, ProfileURL: "https://db.rising-gods.de/?profile=load&id=9001"},
+	}})
+	now := time.Now().UTC()
+	actor := &player.Player{Name: "Importer", Active: true, CreatedAt: now, UpdatedAt: now}
+	if err := players.Create(ctx, actor); err != nil {
+		t.Fatalf("create actor: %v", err)
+	}
+	previewImport(t, svc, "google_sheets", "sheet")
+	rep, err := svc.Merge(ctx, actor.ID, "google_sheets", "sheet", sampleSheet().Hash, "")
+	if err != nil || len(rep.Errors) != 0 {
+		t.Fatalf("merge: %+v %v", rep, err)
+	}
+	chars, err := svc.chars.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	linked := false
+	for _, row := range chars {
+		if row.Name == "Nylama" {
+			linked = row.ExternalSource == registration.ExternalSourceRisingGods && row.ExternalProfileID == "9001"
+		}
+		if row.Name == "Amisu" && row.ExternalProfileID != "" {
+			t.Fatalf("unmatched character linked: %+v", row)
+		}
+	}
+	if !linked {
+		t.Fatalf("Nylama was not linked: %+v", chars)
+	}
+}
+
+func TestSkippedMergeLinksExistingImportedCharacters(t *testing.T) {
+	ctx := context.Background()
+	_, svc, players, _, _, _ := setup(t)
+	now := time.Now().UTC()
+	actor := &player.Player{Name: "Importer", Active: true, CreatedAt: now, UpdatedAt: now}
+	if err := players.Create(ctx, actor); err != nil {
+		t.Fatalf("create actor: %v", err)
+	}
+	previewImport(t, svc, "google_sheets", "sheet")
+	if rep, err := svc.Merge(ctx, actor.ID, "google_sheets", "sheet", sampleSheet().Hash, ""); err != nil || len(rep.Errors) != 0 {
+		t.Fatalf("initial merge: %+v %v", rep, err)
+	}
+	svc.WithExternalClient(fakeExternal{characters: map[string]registration.ExternalCharacter{
+		"9001": {ProfileID: "9001", Name: "Nylama", Class: "Todesritter", MainSpec: "Blut (Tank)", Level: 80, ProfileURL: "https://db.rising-gods.de/?profile=load&id=9001"},
+	}})
+	rep, err := svc.Merge(ctx, actor.ID, "google_sheets", "sheet", sampleSheet().Hash, "")
+	if err != nil || !rep.Skipped {
+		t.Fatalf("skipped merge: %+v %v", rep, err)
+	}
+	chars, err := svc.chars.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range chars {
+		if row.Name == "Nylama" && row.ExternalProfileID == "9001" {
+			return
+		}
+	}
+	t.Fatalf("existing character was not linked: %+v", chars)
 }

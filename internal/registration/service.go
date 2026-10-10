@@ -33,6 +33,7 @@ var (
 	ErrCodeNotFound    = errors.New("registration code not found")
 	ErrProfileRequired = errors.New("rising-gods profile required")
 	ErrProfileUnusable = errors.New("rising-gods profile could not be used")
+	ErrProfileLinked   = errors.New("rising-gods profile already linked")
 )
 
 type Service struct {
@@ -57,17 +58,81 @@ type GeneratedCode struct {
 	PlainCode  string `json:"code"`
 }
 
+type LinkedCharacterInput struct {
+	PlayerID  int64
+	ProfileID string
+	IsMain    bool
+	ActorID   *int64
+	Reason    string
+}
+
 func (s *Service) SearchCharacters(ctx context.Context, query string) ([]ExternalCharacter, error) {
 	return s.external.SearchCharacters(ctx, query)
 }
 
-func (s *Service) CreateRequest(ctx context.Context, requesterID *int64, profileID string) (*Request, error) {
+func (s *Service) LoadCharacterProfile(ctx context.Context, profileID string) (ExternalCharacter, string, error) {
+	return s.loadUsableProfile(ctx, profileID)
+}
+
+func (s *Service) CreateLinkedCharacter(ctx context.Context, input LinkedCharacterInput) (*character.Character, error) {
+	profile, raw, err := s.loadUsableProfile(ctx, input.ProfileID)
+	if err != nil {
+		return nil, err
+	}
+	if input.PlayerID <= 0 {
+		return nil, ErrInvalid
+	}
+	now := time.Now().UTC()
+	var created *character.Character
+	err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		players := s.players.WithTx(tx)
+		chars := s.characters.WithTx(tx)
+		if _, err := players.Get(ctx, input.PlayerID); err != nil {
+			return err
+		}
+		c, err := chars.FindByExternalProfile(ctx, ExternalSourceRisingGods, profile.ProfileID)
+		if err == nil {
+			if c.PlayerID == input.PlayerID {
+				created = c
+				return nil
+			}
+			return ErrProfileLinked
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		c = characterFromProfile(input.PlayerID, profile, raw, now)
+		c.IsMain = input.IsMain
+		if err := chars.Create(ctx, c); err != nil {
+			return err
+		}
+		created = c
+		if input.ActorID != nil {
+			return audit.NewRepo(tx).Insert(ctx, &audit.Log{ActorID: input.ActorID, EntityType: "character", EntityID: fmt.Sprint(c.ID), Action: "create_linked_character", AfterJSON: mustJSON(c), Reason: input.Reason, CreatedAt: now})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return created, nil
+}
+
+func (s *Service) loadUsableProfile(ctx context.Context, profileID string) (ExternalCharacter, string, error) {
 	profile, raw, err := s.external.LoadCharacter(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf("load rising-gods profile: %w", ErrProfileUnusable)
+		return ExternalCharacter{}, "", fmt.Errorf("load rising-gods profile: %w", ErrProfileUnusable)
 	}
 	if profile.ProfileID == "" || profile.Name == "" || profile.Class == "" || profile.MainSpec == "" {
-		return nil, ErrProfileRequired
+		return ExternalCharacter{}, "", ErrProfileRequired
+	}
+	return profile, raw, nil
+}
+
+func (s *Service) CreateRequest(ctx context.Context, requesterID *int64, profileID string) (*Request, error) {
+	profile, raw, err := s.loadUsableProfile(ctx, profileID)
+	if err != nil {
+		return nil, err
 	}
 	purpose := PurposeNewAccount
 	if requesterID != nil {
@@ -275,12 +340,20 @@ func (s *Service) consumeCode(ctx context.Context, codeValue string, apply func(
 }
 
 func (s *Service) attachCharacter(ctx context.Context, tx bun.Tx, chars *character.Repo, playerID int64, req *Request, actorID *int64, now time.Time) error {
+	if existing, err := chars.FindByExternalProfile(ctx, req.ExternalSource, req.ExternalProfileID); err == nil {
+		if existing.PlayerID != playerID {
+			return ErrProfileLinked
+		}
+		return nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
 	c, err := chars.FindByName(ctx, req.CharacterName)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 	if errors.Is(err, sql.ErrNoRows) {
-		c = &character.Character{PlayerID: playerID, Name: req.CharacterName, Class: req.Class, MainSpec: req.MainSpec, SecondSpec: req.SecondSpec, Active: true, CreatedAt: now, UpdatedAt: now}
+		c = characterFromRequest(playerID, req, now)
 		return chars.Create(ctx, c)
 	}
 	if c.PlayerID == playerID {
@@ -292,6 +365,10 @@ func (s *Service) attachCharacter(ctx context.Context, tx bun.Tx, chars *charact
 	c.MainSpec = req.MainSpec
 	c.SecondSpec = req.SecondSpec
 	c.Active = true
+	c.ExternalSource = req.ExternalSource
+	c.ExternalProfileID = req.ExternalProfileID
+	c.ExternalProfileURL = req.ExternalProfileURL
+	c.ExternalProfileJSON = req.RawProfileJSON
 	c.UpdatedAt = now
 	if err := chars.Update(ctx, c); err != nil {
 		return err
@@ -301,6 +378,19 @@ func (s *Service) attachCharacter(ctx context.Context, tx bun.Tx, chars *charact
 		return audit.NewRepo(tx).Insert(ctx, &audit.Log{ActorID: actorID, EntityType: "character", EntityID: fmt.Sprint(c.ID), Action: "claim_character", BeforeJSON: string(before), AfterJSON: string(after), Reason: "registration code character claim", CreatedAt: now})
 	}
 	return nil
+}
+
+func characterFromProfile(playerID int64, profile ExternalCharacter, raw string, now time.Time) *character.Character {
+	return &character.Character{PlayerID: playerID, Name: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, Active: true, ExternalSource: ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, ExternalProfileJSON: raw, CreatedAt: now, UpdatedAt: now}
+}
+
+func characterFromRequest(playerID int64, req *Request, now time.Time) *character.Character {
+	return &character.Character{PlayerID: playerID, Name: req.CharacterName, Class: req.Class, MainSpec: req.MainSpec, SecondSpec: req.SecondSpec, Active: true, ExternalSource: req.ExternalSource, ExternalProfileID: req.ExternalProfileID, ExternalProfileURL: req.ExternalProfileURL, ExternalProfileJSON: req.RawProfileJSON, CreatedAt: now, UpdatedAt: now}
+}
+
+func mustJSON(v any) string {
+	b, _ := json.Marshal(v)
+	return string(b)
 }
 
 func newCode() (string, string, error) {

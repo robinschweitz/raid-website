@@ -13,6 +13,7 @@ import (
 	"raid-website/internal/audit"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
+	"raid-website/internal/registration"
 	"raid-website/internal/validation"
 )
 
@@ -26,9 +27,17 @@ var (
 )
 
 // Service applies history changes with audit and append-only compensation.
-type Service struct{ repo *Repo }
+type Service struct {
+	repo     *Repo
+	external registration.ExternalClient
+}
 
 func NewService(repo *Repo) *Service { return &Service{repo: repo} }
+
+func (s *Service) WithExternalClient(external registration.ExternalClient) *Service {
+	s.external = external
+	return s
+}
 
 func referenceError(err error) error {
 	if errors.Is(err, sql.ErrNoRows) {

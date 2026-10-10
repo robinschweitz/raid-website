@@ -30,6 +30,8 @@ func registrationError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusConflict, "username_taken", "Benutzername ist bereits vergeben.")
 	case errors.Is(err, registration.ErrForbidden):
 		WriteError(w, http.StatusForbidden, "registration_forbidden", "Dieser Code passt nicht zu dieser Aktion.")
+	case errors.Is(err, registration.ErrProfileLinked):
+		WriteError(w, http.StatusConflict, "profile_already_linked", "Dieser Rising-Gods-Charakter ist bereits verknüpft.")
 	case errors.Is(err, registration.ErrRequestNotFound), errors.Is(err, registration.ErrCodeNotFound):
 		WriteError(w, http.StatusNotFound, "not_found", "Eintrag nicht gefunden.")
 	case errors.Is(err, registration.ErrInvalid), errors.Is(err, registration.ErrProfileRequired), errors.Is(err, registration.ErrProfileUnusable):

@@ -14,7 +14,10 @@ import (
 )
 
 func TestCharacterCRUDAndRename(t *testing.T) {
-	srv, bdb := setupServer(t)
+	feed := fakeRegistrationFeed{characters: map[string]registration.ExternalCharacter{
+		"101": {ProfileID: "101", Name: "Altchar", Class: "Krieger", MainSpec: "Waffen", Level: 80, ProfileURL: "https://db.rising-gods.de/?profile=load&id=101"},
+	}}
+	srv, bdb := setupServerWithOptions(t, httpapi.Options{RegistrationFeed: feed})
 	client := srv.Client()
 	seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
 	token := login(t, client, srv, "admin", "pw")
@@ -22,10 +25,8 @@ func TestCharacterCRUDAndRename(t *testing.T) {
 	playerID := createPlayer(t, client, srv, token, "Owner")
 
 	status, body := do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/characters", srv.URL, playerID), token, map[string]any{
-		"name":      "Altchar",
-		"class":     "krieger",
-		"main_spec": "Waffen",
-		"is_main":   true,
+		"profile_id": "101",
+		"is_main":    true,
 	})
 	if status != http.StatusCreated {
 		t.Fatalf("create character: status %d body %s", status, body)

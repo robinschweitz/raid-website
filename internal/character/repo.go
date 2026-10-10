@@ -50,6 +50,15 @@ func (r *Repo) FindByName(ctx context.Context, name string) (*Character, error) 
 	return c, nil
 }
 
+func (r *Repo) FindByExternalProfile(ctx context.Context, source, profileID string) (*Character, error) {
+	c := new(Character)
+	err := r.db.NewSelect().Model(c).Where("external_source = ? AND external_profile_id = ?", source, profileID).Order("id ASC").Limit(1).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 func (r *Repo) Update(ctx context.Context, c *Character) error {
 	_, err := r.db.NewUpdate().Model(c).WherePK().Exec(ctx)
 	return err

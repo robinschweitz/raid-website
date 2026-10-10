@@ -12,6 +12,7 @@ import (
 	"raid-website/internal/attendance"
 	"raid-website/internal/character"
 	"raid-website/internal/player"
+	"raid-website/internal/registration"
 	"raid-website/internal/validation"
 )
 
@@ -29,18 +30,23 @@ type QuickAdd struct {
 	RequestID  string                    `json:"request_id"`
 	PlayerID   int64                     `json:"player_id"`
 	PlayerName string                    `json:"player_name"`
-	Name       string                    `json:"name"`
-	Class      string                    `json:"class"`
-	MainSpec   string                    `json:"main_spec"`
-	SecondSpec string                    `json:"second_spec"`
+	ProfileID  string                    `json:"profile_id"`
 	Role       validation.AttendanceRole `json:"role"`
 	Reason     string                    `json:"reason"`
 }
 
 // AddNewCharacter creates identity and attendance atomically and supports safe retries.
 func (s *Service) AddNewCharacter(ctx context.Context, raidID, actor int64, input QuickAdd) (*attendance.Attendance, error) {
+	external := s.external
+	if external == nil {
+		external = registration.RisingGodsClient{}
+	}
+	profile, raw, err := external.LoadCharacter(ctx, input.ProfileID)
+	if err != nil || profile.ProfileID == "" || profile.Name == "" || profile.Class == "" || profile.MainSpec == "" {
+		return nil, registration.ErrProfileUnusable
+	}
 	var result *attendance.Attendance
-	err := s.repo.InTransaction(ctx, func(r *Repo) error {
+	err = s.repo.InTransaction(ctx, func(r *Repo) error {
 		staff, err := r.players.Get(ctx, actor)
 		if err != nil {
 			return referenceError(err)
@@ -48,10 +54,10 @@ func (s *Service) AddNewCharacter(ctx context.Context, raidID, actor int64, inpu
 		if !staff.Role.AtLeast(validation.RoleRaidassistent) {
 			return ErrQuickAddForbidden
 		}
-		input.Name = strings.TrimSpace(input.Name)
 		input.PlayerName = strings.TrimSpace(input.PlayerName)
-		input.Class = validation.NormalizeClassName(input.Class)
-		if input.Name == "" || strings.TrimSpace(input.RequestID) == "" || len(input.RequestID) > 128 || input.PlayerID < 0 || (input.PlayerID > 0 && input.PlayerName != "") || !slices.Contains(validation.ClassSpecs[input.Class], input.MainSpec) || (input.SecondSpec != "" && !slices.Contains(validation.ClassSpecs[input.Class], input.SecondSpec)) {
+		input.ProfileID = strings.TrimSpace(input.ProfileID)
+		profile.Class = validation.NormalizeClassName(profile.Class)
+		if input.ProfileID == "" || strings.TrimSpace(input.RequestID) == "" || len(input.RequestID) > 128 || input.PlayerID < 0 || (input.PlayerID > 0 && input.PlayerName != "") || !slices.Contains(validation.ClassSpecs[profile.Class], profile.MainSpec) || (profile.SecondSpec != "" && !slices.Contains(validation.ClassSpecs[profile.Class], profile.SecondSpec)) {
 			return ErrInvalid
 		}
 		payload, err := json.Marshal(input)
@@ -77,7 +83,7 @@ func (s *Service) AddNewCharacter(ctx context.Context, raidID, actor int64, inpu
 		if ownerID == 0 {
 			name := input.PlayerName
 			if name == "" {
-				name = input.Name
+				name = profile.Name
 			}
 			if _, err := r.players.FindByName(ctx, name); err == nil {
 				return ErrPlayerExists
@@ -96,7 +102,22 @@ func (s *Service) AddNewCharacter(ctx context.Context, raidID, actor int64, inpu
 		if _, err := r.players.Get(ctx, ownerID); err != nil {
 			return referenceError(err)
 		}
-		c := &character.Character{PlayerID: ownerID, Name: input.Name, Class: input.Class, MainSpec: input.MainSpec, SecondSpec: input.SecondSpec, Active: true, CreatedAt: now, UpdatedAt: now}
+		if existing, err := r.characters.FindByExternalProfile(ctx, registration.ExternalSourceRisingGods, profile.ProfileID); err == nil {
+			if existing.PlayerID != ownerID {
+				return registration.ErrProfileLinked
+			}
+			result = &attendance.Attendance{RaidID: raidID, PlayerID: ownerID, CharacterID: existing.ID, Role: input.Role}
+			if err := NewService(r).SaveAttendance(ctx, result, actor, input.Reason); err != nil {
+				return err
+			}
+			if err := s.log(ctx, r, "raid_quick_add", result.ID, actor, input.Reason, nil, result); err != nil {
+				return err
+			}
+			return r.saveQuickAddRequest(ctx, raidID, actor, input.RequestID, string(payload), result.ID)
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		c := &character.Character{PlayerID: ownerID, Name: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, Active: true, ExternalSource: registration.ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, ExternalProfileJSON: raw, CreatedAt: now, UpdatedAt: now}
 		if err := r.characters.Create(ctx, c); err != nil {
 			return err
 		}

@@ -19,6 +19,9 @@ export interface Player {
   username: string | null
   role: Role
   active: boolean
+  external_source: string
+  external_profile_id: string
+  external_profile_url: string
   created_at: string
   updated_at: string
 }
@@ -40,6 +43,9 @@ export interface Character {
   second_spec: string
   is_main: boolean
   active: boolean
+  external_source: string
+  external_profile_id: string
+  external_profile_url: string
   created_at: string
   updated_at: string
 }

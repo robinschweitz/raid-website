@@ -245,8 +245,8 @@ func (s *Service) consumeCode(ctx context.Context, codeValue string, apply func(
 		if err != nil {
 			return err
 		}
-		row.Code.UsedAt = &now
-		row.Code.UsedByPlayerID = &usedBy
+		row.UsedAt = &now
+		row.UsedByPlayerID = &usedBy
 		if err := repo.UpdateCode(ctx, &row.Code); err != nil {
 			return err
 		}

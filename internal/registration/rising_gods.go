@@ -194,12 +194,13 @@ func splitJSObjects(data string) []string {
 			inString = true
 			continue
 		}
-		if ch == '{' {
+		switch ch {
+		case '{':
 			if depth == 0 {
 				objectStart = i
 			}
 			depth++
-		} else if ch == '}' {
+		case '}':
 			depth--
 			if depth == 0 && objectStart >= 0 {
 				out = append(out, data[objectStart:i+1])
@@ -243,9 +244,10 @@ func extractRegisterProfileObject(body string) string {
 			inString = true
 			continue
 		}
-		if ch == '{' {
+		switch ch {
+		case '{':
 			depth++
-		} else if ch == '}' {
+		case '}':
 			depth--
 			if depth == 0 {
 				return body[start : i+1]

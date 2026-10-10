@@ -118,7 +118,7 @@ func TestArchiveAPIPrerequisitesHistoryAndRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	url := fmt.Sprintf("%s/api/v1/raids/%d", srv.URL, rd.ID)
-	status, body := do(t, client, http.MethodPost, url+"/archive", member, nil)
+	status, _ := do(t, client, http.MethodPost, url+"/archive", member, nil)
 	if status != http.StatusForbidden {
 		t.Fatalf("member archive: %d", status)
 	}
@@ -126,7 +126,7 @@ func TestArchiveAPIPrerequisitesHistoryAndRetry(t *testing.T) {
 	if status != http.StatusForbidden {
 		t.Fatalf("member attach: %d", status)
 	}
-	status, body = do(t, client, http.MethodPost, url+"/archive", assistant, nil)
+	status, body := do(t, client, http.MethodPost, url+"/archive", assistant, nil)
 	assertArchiveCode(t, status, body, "series_required")
 	status, body = do(t, client, http.MethodPatch, url, assistant, map[string]any{"series_id": series.ID})
 	if status != http.StatusOK {

@@ -37,18 +37,6 @@ func (r *Repo) listByCharacter(ctx context.Context, charID int64) ([]Wish, error
 	return rows, nil
 }
 
-func (r *Repo) listByPlayer(ctx context.Context, playerID int64) ([]Wish, error) {
-	rows := []Wish{}
-	if err := r.db.NewSelect().
-		Model(&rows).
-		Where("player_id = ?", playerID).
-		Order("character_id ASC, priority DESC, id ASC").
-		Scan(ctx); err != nil {
-		return nil, err
-	}
-	return rows, nil
-}
-
 func (r *Repo) add(ctx context.Context, wish *Wish) error {
 	if wish.ItemID == "" || strings.TrimSpace(wish.ItemName) == "" {
 		return ErrInvalid

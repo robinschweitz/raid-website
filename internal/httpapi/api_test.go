@@ -277,7 +277,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("archive did not finalize and schedule future successor: %s", body)
 	}
 
-	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/points", srv.URL, plain), "", nil)
+	status, _ = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/points", srv.URL, plain), "", nil)
 	if status != http.StatusUnauthorized {
 		t.Fatalf("get points unauthenticated: want 401 got %d", status)
 	}
@@ -297,7 +297,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 		t.Fatalf("plain balance: want 10 got %d", pointsOut.Data.Balance)
 	}
 
-	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/points", srv.URL, rewarded), token, nil)
+	_, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/points", srv.URL, rewarded), token, nil)
 	if err := json.Unmarshal(body, &pointsOut); err != nil {
 		t.Fatalf("decode rewarded points: %v", err)
 	}

@@ -8,12 +8,6 @@ const (
 	TokenEroberer    = "Weiheabzeichen des Eroberers"
 )
 
-var tokenNamesLower = []string{
-	strings.ToLower(TokenBeschuetzer),
-	strings.ToLower(TokenBezwinger),
-	strings.ToLower(TokenEroberer),
-}
-
 var TokenItemNames = []string{TokenBeschuetzer, TokenBezwinger, TokenEroberer}
 
 func IsTokenAward(itemName string) bool {

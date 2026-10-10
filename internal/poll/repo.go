@@ -190,7 +190,7 @@ func (r *Repo) loadOptions(ctx context.Context, polls []Poll) error {
 		byID[polls[i].ID] = &polls[i]
 	}
 	var opts []Option
-	if err := r.db.NewSelect().Model(&opts).Where("poll_id IN (?)", bun.In(ids)).Order("poll_id ASC, sort_order ASC, id ASC").Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(&opts).Where("poll_id IN (?)", bun.List(ids)).Order("poll_id ASC, sort_order ASC, id ASC").Scan(ctx); err != nil {
 		return err
 	}
 	for _, opt := range opts {
@@ -213,7 +213,7 @@ func (r *Repo) loadVoteChoices(ctx context.Context, votes []Vote) error {
 		byID[votes[i].ID] = &votes[i]
 	}
 	var choices []VoteChoice
-	if err := r.db.NewSelect().Model(&choices).Where("vote_id IN (?)", bun.In(ids)).Order("vote_id ASC, sort_order ASC, id ASC").Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(&choices).Where("vote_id IN (?)", bun.List(ids)).Order("vote_id ASC, sort_order ASC, id ASC").Scan(ctx); err != nil {
 		return err
 	}
 	for _, choice := range choices {

@@ -301,14 +301,7 @@ func convertLocalizedViews(input map[string]localizedItemView) map[string]Locali
 	}
 	out := make(map[string]LocalizedItemView, len(input))
 	for locale, view := range input {
-		out[locale] = LocalizedItemView{
-			Name:           view.Name,
-			Icon:           view.Icon,
-			TooltipHTML:    view.TooltipHTML,
-			TooltipText:    view.TooltipText,
-			FallbackLocale: view.FallbackLocale,
-			FetchError:     view.FetchError,
-		}
+		out[locale] = LocalizedItemView(view)
 	}
 	return out
 }

@@ -1,12 +1,14 @@
 # Coding Rules
 
 Regeln für Code in diesem Repository. Dieses Dokument erklärt die Anforderungen aus `AGENTS.md`
-und die akzeptierten Entscheidungen aus `docs/decisions/ADR-*.md` für den Alltag des
-Schreibens.
+und die akzeptierten Entscheidungen aus `docs/decisions/*.md` für den Alltag des Schreibens.
 
-Vorrang: `AGENTS.md` → `docs/decisions/ADR-*.md` → `ARCHITECTURE.md` → dieses Dokument.
+Vorrang: `AGENTS.md` → `docs/decisions/*.md` → `ARCHITECTURE.md` → dieses Dokument.
 Widersprüche werden nicht stillschweigend aufgelöst; der Owner entscheidet, bei
-verhaltensrelevanten Fragen mit einer neuen ADR.
+verhaltensrelevanten Fragen mit einer neuen ADR. Alte Entscheidungen sind zu befolgen, solange sie
+aktuell sind. Wenn der Owner eine alte Entscheidung ändert oder verwirft, wird das aktiv als neue,
+supersedende oder ergänzende ADR dokumentiert, statt die alte Entscheidung weiter zu erzwingen
+(ADR-043).
 
 Die MUSS-Regeln sind nicht verhandelbar. Bei Zweifel gilt §1.4: **nicht raten, fragen.**
 

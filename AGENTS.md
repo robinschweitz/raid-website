@@ -6,10 +6,16 @@ future agents do not re-litigate them or silently change them.
 
 **If a rule is not listed here, you do not know it. Do not invent it — ask.**
 
+Accepted decisions are current project memory, not untouchable law. Follow them while they are
+current. If the owner says an old decision is wrong, incomplete, or no longer wanted, update the
+decision record in the same change: add a new ADR that supersedes or amends the old one, and update
+this file when it summarizes the changed rule. Do not force an implementation just because an old ADR
+exists; ask, then record the new decision explicitly (ADR 043).
+
 Authoritative sources, in order of precedence:
 
 1. This file (owner-level requirements and constraints)
-2. `docs/decisions/*.md` (one accepted decision per file, ADR 001-033)
+2. `docs/decisions/*.md` (one accepted decision per file)
 3. `ARCHITECTURE.md` (module map and principles)
 4. `CODING_RULES.md` (defines the coding rules)
 5. `README.md` (commands)
@@ -357,8 +363,8 @@ A change is done when:
 2. Business logic lives in the domain package; handlers stay thin.
 3. It is covered by tests, including the permission boundary it touches.
 4. `gofmt`, `go vet`, `go build ./...`, `go test ./...`, `npm run build`, `npm run lint` all pass.
-5. Any behaviour change is reflected in the ADR set — new decisions get a new ADR file, they do not
-   silently rewrite an old one.
+5. Any behaviour change is reflected in the ADR set. New or changed decisions get a new ADR file
+   that supersedes or amends the old decision; do not silently rewrite old project history.
 
 ---
 

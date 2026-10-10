@@ -25,9 +25,6 @@ const qualityLabels: Record<number, string> = {
 function itemMeta(item: CatalogItemDrop): string[] {
   const values: string[] = []
   if (item.item_level) values.push(`iLvl ${item.item_level}`)
-  if (item.required_level) values.push(`Stufe ${item.required_level}`)
-  if (item.slot) values.push(item.slot)
-  if (item.type) values.push(item.type)
   if (item.set_name) values.push(`Set: ${item.set_name}`)
   if (item.conditional) values.push('Bedingte Beute')
   return values
@@ -64,7 +61,6 @@ const bindingLabels: Record<string, string> = {
 
 function itemStats(item: CatalogItemDrop): { label: string; value: string }[] {
   const values: { label: string; value: string }[] = []
-  if (item.armor) values.push({ label: 'Rüstung', value: String(item.armor) })
   const stats = item.stats ?? {}
   for (const [key, value] of Object.entries(stats)) {
     values.push({ label: statLabels[key] ?? key.replace(/_/g, ' '), value: `+${value}` })
@@ -77,11 +73,18 @@ function itemStats(item: CatalogItemDrop): { label: string; value: string }[] {
     if (item.spirit) values.push({ label: 'Willenskraft', value: `+${item.spirit}` })
     if (item.spell_power) values.push({ label: 'Zaubermacht', value: `+${item.spell_power}` })
   }
-  if (item.dps != null) values.push({ label: 'DPS', value: item.dps.toFixed(2) })
-  if (item.dps == null && item.min_damage != null && item.max_damage != null) {
-    values.push({ label: 'Schaden', value: `${item.min_damage.toFixed(1)}-${item.max_damage.toFixed(1)}` })
-  }
   return values
+}
+
+function itemTooltipText(item: CatalogItemDrop): string {
+  return item.locales?.deDE?.tooltip_text ?? item.locales?.enUS?.tooltip_text ?? ''
+}
+
+function itemTooltipDamage(item: CatalogItemDrop): string {
+  const text = itemTooltipText(item)
+  const match = text.match(/\d[\d.,]*\s*-\s*\d[\d.,]*\s+[^\n]*Schaden/i)
+    ?? text.match(/\d[\d.,]*\s*-\s*\d[\d.,]*\s+[^\n]*Damage/i)
+  return match?.[0] ?? ''
 }
 
 function wowheadItemURL(itemID: string): string {
@@ -93,24 +96,34 @@ function itemIconURL(item: CatalogItemDrop): string {
   return icon ? `https://wow.zamimg.com/images/wow/icons/large/${icon}.jpg` : ''
 }
 
-function itemWeaponLine(item: CatalogItemDrop): string {
-  const weapon = item.weapon
-  const min = weapon?.min_damage ?? item.min_damage
-  const max = weapon?.max_damage ?? item.max_damage
-  const speed = weapon?.speed
-  const dps = weapon?.dps ?? item.dps
-  const parts = []
-  if (min != null && max != null) parts.push(`${min.toFixed(0)}-${max.toFixed(0)} Schaden`)
-  if (speed != null) parts.push(`Tempo ${speed.toFixed(2)}`)
-  if (dps != null) parts.push(`${dps.toFixed(2)} DPS`)
-  return parts.join(' · ')
+function itemWeaponDetails(item: CatalogItemDrop): { kind: string; damage: string; speed: string; dps: string } | null {
+  const min = item.weapon?.min_damage ?? item.min_damage
+  const max = item.weapon?.max_damage ?? item.max_damage
+  const speed = item.weapon?.speed
+  const dps = item.weapon?.dps ?? item.dps
+  if (min == null && max == null && speed == null && dps == null) return null
+  return {
+    kind: [item.slot, item.type].filter(Boolean).join(' · '),
+    damage: min != null && max != null ? `${min.toFixed(0)} - ${max.toFixed(0)} Schaden` : itemTooltipDamage(item),
+    speed: speed != null ? `Tempo ${speed.toFixed(2)}` : '',
+    dps: dps != null ? `(${dps.toFixed(2)} Schaden pro Sekunde)` : '',
+  }
+}
+
+function CatalogWeaponLines({ details }: { details: NonNullable<ReturnType<typeof itemWeaponDetails>> }) {
+  return <div className="catalog-weapon-lines">
+    {details.kind && <p className="catalog-weapon-kind">{details.kind}</p>}
+    {(details.damage || details.speed) && <p className="catalog-weapon-damage"><span>{details.damage}</span><span>{details.speed}</span></p>}
+    {details.dps && <p className="catalog-weapon-dps">{details.dps}</p>}
+  </div>
 }
 
 function localizedTooltipLines(item: CatalogItemDrop): string[] {
-  const text = item.locales?.deDE?.tooltip_text ?? item.locales?.enUS?.tooltip_text ?? ''
+  const text = itemTooltipText(item)
   if (!text) return item.effects ?? []
   return text.split('\n').map((line) => line.trim()).filter((line) => {
     if (!line || line === item.name || line.startsWith('Item Level') || line.startsWith('Gegenstandsstufe')) return false
+    if (line.startsWith('Benötigt Stufe') || line.startsWith('Requires Level')) return false
     if (line.startsWith('Verkaufspreis') || line.startsWith('Sell Price') || line.startsWith('Dropchance') || line.startsWith('Drop Chance')) return false
     return /^(Anlegen:|Benutzen:|Chance|Erhöht|Verbessert|Benötigt|Equip:|Use:|Requires)/.test(line)
   }).slice(0, 5)
@@ -213,7 +226,9 @@ export function LootCatalogPage() {
         </div>
         <p role="status">{results.length} Beutevarianten gefunden</p>
         {results.length === 0 && <p className="muted">Keine passende Beute gefunden. Filter ändern oder später erneut versuchen.</p>}
-        <div className="catalog-results">{results.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((item) => <article className="subcard catalog-item-card" key={JSON.stringify([item.boss_id, item.item_id, item.raid_size, item.mode])}>
+        <div className="catalog-results">{results.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((item) => {
+          const weaponDetails = itemWeaponDetails(item)
+          return <article className="subcard catalog-item-card" key={JSON.stringify([item.boss_id, item.item_id, item.raid_size, item.mode])}>
           <div className="catalog-tooltip-card">
             <div className="catalog-item-main">
               <a className="catalog-item-art" href={wowheadItemURL(item.item_id)} target="_blank" rel="noreferrer" aria-label={`${item.name} bei Wowhead öffnen`}>{itemIconURL(item) ? <img src={itemIconURL(item)} alt="" /> : <NavIcon name="package" />}</a>
@@ -226,12 +241,13 @@ export function LootCatalogPage() {
                 </div>
               </div>
             </div>
-            {(item.binding_type || item.unique || itemWeaponLine(item)) && <div className="catalog-tooltip-lines">
+            {(item.binding_type || item.unique || weaponDetails) && <div className="catalog-tooltip-lines">
               {item.binding_type && <p>{bindingLabels[item.binding_type] ?? item.binding_type}</p>}
               {item.unique && <p>Einzigartig</p>}
-              {itemWeaponLine(item) && <p>{itemWeaponLine(item)}</p>}
+              {weaponDetails && <CatalogWeaponLines details={weaponDetails} />}
             </div>}
-            {itemStats(item).length > 0 && <dl className="catalog-stat-grid">{itemStats(item).map((stat) => <div key={stat.label}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl>}
+            {item.armor != null && <p className="catalog-armor-line"><strong>{item.armor}</strong> Rüstung</p>}
+            {itemStats(item).length > 0 && <dl className="catalog-stat-grid">{itemStats(item).map((stat) => <div key={stat.label}><dt>{stat.value}</dt><dd>{stat.label}</dd></div>)}</dl>}
             {(item.sockets?.length || item.socket_bonus) && <div className="catalog-sockets">
               {item.sockets?.map((socket, index) => <span key={`${socket}-${index}`} className={`socket-${socket}`}>{socket}</span>)}
               {item.socket_bonus && <strong>Sockelbonus: {item.socket_bonus.text}</strong>}
@@ -247,7 +263,7 @@ export function LootCatalogPage() {
               </button>
             })}
           </div></div>}
-        </article>)}</div>
+        </article>})}</div>
         {results.length > pageSize && <div className="catalog-pagination"><button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Zurück</button><span>Seite {currentPage + 1} / {lastPage + 1}</span><button type="button" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>Weiter</button></div>}
       </>}
       <button type="button" disabled={loading} onClick={() => void load()}>Beute neu laden</button>

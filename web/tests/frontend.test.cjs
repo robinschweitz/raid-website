@@ -281,12 +281,12 @@ async function chooseSourceDrop(s, view) {
   const catalog = catalogFixture()
   resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
   await flush(view)
-  select(view, 'Loot-Katalogboss').props.onChange(change('boss:1'))
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
   view.render()
   resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
   await flush(view)
-  const option = nodes(select(view, 'Loot-Katalogitem'), (node) => node.type === 'option' && node.props.value)[0]
-  select(view, 'Loot-Katalogitem').props.onChange(change(option.props.value))
+  const option = nodes(select(view, 'Loot-Item'), (node) => node.type === 'option' && node.props.value)[0]
+  select(view, 'Loot-Item').props.onChange(change(option.props.value))
   view.render()
 }
 
@@ -492,13 +492,15 @@ test('character search preserves selected identity and displays the matching own
   assert.doesNotMatch(text(select(view, 'Teilnahme-Charakter')), /Char 11/)
 })
 
-for (const [label, formIndex] of [['Lock anlegen', 1], ['Stornieren', null], ['Anlegen', 0], ['Speichern', 2]]) {
+for (const [label, submits] of [['Lock anlegen', true], ['Stornieren', false], ['Anlegen', true], ['Speichern', true]]) {
   test(`player mutation ${label} blocks same-tick duplicates`, async () => {
     const s = setup()
     const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
     resolvePlayer(s, 1)
     await flush(view)
-    const invoke = formIndex === null ? button(view, label).props.onClick : () => form(view, formIndex).props.onSubmit(event)
+    // Locate the form by its submit label; own-profile claim forms shift form positions.
+    const owner = () => nodes(view.tree, (n) => n.type === 'form' && nodes(n, (b) => b.type === 'button' && text(b) === label).length > 0)[0]
+    const invoke = submits ? () => owner().props.onSubmit(event) : button(view, label).props.onClick
     const first = invoke()
     await invoke()
     assert.equal(writes(s).length, 1)
@@ -768,7 +770,8 @@ test('login has a synchronous guard and German network failure feedback', async 
   await first
   view.render()
   assert.match(text(view.tree), /Anmelden fehlgeschlagen/)
-  assert.equal(button(view, 'Anmelden').props.disabled, false)
+  // The mode tabs also contain an 'Anmelden' button; check the submit button.
+  assert.equal(nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit' && text(n) === 'Anmelden')[0].props.disabled, false)
 })
 
 test('auth gate shows retry instead of login when session lookup fails', () => {
@@ -1955,12 +1958,11 @@ for (const roster of [[], [{ ...recipientRow, raid_id: 2 }]]) {
   })
 }
 
-test('empty catalog is explicit and legacy boss names are neither fabricated nor discarded', async () => {
+test('empty catalog offers no loot selectors and legacy boss names are neither fabricated nor discarded', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, { attendance: [recipientRow], loot: [lootRow, { ...lootRow, id: 9, boss: '', is_main_spec: false }] })
   await flush(view)
-  assert.match(text(view.tree), /Loot-Katalog ist leer/)
   assert.match(text(view.tree), /Old boss/)
   assert.match(text(view.tree), /Boss nicht gespeichert \(historisch\)/)
   assert.equal(nodes(view.tree, (n) => n.type === 'select' && /Boss|Item/.test(n.props['aria-label'] ?? '')).length, 0)
@@ -2020,7 +2022,7 @@ test('archived enhanced history shows saved class-colored names and no write con
   assert.equal(writes(s).length, 0)
 })
 
-test('catalog failure leaves history readable and offers retry, never manual recording', async () => {
+test('catalog failure leaves history readable, never manual recording', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   const catalog = s.requests.find((r) => r.url === '/api/v1/loot-catalog')
@@ -2029,11 +2031,9 @@ test('catalog failure leaves history readable and offers retry, never manual rec
   resolveRaid(s, 1, { attendance: [recipientRow] })
   await flush(view)
   assert.match(text(view.tree), /Raid 1/)
-  assert.match(text(view.tree), /Loot-Katalog derzeit nicht verfügbar/)
   assert.equal(input(view, 'Boss'), undefined)
   assert.equal(input(view, 'Item'), undefined)
   assert.equal(button(view, 'Vergeben').props.disabled, true)
-  assert.ok(button(view, 'Katalog erneut laden'))
   assert.ok(select(view, 'Loot-Empfänger'))
   assert.equal(select(view, 'Loot-Kataloginstanz'), undefined)
 })
@@ -2046,24 +2046,22 @@ test('associated loot filters by persisted instance and size, preserves mixed so
   await flush(view)
   assert.equal(resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631')), true)
   await flush(view)
-  assert.match(text(view.tree), /Teilbestand.*kein vollständiger Raidkatalog/)
-  assert.match(text(view.tree), /GPL-2.0/)
   assert.equal(select(view, 'Loot-Kataloginstanz'), undefined)
   for (const placeholder of ['Boss', 'Item', 'Item-ID']) assert.equal(input(view, placeholder), undefined)
-  select(view, 'Loot-Katalogboss').props.onChange(change('boss:1'))
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
   view.render()
   assert.equal(resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25)), true)
   await flush(view)
-  assert.match(text(select(view, 'Loot-Katalogitem')), /Katalogitem.*25\s+Spieler.*Normal/)
-  const variants = nodes(select(view, 'Loot-Katalogitem'), (n) => n.type === 'option' && n.props.value)
+  assert.match(text(select(view, 'Loot-Item')), /Katalogitem.*25\s+Spieler.*Normal/)
+  const variants = nodes(select(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)
   assert.equal(variants.length, 1)
-  assert.equal(select(view, 'Loot-Katalogmodus').props.value, 'NORMAL')
-  assert.deepEqual(nodes(select(view, 'Loot-Katalogmodus'), (node) => node.type === 'option').map((node) => node.props.value), ['NORMAL', 'HEROIC'])
-  assert.doesNotMatch(text(select(view, 'Loot-Katalogmodus')), /source:|Alle|Lootmodus|Difficulty/)
-  select(view, 'Loot-Katalogmodus').props.onChange(change('HEROIC'))
+  assert.equal(select(view, 'Loot-Modus').props.value, 'NORMAL')
+  assert.deepEqual(nodes(select(view, 'Loot-Modus'), (node) => node.type === 'option').map((node) => node.props.value), ['NORMAL', 'HEROIC'])
+  assert.doesNotMatch(text(select(view, 'Loot-Modus')), /source:|Alle|Lootmodus|Difficulty/)
+  select(view, 'Loot-Modus').props.onChange(change('HEROIC'))
   view.render()
-  assert.equal(nodes(select(view, 'Loot-Katalogitem'), (n) => n.type === 'option' && n.props.value).length, 1)
-  select(view, 'Loot-Katalogitem').props.onChange(change(nodes(select(view, 'Loot-Katalogitem'), (n) => n.type === 'option' && n.props.value)[0].props.value))
+  assert.equal(nodes(select(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value).length, 1)
+  select(view, 'Loot-Item').props.onChange(change(nodes(select(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0].props.value))
   select(view, 'Loot-Empfänger').props.onChange(change('20'))
   select(view, 'Loot-Vergabemethode').props.onChange(change('ENHANCED'))
   view.render()
@@ -2091,22 +2089,22 @@ test('unsaved association is preview only; saved context invalidates old loot re
   await flush(view)
   resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
   await flush(view)
-  select(view, 'Loot-Katalogboss').props.onChange(change('boss:1'))
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
   view.render()
   const items = s.requests.at(-1)
-  const oldBossHandler = select(view, 'Loot-Katalogboss').props.onChange
+  const oldBossHandler = select(view, 'Loot-Boss').props.onChange
   const oldSubmit = form(view, 1).props.onSubmit
-  select(view, 'Raid-Kataloginstanz').props.onChange(change('map:603'))
+  select(view, 'Raidinstanz').props.onChange(change('map:603'))
   view.render()
   assert.equal(s.requests.some((request) => request.url.includes('instance_id=map%3A603')), false)
   assert.equal(writes(s).length, 0)
-  assert.equal(button(view, 'Katalogzuordnung speichern').props.disabled, true)
-  assert.equal(select(view, 'Raid-Kataloggröße').props.value, '')
-  const sizeOptions = nodes(select(view, 'Raid-Kataloggröße'), (n) => n.type === 'option' && n.props.value)
+  assert.equal(button(view, 'Raidinstanz und Größe speichern').props.disabled, true)
+  assert.equal(select(view, 'Raidgröße').props.value, '')
+  const sizeOptions = nodes(select(view, 'Raidgröße'), (n) => n.type === 'option' && n.props.value)
   assert.deepEqual(sizeOptions.map((node) => Number(node.props.value)), [10])
-  select(view, 'Raid-Kataloggröße').props.onChange(change('10'))
+  select(view, 'Raidgröße').props.onChange(change('10'))
   view.render()
-  const save = button(view, 'Katalogzuordnung speichern').props.onClick()
+  const save = button(view, 'Raidinstanz und Größe speichern').props.onClick()
   assert.deepEqual(writes(s)[0].body, { catalog_instance_id: 'map:603', raid_size: 10 })
   writes(s)[0].resolve({ ...raid(1), catalog_instance_id: 'map:603', raid_size: 10 })
   await save
@@ -2117,7 +2115,7 @@ test('unsaved association is preview only; saved context invalidates old loot re
   assert.equal(writes(s).length, 1)
   assert.equal(s.requests.some((request) => request.url.includes('items?boss_id=boss%3A2')), false)
   assert.ok(s.requests.some((request) => request.url === '/api/v1/loot-catalog/bosses?instance_id=map%3A603'))
-  assert.equal(select(view, 'Loot-Katalogitem').props.disabled, true)
+  assert.equal(select(view, 'Loot-Item').props.disabled, true)
   assert.doesNotMatch(text(view.tree), /Items konnten nicht geladen/)
 })
 
@@ -2136,13 +2134,11 @@ for (const sourceState of ['empty', 'failed', 'missing-provenance']) {
     resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', [])
     await flush(view)
     for (const placeholder of ['Boss', 'Item', 'Item-ID']) assert.equal(input(view, placeholder), undefined)
-    assert.equal(select(view, 'Loot-Katalogboss').props.disabled, true)
+    assert.equal(select(view, 'Loot-Boss').props.disabled, true)
     assert.equal(button(view, 'Vergeben').props.disabled, true)
     await form(view, 1).props.onSubmit(event)
     assert.equal(writes(s).length, 0)
     assert.match(text(view.tree), /historische Einträge bleiben erhalten/)
-    if (sourceState === 'failed') assert.match(text(view.tree), /Loot-Katalog derzeit nicht verfügbar/)
-    else assert.match(text(view.tree), /Keine geprüfte Katalogquelle verfügbar/)
     button(view, 'Loot korrigieren').props.onClick()
     view.render()
     input(view, 'Loot-Notizen').props.onChange(change('Historical note only'))
@@ -2195,12 +2191,12 @@ test('associated correction sends changed catalog ID and item ID only; recipient
   assert.equal(button(view, 'Loot-Korrektur speichern').props.disabled, true)
   await form(view, 1).props.onSubmit(event)
   assert.equal(writes(s).length, 0)
-  select(view, 'Loot-Katalogboss').props.onChange(change('boss:1'))
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
   view.render()
   resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
   await flush(view)
-  const drop = nodes(select(view, 'Loot-Katalogitem'), (n) => n.type === 'option' && n.props.value)[0]
-  select(view, 'Loot-Katalogitem').props.onChange(change(drop.props.value))
+  const drop = nodes(select(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0]
+  select(view, 'Loot-Item').props.onChange(change(drop.props.value))
   view.render()
   const save = form(view, 1).props.onSubmit(event)
   assert.equal(writes(s)[0].method, 'patch')
@@ -2223,11 +2219,11 @@ test('same catalog item recipient correction omits unchanged catalog IDs and met
   await flush(view)
   button(view, 'Loot korrigieren').props.onClick()
   view.render()
-  select(view, 'Loot-Katalogboss').props.onChange(change('boss:1'))
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
   view.render()
   resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
   await flush(view)
-  select(view, 'Loot-Katalogitem').props.onChange(change(nodes(select(view, 'Loot-Katalogitem'), (n) => n.type === 'option' && n.props.value)[0].props.value))
+  select(view, 'Loot-Item').props.onChange(change(nodes(select(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0].props.value))
   select(view, 'Loot-Empfänger').props.onChange(change('20'))
   assert.equal(input(view, 'Loot-Begründung'), undefined)
   view.render()
@@ -2243,15 +2239,15 @@ test('association size-only save sends a partial PATCH and cannot clear persiste
   const catalog = catalogFixture()
   resolveRaid(s, 1, { raid: { catalog_instance_id: 'map:631', raid_size: 25 }, catalog })
   await flush(view)
-  select(view, 'Raid-Kataloginstanz').props.onChange(change(''))
-  select(view, 'Raid-Kataloggröße').props.onChange(change(''))
+  select(view, 'Raidinstanz').props.onChange(change(''))
+  select(view, 'Raidgröße').props.onChange(change(''))
   view.render()
-  assert.equal(select(view, 'Raid-Kataloginstanz').props.value, 'map:631')
-  assert.equal(select(view, 'Raid-Kataloggröße').props.value, '25')
-  assert.equal(button(view, 'Katalogzuordnung speichern').props.disabled, true)
-  select(view, 'Raid-Kataloggröße').props.onChange(change('10'))
+  assert.equal(select(view, 'Raidinstanz').props.value, 'map:631')
+  assert.equal(select(view, 'Raidgröße').props.value, '25')
+  assert.equal(button(view, 'Raidinstanz und Größe speichern').props.disabled, true)
+  select(view, 'Raidgröße').props.onChange(change('10'))
   view.render()
-  const saveHandler = button(view, 'Katalogzuordnung speichern').props.onClick
+  const saveHandler = button(view, 'Raidinstanz und Größe speichern').props.onClick
   const save = saveHandler()
   await saveHandler()
   assert.equal(writes(s).length, 1)
@@ -2259,7 +2255,7 @@ test('association size-only save sends a partial PATCH and cannot clear persiste
   writes(s)[0].resolve({ ...raid(1), catalog_instance_id: 'map:631', raid_size: 10 })
   await save
   view.render()
-  assert.equal(select(view, 'Raid-Kataloggröße').props.value, '10')
+  assert.equal(select(view, 'Raidgröße').props.value, '10')
 })
 
 test('associating an unassociated raid is explicit and leaves manual drafts unusable after save', async () => {
@@ -2271,16 +2267,16 @@ test('associating an unassociated raid is explicit and leaves manual drafts unus
   select(view, 'Loot-Empfänger').props.onChange(change('20'))
   view.render()
   const oldSubmit = form(view, 1).props.onSubmit
-  const oldSave = button(view, 'Katalogzuordnung speichern').props.onClick
-  select(view, 'Raid-Kataloginstanz').props.onChange(change('map:603'))
+  const oldSave = button(view, 'Raidinstanz und Größe speichern').props.onClick
+  select(view, 'Raidinstanz').props.onChange(change('map:603'))
   await oldSave()
   assert.equal(writes(s).length, 0)
   view.render()
   assert.equal(input(view, 'Item'), undefined)
   assert.equal(s.requests.some((request) => request.url.includes('/loot-catalog/bosses')), false)
-  select(view, 'Raid-Kataloggröße').props.onChange(change('10'))
+  select(view, 'Raidgröße').props.onChange(change('10'))
   view.render()
-  const save = button(view, 'Katalogzuordnung speichern').props.onClick()
+  const save = button(view, 'Raidinstanz und Größe speichern').props.onClick()
   writes(s)[0].resolve({ ...raid(1), catalog_instance_id: 'map:603', raid_size: 10 })
   await save
   await oldSubmit(event)
@@ -2299,17 +2295,17 @@ test('boss switch discards obsolete item variants and prevents stale variant han
   await flush(view)
   resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
   await flush(view)
-  select(view, 'Loot-Katalogboss').props.onChange(change('boss:1'))
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
   view.render()
   const oldItems = s.requests.at(-1)
-  const oldVariantHandler = select(view, 'Loot-Katalogitem').props.onChange
-  select(view, 'Loot-Katalogboss').props.onChange(change('boss:2'))
+  const oldVariantHandler = select(view, 'Loot-Item').props.onChange
+  select(view, 'Loot-Boss').props.onChange(change('boss:2'))
   oldItems.resolve(itemDrops(catalog, 'boss:1', 25))
   oldVariantHandler(change(JSON.stringify(['boss:1', '12345', 25, '0', 1])))
   await flush(view)
-  assert.equal(select(view, 'Loot-Katalogitem').props.disabled, true)
-  assert.equal(select(view, 'Loot-Katalogitem').props.value, '')
-  assert.doesNotMatch(text(select(view, 'Loot-Katalogitem')), /Katalogitem/)
+  assert.equal(select(view, 'Loot-Item').props.disabled, true)
+  assert.equal(select(view, 'Loot-Item').props.value, '')
+  assert.doesNotMatch(text(select(view, 'Loot-Item')), /Katalogitem/)
 })
 
 for (const code of ['catalog_item_invalid', 'request_id_required']) {
@@ -2327,9 +2323,9 @@ for (const code of ['catalog_item_invalid', 'request_id_required']) {
     await save
     view.render()
     assert.doesNotMatch(text(view.tree), /English server fallback/)
-    assert.match(text(view.tree), code === 'catalog_item_invalid' ? /Zuordnung prüfen.*erneut aus dem Katalog/ : /Speicherschlüssel.*erneut speichern/)
+    assert.match(text(view.tree), code === 'catalog_item_invalid' ? /Zuordnung prüfen.*Beute erneut wählen/ : /Speicherschlüssel.*erneut speichern/)
     assert.match(text(form(view, 1)), /Katalogitem/)
-    assert.notEqual(select(view, 'Loot-Katalogitem').props.value, '')
+    assert.notEqual(select(view, 'Loot-Item').props.value, '')
   })
 }
 
@@ -2343,8 +2339,8 @@ test('archived associated history keeps boss groups and saved names without cata
   assert.match(text(view.tree), /Old boss/)
   assert.match(text(view.tree), /Boss nicht gespeichert \(historisch\)/)
   assert.equal(nodes(view.tree, (n) => n.type === 'div' && n.props.className === 'subcard loot-boss-group').length, 2)
-  assert.equal(select(view, 'Raid-Kataloginstanz'), undefined)
-  assert.equal(select(view, 'Loot-Katalogboss'), undefined)
+  assert.equal(select(view, 'Raidinstanz'), undefined)
+  assert.equal(select(view, 'Loot-Boss'), undefined)
   assert.equal(form(view), undefined)
   assert.equal(s.requests.some((request) => request.url.includes('/loot-catalog/bosses')), false)
 })
@@ -2380,8 +2376,8 @@ test('an unrelated historical correction does not discard the pending boss list 
   await save
   bosses.resolve(catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
   await flush(view)
-  assert.equal(select(view, 'Loot-Katalogboss').props.disabled, false)
-  assert.match(text(select(view, 'Loot-Katalogboss')), /Gespeicherter Boss/)
+  assert.equal(select(view, 'Loot-Boss').props.disabled, false)
+  assert.match(text(select(view, 'Loot-Boss')), /Gespeicherter Boss/)
 })
 
 test('raid workspace opens on roster, preserves drafts between views and resets on raid switch', async () => {

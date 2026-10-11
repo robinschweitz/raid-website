@@ -32,10 +32,11 @@ type SetupConfig struct {
 }
 
 type SetupPlan struct {
-	Series  raidseries.Series
-	Start   time.Time
-	Leader  string
-	Entries []AttendancePlan
+	Series   raidseries.Series
+	RaidName string
+	Start    time.Time
+	Leader   string
+	Entries  []AttendancePlan
 }
 
 type SetupReport struct {
@@ -201,7 +202,13 @@ func (s *Service) planWithSetup(ctx context.Context, source, sheetID string, dat
 			p.Errors = append(p.Errors, "ICC25 Raidsetup: series name already exists without setup provenance; existing configuration will not be overwritten")
 		}
 	}
-	if _, err := s.raids.FindByName(ctx, series.Name); err == nil {
+	plannedRaidName := series.Name
+	if name, template, nextNumber, ok := setupRaidName(series.Name, p.Raids, start); ok {
+		plannedRaidName = name
+		series.NameTemplate = template
+		series.NextRaidNumber = nextNumber
+	}
+	if _, err := s.raids.FindByName(ctx, plannedRaidName); err == nil {
 		p.Errors = append(p.Errors, "ICC25 Raidsetup: raid name already exists without setup provenance")
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return p, rows, nil, err
@@ -248,9 +255,37 @@ func (s *Service) planWithSetup(ctx context.Context, source, sheetID string, dat
 	}
 	sort.Slice(p.Players, func(i, j int) bool { return p.Players[i].Name < p.Players[j].Name })
 	sort.Slice(p.Characters, func(i, j int) bool { return p.Characters[i].Name < p.Characters[j].Name })
-	p.Setup = &SetupPlan{Series: series, Start: start, Leader: leader, Entries: entries}
+	p.Setup = &SetupPlan{Series: series, RaidName: plannedRaidName, Start: start, Leader: leader, Entries: entries}
 	report := &SetupReport{Name: series.Name, Leader: leader, ScheduledStart: start, Timezone: series.Timezone, Weekdays: series.Weekdays, IntervalWeeks: series.IntervalWeeks, Attendance: len(entries)}
 	return p, rows, report, nil
+}
+
+func setupRaidName(seriesName string, raids []RaidPlan, start time.Time) (string, string, int, bool) {
+	seriesName = strings.TrimSpace(seriesName)
+	if seriesName == "" {
+		return "", "", 0, false
+	}
+	prefix := seriesName + "-"
+	maxNumber := 0
+	for _, rd := range raids {
+		key := strings.TrimSpace(rd.Key)
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		number, err := strconv.Atoi(strings.TrimPrefix(key, prefix))
+		if err != nil || number <= 0 {
+			continue
+		}
+		if number > maxNumber {
+			maxNumber = number
+		}
+	}
+	if maxNumber == 0 {
+		return "", "", 0, false
+	}
+	template := prefix + "{number}"
+	nextNumber := maxNumber + 1
+	return raidseries.EvaluateName(template, nextNumber, seriesName, start), template, nextNumber + 1, true
 }
 
 func (s *Service) mergeSetup(ctx context.Context, source, sheetID string, p Plan, charIDs, playerIDs map[string]int64, now time.Time, rep *Report) error {
@@ -270,7 +305,7 @@ func (s *Service) mergeSetup(ctx context.Context, source, sheetID string, p Plan
 	if err := s.series.Save(ctx, &series); err != nil {
 		return err
 	}
-	rd := &raid.Raid{Name: series.Name, RaidLeaderID: series.RaidLeaderID, SeriesID: &series.ID, Status: validation.RaidStatusPlanned, ScheduledStart: &setup.Start, CatalogInstanceID: series.CatalogInstanceID, RaidSize: series.RaidSize, CreatedAt: now, UpdatedAt: now}
+	rd := &raid.Raid{Name: setup.RaidName, RaidLeaderID: series.RaidLeaderID, SeriesID: &series.ID, Status: validation.RaidStatusPlanned, ScheduledStart: &setup.Start, CatalogInstanceID: series.CatalogInstanceID, RaidSize: series.RaidSize, CreatedAt: now, UpdatedAt: now}
 	if err := s.raids.Create(ctx, rd); err != nil {
 		return err
 	}

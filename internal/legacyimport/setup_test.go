@@ -57,8 +57,14 @@ func TestSetupBootstrapPreviewRosterScheduleAndIdempotence(t *testing.T) {
 	if err != nil || rd.ScheduledStart.Format(time.RFC3339) != "2026-10-05T17:00:00Z" || rd.ArchivedAt != nil || rd.CompletedAt != nil || rd.Status != "PLANNED" {
 		t.Fatalf("raid: %+v %v", rd, err)
 	}
+	if rd.Name != "ICC25-2" {
+		t.Fatalf("planned raid name: %q", rd.Name)
+	}
 	if len(series.Weekdays) != 1 || series.Weekdays[0] != 1 || series.IntervalWeeks != 1 || series.StartTime != "19:00" {
 		t.Fatalf("series: %+v", series)
+	}
+	if series.NameTemplate != "ICC25-{number}" || series.NextRaidNumber != 3 {
+		t.Fatalf("series naming: %+v", series)
 	}
 	rows, err := s.att.ListByRaid(ctx, rd.ID)
 	if err != nil || len(rows) != 2 {
@@ -85,6 +91,43 @@ func TestSetupBootstrapPreviewRosterScheduleAndIdempotence(t *testing.T) {
 	repeated, err := s.MergeWithSetup(ctx, actor, "source", "sheet", "", "", setupConfig())
 	if err != nil || !repeated.Skipped {
 		t.Fatalf("idempotence: %+v %v", repeated, err)
+	}
+}
+
+func TestSetupRaidNameContinuesLatestHistoricalSheetRaid(t *testing.T) {
+	s, actor := importFixture(t)
+	ctx := context.Background()
+	data := sampleSheet()
+	data.Raid = append(data.Raid, []byte("\"ICC25-34\",\"04.10.2026\",\"3\",\"Oxora\",\"DD\",\"Paladin\",\"Vergeltung\",\"\"\n")...)
+	data.Loot = append(data.Loot, []byte("\"ICC25-34\",\"04.10.2026\",\"Oxora\",\"Blutfall\",\"Second\",\"50178\"\n")...)
+	data.Setup = setupCSV()
+	data.Hash = "sample-with-icc25-34"
+	s.fetcher = fakeFetcher{data: data}
+	preview, err := s.DryRunWithSetup(ctx, "source", "sheet", setupConfig())
+	if err != nil || len(preview.Errors) != 0 {
+		t.Fatalf("preview: %+v %v", preview, err)
+	}
+	report, err := s.MergeWithSetup(ctx, actor, "source", "sheet", preview.RawHash, "", setupConfig())
+	if err != nil || len(report.Errors) != 0 {
+		t.Fatalf("merge: %+v %v", report, err)
+	}
+	mapping, err := s.imports.setupMapping(ctx, "source", "sheet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rd, err := s.raids.Get(ctx, mapping.RaidID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rd.Name != "ICC25-35" {
+		t.Fatalf("planned raid name: %q", rd.Name)
+	}
+	series, err := s.series.Get(ctx, mapping.SeriesID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if series.Name != "ICC25" || series.NameTemplate != "ICC25-{number}" || series.NextRaidNumber != 36 {
+		t.Fatalf("series naming: %+v", series)
 	}
 }
 

@@ -88,17 +88,21 @@ export function AddonLootImport({ raidID, onImported }: Props) {
               return <tr key={row.line_key}>
                 <td><input type="checkbox" aria-label={`Zeile ${row.line_number} übernehmen`} disabled={pending || !row.is_importable} checked={choice?.isSelected ?? false} onChange={(e) => choose(row, { isSelected: e.target.checked })} /></td>
                 <td>{row.item_name || 'Unbekannter Gegenstand'}{row.item_id && <span className="muted"> · {row.item_id}</span>}</td>
-                <td>{row.boss_options.length > 1
-                  ? <select aria-label={`Boss für Zeile ${row.line_number}`} disabled={pending || !row.is_importable} value={choice?.bossID ?? ''} onChange={(e) => choose(row, { bossID: e.target.value })}>
+                <td className="addon-boss">{row.is_importable && row.boss_options.length > 1
+                  ? <select aria-label={`Boss für Zeile ${row.line_number}`} disabled={pending} value={choice?.bossID ?? ''} onChange={(e) => choose(row, { bossID: e.target.value })}>
                     <option value="">Boss wählen</option>
                     {row.boss_options.map((boss) => <option key={boss.id} value={boss.id}>{boss.name}</option>)}
                   </select>
-                  : row.boss_options[0]?.name ?? '—'}</td>
+                  : row.boss_options.find((boss) => boss.id === row.catalog_boss_id)?.name ?? '—'}</td>
                 <td>{row.character_name || row.recipient_name || '—'}</td>
-                <td><select aria-label={`Vergabeart für Zeile ${row.line_number}`} disabled={pending || !row.is_importable} value={choice?.method ?? row.award_method} onChange={(e) => choose(row, { method: e.target.value as AwardMethod })}>
-                  {Object.entries(methodLabels).map(([method, label]) => <option key={method} value={method}>{label}</option>)}
-                </select></td>
-                <td>{row.errors.map((text) => <div key={text} className="error">{text}</div>)}{row.warnings.map((text) => <div key={text} className="muted">{text}</div>)}</td>
+                <td>{row.is_importable
+                  ? <select aria-label={`Vergabeart für Zeile ${row.line_number}`} disabled={pending} value={choice?.method ?? row.award_method} onChange={(e) => choose(row, { method: e.target.value as AwardMethod })}>
+                    {Object.entries(methodLabels).map(([method, label]) => <option key={method} value={method}>{label}</option>)}
+                  </select>
+                  : '—'}</td>
+                <td className="addon-hints">{row.errors.length > 0
+                  ? row.errors.map((text) => <div key={text} className="addon-hint-error">{text}</div>)
+                  : row.warnings.map((text) => <div key={text} className="muted">{text}</div>)}</td>
               </tr>
             })}
           </tbody>

@@ -196,8 +196,12 @@ func TestAddonLootImportIsIdempotentAcrossStaff(t *testing.T) {
 			t.Fatalf("repeat import must be a no-op: %+v", again)
 		}
 	}
-	if rows := f.addonPreview(payload).Rows; !rows[0].IsAlreadyImported || rows[0].IsImportable {
+	rows := f.addonPreview(payload).Rows
+	if !rows[0].IsAlreadyImported || rows[0].IsImportable {
 		t.Fatalf("preview must show imported lines: %+v", rows[0])
+	}
+	if rows[1].CatalogBossID == nil || *rows[1].CatalogBossID != f.tokenBoss {
+		t.Fatalf("an imported line must show the boss chosen at import: %+v", rows[1])
 	}
 	awards, err := loot.NewRepo(f.db).ListByRaid(context.Background(), f.raidID)
 	if err != nil || len(awards) != 2 {

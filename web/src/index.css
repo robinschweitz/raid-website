@@ -289,6 +289,23 @@ table.table.small {
   resize: vertical;
 }
 
+.addon-loot-import td.addon-boss {
+  min-width: 12rem;
+}
+
+.addon-loot-import td select {
+  width: 100%;
+  min-width: 9rem;
+}
+
+.addon-loot-import td.addon-hints {
+  min-width: 15rem;
+}
+
+.addon-hint-error {
+  color: var(--danger);
+}
+
 .option-stack {
   display: flex;
   flex-wrap: wrap;

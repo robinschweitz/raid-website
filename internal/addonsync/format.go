@@ -30,14 +30,25 @@ type InviteMember struct {
 
 // BuildInviteExport renders the invite list:
 //
-//	RS1|INV|<raidID>|<raidName>|<raidSize>
+//	RS2|INV|<raidID>|<raidName>|<raidSize>|<startUnix>|<endUnix>
 //	<name>|<role>|<class>|<bench 0/1>
 func BuildInviteExport(raidID int64, raidName string, raidSize *int, members []InviteMember) string {
+    return BuildScheduledInviteExport(raidID, raidName, raidSize, nil, nil, members)
+}
+
+// BuildScheduledInviteExport adds UTC Unix schedule timestamps when both are known.
+// Legacy RS1 is retained for unscheduled raids.
+func BuildScheduledInviteExport(raidID int64, raidName string, raidSize *int, start, end *time.Time, members []InviteMember) string {
 	size := ""
 	if raidSize != nil {
 		size = strconv.Itoa(*raidSize)
 	}
-	lines := []string{strings.Join([]string{formatVersion, "INV", strconv.FormatInt(raidID, 10), field(raidName), size}, "|")}
+	header := []string{formatVersion, "INV", strconv.FormatInt(raidID, 10), field(raidName), size}
+    if start != nil && end != nil && end.After(*start) {
+        header[0] = "RS2"
+        header = append(header, strconv.FormatInt(start.Unix(), 10), strconv.FormatInt(end.Unix(), 10))
+    }
+    lines := []string{strings.Join(header, "|")}
 	for _, member := range members {
 		bench := "0"
 		if member.IsBench {

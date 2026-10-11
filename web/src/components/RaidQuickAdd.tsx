@@ -79,7 +79,7 @@ export function RaidQuickAdd({ raidID, players, options, needsReason, onAdded, o
       <label>Rolle im Raid<select value={role} onChange={(event) => setRole(event.target.value as AttendanceRole)}><option value="DD">DD</option><option value="TANK">Tank</option><option value="HEAL">Heal</option></select></label>
       {needsReason && <label>Begründung (Pflicht)<input required value={reason} onChange={(event) => setReason(event.target.value)} /></label>}
     </fieldset>
-    {searching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft…</p>}
+    {searching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft… Das kann einige Sekunden dauern. Schneller geht es mit einem Rising-Gods-Profil-Link.</p>}
     {results.length > 0 && <div className="plain-list">{results.map((row) => <button key={row.profile_id} type="button" className={selected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setSelected(row)}>{row.name} · {row.class} · {row.main_spec || 'Spec unbekannt'} · Stufe {row.level || '—'}</button>)}</div>}
     {selected && <p className="muted">Ausgewählt: {selected.name} · {selected.class} · {selected.main_spec}</p>}
     <p className="muted">Charakter und Teilnahme werden gemeinsam gespeichert. Neue Spieler benötigen hier keine Zugangsdaten.</p>

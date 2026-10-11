@@ -41,11 +41,18 @@ var (
 	defaultRisingGodsCache = newRisingGodsCache()
 )
 
+// Upstream profile list searches take 3-5 seconds regardless of the filter, so
+// search results are kept for a long time and served stale while they are
+// refreshed in the background. Profile loads stay short-lived because they are
+// the authoritative check before anything is stored.
 const (
-	risingGodsSearchTTL  = 10 * time.Minute
-	risingGodsProfileTTL = 10 * time.Minute
-	risingGodsSlugTTL    = 24 * time.Hour
-	risingGodsListCap    = 300
+	risingGodsSearchTTL        = 12 * time.Hour
+	risingGodsSearchStaleMax   = 7 * 24 * time.Hour
+	risingGodsSearchMaxEntries = 2000
+	risingGodsProfileTTL       = 10 * time.Minute
+	risingGodsSlugTTL          = 24 * time.Hour
+	risingGodsListCap          = 300
+	risingGodsFetchTimeout     = 20 * time.Second
 )
 
 type ExternalClient interface {
@@ -97,7 +104,7 @@ func (c RisingGodsClient) client() *http.Client {
 	if c.HTTPClient != nil {
 		return c.HTTPClient
 	}
-	return &http.Client{Timeout: 10 * time.Second}
+	return &http.Client{Timeout: risingGodsFetchTimeout}
 }
 
 func (c RisingGodsClient) sharedCache() *risingGodsCache {
@@ -119,31 +126,61 @@ func (c RisingGodsClient) SearchCharacters(ctx context.Context, query string) ([
 		}
 		return []ExternalCharacter{profile}, nil
 	}
+	cache := c.sharedCache()
 	cacheKey := "search:" + strings.ToLower(q)
-	if rows, ok := c.sharedCache().getSearch(cacheKey); ok {
+	if rows, fresh, ok := cache.getSearch(cacheKey); ok {
+		if !fresh {
+			cache.start(cacheKey, c.refreshSearch(ctx, cacheKey, q))
+		}
 		return rows, nil
 	}
-	if rows, ok := c.sharedCache().getCompletePrefixSearch(q); ok {
+	if rows, ok := cache.getCompletePrefixSearch(q); ok {
 		return rows, nil
 	}
-	rowsAny, err := c.sharedCache().do(cacheKey, func() (any, error) {
-		if rows, ok := c.sharedCache().getSearch(cacheKey); ok {
+	rowsAny, err := cache.do(ctx, cacheKey, c.refreshSearch(ctx, cacheKey, q))
+	if err != nil {
+		return nil, err
+	}
+	return rowsAny.([]ExternalCharacter), nil
+}
+
+// WarmSearch makes sure the cache holds a fresh result for query. Unlike
+// SearchCharacters it waits for the upstream fetch instead of serving a stale
+// entry, so the caller controls how many upstream requests run at once.
+func (c RisingGodsClient) WarmSearch(ctx context.Context, query string) error {
+	q := strings.TrimSpace(query)
+	if len([]rune(q)) < 3 {
+		return ErrExternalInvalid
+	}
+	cacheKey := "search:" + strings.ToLower(q)
+	if _, fresh, ok := c.sharedCache().getSearch(cacheKey); ok && fresh {
+		return nil
+	}
+	_, err := c.sharedCache().do(ctx, cacheKey, c.refreshSearch(ctx, cacheKey, q))
+	return err
+}
+
+func (c RisingGodsClient) refreshSearch(ctx context.Context, cacheKey, q string) func() (any, error) {
+	return func() (any, error) {
+		if rows, fresh, ok := c.sharedCache().getSearch(cacheKey); ok && fresh {
 			return rows, nil
 		}
-		if rows, ok := c.sharedCache().getCompletePrefixSearch(q); ok {
-			return rows, nil
-		}
-		rows, err := c.searchCharactersLive(ctx, q)
+		fetchCtx, cancel := detachedFetchContext(ctx)
+		defer cancel()
+		rows, err := c.searchCharactersLive(fetchCtx, q)
 		if err != nil {
 			return nil, err
 		}
 		c.sharedCache().setSearch(cacheKey, rows, len(rows) < risingGodsListCap, risingGodsSearchTTL)
 		return rows, nil
-	})
-	if err != nil {
-		return nil, err
 	}
-	return rowsAny.([]ExternalCharacter), nil
+}
+
+// detachedFetchContext keeps the caller's values but not its cancellation:
+// coalesced callers and background refreshes share one upstream fetch, which
+// must not fail just because the first caller's request went away.
+func detachedFetchContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), risingGodsFetchTimeout)
 }
 
 func (c RisingGodsClient) searchCharactersLive(ctx context.Context, q string) ([]ExternalCharacter, error) {
@@ -193,11 +230,13 @@ func (c RisingGodsClient) LoadCharacter(ctx context.Context, profileID string) (
 	if profile, raw, ok := c.sharedCache().getProfile(cacheKey); ok {
 		return profile, raw, nil
 	}
-	profileAny, err := c.sharedCache().do(cacheKey, func() (any, error) {
+	profileAny, err := c.sharedCache().do(ctx, cacheKey, func() (any, error) {
 		if profile, raw, ok := c.sharedCache().getProfile(cacheKey); ok {
 			return cachedProfile{profile: profile, raw: raw}, nil
 		}
-		profile, raw, err := c.loadCharacterLive(ctx, id)
+		fetchCtx, cancel := detachedFetchContext(ctx)
+		defer cancel()
+		profile, raw, err := c.loadCharacterLive(fetchCtx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -241,6 +280,11 @@ func (c RisingGodsClient) loadCharacterLive(ctx context.Context, id string) (Ext
 		secondSpec = deriveSpec(class, talentMatches[1][1])
 	}
 	if mainSpec == "" {
+		if row, ok := c.sharedCache().findSearchRow(id); ok {
+			mainSpec = row.MainSpec
+		}
+	}
+	if mainSpec == "" {
 		rows, err := c.SearchCharacters(ctx, name)
 		if err == nil {
 			for _, row := range rows {
@@ -278,11 +322,13 @@ func (c RisingGodsClient) resolveProfileSlug(ctx context.Context, ref string) (s
 	if id, ok := c.sharedCache().getSlug(cacheKey); ok {
 		return id, nil
 	}
-	idAny, err := c.sharedCache().do(cacheKey, func() (any, error) {
+	idAny, err := c.sharedCache().do(ctx, cacheKey, func() (any, error) {
 		if id, ok := c.sharedCache().getSlug(cacheKey); ok {
 			return id, nil
 		}
-		body, err := c.fetch(ctx, slugURL)
+		fetchCtx, cancel := detachedFetchContext(ctx)
+		defer cancel()
+		body, err := c.fetch(fetchCtx, slugURL)
 		if err != nil {
 			return "", err
 		}
@@ -322,15 +368,36 @@ func (c RisingGodsClient) fetch(ctx context.Context, u string) (string, error) {
 	return string(b), nil
 }
 
-func (c *risingGodsCache) getSearch(key string) ([]ExternalCharacter, bool) {
+// getSearch returns a cached search. fresh is false when the entry is past its
+// TTL but still young enough to be served while a refresh runs.
+func (c *risingGodsCache) getSearch(key string) (rows []ExternalCharacter, fresh bool, ok bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	cached, ok := c.searches[key]
-	if !ok || time.Now().After(cached.expiresAt) {
-		return nil, false
+	now := time.Now()
+	if !ok || now.After(cached.expiresAt.Add(risingGodsSearchStaleMax)) {
+		return nil, false, false
 	}
-	rows := append([]ExternalCharacter(nil), cached.rows...)
-	return rows, true
+	rows = append([]ExternalCharacter(nil), cached.rows...)
+	return rows, !now.After(cached.expiresAt), true
+}
+
+// findSearchRow looks up a profile in any cached search, stale ones included.
+func (c *risingGodsCache) findSearchRow(profileID string) (ExternalCharacter, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cutoff := time.Now().Add(-risingGodsSearchStaleMax)
+	for _, cached := range c.searches {
+		if cached.expiresAt.Before(cutoff) {
+			continue
+		}
+		for _, row := range cached.rows {
+			if row.ProfileID == profileID && row.MainSpec != "" {
+				return row, true
+			}
+		}
+	}
+	return ExternalCharacter{}, false
 }
 
 func (c *risingGodsCache) getCompletePrefixSearch(query string) ([]ExternalCharacter, bool) {
@@ -360,7 +427,33 @@ func (c *risingGodsCache) getCompletePrefixSearch(query string) ([]ExternalChara
 func (c *risingGodsCache) setSearch(key string, rows []ExternalCharacter, complete bool, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.searches[key] = cachedSearch{rows: append([]ExternalCharacter(nil), rows...), expiresAt: time.Now().Add(ttl), complete: complete}
+	now := time.Now()
+	if _, exists := c.searches[key]; !exists {
+		c.pruneSearchesLocked(now)
+	}
+	c.searches[key] = cachedSearch{rows: append([]ExternalCharacter(nil), rows...), expiresAt: now.Add(ttl), complete: complete}
+}
+
+// pruneSearchesLocked drops searches too old to serve and, if the cache is
+// still full, the entry closest to expiry. The search endpoint is public, so
+// the number of cached queries must stay bounded.
+func (c *risingGodsCache) pruneSearchesLocked(now time.Time) {
+	cutoff := now.Add(-risingGodsSearchStaleMax)
+	for key, cached := range c.searches {
+		if cached.expiresAt.Before(cutoff) {
+			delete(c.searches, key)
+		}
+	}
+	for len(c.searches) >= risingGodsSearchMaxEntries {
+		oldestKey := ""
+		var oldest time.Time
+		for key, cached := range c.searches {
+			if oldestKey == "" || cached.expiresAt.Before(oldest) {
+				oldestKey, oldest = key, cached.expiresAt
+			}
+		}
+		delete(c.searches, oldestKey)
+	}
 }
 
 func (c *risingGodsCache) getProfile(key string) (ExternalCharacter, string, bool) {
@@ -395,24 +488,37 @@ func (c *risingGodsCache) setSlug(key string, id string, ttl time.Duration) {
 	c.slugs[key] = cachedSlug{id: id, expiresAt: time.Now().Add(ttl)}
 }
 
-func (c *risingGodsCache) do(key string, fn func() (any, error)) (any, error) {
-	c.mu.Lock()
-	if call, ok := c.inflight[key]; ok {
-		c.mu.Unlock()
-		<-call.done
+// do runs fn once per key across concurrent callers. Each caller stops waiting
+// when its own ctx is done; the shared call keeps running for the others.
+func (c *risingGodsCache) do(ctx context.Context, key string, fn func() (any, error)) (any, error) {
+	call := c.start(key, fn)
+	select {
+	case <-call.done:
 		return call.val, call.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// start launches fn for key in the background unless a call for key is
+// already running, and returns the running call.
+func (c *risingGodsCache) start(key string, fn func() (any, error)) *risingGodsCall {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if call, ok := c.inflight[key]; ok {
+		return call
 	}
 	call := &risingGodsCall{done: make(chan struct{})}
 	c.inflight[key] = call
-	c.mu.Unlock()
-
-	call.val, call.err = fn()
-
-	c.mu.Lock()
-	delete(c.inflight, key)
-	close(call.done)
-	c.mu.Unlock()
-	return call.val, call.err
+	go func() {
+		val, err := fn()
+		c.mu.Lock()
+		call.val, call.err = val, err
+		delete(c.inflight, key)
+		c.mu.Unlock()
+		close(call.done)
+	}()
+	return call
 }
 
 func risingGodsProfileReference(input string) (string, bool) {

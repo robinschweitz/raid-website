@@ -109,7 +109,7 @@ export function LoginPage() {
             <label>Charakter suchen<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
             <button type="button" disabled={busy || query.trim().length < 3} onClick={() => void searchCharacters()}>{searching ? 'Suche…' : 'Suchen'}</button>
           </div>
-          {searching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft…</p>}
+          {searching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft… Das kann einige Sekunden dauern. Schneller geht es mit einem Rising-Gods-Profil-Link.</p>}
           {results.length > 0 && <div className="login-results">{results.map((row) => <button key={row.profile_id} type="button" className={selected?.profile_id === row.profile_id ? 'active' : ''} onClick={() => setSelected(row)}>
             <strong>{row.name}</strong><span>{row.class} · Stufe {row.level || '—'}</span>
           </button>)}</div>}

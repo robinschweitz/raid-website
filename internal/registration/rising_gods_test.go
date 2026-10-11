@@ -2,6 +2,7 @@ package registration
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestRisingGodsSearchUsesAllianceLevel80FilterAndCache(t *testing.T) {
@@ -182,6 +184,144 @@ func TestRisingGodsLoadCharacterRejectsNonAllianceOrNonLevel80(t *testing.T) {
 				t.Fatal("expected invalid profile error")
 			}
 		})
+	}
+}
+
+func TestRisingGodsSearchServesStaleWhileRefreshing(t *testing.T) {
+	var searches int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&searches, 1)
+		_, _ = w.Write([]byte(`{"data":[{"id":2,"name":"Servenaja","classs":5,"level":80,"talenttree1":0,"talenttree2":51,"talenttree3":20}],"parent":{}}`))
+	}))
+	defer srv.Close()
+
+	client := testRisingGodsClient(srv.URL)
+	client.cache.setSearch("search:serv", []ExternalCharacter{{ProfileID: "1", Name: "Servold", Class: "Priester", MainSpec: "Heilig", Level: 80}}, true, -time.Second)
+
+	rows, err := client.SearchCharacters(context.Background(), "Serv")
+	if err != nil {
+		t.Fatalf("search characters: %v", err)
+	}
+	if len(rows) != 1 || rows[0].ProfileID != "1" {
+		t.Fatalf("expected stale rows to be served immediately, got %#v", rows)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if rows, fresh, ok := client.cache.getSearch("search:serv"); ok && fresh && len(rows) == 1 && rows[0].ProfileID == "2" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("stale search was not refreshed in the background")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := atomic.LoadInt32(&searches); got != 1 {
+		t.Fatalf("expected one background refresh, got %d upstream searches", got)
+	}
+}
+
+func TestRisingGodsSearchCancelledCallerDoesNotFailWaiters(t *testing.T) {
+	var searches int32
+	arrived := make(chan struct{})
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&searches, 1) == 1 {
+			close(arrived)
+		}
+		<-release
+		_, _ = w.Write([]byte(`{"data":[{"id":1,"name":"Servenaja","classs":5,"level":80,"talenttree1":0,"talenttree2":51,"talenttree3":20}],"parent":{}}`))
+	}))
+	defer srv.Close()
+
+	client := testRisingGodsClient(srv.URL)
+	firstCtx, cancelFirst := context.WithCancel(context.Background())
+	firstErr := make(chan error, 1)
+	go func() {
+		_, err := client.SearchCharacters(firstCtx, "Serv")
+		firstErr <- err
+	}()
+	<-arrived
+	secondRows := make(chan []ExternalCharacter, 1)
+	secondErr := make(chan error, 1)
+	go func() {
+		rows, err := client.SearchCharacters(context.Background(), "Serv")
+		secondRows <- rows
+		secondErr <- err
+	}()
+	cancelFirst()
+	if err := <-firstErr; !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected cancelled first caller, got %v", err)
+	}
+	close(release)
+	if err := <-secondErr; err != nil {
+		t.Fatalf("second caller failed: %v", err)
+	}
+	if rows := <-secondRows; len(rows) != 1 || rows[0].Name != "Servenaja" {
+		t.Fatalf("unexpected rows: %#v", rows)
+	}
+	if got := atomic.LoadInt32(&searches); got != 1 {
+		t.Fatalf("expected one coalesced upstream search, got %d", got)
+	}
+}
+
+func TestRisingGodsLoadCharacterUsesCachedSearchSpec(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("profile") != "load" {
+			t.Errorf("unexpected upstream request: %s", r.URL.String())
+			return
+		}
+		_, _ = w.Write([]byte(`$WowheadProfiler.registerProfile({"id":7,"name":"Servenaja","classs":5,"race":1,"faction":1,"level":80});`))
+	}))
+	defer srv.Close()
+
+	client := testRisingGodsClient(srv.URL)
+	client.cache.setSearch("search:servenaja", []ExternalCharacter{{ProfileID: "7", Name: "Servenaja", Class: "Priester", MainSpec: "Heilig", Level: 80}}, true, -time.Hour)
+
+	profile, _, err := client.LoadCharacter(context.Background(), "7")
+	if err != nil {
+		t.Fatalf("load character: %v", err)
+	}
+	if profile.MainSpec != "Heilig" {
+		t.Fatalf("expected spec from cached search row, got %q", profile.MainSpec)
+	}
+}
+
+func TestRisingGodsSearchCacheStaysBounded(t *testing.T) {
+	cache := newRisingGodsCache()
+	for i := 0; i <= risingGodsSearchMaxEntries; i++ {
+		cache.setSearch("search:name"+strconv.Itoa(i), nil, true, time.Duration(i)*time.Second)
+	}
+	if got := len(cache.searches); got != risingGodsSearchMaxEntries {
+		t.Fatalf("expected %d cached searches, got %d", risingGodsSearchMaxEntries, got)
+	}
+	if _, _, ok := cache.getSearch("search:name0"); ok {
+		t.Fatal("expected the entry closest to expiry to be evicted")
+	}
+}
+
+func TestWarmSearchCacheSkipsFreshEntries(t *testing.T) {
+	var searches int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if filter := r.URL.Query().Get("filter"); filter != "si=1;minle=80;maxle=80;na=Bravo" {
+			t.Errorf("unexpected filter: %q", filter)
+		}
+		atomic.AddInt32(&searches, 1)
+		_, _ = w.Write([]byte(`{"data":[{"id":2,"name":"Bravo","classs":8,"level":80,"talenttree1":17,"talenttree2":0,"talenttree3":53}],"parent":{}}`))
+	}))
+	defer srv.Close()
+
+	client := testRisingGodsClient(srv.URL)
+	client.cache.setSearch("search:alpha", []ExternalCharacter{{ProfileID: "1", Name: "Alpha"}}, true, time.Hour)
+
+	warmed, failed := WarmSearchCache(context.Background(), client, []string{"Alpha", "Bravo"}, 2)
+	if warmed != 2 || failed != 0 {
+		t.Fatalf("unexpected warm result: warmed=%d failed=%d", warmed, failed)
+	}
+	if got := atomic.LoadInt32(&searches); got != 1 {
+		t.Fatalf("expected only the missing name to be fetched, got %d upstream searches", got)
+	}
+	if _, fresh, ok := client.cache.getSearch("search:bravo"); !ok || !fresh {
+		t.Fatal("expected Bravo to be cached fresh")
 	}
 }
 

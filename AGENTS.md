@@ -297,6 +297,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   - **Self-service (`MEMBER` and up)** — create and cancel **own** item locks;
     vote on polls.
 - The first admin is bootstrapped from `ADMIN_USERNAME` / `ADMIN_PASSWORD` at startup.
+- Login MFA options are server-reported per challenge. The frontend shows only configured factors;
+  WebAuthn/FIDO2 security keys are the default option when available and supported (ADR 047).
 
 ---
 

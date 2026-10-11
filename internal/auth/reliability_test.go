@@ -280,6 +280,46 @@ func TestMFAStatusAndFactorRemoval(t *testing.T) {
 	}
 }
 
+func TestStartLoginReportsAvailableMFAFactors(t *testing.T) {
+	ctx := context.Background()
+	bdb := reliabilityDB(t)
+	svc := NewService(player.NewRepo(bdb.DB), NewRepo(bdb.DB))
+	repo := NewRepo(bdb.DB)
+	if err := svc.BootstrapAdmin(ctx, "owner", "valid-password"); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := player.NewRepo(bdb.DB).FindByUsername(ctx, "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+
+	if err := repo.CreateWebAuthnCredential(ctx, &WebAuthnCredential{PlayerID: owner.ID, CredentialIDHash: "credential-hash", Name: "YubiKey", CredentialJSON: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := svc.StartLogin(ctx, "owner", "valid-password", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.MFAChallenge == "" || !result.MFAFactors.WebAuthn || result.MFAFactors.TOTPEnabled || result.MFAFactors.RecoveryCodes {
+		t.Fatalf("webauthn-only factors = challenge %q, %+v", result.MFAChallenge, result.MFAFactors)
+	}
+
+	if err := repo.UpsertMFASettings(ctx, &MFASettings{PlayerID: owner.ID, TOTPSecret: "secret", TOTPEnabledAt: &now, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateRecoveryCode(ctx, &MFARecoveryCode{PlayerID: owner.ID, CodeHash: hashToken("recovery"), CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	result, err = svc.StartLogin(ctx, "owner", "valid-password", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.MFAChallenge == "" || !result.MFAFactors.WebAuthn || !result.MFAFactors.TOTPEnabled || !result.MFAFactors.RecoveryCodes {
+		t.Fatalf("combined factors = challenge %q, %+v", result.MFAChallenge, result.MFAFactors)
+	}
+}
+
 func TestDeleteWebAuthnCredentialRejectsOtherOwner(t *testing.T) {
 	ctx := context.Background()
 	bdb := reliabilityDB(t)

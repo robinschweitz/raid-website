@@ -3,12 +3,18 @@ import { api, ApiError } from './api'
 import type { Player } from './types'
 import { getWebAuthnCredential, type WebAuthnBeginResponse } from './webauthn'
 
+export interface MFAFactors {
+  totp_enabled: boolean
+  recovery_codes: boolean
+  webauthn: boolean
+}
+
 interface AuthState {
   player: Player | null
   loading: boolean
   error: string
   refresh: () => Promise<void>
-  login: (username: string, password: string) => Promise<{ mfaRequired: boolean; challenge?: string }>
+  login: (username: string, password: string) => Promise<{ mfaRequired: boolean; challenge?: string; factors?: MFAFactors }>
   verifyMFA: (challenge: string, code: string) => Promise<void>
   verifySecurityKey: (challenge: string) => Promise<void>
   logout: () => Promise<void>
@@ -49,10 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     const requestVersion = ++version.current
-    const result = await api.post<Player | { mfa_required: true; challenge: string }>('/api/v1/auth/login', { username, password })
+    const result = await api.post<Player | { mfa_required: true; challenge: string; factors: MFAFactors }>('/api/v1/auth/login', { username, password })
     if ('mfa_required' in result) {
       if (requestVersion === version.current) setLoading(false)
-      return { mfaRequired: true, challenge: result.challenge }
+      return { mfaRequired: true, challenge: result.challenge, factors: result.factors }
     }
     if (requestVersion === version.current) {
       setPlayer(result)

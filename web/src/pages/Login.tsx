@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useAuth } from '../auth'
+import { useAuth, type MFAFactors } from '../auth'
 import { api, ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
 import { GuildCrest } from '../components/GuildCrest'
@@ -12,6 +12,8 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [mfaCode, setMfaCode] = useState('')
   const [mfaChallenge, setMfaChallenge] = useState('')
+  const [mfaFactors, setMfaFactors] = useState<MFAFactors>({ totp_enabled: false, recovery_codes: false, webauthn: false })
+  const [mfaMethod, setMfaMethod] = useState<'webauthn' | 'code'>('code')
   const [code, setCode] = useState('')
   const [regUser, setRegUser] = useState('')
   const [regPass, setRegPass] = useState('')
@@ -31,7 +33,10 @@ export function LoginPage() {
       try {
         const result = await login(username, password)
         if (result.mfaRequired && result.challenge) {
+          const factors = result.factors ?? { totp_enabled: false, recovery_codes: false, webauthn: false }
           setMfaChallenge(result.challenge)
+          setMfaFactors(factors)
+          setMfaMethod(factors.webauthn ? 'webauthn' : 'code')
           setPassword('')
           return
         }
@@ -63,6 +68,22 @@ export function LoginPage() {
       }
     })
   }
+
+  const hasCodeMFA = mfaFactors.totp_enabled || mfaFactors.recovery_codes
+  const webAuthnSupported = browserSupportsWebAuthn()
+  const hasUsableWebAuthn = mfaFactors.webauthn && webAuthnSupported
+  const resetMFA = () => {
+    setMfaChallenge('')
+    setMfaCode('')
+    setMfaFactors({ totp_enabled: false, recovery_codes: false, webauthn: false })
+    setMfaMethod('code')
+  }
+
+  const codePrompt = mfaFactors.totp_enabled && mfaFactors.recovery_codes
+    ? 'Bitte gib den sechsstelligen Code aus deiner Authenticator-App oder einen Wiederherstellungscode ein.'
+    : mfaFactors.totp_enabled
+      ? 'Bitte gib den sechsstelligen Code aus deiner Authenticator-App ein.'
+      : 'Bitte gib einen Wiederherstellungscode ein.'
 
   const searchCharacters = async () => {
     if (query.trim().length < 3) { setError('Bitte mindestens 3 Zeichen eingeben.'); return }
@@ -134,16 +155,25 @@ export function LoginPage() {
           </label>
           <button type="submit" disabled={busy}>{busy ? 'Anmelden…' : 'Anmelden'}</button>
         </form>}
-        {mode === 'login' && mfaChallenge && <form className="login-section" onSubmit={onMFASubmit}>
-          <p className="muted">Bitte gib den sechsstelligen Code aus deiner Authenticator-App oder einen Wiederherstellungscode ein.</p>
-          <label>
-            MFA-Code
-            <input value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} autoComplete="one-time-code" autoFocus />
-          </label>
-          <button type="submit" disabled={busy || !mfaCode.trim()}>{busy ? 'Prüfe…' : 'Anmelden'}</button>
-          {browserSupportsWebAuthn() && <button type="button" disabled={busy} onClick={() => void onSecurityKeySubmit()}>Mit YubiKey anmelden</button>}
-          <button type="button" className="ghost" disabled={busy} onClick={() => { setMfaChallenge(''); setMfaCode('') }}>Zurück</button>
-        </form>}
+        {mode === 'login' && mfaChallenge && <div className="login-section">
+          {mfaFactors.webauthn && mfaMethod === 'webauthn' && <div className="login-section">
+            <p className="muted">Melde dich mit deinem Sicherheitsschlüssel an.</p>
+            {!webAuthnSupported && <p className="error">Dieser Browser unterstützt WebAuthn nicht. Verwende einen kompatiblen Browser oder ein Gerät mit Sicherheitsschlüssel-Unterstützung.</p>}
+            <button type="button" disabled={busy || !hasUsableWebAuthn} onClick={() => void onSecurityKeySubmit()}>{busy ? 'Prüfe…' : 'Mit YubiKey anmelden'}</button>
+            {hasCodeMFA && <button type="button" className="ghost" disabled={busy} onClick={() => setMfaMethod('code')}>Stattdessen Code verwenden</button>}
+          </div>}
+          {hasCodeMFA && mfaMethod === 'code' && <form className="login-section" onSubmit={onMFASubmit}>
+            <p className="muted">{codePrompt}</p>
+            <label>
+              MFA-Code
+              <input value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} autoComplete="one-time-code" autoFocus />
+            </label>
+            <button type="submit" disabled={busy || !mfaCode.trim()}>{busy ? 'Prüfe…' : 'Anmelden'}</button>
+            {hasUsableWebAuthn && <button type="button" className="ghost" disabled={busy} onClick={() => setMfaMethod('webauthn')}>Mit YubiKey anmelden</button>}
+          </form>}
+          {!mfaFactors.webauthn && !hasCodeMFA && <p className="error">Für dieses Konto ist MFA aktiv, aber es ist kein verwendbarer Faktor verfügbar.</p>}
+          <button type="button" className="ghost" disabled={busy} onClick={resetMFA}>Zurück</button>
+        </div>}
         {mode === 'request' && <div className="login-section">
           <p className="muted">Suche deinen Rising-Gods-Charakter. Ein Admin sendet dir danach einen Code ingame an genau diesen Charakter.</p>
           <div className="login-search">

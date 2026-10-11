@@ -107,7 +107,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if result.MFAChallenge != "" {
-		WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"mfa_required": true, "challenge": result.MFAChallenge}})
+		WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"mfa_required": true, "challenge": result.MFAChallenge, "factors": result.MFAFactors}})
 		return
 	}
 	a.setSessionCookie(w, result.Token, sessionMaxAgeSeconds)

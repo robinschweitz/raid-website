@@ -53,6 +53,13 @@ type LoginStart struct {
 	Token        string
 	Player       *player.Player
 	MFAChallenge string
+	MFAFactors   MFAFactors
+}
+
+type MFAFactors struct {
+	TOTPEnabled   bool `json:"totp_enabled"`
+	RecoveryCodes bool `json:"recovery_codes"`
+	WebAuthn      bool `json:"webauthn"`
 }
 
 type TOTPSetup struct {
@@ -61,8 +68,9 @@ type TOTPSetup struct {
 }
 
 type MFAStatus struct {
-	TOTPEnabled  bool                     `json:"totp_enabled"`
-	SecurityKeys []WebAuthnCredentialInfo `json:"security_keys"`
+	TOTPEnabled   bool                     `json:"totp_enabled"`
+	RecoveryCodes bool                     `json:"recovery_codes"`
+	SecurityKeys  []WebAuthnCredentialInfo `json:"security_keys"`
 }
 
 type WebAuthnCredentialInfo struct {
@@ -260,9 +268,12 @@ func (s *Service) StartLogin(ctx context.Context, username, password, clientIP s
 		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
 		return nil, ErrInactive
 	}
-	if enabled, err := s.MFAEnabled(ctx, p.ID); err != nil {
+	status, err := s.MFAStatus(ctx, p.ID)
+	if err != nil {
 		return nil, err
-	} else if enabled {
+	}
+	factors := status.Factors()
+	if factors.Any() {
 		challenge, err := newToken()
 		if err != nil {
 			return nil, fmt.Errorf("generate mfa challenge: %w", err)
@@ -271,7 +282,7 @@ func (s *Service) StartLogin(ctx context.Context, username, password, clientIP s
 			return nil, fmt.Errorf("create mfa challenge: %w", err)
 		}
 		s.recordLoginAttempt(ctx, uname, clientIP, true, now)
-		return &LoginStart{Player: p, MFAChallenge: challenge}, nil
+		return &LoginStart{Player: p, MFAChallenge: challenge, MFAFactors: factors}, nil
 	}
 	token, err := newToken()
 	if err != nil {
@@ -345,19 +356,11 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 }
 
 func (s *Service) MFAEnabled(ctx context.Context, playerID int64) (bool, error) {
-	settings, err := s.sessions.GetMFASettings(ctx, playerID)
+	status, err := s.MFAStatus(ctx, playerID)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return false, fmt.Errorf("get mfa settings: %w", err)
-		}
-	} else if settings.TOTPEnabledAt != nil && settings.TOTPSecret != "" {
-		return true, nil
+		return false, err
 	}
-	count, err := s.sessions.CountWebAuthnCredentials(ctx, playerID)
-	if err != nil {
-		return false, fmt.Errorf("count webauthn credentials: %w", err)
-	}
-	return count > 0, nil
+	return status.Factors().Any(), nil
 }
 
 func (s *Service) SetupTOTP(ctx context.Context, playerID int64, issuer string) (*TOTPSetup, error) {
@@ -418,6 +421,11 @@ func (s *Service) MFAStatus(ctx context.Context, playerID int64) (*MFAStatus, er
 	if settings != nil {
 		status.TOTPEnabled = settings.TOTPEnabledAt != nil && settings.TOTPSecret != ""
 	}
+	recoveryCodes, err := s.sessions.CountUnusedRecoveryCodes(ctx, playerID)
+	if err != nil {
+		return nil, fmt.Errorf("count recovery codes: %w", err)
+	}
+	status.RecoveryCodes = recoveryCodes > 0
 	keys, err := s.sessions.ListWebAuthnCredentials(ctx, playerID)
 	if err != nil {
 		return nil, fmt.Errorf("list webauthn credentials: %w", err)
@@ -426,6 +434,17 @@ func (s *Service) MFAStatus(ctx context.Context, playerID int64) (*MFAStatus, er
 		status.SecurityKeys = append(status.SecurityKeys, WebAuthnCredentialInfo{ID: key.ID, Name: key.Name, CreatedAt: key.CreatedAt, LastUsedAt: key.LastUsedAt})
 	}
 	return status, nil
+}
+
+func (s *MFAStatus) Factors() MFAFactors {
+	if s == nil {
+		return MFAFactors{}
+	}
+	return MFAFactors{TOTPEnabled: s.TOTPEnabled, RecoveryCodes: s.RecoveryCodes, WebAuthn: len(s.SecurityKeys) > 0}
+}
+
+func (f MFAFactors) Any() bool {
+	return f.TOTPEnabled || f.RecoveryCodes || f.WebAuthn
 }
 
 func (s *Service) DisableTOTP(ctx context.Context, playerID int64, currentPassword string) error {

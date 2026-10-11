@@ -124,6 +124,11 @@ func (r *Repo) MarkRecoveryCodeUsed(ctx context.Context, id int64, at time.Time)
 	return err
 }
 
+func (r *Repo) CountUnusedRecoveryCodes(ctx context.Context, playerID int64) (int, error) {
+	count, err := r.db.NewSelect().Model((*MFARecoveryCode)(nil)).Where("player_id = ?", playerID).Where("used_at IS NULL").Count(ctx)
+	return int(count), err
+}
+
 func (r *Repo) CreateMFAChallenge(ctx context.Context, c *MFAChallenge) error {
 	_, err := r.db.NewInsert().Model(c).Exec(ctx)
 	return err

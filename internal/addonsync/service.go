@@ -59,6 +59,18 @@ func NewService(raids *raid.Repo, attendanceRepo *attendance.Repo, characters *c
 	return &Service{raids: raids, attendance: attendanceRepo, characters: characters, players: players, catalog: catalog, loot: lootRepo, points: points, corrections: corrections}
 }
 
+// CalendarICS returns a downloadable event for a scheduled raid.
+func (s *Service) CalendarICS(ctx context.Context, raidID int64) (string, error) {
+    rd, err := s.getRaid(ctx, raidID)
+    if err != nil { return "", err }
+    if rd.ScheduledStart == nil || rd.ScheduledEnd == nil || !rd.ScheduledEnd.After(*rd.ScheduledStart) {
+        return "", ErrRaidSchedule
+    }
+    return BuildCalendarICS(rd.ID, rd.Name, rd.Notes, *rd.ScheduledStart, *rd.ScheduledEnd, rd.UpdatedAt), nil
+}
+
+var ErrRaidSchedule = errors.New("raid schedule is missing or invalid")
+
 // InviteExport renders the raid roster for the addon. Invites use the live
 // character name, because the roster snapshot keeps the name from accept time
 // and a renamed character could not be invited under it.

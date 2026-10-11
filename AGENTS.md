@@ -180,6 +180,15 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - The legacy sheet's "Tokens gesammelt" total is **reconciliation-only** and must never be written
   over derived data.
 
+### RaidSync addon exchange (ADR 045)
+- The in-game addon RaidSync (separate `wow-addons` repository) exchanges copy-and-paste text with the
+  website: an invite export of the saved roster (current character names, bench optional) and a loot
+  export recorded in game by master loot.
+- Loot import is preview then apply, RAIDASSISTENT and up, only for planned/open unarchived raids.
+  Staff choose the award method per line (default `MAIN`, armor tokens `SECOND`). Recipients must be in
+  the roster; the import never creates roster entries. Lines go through the ordinary loot path (catalog,
+  locks, Enhanced costs) with stable request IDs, so repeated imports create nothing new.
+
 ### Loot, attendance, and character corrections
 - Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived
   raid history only; live-character changes never rewrite raid snapshots (ADR 032).
@@ -378,5 +387,6 @@ A change is done when:
 ## Known gaps — do not assume these exist
 
 - No `DELETE` endpoint is exposed. Archive/expire flows only (ADR 007 remains the intent).
-- `internal/export` is an empty directory; exporting is not implemented.
+- `internal/export` is an empty directory; general data export is not implemented. The RaidSync
+  addon exchange lives in `internal/addonsync` (ADR 045).
 - The audit log is written but has no read endpoint yet.

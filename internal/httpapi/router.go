@@ -8,6 +8,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/addonsync"
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
 	"raid-website/internal/auth"
@@ -79,6 +80,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		return nil, fmt.Errorf("bootstrap admin: %w", err)
 	}
 
+	corrections := raidcorrection.NewService(raidcorrection.NewRepo(db)).WithExternalClient(registrationFeed)
 	api := v1.NewAPI(v1.Deps{
 		DB:           db,
 		Auth:         authSvc,
@@ -95,7 +97,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Roster:       rosterRepo,
 		Audit:        audits,
 		Completion:   raidcompletion.NewService(raidcompletion.NewRepo(db)),
-		Corrections:  raidcorrection.NewService(raidcorrection.NewRepo(db)).WithExternalClient(registrationFeed),
+		Corrections:  corrections,
 		Imports:      importsSvc,
 		Signups:      raidsignup.NewService(raidsignup.NewRepo(db)),
 		Registration: registrationSvc,
@@ -104,6 +106,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	mux := http.NewServeMux()
 	api.Register(mux)
 	v1.CatalogHandlers{Catalog: catalog}.Register(mux)
+	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, att, chars, players, catalog, lootRepo, points, corrections)}.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)
 	if spa, err := webui.Handler(); err == nil {
 		mux.Handle("/", spa)

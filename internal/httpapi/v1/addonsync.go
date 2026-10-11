@@ -2,6 +2,7 @@ package v1
 
 import (
 	"errors"
+    "fmt"
 	"net/http"
 
 	"raid-website/internal/addonsync"
@@ -17,6 +18,7 @@ type AddonSyncHandlers struct {
 // Register adds the addon exchange routes.
 func (h AddonSyncHandlers) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/raids/{id}/addon-invite-export", RequireAuth(h.inviteExport))
+    mux.HandleFunc("GET /api/v1/raids/{id}/calendar.ics", RequireAuth(h.calendarICS))
 	mux.HandleFunc("POST /api/v1/raids/{id}/addon-loot-import/preview", RequireRole(validation.RoleRaidassistent, h.previewLootImport))
 	mux.HandleFunc("POST /api/v1/raids/{id}/addon-loot-import", RequireRole(validation.RoleRaidassistent, h.applyLootImport))
 	mux.HandleFunc("POST /api/v1/raids/{id}/addon-roster-import/preview", RequireRole(validation.RoleRaidassistent, h.previewRosterImport))
@@ -39,6 +41,22 @@ type addonLootImportRequest struct {
 type addonRosterImportRequest struct {
 	Payload    string                      `json:"payload"`
 	Selections []addonsync.RosterSelection `json:"selections"`
+}
+
+func (h AddonSyncHandlers) calendarICS(w http.ResponseWriter, r *http.Request) {
+    raidID, ok := pathID(r, "id")
+    if !ok { BadRequest(w, "invalid raid id"); return }
+    data, err := h.AddonSync.CalendarICS(r.Context(), raidID)
+    if errors.Is(err, addonsync.ErrRaidSchedule) {
+        WriteError(w, http.StatusConflict, "raid_schedule", "Raid hat keinen gültigen Start- und Endzeitpunkt")
+        return
+    }
+    if err != nil { writeAddonSyncError(w, err); return }
+    w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
+    w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=raid-%d.ics", raidID))
+    w.Header().Set("Cache-Control", "private, no-store")
+    w.WriteHeader(http.StatusOK)
+    _, _ = w.Write([]byte(data))
 }
 
 func (h AddonSyncHandlers) inviteExport(w http.ResponseWriter, r *http.Request) {

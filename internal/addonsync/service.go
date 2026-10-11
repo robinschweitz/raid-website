@@ -82,7 +82,7 @@ func (s *Service) InviteExport(ctx context.Context, raidID int64, includeBench b
 		}
 		members = append(members, InviteMember{Name: name, Role: row.Role, Class: row.Class, IsBench: row.IsBench})
 	}
-	return BuildInviteExport(rd.ID, rd.Name, rd.RaidSize, members), nil
+	return BuildScheduledInviteExport(rd.ID, rd.Name, rd.RaidSize, rd.ScheduledStart, rd.ScheduledEnd, members), nil
 }
 
 // LootPreview is the dry run of a loot import. It never writes.

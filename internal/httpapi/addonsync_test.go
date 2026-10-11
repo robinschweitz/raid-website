@@ -407,16 +407,21 @@ func TestAddonRosterPreviewMatchesRosterKnownAndUnknown(t *testing.T) {
 	if err := attendance.NewRepo(f.db).Create(ctx, &attendance.Attendance{RaidID: earlier.ID, PlayerID: f.second, CharacterID: f.secondChar, Role: validation.RoleHeal, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
+	umlaut := &character.Character{PlayerID: f.second, Name: "Rüdiger", Class: "Warrior", MainSpec: "Protection", Active: true, CreatedAt: now, UpdatedAt: now}
+	if err := character.NewRepo(f.db).Create(ctx, umlaut); err != nil {
+		t.Fatal(err)
+	}
 	first, second := f.characterName(f.firstChar), f.characterName(f.secondChar)
 	payload := strings.Join([]string{
 		fmt.Sprintf("RS1|ROSTER|%d|%s|1760007200", f.raidID, first),
 		fmt.Sprintf("%s|MAGE|1760000060", strings.ToUpper(first)),
-		fmt.Sprintf("%s|MAGE|1760003600", second),
+		fmt.Sprintf("%s|MAGE|1760003600", strings.ToUpper(second)),
 		"Weltchat|PALADIN|1760003600",
 		"kaputt",
+		"RÜDIGER|WARRIOR|1760000100",
 	}, "\n")
 	preview := f.rosterPreview(payload)
-	if len(preview.Rows) != 4 || len(preview.Missing) != 0 || len(preview.Warnings) != 0 {
+	if len(preview.Rows) != 5 || len(preview.Missing) != 0 || len(preview.Warnings) != 0 {
 		t.Fatalf("preview: %+v", preview)
 	}
 	if row := preview.Rows[0]; row.Status != "in_roster" || row.CharacterID == nil || *row.CharacterID != f.firstChar {
@@ -430,6 +435,9 @@ func TestAddonRosterPreviewMatchesRosterKnownAndUnknown(t *testing.T) {
 	}
 	if row := preview.Rows[3]; row.Status != "invalid" || len(row.Errors) != 1 {
 		t.Fatalf("broken line: %+v", row)
+	}
+	if row := preview.Rows[4]; row.Status != "known" || row.CharacterID == nil || *row.CharacterID != umlaut.ID || row.CharacterName != "Rüdiger" {
+		t.Fatalf("known character must match regardless of case, umlauts included: %+v", row)
 	}
 	missing := f.rosterPreview(fmt.Sprintf("RS1|ROSTER|%d|x|1\n%s|-|1760000000", f.raidID+1, second))
 	if len(missing.Missing) != 1 || missing.Missing[0] != first || len(missing.Warnings) != 1 || missing.Rows[0].SuggestedRole != "HEAL" || missing.Rows[0].SuggestLateJoin {

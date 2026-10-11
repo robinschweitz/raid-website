@@ -91,13 +91,17 @@ func (s *Service) PreviewRosterImport(ctx context.Context, raidID int64, text st
 	if err != nil {
 		return nil, err
 	}
+	known, err := s.knownCharacters(ctx)
+	if err != nil {
+		return nil, err
+	}
 	preview := &RosterPreview{RaidID: rd.ID, HeaderRaidID: export.RaidID, Recorder: export.Recorder, Rows: []RosterPreviewRow{}, Missing: []string{}, Warnings: []string{}}
 	if export.RaidID != rd.ID {
 		preview.Warnings = append(preview.Warnings, fmt.Sprintf("Der Export wurde für Raid #%d aufgezeichnet, nicht für diesen Raid (#%d).", export.RaidID, rd.ID))
 	}
 	seen := map[int64]bool{}
 	for _, member := range export.Members {
-		row, err := s.resolveRosterMember(ctx, rd, roster, member)
+		row, err := s.resolveRosterMember(ctx, rd, roster, known, member)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +118,7 @@ func (s *Service) PreviewRosterImport(ctx context.Context, raidID int64, text st
 	return preview, nil
 }
 
-func (s *Service) resolveRosterMember(ctx context.Context, rd *raid.Raid, roster []rosterEntry, member RosterMember) (RosterPreviewRow, error) {
+func (s *Service) resolveRosterMember(ctx context.Context, rd *raid.Raid, roster []rosterEntry, known knownCharacters, member RosterMember) (RosterPreviewRow, error) {
 	row := RosterPreviewRow{LineNumber: member.LineNumber, Name: member.Name, ClassToken: member.ClassToken, Errors: []string{}}
 	if member.Error != "" {
 		row.Status = RosterInvalid
@@ -129,13 +133,10 @@ func (s *Service) resolveRosterMember(ctx context.Context, rd *raid.Raid, roster
 		row.CharacterName, row.Class, row.SuggestedRole = entry.currentName, entry.attendance.Class, entry.attendance.Role
 		return row, nil
 	}
-	c, err := s.characters.FindByName(ctx, member.Name)
-	if errors.Is(err, sql.ErrNoRows) {
+	c := known.find(member.Name)
+	if c == nil {
 		row.Status = RosterUnknown
 		return row, nil
-	}
-	if err != nil {
-		return row, fmt.Errorf("find character %q: %w", member.Name, err)
 	}
 	role, err := s.suggestedRole(ctx, c)
 	if err != nil {
@@ -214,6 +215,44 @@ func (s *Service) addRosterCharacter(ctx context.Context, raidID, actorID int64,
 	}
 }
 
+// knownCharacters indexes the character directory by lower-cased name. The
+// addon reports names as the game shows them, which need not match the case
+// stored on the website; folding in Go also covers umlauts, which SQLite's
+// lower() leaves alone.
+type knownCharacters map[string][]character.Character
+
+func (s *Service) knownCharacters(ctx context.Context) (knownCharacters, error) {
+	rows, err := s.characters.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list characters: %w", err)
+	}
+	known := knownCharacters{}
+	for _, c := range rows {
+		key := toKey(c.Name)
+		known[key] = append(known[key], c)
+	}
+	return known, nil
+}
+
+// find prefers an exact-case match and otherwise the oldest character, the
+// same tie-break as character.Repo.FindByName.
+func (k knownCharacters) find(name string) *character.Character {
+	matches := k[toKey(name)]
+	if len(matches) == 0 {
+		return nil
+	}
+	best := &matches[0]
+	for i := range matches {
+		switch {
+		case matches[i].Name == name && best.Name != name:
+			best = &matches[i]
+		case (matches[i].Name == name) == (best.Name == name) && matches[i].ID < best.ID:
+			best = &matches[i]
+		}
+	}
+	return best
+}
+
 // suggestedRole repeats the role the character played last time, or DD.
 func (s *Service) suggestedRole(ctx context.Context, c *character.Character) (validation.AttendanceRole, error) {
 	last, err := s.attendance.LatestByCharacter(ctx, c.ID)
@@ -263,4 +302,8 @@ func raidStart(rd *raid.Raid) *time.Time {
 		return rd.StartedAt
 	}
 	return rd.ScheduledStart
+}
+
+func toKey(name string) string {
+	return strings.ToLower(name)
 }

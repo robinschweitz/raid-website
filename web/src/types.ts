@@ -457,6 +457,7 @@ export interface AddonLootPreviewRow {
   item_id: string
   item_name: string
   recipient_name: string
+  state: '' | 'given' | 'held' | 'manual'
   character_id: number | null
   character_name: string
   catalog_boss_id: string | null
@@ -473,7 +474,41 @@ export interface AddonLootPreview {
   header_raid_id: number
   recorder: string
   rows: AddonLootPreviewRow[]
+  recipient_options: { character_id: number; character_name: string }[]
   warnings: string[]
+}
+
+export interface AddonRosterPreviewRow {
+  line_number: number
+  name: string
+  class_token: string
+  first_seen: string | null
+  status: 'in_roster' | 'known' | 'unknown' | 'invalid'
+  character_id: number | null
+  character_name: string
+  player_id: number | null
+  class: string
+  suggested_role: AttendanceRole
+  suggest_late_join: boolean
+  errors: string[]
+}
+
+export interface AddonRosterPreview {
+  raid_id: number
+  header_raid_id: number
+  recorder: string
+  rows: AddonRosterPreviewRow[]
+  missing: string[]
+  warnings: string[]
+}
+
+export interface AddonRosterImportResult {
+  character_id: number
+  character_name: string
+  status: 'added' | 'already_in_roster' | 'failed'
+  attendance_id: number | null
+  code: string
+  message: string
 }
 
 export interface AddonLootImportResult {

@@ -23,9 +23,9 @@ import (
 var (
 	// ErrRaidNotFound means the raid in the URL does not exist.
 	ErrRaidNotFound = errors.New("raid not found")
-	// ErrRaidState means loot can only be imported into planned or open raids
-	// that are not archived; archived raids use ordinary corrections.
-	ErrRaidState = errors.New("raid does not accept addon loot imports")
+	// ErrRaidState means addon exports can only be imported into planned or open
+	// raids that are not archived; archived raids use ordinary corrections.
+	ErrRaidState = errors.New("raid does not accept addon imports")
 )
 
 // importNote marks awards created from an addon export.
@@ -87,11 +87,19 @@ func (s *Service) InviteExport(ctx context.Context, raidID int64, includeBench b
 
 // LootPreview is the dry run of a loot import. It never writes.
 type LootPreview struct {
-	RaidID       int64            `json:"raid_id"`
-	HeaderRaidID int64            `json:"header_raid_id"`
-	Recorder     string           `json:"recorder"`
-	Rows         []LootPreviewRow `json:"rows"`
-	Warnings     []string         `json:"warnings"`
+	RaidID           int64             `json:"raid_id"`
+	HeaderRaidID     int64             `json:"header_raid_id"`
+	Recorder         string            `json:"recorder"`
+	Rows             []LootPreviewRow  `json:"rows"`
+	RecipientOptions []RecipientOption `json:"recipient_options"`
+	Warnings         []string          `json:"warnings"`
+}
+
+// RecipientOption is a roster character staff may pick as the real winner,
+// e.g. when another player passed a unique item on by trade.
+type RecipientOption struct {
+	CharacterID   int64  `json:"character_id"`
+	CharacterName string `json:"character_name"`
 }
 
 // LootPreviewRow is one recorded drop with everything the website resolved for
@@ -104,6 +112,7 @@ type LootPreviewRow struct {
 	ItemID            string             `json:"item_id"`
 	ItemName          string             `json:"item_name"`
 	RecipientName     string             `json:"recipient_name"`
+	State             LootState          `json:"state"`
 	CharacterID       *int64             `json:"character_id"`
 	CharacterName     string             `json:"character_name"`
 	CatalogBossID     *string            `json:"catalog_boss_id"`
@@ -129,7 +138,7 @@ func (s *Service) PreviewLootImport(ctx context.Context, raidID int64, text stri
 	if err != nil {
 		return nil, err
 	}
-	preview := &LootPreview{RaidID: rd.ID, HeaderRaidID: export.RaidID, Recorder: export.Recorder, Rows: []LootPreviewRow{}, Warnings: []string{}}
+	preview := &LootPreview{RaidID: rd.ID, HeaderRaidID: export.RaidID, Recorder: export.Recorder, Rows: []LootPreviewRow{}, RecipientOptions: resolver.recipientOptions(), Warnings: []string{}}
 	if export.RaidID != rd.ID {
 		preview.Warnings = append(preview.Warnings, fmt.Sprintf("Der Export wurde für Raid #%d aufgezeichnet, nicht für diesen Raid (#%d).", export.RaidID, rd.ID))
 	}
@@ -297,13 +306,24 @@ func (s *Service) getRaid(ctx context.Context, raidID int64) (*raid.Raid, error)
 	return rd, nil
 }
 
-func (s *Service) importableRaid(ctx context.Context, raidID int64) (*raid.Raid, error) {
+// openRaid loads a raid that still accepts addon imports: planned or open and
+// not archived.
+func (s *Service) openRaid(ctx context.Context, raidID int64) (*raid.Raid, error) {
 	rd, err := s.getRaid(ctx, raidID)
 	if err != nil {
 		return nil, err
 	}
 	if rd.ArchivedAt != nil || (rd.Status != validation.RaidStatusPlanned && rd.Status != validation.RaidStatusOpen) {
 		return nil, ErrRaidState
+	}
+	return rd, nil
+}
+
+// importableRaid is an open raid with the catalog context loot validation needs.
+func (s *Service) importableRaid(ctx context.Context, raidID int64) (*raid.Raid, error) {
+	rd, err := s.openRaid(ctx, raidID)
+	if err != nil {
+		return nil, err
 	}
 	if rd.CatalogInstanceID == nil || rd.RaidSize == nil {
 		return nil, loot.ErrCatalogContextRequired
@@ -355,17 +375,9 @@ type rosterEntry struct {
 }
 
 func (s *Service) newResolver(ctx context.Context, rd *raid.Raid) (*resolver, error) {
-	rows, err := s.attendance.ListByRaid(ctx, rd.ID)
+	roster, err := s.rosterEntries(ctx, rd.ID)
 	if err != nil {
-		return nil, fmt.Errorf("list attendance for raid %d: %w", rd.ID, err)
-	}
-	roster := make([]rosterEntry, 0, len(rows))
-	for _, row := range rows {
-		name, err := s.currentCharacterName(ctx, row)
-		if err != nil {
-			return nil, err
-		}
-		roster = append(roster, rosterEntry{attendance: row, currentName: name})
+		return nil, err
 	}
 	bossesByItem, err := s.catalog.BossesByItem(ctx)
 	if err != nil {
@@ -383,7 +395,7 @@ func (s *Service) newResolver(ctx context.Context, rd *raid.Raid) (*resolver, er
 }
 
 func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootPreviewRow {
-	row := LootPreviewRow{LineKey: key, LineNumber: line.LineNumber, NPCID: line.NPCID, ItemID: line.ItemID, RecipientName: line.RecipientName, BossOptions: []lootcatalog.Boss{}, Warnings: []string{}, Errors: []string{}}
+	row := LootPreviewRow{LineKey: key, LineNumber: line.LineNumber, NPCID: line.NPCID, ItemID: line.ItemID, RecipientName: line.RecipientName, State: line.State, BossOptions: []lootcatalog.Boss{}, Warnings: []string{}, Errors: []string{}}
 	if line.Error != "" {
 		row.Errors = append(row.Errors, fmt.Sprintf("Zeile %d: %s", line.LineNumber, line.Error))
 		return row
@@ -425,14 +437,31 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 		row.AwardMethod = loot.Second
 	}
 
-	if line.RecipientName == "" {
-		row.Warnings = append(row.Warnings, "Nicht vergeben (auf der Leiche gelassen oder entzaubert)")
-	} else if entry := r.findRecipient(line.RecipientName); entry != nil {
+	// The recipient is only a suggestion: staff may pick another roster
+	// character, because a trade between two other players is invisible to
+	// the recorder.
+	// Once imported, only a recipient that differs from the stored award matters.
+	entry := findRosterEntry(r.roster, line.RecipientName)
+	switch {
+	case isImported && entry != nil:
 		characterID := entry.attendance.CharacterID
 		row.CharacterID = &characterID
 		row.CharacterName = entry.currentName
-	} else {
-		row.Errors = append(row.Errors, fmt.Sprintf("%s steht nicht in der Aufstellung – zuerst per Schnellaufnahme hinzufügen", line.RecipientName))
+	case isImported:
+	case line.RecipientName == "":
+		row.Warnings = append(row.Warnings, "Nicht vergeben (auf der Leiche gelassen oder entzaubert) – bei Bedarf Empfänger wählen")
+	case entry != nil:
+		characterID := entry.attendance.CharacterID
+		row.CharacterID = &characterID
+		row.CharacterName = entry.currentName
+	default:
+		row.Warnings = append(row.Warnings, fmt.Sprintf("%s steht nicht in der Aufstellung – Empfänger wählen oder zuerst per Schnellaufnahme hinzufügen", line.RecipientName))
+	}
+	if line.State == LootHeld && !isImported {
+		row.Warnings = append(row.Warnings, "Noch beim Plündermeister – Empfänger prüfen")
+	}
+	if isImported && existing.AwardedToCharacterID != nil && (row.CharacterID == nil || *existing.AwardedToCharacterID != *row.CharacterID) {
+		row.Warnings = append(row.Warnings, fmt.Sprintf("Bereits importiert an %s, der Export nennt %s – bitte über die Loot-Korrektur ändern", r.characterName(ctx, *existing.AwardedToCharacterID), displayRecipient(line.RecipientName)))
 	}
 
 	for _, lock := range r.locks {
@@ -441,8 +470,15 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 		}
 	}
 
-	row.IsImportable = len(row.Errors) == 0 && row.CharacterID != nil && !row.IsAlreadyImported
+	row.IsImportable = len(row.Errors) == 0 && !row.IsAlreadyImported
 	return row
+}
+
+func displayRecipient(name string) string {
+	if name == "" {
+		return "niemanden"
+	}
+	return name
 }
 
 type bossCandidate struct {
@@ -486,18 +522,28 @@ func (r *resolver) hintedBoss(npcID string, candidates []bossCandidate) string {
 	return ""
 }
 
-func (r *resolver) findRecipient(name string) *rosterEntry {
-	for i := range r.roster {
-		if strings.EqualFold(r.roster[i].currentName, name) {
-			return &r.roster[i]
+// recipientOptions lists every roster character by current name.
+func (r *resolver) recipientOptions() []RecipientOption {
+	options := make([]RecipientOption, 0, len(r.roster))
+	for _, entry := range r.roster {
+		options = append(options, RecipientOption{CharacterID: entry.attendance.CharacterID, CharacterName: entry.currentName})
+	}
+	sort.Slice(options, func(i, j int) bool {
+		return strings.ToLower(options[i].CharacterName) < strings.ToLower(options[j].CharacterName)
+	})
+	return options
+}
+
+func (r *resolver) characterName(ctx context.Context, characterID int64) string {
+	for _, entry := range r.roster {
+		if entry.attendance.CharacterID == characterID {
+			return entry.currentName
 		}
 	}
-	for i := range r.roster {
-		if strings.EqualFold(r.roster[i].attendance.CharacterName, name) {
-			return &r.roster[i]
-		}
+	if c, err := r.service.characters.Get(ctx, characterID); err == nil {
+		return c.Name
 	}
-	return nil
+	return fmt.Sprintf("Charakter #%d", characterID)
 }
 
 func (r *resolver) playerName(ctx context.Context, playerID int64) string {

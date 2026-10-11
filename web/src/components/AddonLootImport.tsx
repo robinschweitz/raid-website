@@ -11,6 +11,7 @@ interface Props {
 interface Choice {
   isSelected: boolean
   bossID: string
+  characterID: string
   method: AwardMethod
 }
 
@@ -18,7 +19,8 @@ const methodLabels: Record<AwardMethod, string> = { MAIN: 'Main-Spec', SECOND: '
 const resultLabels: Record<AddonLootImportResult['status'], string> = { created: 'Übernommen', already_imported: 'Bereits importiert', failed: 'Fehler' }
 
 function initialChoices(preview: AddonLootPreview): Record<string, Choice> {
-  return Object.fromEntries(preview.rows.map((row) => [row.line_key, { isSelected: row.is_importable, bossID: row.catalog_boss_id ?? '', method: row.award_method }]))
+  // Held drops are still with the loot master, so they wait for an explicit choice.
+  return Object.fromEntries(preview.rows.map((row) => [row.line_key, { isSelected: row.is_importable && row.character_id != null && row.state !== 'held', bossID: row.catalog_boss_id ?? '', characterID: row.character_id != null ? String(row.character_id) : '', method: row.award_method }]))
 }
 
 export function AddonLootImport({ raidID, onImported }: Props) {
@@ -49,13 +51,13 @@ export function AddonLootImport({ raidID, onImported }: Props) {
   })
 
   const selectedRows = preview?.rows.filter((row) => row.is_importable && choices[row.line_key]?.isSelected) ?? []
-  const isReady = selectedRows.length > 0 && selectedRows.every((row) => choices[row.line_key].bossID)
+  const isReady = selectedRows.length > 0 && selectedRows.every((row) => choices[row.line_key].bossID && choices[row.line_key].characterID)
 
   const apply = () => submit(async () => {
     if (!preview || !isReady) return
     setError('')
     try {
-      const selections = selectedRows.map((row) => ({ line_key: row.line_key, catalog_boss_id: choices[row.line_key].bossID, character_id: row.character_id, award_method: choices[row.line_key].method }))
+      const selections = selectedRows.map((row) => ({ line_key: row.line_key, catalog_boss_id: choices[row.line_key].bossID, character_id: Number(choices[row.line_key].characterID), award_method: choices[row.line_key].method }))
       const imported = await api.post<AddonLootImportResult[]>(`/api/v1/raids/${raidID}/addon-loot-import`, { payload: previewedPayload, selections })
       if (!isActive()) return
       setResults(imported)
@@ -70,7 +72,7 @@ export function AddonLootImport({ raidID, onImported }: Props) {
 
   return <section className="subcard addon-loot-import" aria-label="Loot aus Addon importieren">
     <h3>Loot aus Addon importieren</h3>
-    <p className="muted">Den Loot-Export des RaidSync-Addons einfügen, prüfen und die Vergabeart je Gegenstand wählen. Locks, Enhanced-Kosten und Raidkader werden wie bei manueller Erfassung geprüft. Bereits importierte Zeilen werden übersprungen.</p>
+    <p className="muted">Den Loot-Export des RaidSync-Addons einfügen, prüfen und Empfänger und Vergabeart je Gegenstand wählen. Hat jemand anderes ein Item per Handel weitergegeben, hier den tatsächlichen Gewinner wählen. Locks, Enhanced-Kosten und Raidkader werden wie bei manueller Erfassung geprüft. Bereits importierte Zeilen werden übersprungen.</p>
     <textarea className="addon-code-export" aria-label="Loot-Export" rows={4} value={payload} disabled={pending} placeholder="RS1|LOOT|…" onChange={(e) => setPayload(e.target.value)} />
     <div className="actions">
       <button type="button" disabled={pending || !payload.trim()} onClick={() => void runPreview()}>Vorschau</button>
@@ -94,7 +96,14 @@ export function AddonLootImport({ raidID, onImported }: Props) {
                     {row.boss_options.map((boss) => <option key={boss.id} value={boss.id}>{boss.name}</option>)}
                   </select>
                   : row.boss_options.find((boss) => boss.id === row.catalog_boss_id)?.name ?? '—'}</td>
-                <td>{row.character_name || row.recipient_name || '—'}</td>
+                <td>{row.is_importable
+                  ? <select aria-label={`Empfänger für Zeile ${row.line_number}`} disabled={pending} value={choice?.characterID ?? ''} onChange={(e) => choose(row, { characterID: e.target.value })}>
+                    <option value="">Empfänger wählen</option>
+                    {preview.recipient_options.map((option) => <option key={option.character_id} value={option.character_id}>{option.character_name}</option>)}
+                  </select>
+                  : row.character_name || row.recipient_name || '—'}
+                  {row.is_importable && row.recipient_name && row.recipient_name.toLocaleLowerCase('de') !== (row.character_name || '').toLocaleLowerCase('de') && <div className="muted">Addon: {row.recipient_name}</div>}
+                  {row.state === 'held' && <div className="muted">beim Plündermeister</div>}</td>
                 <td>{row.is_importable
                   ? <select aria-label={`Vergabeart für Zeile ${row.line_number}`} disabled={pending} value={choice?.method ?? row.award_method} onChange={(e) => choose(row, { method: e.target.value as AwardMethod })}>
                     {Object.entries(methodLabels).map(([method, label]) => <option key={method} value={method}>{label}</option>)}
@@ -110,7 +119,7 @@ export function AddonLootImport({ raidID, onImported }: Props) {
       </div>
       <div className="actions">
         <button type="button" disabled={pending || !isReady} onClick={() => void apply()}>{selectedRows.length === 1 ? '1 Gegenstand übernehmen' : `${selectedRows.length} Gegenstände übernehmen`}</button>
-        {selectedRows.length > 0 && !isReady && <span className="muted">Bitte für alle ausgewählten Zeilen einen Boss wählen.</span>}
+        {selectedRows.length > 0 && !isReady && <span className="muted">Bitte für alle ausgewählten Zeilen Boss und Empfänger wählen.</span>}
       </div>
     </>}
     {results.length > 0 && <ul className="plain-list" role="status" aria-label="Importergebnis">

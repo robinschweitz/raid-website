@@ -182,12 +182,17 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 
 ### RaidSync addon exchange (ADR 045)
 - The in-game addon RaidSync (separate `wow-addons` repository) exchanges copy-and-paste text with the
-  website: an invite export of the saved roster (current character names, bench optional) and a loot
-  export recorded in game by master loot.
-- Loot import is preview then apply, RAIDASSISTENT and up, only for planned/open unarchived raids.
-  Staff choose the award method per line (default `MAIN`, armor tokens `SECOND`). Recipients must be in
-  the roster; the import never creates roster entries. Lines go through the ordinary loot path (catalog,
-  locks, Enhanced costs) with stable request IDs, so repeated imports create nothing new.
+  website: an invite export of the saved roster (current character names, bench optional), a roster
+  export of who was actually in the raid, and a loot export recorded in game by master loot, including
+  trades of items the loot master held.
+- Roster import is preview then apply, RAIDASSISTENT and up, only for planned/open unarchived raids. It
+  adds selected known characters through the ordinary attendance path; unknown characters go through
+  the Rising-Gods quick-add, never automatic creation.
+- Loot import is preview then apply with the same permissions and raid states. Staff choose the award
+  method (default `MAIN`, armor tokens `SECOND`) and may override the recorded recipient with any roster
+  character. Lines go through the ordinary loot path (catalog, locks, Enhanced costs) with request IDs
+  derived from the addon's entry ID, so repeated imports create nothing new even after a trade changed
+  the recipient.
 
 ### Loot, attendance, and character corrections
 - Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived

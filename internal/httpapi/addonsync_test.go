@@ -15,6 +15,7 @@ import (
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
 	"raid-website/internal/lootcatalog"
+	"raid-website/internal/raid"
 	"raid-website/internal/validation"
 )
 
@@ -22,6 +23,7 @@ type addonPreviewRow struct {
 	LineKey           string             `json:"line_key"`
 	ItemID            string             `json:"item_id"`
 	ItemName          string             `json:"item_name"`
+	State             string             `json:"state"`
 	CharacterID       *int64             `json:"character_id"`
 	CharacterName     string             `json:"character_name"`
 	CatalogBossID     *string            `json:"catalog_boss_id"`
@@ -34,9 +36,13 @@ type addonPreviewRow struct {
 }
 
 type addonPreview struct {
-	HeaderRaidID int64             `json:"header_raid_id"`
-	Rows         []addonPreviewRow `json:"rows"`
-	Warnings     []string          `json:"warnings"`
+	HeaderRaidID     int64             `json:"header_raid_id"`
+	Rows             []addonPreviewRow `json:"rows"`
+	RecipientOptions []struct {
+		CharacterID   int64  `json:"character_id"`
+		CharacterName string `json:"character_name"`
+	} `json:"recipient_options"`
+	Warnings []string `json:"warnings"`
 }
 
 type addonImportResult struct {
@@ -129,12 +135,12 @@ func TestAddonLootPreviewResolvesBossRecipientAndProblems(t *testing.T) {
 	creatureBoss, creatureItem := uniqueCreatureDrop(t, f)
 	payload := strings.Join([]string{
 		fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000", f.raidID+1),
-		fmt.Sprintf("1760000100|%s|%s|%s", creatureBoss, creatureItem, strings.ToUpper(first)),
-		fmt.Sprintf("1760000200|-|%s|%s", f.tokenItem, first),
-		fmt.Sprintf("1760000300|-|%s|Unbekannt", f.ordinaryItem),
-		fmt.Sprintf("1760000400|-|%s|-", f.ordinaryItem),
+		fmt.Sprintf("1|1760000100|%s|%s|%s|given", creatureBoss, creatureItem, strings.ToUpper(first)),
+		fmt.Sprintf("2|1760000200|-|%s|%s|given", f.tokenItem, first),
+		fmt.Sprintf("3|1760000300|-|%s|Unbekannt|given", f.ordinaryItem),
+		fmt.Sprintf("4|1760000400|-|%s|-|-", f.ordinaryItem),
 		"kaputt",
-		"1760000500|-|1|" + first,
+		"6|1760000500|-|1|" + first + "|given",
 	}, "\n")
 	preview := f.addonPreview(payload)
 	if preview.HeaderRaidID != f.raidID+1 || len(preview.Warnings) != 1 {
@@ -151,14 +157,15 @@ func TestAddonLootPreviewResolvesBossRecipientAndProblems(t *testing.T) {
 	if !token.IsImportable || token.AwardMethod != "SECOND" || len(token.BossOptions) < 2 || token.CatalogBossID != nil {
 		t.Fatalf("token row must be SECOND with an open boss choice: %+v", token)
 	}
-	hinted := f.addonPreview(fmt.Sprintf("RS1|LOOT|%d|Recorder|1\n2|%s|%s|%s", f.raidID, tokenBossCreature(t, token.BossOptions), f.tokenItem, first)).Rows[0]
+	hinted := f.addonPreview(fmt.Sprintf("RS1|LOOT|%d|Recorder|1\n1|2|%s|%s|%s|given", f.raidID, tokenBossCreature(t, token.BossOptions), f.tokenItem, first)).Rows[0]
 	if hinted.CatalogBossID == nil || *hinted.CatalogBossID != tokenBossCreature(t, token.BossOptions) {
 		t.Fatalf("the killed creature must pick the boss: %+v", hinted)
 	}
-	if row := preview.Rows[2]; row.IsImportable || len(row.Errors) != 1 {
+	// Unknown or missing recipients are suggestions only: staff pick the winner.
+	if row := preview.Rows[2]; !row.IsImportable || row.CharacterID != nil || len(row.Errors) != 0 || !strings.Contains(strings.Join(row.Warnings, " "), "nicht in der Aufstellung") {
 		t.Fatalf("unknown recipient: %+v", row)
 	}
-	if row := preview.Rows[3]; row.IsImportable || len(row.Warnings) != 1 {
+	if row := preview.Rows[3]; !row.IsImportable || row.CharacterID != nil || len(row.Warnings) != 1 {
 		t.Fatalf("unassigned drop: %+v", row)
 	}
 	if row := preview.Rows[4]; row.IsImportable || len(row.Errors) != 1 {
@@ -177,7 +184,7 @@ func TestAddonLootImportIsIdempotentAcrossStaff(t *testing.T) {
 	f := newCorrectionFixture(t)
 	f.attend(f.first, f.firstChar)
 	first := f.characterName(f.firstChar)
-	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1760000100|-|%s|%s\n1760000200|-|%s|%s", f.raidID, f.ordinaryItem, first, f.tokenItem, first)
+	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1|1760000100|-|%s|%s|given\n2|1760000200|-|%s|%s|given", f.raidID, f.ordinaryItem, first, f.tokenItem, first)
 	preview := f.addonPreview(payload)
 	selections := []map[string]any{
 		{"line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"},
@@ -218,7 +225,7 @@ func TestAddonLootImportReportsFailuresPerLine(t *testing.T) {
 	f := newCorrectionFixture(t)
 	f.attend(f.first, f.firstChar)
 	first := f.characterName(f.firstChar)
-	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1760000100|-|%s|%s\n1760000200|-|%s|%s", f.raidID, f.ordinaryItem, first, f.ordinaryItem, first)
+	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1|1760000100|-|%s|%s|given\n2|1760000200|-|%s|%s|given", f.raidID, f.ordinaryItem, first, f.ordinaryItem, first)
 	preview := f.addonPreview(payload)
 	results := f.addonImport(f.token, payload, []map[string]any{
 		{"line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
@@ -243,7 +250,7 @@ func TestAddonLootImportAppliesItemLock(t *testing.T) {
 	if err := enhancepoints.NewRepo(f.db).CreateLock(context.Background(), lock); err != nil {
 		t.Fatal(err)
 	}
-	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1760000100|-|%s|%s", f.raidID, f.ordinaryItem, f.characterName(f.firstChar))
+	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1|1760000100|-|%s|%s|given", f.raidID, f.ordinaryItem, f.characterName(f.firstChar))
 	preview := f.addonPreview(payload)
 	if !strings.Contains(strings.Join(preview.Rows[0].Warnings, " "), "Item-Lock") {
 		t.Fatalf("lock warning missing: %+v", preview.Rows[0])
@@ -275,6 +282,208 @@ func TestAddonLootImportPermissionsAndRaidState(t *testing.T) {
 	}
 	f.archiveHistory()
 	result = f.request(http.MethodPost, "/addon-loot-import/preview", map[string]any{"payload": payload}, http.StatusConflict)
+	if !bytes.Contains(result, []byte(`"code":"raid_state"`)) {
+		t.Fatalf("wrong code: %s", result)
+	}
+}
+
+func TestAddonLootReimportAfterTradeKeepsTheAward(t *testing.T) {
+	f := newCorrectionFixture(t)
+	f.attend(f.first, f.firstChar)
+	f.attend(f.second, f.secondChar)
+	first, second := f.characterName(f.firstChar), f.characterName(f.secondChar)
+	held := fmt.Sprintf("RS1|LOOT|%d|%s|1760000000\n1|1760000100|-|%s|%s|held", f.raidID, first, f.ordinaryItem, first)
+	preview := f.addonPreview(held)
+	row := preview.Rows[0]
+	if row.State != "held" || !row.IsImportable || !strings.Contains(strings.Join(row.Warnings, " "), "Noch beim Plündermeister") {
+		t.Fatalf("held drop must warn: %+v", row)
+	}
+	if len(preview.RecipientOptions) != 2 {
+		t.Fatalf("recipient options: %+v", preview.RecipientOptions)
+	}
+	results := f.addonImport(f.token, held, []map[string]any{{"line_key": row.LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"}})
+	if len(results) != 1 || results[0].Status != "created" {
+		t.Fatalf("first import: %+v", results)
+	}
+
+	// The loot master traded the item on after the first import.
+	traded := fmt.Sprintf("RS1|LOOT|%d|%s|1760000000\n1|1760000100|-|%s|%s|given", f.raidID, first, f.ordinaryItem, second)
+	again := f.addonPreview(traded).Rows[0]
+	if again.LineKey != row.LineKey || !again.IsAlreadyImported || again.IsImportable || len(again.Warnings) != 2 || !strings.Contains(again.Warnings[1], "Bereits importiert an "+first) {
+		t.Fatalf("re-import after a trade must be recognised and warn only about the recipient: %+v", again)
+	}
+	if same := f.addonPreview(held).Rows[0]; len(same.Warnings) != 1 {
+		t.Fatalf("an unchanged imported line only says it was imported: %+v", same)
+	}
+	repeat := f.addonImport(f.token, traded, []map[string]any{{"line_key": again.LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"}})
+	if len(repeat) != 1 || repeat[0].Status != "already_imported" {
+		t.Fatalf("repeat must not create a second award: %+v", repeat)
+	}
+	awards, err := loot.NewRepo(f.db).ListByRaid(context.Background(), f.raidID)
+	if err != nil || len(awards) != 1 || *awards[0].AwardedToCharacterID != f.firstChar {
+		t.Fatalf("awards: %+v %v", awards, err)
+	}
+}
+
+func TestAddonLootImportAcceptsAChosenRecipient(t *testing.T) {
+	f := newCorrectionFixture(t)
+	f.attend(f.first, f.firstChar)
+	f.attend(f.second, f.secondChar)
+	// A unique item went to a helper first, who traded it to the winner.
+	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1|1760000100|-|%s|Helfer|given\n2|1760000200|-|%s|-|-", f.raidID, f.ordinaryItem, f.ordinaryItem)
+	preview := f.addonPreview(payload)
+	results := f.addonImport(f.token, payload, []map[string]any{
+		{"line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
+		{"line_key": preview.Rows[1].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": 0, "award_method": "MAIN"},
+	})
+	if len(results) != 2 || results[0].Status != "created" || results[0].CharacterName != f.characterName(f.secondChar) || results[1].Code != "recipient_not_in_roster" {
+		t.Fatalf("results: %+v", results)
+	}
+}
+
+type rosterPreviewRow struct {
+	Name            string `json:"name"`
+	Status          string `json:"status"`
+	CharacterID     *int64 `json:"character_id"`
+	CharacterName   string `json:"character_name"`
+	SuggestedRole   string `json:"suggested_role"`
+	SuggestLateJoin bool   `json:"suggest_late_join"`
+	Errors          []string
+}
+
+type rosterPreview struct {
+	HeaderRaidID int64              `json:"header_raid_id"`
+	Rows         []rosterPreviewRow `json:"rows"`
+	Missing      []string           `json:"missing"`
+	Warnings     []string           `json:"warnings"`
+}
+
+type rosterImportResult struct {
+	CharacterID  int64  `json:"character_id"`
+	Status       string `json:"status"`
+	AttendanceID *int64 `json:"attendance_id"`
+	Code         string `json:"code"`
+}
+
+func (f *correctionFixture) rosterPreview(payload string) rosterPreview {
+	f.t.Helper()
+	body := f.request(http.MethodPost, "/addon-roster-import/preview", map[string]any{"payload": payload}, http.StatusOK)
+	var out struct{ Data rosterPreview }
+	if err := json.Unmarshal(body, &out); err != nil {
+		f.t.Fatal(err)
+	}
+	return out.Data
+}
+
+func (f *correctionFixture) rosterImport(payload string, selections []map[string]any) []rosterImportResult {
+	f.t.Helper()
+	body := f.request(http.MethodPost, "/addon-roster-import", map[string]any{"payload": payload, "selections": selections}, http.StatusOK)
+	var out struct{ Data []rosterImportResult }
+	if err := json.Unmarshal(body, &out); err != nil {
+		f.t.Fatal(err)
+	}
+	return out.Data
+}
+
+func TestAddonRosterPreviewMatchesRosterKnownAndUnknown(t *testing.T) {
+	f := newCorrectionFixture(t)
+	f.attend(f.first, f.firstChar)
+	ctx := context.Background()
+	rd, err := raid.NewRepo(f.db).Get(ctx, f.raidID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Unix(1760000000, 0).UTC()
+	rd.ScheduledStart = &start
+	if err := raid.NewRepo(f.db).Update(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	// The second character healed last time in another raid.
+	now := time.Now().UTC()
+	earlier := &raid.Raid{Name: "Earlier raid", RaidLeaderID: f.actor, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
+	if err := raid.NewRepo(f.db).Create(ctx, earlier); err != nil {
+		t.Fatal(err)
+	}
+	if err := attendance.NewRepo(f.db).Create(ctx, &attendance.Attendance{RaidID: earlier.ID, PlayerID: f.second, CharacterID: f.secondChar, Role: validation.RoleHeal, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	first, second := f.characterName(f.firstChar), f.characterName(f.secondChar)
+	payload := strings.Join([]string{
+		fmt.Sprintf("RS1|ROSTER|%d|%s|1760007200", f.raidID, first),
+		fmt.Sprintf("%s|MAGE|1760000060", strings.ToUpper(first)),
+		fmt.Sprintf("%s|MAGE|1760003600", second),
+		"Weltchat|PALADIN|1760003600",
+		"kaputt",
+	}, "\n")
+	preview := f.rosterPreview(payload)
+	if len(preview.Rows) != 4 || len(preview.Missing) != 0 || len(preview.Warnings) != 0 {
+		t.Fatalf("preview: %+v", preview)
+	}
+	if row := preview.Rows[0]; row.Status != "in_roster" || row.CharacterID == nil || *row.CharacterID != f.firstChar {
+		t.Fatalf("roster member: %+v", row)
+	}
+	if row := preview.Rows[1]; row.Status != "known" || *row.CharacterID != f.secondChar || row.SuggestedRole != "HEAL" || !row.SuggestLateJoin {
+		t.Fatalf("known character: %+v", row)
+	}
+	if row := preview.Rows[2]; row.Status != "unknown" || row.CharacterID != nil {
+		t.Fatalf("unknown character: %+v", row)
+	}
+	if row := preview.Rows[3]; row.Status != "invalid" || len(row.Errors) != 1 {
+		t.Fatalf("broken line: %+v", row)
+	}
+	missing := f.rosterPreview(fmt.Sprintf("RS1|ROSTER|%d|x|1\n%s|-|1760000000", f.raidID+1, second))
+	if len(missing.Missing) != 1 || missing.Missing[0] != first || len(missing.Warnings) != 1 || missing.Rows[0].SuggestedRole != "HEAL" || missing.Rows[0].SuggestLateJoin {
+		t.Fatalf("roster members not seen in game must be listed: %+v", missing)
+	}
+	if rows, err := attendance.NewRepo(f.db).ListByRaid(ctx, f.raidID); err != nil || len(rows) != 1 {
+		t.Fatalf("preview wrote attendance: %v %v", rows, err)
+	}
+}
+
+func TestAddonRosterImportAddsKnownCharactersOnce(t *testing.T) {
+	f := newCorrectionFixture(t)
+	f.attend(f.first, f.firstChar)
+	second := f.characterName(f.secondChar)
+	payload := fmt.Sprintf("RS1|ROSTER|%d|x|1760007200\n%s|MAGE|1760003600", f.raidID, second)
+	results := f.rosterImport(payload, []map[string]any{
+		{"character_id": f.secondChar, "role": "HEAL", "late_join": true},
+		{"character_id": f.firstChar, "role": "DD"},
+		{"character_id": 999999, "role": "DD"},
+	})
+	if len(results) != 3 || results[0].Status != "added" || results[0].AttendanceID == nil || results[1].Code != "not_in_export" || results[2].Code != "unknown_character" {
+		t.Fatalf("results: %+v", results)
+	}
+	row, err := attendance.NewRepo(f.db).Get(context.Background(), *results[0].AttendanceID)
+	if err != nil || row.PlayerID != f.second || row.Role != validation.RoleHeal || !row.LateJoin {
+		t.Fatalf("attendance: %+v %v", row, err)
+	}
+	again := f.rosterImport(payload, []map[string]any{{"character_id": f.secondChar, "role": "DD"}})
+	if len(again) != 1 || again[0].Status != "already_in_roster" {
+		t.Fatalf("repeat must not add twice: %+v", again)
+	}
+	if rows, err := attendance.NewRepo(f.db).ListByRaid(context.Background(), f.raidID); err != nil || len(rows) != 2 {
+		t.Fatalf("attendance rows: %v %v", rows, err)
+	}
+	if bad := f.rosterImport(payload, []map[string]any{{"character_id": f.secondChar, "role": "BOSS"}}); bad[0].Status != "already_in_roster" {
+		t.Fatalf("existing row is reported before the role is checked: %+v", bad)
+	}
+}
+
+func TestAddonRosterImportPermissionsAndRaidState(t *testing.T) {
+	f := newCorrectionFixture(t)
+	payload := fmt.Sprintf("RS1|ROSTER|%d|x|1", f.raidID)
+	for _, suffix := range []string{"/addon-roster-import/preview", "/addon-roster-import"} {
+		status, body := do(t, f.srv.Client(), http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d%s", f.srv.URL, f.raidID, suffix), f.memberToken, map[string]any{"payload": payload})
+		if status != http.StatusForbidden {
+			t.Fatalf("member %s: %d %s", suffix, status, body)
+		}
+	}
+	result := f.request(http.MethodPost, "/addon-roster-import/preview", map[string]any{"payload": fmt.Sprintf("RS1|LOOT|%d|x|1", f.raidID)}, http.StatusBadRequest)
+	if !bytes.Contains(result, []byte(`"code":"invalid_addon_export"`)) {
+		t.Fatalf("wrong code: %s", result)
+	}
+	f.archiveHistory()
+	result = f.request(http.MethodPost, "/addon-roster-import", map[string]any{"payload": payload}, http.StatusConflict)
 	if !bytes.Contains(result, []byte(`"code":"raid_state"`)) {
 		t.Fatalf("wrong code: %s", result)
 	}

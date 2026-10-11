@@ -297,6 +297,9 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 	if uname == "" || strings.TrimSpace(password) == "" {
 		return "", nil, ErrInvalid
 	}
+	if err := auth.ValidatePassword(password); err != nil {
+		return "", nil, err
+	}
 	if _, err := s.players.FindByUsername(ctx, uname); err == nil {
 		return "", nil, ErrUsernameTaken
 	} else if !errors.Is(err, sql.ErrNoRows) {

@@ -13,6 +13,7 @@ func TestProductionCredentials(t *testing.T) {
 		{"default username", "Robin", "unique-password", false},
 		{"normalized default username", " ROBIN ", "unique-password", false},
 		{"default password", "owner", "test", false},
+		{"development default password", "owner", "development-password", false},
 		{"blank username", " \t", "unique-password", false},
 		{"blank password", "owner", " \t", false},
 		{"explicit credentials", "owner", "unique-password", true},
@@ -41,7 +42,7 @@ func TestDevelopmentDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AdminUsername != "Robin" || cfg.AdminPassword != "test" {
+	if cfg.AdminUsername != "Robin" || cfg.AdminPassword != "development-password" {
 		t.Fatal("development defaults changed")
 	}
 }

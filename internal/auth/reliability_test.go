@@ -47,7 +47,7 @@ func TestLoginRepositoryFailures(t *testing.T) {
 			username := "unknown"
 			if scenario == "session insert failure" {
 				username = "owner"
-				if err := svc.BootstrapAdmin(ctx, username, "password"); err != nil {
+				if err := svc.BootstrapAdmin(ctx, username, "valid-password"); err != nil {
 					t.Fatal(err)
 				}
 				if _, err := bdb.DB.ExecContext(ctx, "CREATE TRIGGER reject_session AFTER INSERT ON sessions BEGIN SELECT RAISE(ABORT, 'injected failure'); END"); err != nil {
@@ -59,7 +59,7 @@ func TestLoginRepositoryFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			token, p, err := svc.Login(ctx, username, "password")
+			token, p, err := svc.Login(ctx, username, "valid-password")
 			if err == nil || token != "" || p != nil {
 				t.Fatalf("Login = %q, %v, %v; want no session or identity", token, p, err)
 			}
@@ -85,10 +85,10 @@ func TestAuthenticateExpectedMisses(t *testing.T) {
 			t.Fatalf("Authenticate(%q) = %v, %v", token, p, err)
 		}
 	}
-	if err := svc.BootstrapAdmin(ctx, "owner", "password"); err != nil {
+	if err := svc.BootstrapAdmin(ctx, "owner", "valid-password"); err != nil {
 		t.Fatal(err)
 	}
-	token, p, err := svc.Login(ctx, "owner", "password")
+	token, p, err := svc.Login(ctx, "owner", "valid-password")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,10 +116,10 @@ func TestAuthenticateOperationalFailures(t *testing.T) {
 			ctx := context.Background()
 			bdb := reliabilityDB(t)
 			svc := NewService(player.NewRepo(bdb.DB), NewRepo(bdb.DB))
-			if err := svc.BootstrapAdmin(ctx, "owner", "password"); err != nil {
+			if err := svc.BootstrapAdmin(ctx, "owner", "valid-password"); err != nil {
 				t.Fatal(err)
 			}
-			token, _, err := svc.Login(ctx, "owner", "password")
+			token, _, err := svc.Login(ctx, "owner", "valid-password")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -213,5 +213,105 @@ func TestSetCredentialsRollback(t *testing.T) {
 	}
 	if *after.Username != *before.Username || after.PasswordHash != before.PasswordHash || after.Role != before.Role || !after.UpdatedAt.Equal(before.UpdatedAt) {
 		t.Fatal("failed credential update left partial changes")
+	}
+}
+
+func TestMFAStatusAndFactorRemoval(t *testing.T) {
+	ctx := context.Background()
+	bdb := reliabilityDB(t)
+	players := player.NewRepo(bdb.DB)
+	repo := NewRepo(bdb.DB)
+	svc := NewService(players, repo)
+	if err := svc.BootstrapAdmin(ctx, "owner", "initial-password"); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := players.FindByUsername(ctx, "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if err := repo.UpsertMFASettings(ctx, &MFASettings{PlayerID: owner.ID, TOTPSecret: "secret", TOTPEnabledAt: &now, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateRecoveryCode(ctx, &MFARecoveryCode{PlayerID: owner.ID, CodeHash: hashToken("recovery"), CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateWebAuthnCredential(ctx, &WebAuthnCredential{PlayerID: owner.ID, CredentialIDHash: "credential-hash", Name: "YubiKey", CredentialJSON: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := svc.MFAStatus(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.TOTPEnabled || len(status.SecurityKeys) != 1 || status.SecurityKeys[0].Name != "YubiKey" {
+		t.Fatalf("unexpected MFA status: %+v", status)
+	}
+
+	if err := svc.DisableTOTP(ctx, owner.ID, "wrong-password"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("DisableTOTP with wrong password = %v, want invalid credentials", err)
+	}
+	if err := svc.DisableTOTP(ctx, owner.ID, "initial-password"); err != nil {
+		t.Fatal(err)
+	}
+	status, err = svc.MFAStatus(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.TOTPEnabled || len(status.SecurityKeys) != 1 {
+		t.Fatalf("unexpected MFA status after disabling TOTP: %+v", status)
+	}
+	if _, err := repo.FindUnusedRecoveryCode(ctx, owner.ID, hashToken("recovery")); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("recovery code after disabling TOTP = %v, want removed", err)
+	}
+
+	if err := svc.DeleteWebAuthnCredential(ctx, owner.ID, status.SecurityKeys[0].ID, "wrong-password"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("DeleteWebAuthnCredential with wrong password = %v, want invalid credentials", err)
+	}
+	if err := svc.DeleteWebAuthnCredential(ctx, owner.ID, status.SecurityKeys[0].ID, "initial-password"); err != nil {
+		t.Fatal(err)
+	}
+	status, err = svc.MFAStatus(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.SecurityKeys) != 0 {
+		t.Fatalf("security keys after deletion: %+v", status.SecurityKeys)
+	}
+}
+
+func TestDeleteWebAuthnCredentialRejectsOtherOwner(t *testing.T) {
+	ctx := context.Background()
+	bdb := reliabilityDB(t)
+	players := player.NewRepo(bdb.DB)
+	repo := NewRepo(bdb.DB)
+	svc := NewService(players, repo)
+	if err := svc.BootstrapAdmin(ctx, "owner", "initial-password"); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := players.FindByUsername(ctx, "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherPassword, err := HashPassword("other-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherUsername := "other"
+	now := time.Now().UTC()
+	other := &player.Player{Name: "Other", Username: &otherUsername, PasswordHash: otherPassword, Role: validation.RoleMember, Active: true, CreatedAt: now, UpdatedAt: now}
+	if err := players.Create(ctx, other); err != nil {
+		t.Fatal(err)
+	}
+	credential := &WebAuthnCredential{PlayerID: other.ID, CredentialIDHash: "other-credential", Name: "Other key", CredentialJSON: "{}", CreatedAt: now, UpdatedAt: now}
+	if err := repo.CreateWebAuthnCredential(ctx, credential); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := svc.DeleteWebAuthnCredential(ctx, owner.ID, credential.ID, "initial-password"); !errors.Is(err, ErrInvalidMFA) {
+		t.Fatalf("DeleteWebAuthnCredential for another owner = %v, want invalid MFA", err)
+	}
+	if _, err := repo.GetWebAuthnCredential(ctx, credential.ID); err != nil {
+		t.Fatalf("credential was removed or became unreadable: %v", err)
 	}
 }

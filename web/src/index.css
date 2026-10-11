@@ -345,6 +345,14 @@ label.inline-choice {
   overflow-wrap: anywhere;
 }
 
+.totp-qr {
+  width: 180px;
+  height: 180px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
 .plain-list.scroll {
   max-height: 240px;
   overflow-y: auto;

@@ -4,11 +4,14 @@ import { api, ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
 import { GuildCrest } from '../components/GuildCrest'
 import type { ExternalCharacter, Player, RegistrationRequest } from '../types'
+import { browserSupportsWebAuthn } from '../webauthn'
 
 export function LoginPage() {
-  const { login, refresh } = useAuth()
+  const { login, verifyMFA, verifySecurityKey, refresh } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [mfaCode, setMfaCode] = useState('')
+  const [mfaChallenge, setMfaChallenge] = useState('')
   const [code, setCode] = useState('')
   const [regUser, setRegUser] = useState('')
   const [regPass, setRegPass] = useState('')
@@ -26,9 +29,37 @@ export function LoginPage() {
     await submit(async () => {
       setError('')
       try {
-        await login(username, password)
+        const result = await login(username, password)
+        if (result.mfaRequired && result.challenge) {
+          setMfaChallenge(result.challenge)
+          setPassword('')
+          return
+        }
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Anmelden fehlgeschlagen. Bitte erneut versuchen.')
+      }
+    })
+  }
+
+  const onMFASubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    await submit(async () => {
+      setError('')
+      try {
+        await verifyMFA(mfaChallenge, mfaCode)
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'MFA-Code konnte nicht geprüft werden.')
+      }
+    })
+  }
+
+  const onSecurityKeySubmit = async () => {
+    await submit(async () => {
+      setError('')
+      try {
+        await verifySecurityKey(mfaChallenge)
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Sicherheitsschlüssel konnte nicht geprüft werden.')
       }
     })
   }
@@ -92,7 +123,7 @@ export function LoginPage() {
           <button type="button" className={mode === 'request' ? 'active' : ''} onClick={() => setMode('request')}>Code anfordern</button>
           <button type="button" className={mode === 'redeem' ? 'active' : ''} onClick={() => setMode('redeem')}>Registrieren</button>
         </div>
-        {mode === 'login' && <form className="login-section" onSubmit={onSubmit}>
+        {mode === 'login' && !mfaChallenge && <form className="login-section" onSubmit={onSubmit}>
           <label>
             Benutzername
             <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus />
@@ -102,6 +133,16 @@ export function LoginPage() {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
           </label>
           <button type="submit" disabled={busy}>{busy ? 'Anmelden…' : 'Anmelden'}</button>
+        </form>}
+        {mode === 'login' && mfaChallenge && <form className="login-section" onSubmit={onMFASubmit}>
+          <p className="muted">Bitte gib den sechsstelligen Code aus deiner Authenticator-App oder einen Wiederherstellungscode ein.</p>
+          <label>
+            MFA-Code
+            <input value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} autoComplete="one-time-code" autoFocus />
+          </label>
+          <button type="submit" disabled={busy || !mfaCode.trim()}>{busy ? 'Prüfe…' : 'Anmelden'}</button>
+          {browserSupportsWebAuthn() && <button type="button" disabled={busy} onClick={() => void onSecurityKeySubmit()}>Mit YubiKey anmelden</button>}
+          <button type="button" className="ghost" disabled={busy} onClick={() => { setMfaChallenge(''); setMfaCode('') }}>Zurück</button>
         </form>}
         {mode === 'request' && <div className="login-section">
           <p className="muted">Suche deinen Rising-Gods-Charakter. Ein Admin sendet dir danach einen Code ingame an genau diesen Charakter.</p>

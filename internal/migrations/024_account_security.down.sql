@@ -1,0 +1,11 @@
+DROP INDEX IF EXISTS idx_webauthn_sessions_hash;
+DROP TABLE IF EXISTS webauthn_sessions;
+DROP INDEX IF EXISTS idx_webauthn_credentials_player;
+DROP TABLE IF EXISTS webauthn_credentials;
+DROP INDEX IF EXISTS idx_mfa_login_challenges_hash;
+DROP TABLE IF EXISTS mfa_login_challenges;
+DROP INDEX IF EXISTS idx_mfa_recovery_codes_player;
+DROP TABLE IF EXISTS mfa_recovery_codes;
+DROP TABLE IF EXISTS player_mfa_settings;
+DROP INDEX IF EXISTS idx_login_attempts_lookup;
+DROP TABLE IF EXISTS login_attempts;

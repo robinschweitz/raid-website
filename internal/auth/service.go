@@ -2,13 +2,19 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha1"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/base32"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,7 +25,12 @@ import (
 )
 
 const (
-	defaultSessionTTL = 30 * 24 * time.Hour
+	defaultSessionTTL        = 30 * 24 * time.Hour
+	MinPasswordLength        = 12
+	loginFailureLimit        = 5
+	loginFailureWindow       = 15 * time.Minute
+	mfaChallengeTTL          = 5 * time.Minute
+	totpPeriodSeconds  int64 = 30
 
 	// CookieName is the name of the session cookie.
 	CookieName = "raid_session"
@@ -30,7 +41,36 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	// ErrInactive is returned when the account exists but is deactivated.
 	ErrInactive = errors.New("account inactive")
+	// ErrWeakPassword is returned when a new password does not meet the policy.
+	ErrWeakPassword = errors.New("password must be at least 12 characters")
+	// ErrLoginRateLimited is returned when too many failed logins were recorded recently.
+	ErrLoginRateLimited = errors.New("login rate limited")
+	ErrMFARequired      = errors.New("mfa required")
+	ErrInvalidMFA       = errors.New("invalid mfa code")
 )
+
+type LoginStart struct {
+	Token        string
+	Player       *player.Player
+	MFAChallenge string
+}
+
+type TOTPSetup struct {
+	Secret string `json:"secret"`
+	URI    string `json:"uri"`
+}
+
+type MFAStatus struct {
+	TOTPEnabled  bool                     `json:"totp_enabled"`
+	SecurityKeys []WebAuthnCredentialInfo `json:"security_keys"`
+}
+
+type WebAuthnCredentialInfo struct {
+	ID         int64      `json:"id"`
+	Name       string     `json:"name"`
+	CreatedAt  time.Time  `json:"created_at"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+}
 
 type Service struct {
 	players  *player.Repo
@@ -51,10 +91,58 @@ func HashPassword(password string) (string, error) {
 	return string(b), nil
 }
 
+// ValidatePassword enforces the account password policy for new or changed credentials.
+func ValidatePassword(password string) error {
+	if len([]rune(strings.TrimSpace(password))) < MinPasswordLength {
+		return ErrWeakPassword
+	}
+	return nil
+}
+
+func (s *Service) VerifyPassword(ctx context.Context, playerID int64, password string) error {
+	p, err := s.players.Get(ctx, playerID)
+	if err != nil {
+		return fmt.Errorf("get password player: %w", err)
+	}
+	if p.PasswordHash == "" || bcrypt.CompareHashAndPassword([]byte(p.PasswordHash), []byte(password)) != nil {
+		return ErrInvalidCredentials
+	}
+	if !p.Active {
+		return ErrInactive
+	}
+	return nil
+}
+
+func (s *Service) ChangeOwnPassword(ctx context.Context, playerID int64, currentPassword, newPassword string) error {
+	if err := s.VerifyPassword(ctx, playerID, currentPassword); err != nil {
+		return err
+	}
+	if err := ValidatePassword(newPassword); err != nil {
+		return err
+	}
+	hash, err := HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("hash own password: %w", err)
+	}
+	p, err := s.players.Get(ctx, playerID)
+	if err != nil {
+		return fmt.Errorf("get own password player: %w", err)
+	}
+	p.PasswordHash = hash
+	p.UpdatedAt = time.Now().UTC()
+	if err := s.players.Update(ctx, p); err != nil {
+		return fmt.Errorf("update own password: %w", err)
+	}
+	return nil
+}
+
 // BootstrapAdmin creates an initial account atomically without changing existing accounts.
 func (s *Service) BootstrapAdmin(ctx context.Context, username, password string) error {
 	if username == "" || password == "" {
 		return nil
+	}
+	if err := ValidatePassword(password); err != nil {
+		return err
 	}
 	uname := strings.ToLower(strings.TrimSpace(username))
 	if uname == "" {
@@ -99,6 +187,9 @@ func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, 
 		}
 		hash := p.PasswordHash
 		if password != "" {
+			if err := ValidatePassword(password); err != nil {
+				return err
+			}
 			hash, err = HashPassword(password)
 			if err != nil {
 				return fmt.Errorf("hash credential password: %w", err)
@@ -122,28 +213,70 @@ func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, 
 
 // Login verifies credentials and creates a session, returning the raw token.
 func (s *Service) Login(ctx context.Context, username, password string) (string, *player.Player, error) {
+	return s.LoginWithClient(ctx, username, password, "")
+}
+
+// LoginWithClient verifies credentials with rate limiting for a username/client pair.
+func (s *Service) LoginWithClient(ctx context.Context, username, password, clientIP string) (string, *player.Player, error) {
+	result, err := s.StartLogin(ctx, username, password, clientIP)
+	if err != nil {
+		return "", nil, err
+	}
+	if result.MFAChallenge != "" {
+		return "", nil, ErrMFARequired
+	}
+	return result.Token, result.Player, nil
+}
+
+func (s *Service) StartLogin(ctx context.Context, username, password, clientIP string) (*LoginStart, error) {
 	uname := strings.ToLower(strings.TrimSpace(username))
+	now := time.Now().UTC()
+	if clientIP != "" {
+		count, err := s.sessions.CountFailedLoginAttempts(ctx, uname, clientIP, now.Add(-loginFailureWindow))
+		if err != nil {
+			return nil, fmt.Errorf("count login attempts: %w", err)
+		}
+		if count >= loginFailureLimit {
+			return nil, ErrLoginRateLimited
+		}
+	}
 	p, err := s.players.FindByUsername(ctx, uname)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", nil, ErrInvalidCredentials
+			s.recordLoginAttempt(ctx, uname, clientIP, false, now)
+			return nil, ErrInvalidCredentials
 		}
-		return "", nil, fmt.Errorf("find login player: %w", err)
+		return nil, fmt.Errorf("find login player: %w", err)
 	}
 	if p.PasswordHash == "" {
-		return "", nil, ErrInvalidCredentials
+		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
+		return nil, ErrInvalidCredentials
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(p.PasswordHash), []byte(password)); err != nil {
-		return "", nil, ErrInvalidCredentials
+		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
+		return nil, ErrInvalidCredentials
 	}
 	if !p.Active {
-		return "", nil, ErrInactive
+		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
+		return nil, ErrInactive
+	}
+	if enabled, err := s.MFAEnabled(ctx, p.ID); err != nil {
+		return nil, err
+	} else if enabled {
+		challenge, err := newToken()
+		if err != nil {
+			return nil, fmt.Errorf("generate mfa challenge: %w", err)
+		}
+		if err := s.sessions.CreateMFAChallenge(ctx, &MFAChallenge{ChallengeHash: hashToken(challenge), PlayerID: p.ID, CreatedAt: now, ExpiresAt: now.Add(mfaChallengeTTL)}); err != nil {
+			return nil, fmt.Errorf("create mfa challenge: %w", err)
+		}
+		s.recordLoginAttempt(ctx, uname, clientIP, true, now)
+		return &LoginStart{Player: p, MFAChallenge: challenge}, nil
 	}
 	token, err := newToken()
 	if err != nil {
-		return "", nil, fmt.Errorf("generate session token: %w", err)
+		return nil, fmt.Errorf("generate session token: %w", err)
 	}
-	now := time.Now().UTC()
 	sess := &Session{
 		TokenHash:  hashToken(token),
 		PlayerID:   p.ID,
@@ -152,9 +285,20 @@ func (s *Service) Login(ctx context.Context, username, password string) (string,
 		LastSeenAt: now,
 	}
 	if err := s.sessions.CreateSession(ctx, sess); err != nil {
-		return "", nil, fmt.Errorf("create login session: %w", err)
+		return nil, fmt.Errorf("create login session: %w", err)
 	}
-	return token, p, nil
+	s.recordLoginAttempt(ctx, uname, clientIP, true, now)
+	return &LoginStart{Token: token, Player: p}, nil
+}
+
+func (s *Service) recordLoginAttempt(ctx context.Context, username, clientIP string, success bool, at time.Time) {
+	if clientIP == "" {
+		return
+	}
+	if err := s.sessions.CreateLoginAttempt(ctx, &LoginAttempt{Username: username, ClientIP: clientIP, Success: success, CreatedAt: at}); err != nil {
+		// Login correctness must not depend on best-effort throttle bookkeeping after the credential decision.
+		return
+	}
 }
 
 // Authenticate resolves a raw session token. Missing, unknown, or expired sessions return nil, nil.
@@ -198,6 +342,261 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 		return fmt.Errorf("delete logout session: %w", err)
 	}
 	return nil
+}
+
+func (s *Service) MFAEnabled(ctx context.Context, playerID int64) (bool, error) {
+	settings, err := s.sessions.GetMFASettings(ctx, playerID)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return false, fmt.Errorf("get mfa settings: %w", err)
+		}
+	} else if settings.TOTPEnabledAt != nil && settings.TOTPSecret != "" {
+		return true, nil
+	}
+	count, err := s.sessions.CountWebAuthnCredentials(ctx, playerID)
+	if err != nil {
+		return false, fmt.Errorf("count webauthn credentials: %w", err)
+	}
+	return count > 0, nil
+}
+
+func (s *Service) SetupTOTP(ctx context.Context, playerID int64, issuer string) (*TOTPSetup, error) {
+	p, err := s.players.Get(ctx, playerID)
+	if err != nil {
+		return nil, fmt.Errorf("get totp player: %w", err)
+	}
+	secret, err := newTOTPSecret()
+	if err != nil {
+		return nil, fmt.Errorf("generate totp secret: %w", err)
+	}
+	now := time.Now().UTC()
+	settings := &MFASettings{PlayerID: playerID, TOTPSecret: secret, CreatedAt: now, UpdatedAt: now}
+	if err := s.sessions.UpsertMFASettings(ctx, settings); err != nil {
+		return nil, fmt.Errorf("save totp settings: %w", err)
+	}
+	if issuer == "" {
+		issuer = "Bratwurst des Schicksals"
+	}
+	return &TOTPSetup{Secret: secret, URI: totpURI(issuer, accountLabel(p), secret)}, nil
+}
+
+func (s *Service) EnableTOTP(ctx context.Context, playerID int64, code string) ([]string, error) {
+	settings, err := s.sessions.GetMFASettings(ctx, playerID)
+	if err != nil {
+		return nil, fmt.Errorf("get totp settings: %w", err)
+	}
+	if !verifyTOTP(settings.TOTPSecret, code, time.Now().UTC()) {
+		return nil, ErrInvalidMFA
+	}
+	recovery, err := newRecoveryCodes(10)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	settings.TOTPEnabledAt = &now
+	settings.UpdatedAt = now
+	if err := s.sessions.UpsertMFASettings(ctx, settings); err != nil {
+		return nil, fmt.Errorf("enable totp: %w", err)
+	}
+	if err := s.sessions.DeleteRecoveryCodes(ctx, playerID); err != nil {
+		return nil, fmt.Errorf("replace recovery codes: %w", err)
+	}
+	for _, plain := range recovery {
+		if err := s.sessions.CreateRecoveryCode(ctx, &MFARecoveryCode{PlayerID: playerID, CodeHash: hashToken(normalizeMFACode(plain)), CreatedAt: now}); err != nil {
+			return nil, fmt.Errorf("create recovery code: %w", err)
+		}
+	}
+	return recovery, nil
+}
+
+func (s *Service) MFAStatus(ctx context.Context, playerID int64) (*MFAStatus, error) {
+	status := &MFAStatus{SecurityKeys: []WebAuthnCredentialInfo{}}
+	settings, err := s.sessions.GetMFASettings(ctx, playerID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("get mfa settings: %w", err)
+	}
+	if settings != nil {
+		status.TOTPEnabled = settings.TOTPEnabledAt != nil && settings.TOTPSecret != ""
+	}
+	keys, err := s.sessions.ListWebAuthnCredentials(ctx, playerID)
+	if err != nil {
+		return nil, fmt.Errorf("list webauthn credentials: %w", err)
+	}
+	for _, key := range keys {
+		status.SecurityKeys = append(status.SecurityKeys, WebAuthnCredentialInfo{ID: key.ID, Name: key.Name, CreatedAt: key.CreatedAt, LastUsedAt: key.LastUsedAt})
+	}
+	return status, nil
+}
+
+func (s *Service) DisableTOTP(ctx context.Context, playerID int64, currentPassword string) error {
+	if err := s.VerifyPassword(ctx, playerID, currentPassword); err != nil {
+		return err
+	}
+	settings, err := s.sessions.GetMFASettings(ctx, playerID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("get mfa settings: %w", err)
+	}
+	settings.TOTPSecret = ""
+	settings.TOTPEnabledAt = nil
+	settings.UpdatedAt = time.Now().UTC()
+	if err := s.sessions.UpsertMFASettings(ctx, settings); err != nil {
+		return fmt.Errorf("disable totp: %w", err)
+	}
+	if err := s.sessions.DeleteRecoveryCodes(ctx, playerID); err != nil {
+		return fmt.Errorf("delete recovery codes: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) DeleteWebAuthnCredential(ctx context.Context, playerID, credentialID int64, currentPassword string) error {
+	if err := s.VerifyPassword(ctx, playerID, currentPassword); err != nil {
+		return err
+	}
+	credential, err := s.sessions.GetWebAuthnCredential(ctx, credentialID)
+	if err != nil {
+		return fmt.Errorf("get webauthn credential: %w", err)
+	}
+	if credential.PlayerID != playerID {
+		return ErrInvalidMFA
+	}
+	if err := s.sessions.DeleteWebAuthnCredential(ctx, credentialID); err != nil {
+		return fmt.Errorf("delete webauthn credential: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) VerifyMFAChallenge(ctx context.Context, challenge, code string) (string, *player.Player, error) {
+	now := time.Now().UTC()
+	c, err := s.sessions.FindMFAChallenge(ctx, hashToken(challenge), now)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil, ErrInvalidMFA
+		}
+		return "", nil, fmt.Errorf("find mfa challenge: %w", err)
+	}
+	p, err := s.players.Get(ctx, c.PlayerID)
+	if err != nil {
+		return "", nil, fmt.Errorf("get mfa player: %w", err)
+	}
+	settings, err := s.sessions.GetMFASettings(ctx, p.ID)
+	if err != nil {
+		return "", nil, fmt.Errorf("get mfa settings: %w", err)
+	}
+	if !verifyTOTP(settings.TOTPSecret, code, now) {
+		used, err := s.useRecoveryCode(ctx, p.ID, code, now)
+		if err != nil {
+			return "", nil, err
+		}
+		if !used {
+			return "", nil, ErrInvalidMFA
+		}
+	}
+	if err := s.sessions.MarkMFAChallengeUsed(ctx, c.ID, now); err != nil {
+		return "", nil, fmt.Errorf("mark mfa challenge used: %w", err)
+	}
+	token, err := s.createSession(ctx, p.ID, now)
+	if err != nil {
+		return "", nil, err
+	}
+	return token, p, nil
+}
+
+func (s *Service) useRecoveryCode(ctx context.Context, playerID int64, code string, now time.Time) (bool, error) {
+	row, err := s.sessions.FindUnusedRecoveryCode(ctx, playerID, hashToken(normalizeMFACode(code)))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("find recovery code: %w", err)
+	}
+	if err := s.sessions.MarkRecoveryCodeUsed(ctx, row.ID, now); err != nil {
+		return false, fmt.Errorf("mark recovery code used: %w", err)
+	}
+	return true, nil
+}
+
+func (s *Service) createSession(ctx context.Context, playerID int64, now time.Time) (string, error) {
+	token, err := newToken()
+	if err != nil {
+		return "", fmt.Errorf("generate session token: %w", err)
+	}
+	if err := s.sessions.CreateSession(ctx, &Session{TokenHash: hashToken(token), PlayerID: playerID, CreatedAt: now, ExpiresAt: now.Add(s.ttl), LastSeenAt: now}); err != nil {
+		return "", fmt.Errorf("create login session: %w", err)
+	}
+	return token, nil
+}
+
+func newTOTPSecret() (string, error) {
+	b := make([]byte, 20)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return strings.TrimRight(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b), "="), nil
+}
+
+func verifyTOTP(secret, code string, at time.Time) bool {
+	code = normalizeMFACode(code)
+	if len(code) != 6 {
+		return false
+	}
+	for offset := int64(-1); offset <= 1; offset++ {
+		if generateTOTP(secret, at.Unix()/totpPeriodSeconds+offset) == code {
+			return true
+		}
+	}
+	return false
+}
+
+func generateTOTP(secret string, counter int64) string {
+	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(strings.TrimSpace(secret)))
+	if err != nil {
+		return ""
+	}
+	var msg [8]byte
+	binary.BigEndian.PutUint64(msg[:], uint64(counter))
+	mac := hmac.New(sha1.New, key)
+	mac.Write(msg[:])
+	sum := mac.Sum(nil)
+	offset := sum[len(sum)-1] & 0x0f
+	bin := (uint32(sum[offset])&0x7f)<<24 | (uint32(sum[offset+1])&0xff)<<16 | (uint32(sum[offset+2])&0xff)<<8 | (uint32(sum[offset+3]) & 0xff)
+	return fmt.Sprintf("%06d", bin%1000000)
+}
+
+func normalizeMFACode(code string) string {
+	return strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(code), " ", ""), "-", ""))
+}
+
+func newRecoveryCodes(count int) ([]string, error) {
+	result := make([]string, 0, count)
+	for range count {
+		b := make([]byte, 8)
+		if _, err := rand.Read(b); err != nil {
+			return nil, err
+		}
+		encoded := strings.ToUpper(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b))
+		result = append(result, encoded[:4]+"-"+encoded[4:8]+"-"+encoded[8:12])
+	}
+	return result, nil
+}
+
+func totpURI(issuer, label, secret string) string {
+	v := url.Values{}
+	v.Set("secret", secret)
+	v.Set("issuer", issuer)
+	v.Set("algorithm", "SHA1")
+	v.Set("digits", "6")
+	v.Set("period", strconv.FormatInt(totpPeriodSeconds, 10))
+	return "otpauth://totp/" + url.PathEscape(issuer+":"+label) + "?" + v.Encode()
+}
+
+func accountLabel(p *player.Player) string {
+	if p.Username != nil && *p.Username != "" {
+		return *p.Username
+	}
+	return p.Name
 }
 
 func newToken() (string, error) {

@@ -3,6 +3,7 @@ import { useSubmission } from '../useSubmission'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
+import QRCode from 'qrcode'
 import {
   atLeast,
   type Character,
@@ -18,6 +19,7 @@ import { EnhancePointsCard } from '../components/EnhancePointsCard'
 import { characterClassName } from '../characterTheme'
 import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
+import { browserSupportsWebAuthn, createWebAuthnCredential, type WebAuthnBeginResponse } from '../webauthn'
 
 const CLASSES = [
   'Todesritter',
@@ -34,6 +36,11 @@ const CLASSES = [
 
 const ROLES: Role[] = ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN']
 const LOOT_METHOD_LABELS = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
+
+interface MFAStatus {
+  totp_enabled: boolean
+  security_keys: { id: number; name: string; created_at: string; last_used_at?: string }[]
+}
 
 interface Props {
   playerID: number
@@ -85,6 +92,19 @@ function PlayerDetail({ playerID }: Props) {
   const [accUser, setAccUser] = useState('')
   const [accPass, setAccPass] = useState('')
   const [accRole, setAccRole] = useState<Role>('MEMBER')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [passwordStatus, setPasswordStatus] = useState('')
+  const [totpSecret, setTotpSecret] = useState('')
+  const [totpURI, setTotpURI] = useState('')
+  const [totpCode, setTotpCode] = useState('')
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
+  const [securityKeyStatus, setSecurityKeyStatus] = useState('')
+  const [mfaPassword, setMfaPassword] = useState('')
+  const [mfaPasswordPrompt, setMfaPasswordPrompt] = useState<'totp_setup' | 'totp_disable' | 'security_key' | `security_key_delete:${number}` | ''>('')
+  const [mfaStatus, setMfaStatus] = useState<MFAStatus>({ totp_enabled: false, security_keys: [] })
+  const [qrDataURL, setQrDataURL] = useState('')
+  const [copyStatus, setCopyStatus] = useState('')
 
   const isAdmin = me ? atLeast(me.role, 'ADMIN') : false
   const isOwnProfile = me ? me.id === playerID : false
@@ -119,6 +139,25 @@ function PlayerDetail({ playerID }: Props) {
   }, [playerID, isActive])
 
   useEffect(() => { void load() }, [load])
+
+  const loadMFAStatus = useCallback(async () => {
+    if (!isOwnProfile) return
+    try {
+      const status = await api.get<MFAStatus>('/api/v1/auth/mfa')
+      if (isActive()) setMfaStatus(status)
+    } catch {
+      if (isActive()) setError('MFA-Status konnte nicht geladen werden.')
+    }
+  }, [isOwnProfile, isActive])
+
+  useEffect(() => { void loadMFAStatus() }, [loadMFAStatus])
+
+  useEffect(() => {
+    let active = true
+    if (!totpURI) { setQrDataURL(''); return () => { active = false } }
+    QRCode.toDataURL(totpURI, { margin: 1, width: 180 }).then((url) => { if (active) setQrDataURL(url) }).catch(() => { if (active) setQrDataURL('') })
+    return () => { active = false }
+  }, [totpURI])
 
   useEffect(() => {
     let active = true
@@ -324,6 +363,124 @@ function PlayerDetail({ playerID }: Props) {
     })
   }
 
+  const startTOTPSetup = async () => {
+    if (!isOwnProfile || !mfaPassword.trim()) return
+    await submit(async () => {
+      setError('')
+      setRecoveryCodes([])
+      try {
+        const setup = await api.post<{ secret: string; uri: string }>('/api/v1/auth/mfa/totp/setup', { current_password: mfaPassword })
+        if (!isActive()) return
+        setTotpSecret(setup.secret)
+        setTotpURI(setup.uri)
+        setMfaPassword('')
+        setMfaPasswordPrompt('')
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'MFA-Einrichtung konnte nicht gestartet werden')
+      }
+    })
+  }
+
+  const enableTOTP = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isOwnProfile || !totpCode.trim()) return
+    await submit(async () => {
+      setError('')
+      try {
+        const enabled = await api.post<{ recovery_codes: string[] }>('/api/v1/auth/mfa/totp/enable', { code: totpCode })
+        if (!isActive()) return
+        setRecoveryCodes(enabled.recovery_codes)
+        setTotpCode('')
+        setTotpSecret('')
+        setTotpURI('')
+        await loadMFAStatus()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'MFA-Code konnte nicht bestätigt werden')
+      }
+    })
+  }
+
+  const registerSecurityKey = async () => {
+    if (!isOwnProfile || !mfaPassword.trim()) return
+    await submit(async () => {
+      setError('')
+      setSecurityKeyStatus('')
+      try {
+        const begin = await api.post<WebAuthnBeginResponse<Parameters<typeof createWebAuthnCredential>[0]>>('/api/v1/auth/mfa/webauthn/register/begin', { current_password: mfaPassword })
+        const response = await createWebAuthnCredential(begin.options)
+        await api.post('/api/v1/auth/mfa/webauthn/register/finish', { session: begin.session, response })
+        if (!isActive()) return
+        setMfaPassword('')
+        setMfaPasswordPrompt('')
+        setSecurityKeyStatus('Sicherheitsschlüssel wurde registriert.')
+        await loadMFAStatus()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Sicherheitsschlüssel konnte nicht registriert werden')
+      }
+    })
+  }
+
+  const disableTOTP = async () => {
+    if (!isOwnProfile || !mfaPassword.trim()) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post('/api/v1/auth/mfa/totp/disable', { current_password: mfaPassword })
+        if (!isActive()) return
+        setMfaPassword('')
+        setMfaPasswordPrompt('')
+        setRecoveryCodes([])
+        await loadMFAStatus()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Authenticator konnte nicht entfernt werden')
+      }
+    })
+  }
+
+  const deleteSecurityKey = async (id: number) => {
+    if (!isOwnProfile || !mfaPassword.trim()) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post(`/api/v1/auth/mfa/webauthn/credentials/${id}/delete`, { current_password: mfaPassword })
+        if (!isActive()) return
+        setMfaPassword('')
+        setMfaPasswordPrompt('')
+        await loadMFAStatus()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Sicherheitsschlüssel konnte nicht entfernt werden')
+      }
+    })
+  }
+
+  const copyRecoveryCodes = async () => {
+    const text = recoveryCodes.join('\n')
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopyStatus('Wiederherstellungscodes kopiert.')
+    } catch {
+      setCopyStatus('Kopieren nicht möglich. Bitte manuell markieren.')
+    }
+  }
+
+  const changeOwnPassword = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isOwnProfile || !currentPassword.trim() || !newPassword.trim()) return
+    await submit(async () => {
+      setError('')
+      setPasswordStatus('')
+      try {
+        await api.post('/api/v1/auth/password', { current_password: currentPassword, new_password: newPassword })
+        if (!isActive()) return
+        setNewPassword('')
+        setPasswordStatus('Passwort wurde geändert.')
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Passwort konnte nicht geändert werden')
+      }
+    })
+  }
+
   if (!player) {
     return (
       <div>
@@ -355,7 +512,7 @@ function PlayerDetail({ playerID }: Props) {
         <button type="button" aria-pressed={view === 'loot'} aria-controls="profile-loot" onClick={() => setView('loot')}>Loot ({loot.length})</button>
         <button type="button" aria-pressed={view === 'characters'} aria-controls="profile-characters" onClick={() => setView('characters')}>Charaktere ({ownedCharacters.length})</button>
         <button type="button" aria-pressed={view === 'locks'} aria-controls="profile-locks" onClick={() => setView('locks')}>Item-Locks</button>
-        {isAdmin && <button type="button" aria-pressed={view === 'account'} aria-controls="profile-account" onClick={() => setView('account')}>Konto</button>}
+        {(isAdmin || isOwnProfile) && <button type="button" aria-pressed={view === 'account'} aria-controls="profile-account" onClick={() => setView('account')}>Konto</button>}
       </nav>
       <div id="profile-points" hidden={view !== 'points'}>
         <EnhancePointsCard points={points} showHistory />
@@ -527,27 +684,90 @@ function PlayerDetail({ playerID }: Props) {
         )}
       </section>
 
-      {isAdmin && (
+      {(isAdmin || isOwnProfile) && (
         <section id="profile-account" hidden={view !== 'account'} className="card">
           <h2>Konto</h2>
-          <form className="inline-form" onSubmit={setAccount}>
-            <input aria-label="Benutzername" placeholder="Benutzername" value={accUser} onChange={(e) => setAccUser(e.target.value)} required />
-            <input
-              type="password"
-              aria-label="Passwort (leer = unverändert)"
-              placeholder="Passwort (leer = unverändert)"
-              value={accPass}
-              onChange={(e) => setAccPass(e.target.value)}
-            />
-            <select aria-label="Kontorolle" value={accRole} onChange={(e) => setAccRole(e.target.value as Role)}>
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-            <button type="submit" disabled={pending}>Speichern</button>
-          </form>
+          {isAdmin && <section className="subcard">
+            <h3>Kontodaten</h3>
+            <form className="inline-form" onSubmit={setAccount}>
+              <input aria-label="Benutzername" placeholder="Benutzername" value={accUser} onChange={(e) => setAccUser(e.target.value)} required />
+              {!isOwnProfile && <input
+                type="password"
+                aria-label="Passwort (leer = unverändert)"
+                placeholder="Passwort (leer = unverändert)"
+                value={accPass}
+                onChange={(e) => setAccPass(e.target.value)}
+              />}
+              <select aria-label="Kontorolle" value={accRole} onChange={(e) => setAccRole(e.target.value as Role)}>
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" disabled={pending}>Speichern</button>
+            </form>
+            {isOwnProfile && <p className="muted">Dein eigenes Passwort änderst du im separaten Bereich darunter.</p>}
+          </section>}
+          {isOwnProfile && <section className="subcard">
+            <h3>Passwort ändern</h3>
+            <form className="inline-form" onSubmit={changeOwnPassword}>
+              <input type="password" aria-label="Aktuelles Passwort" placeholder="Aktuelles Passwort" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" />
+              <input type="password" aria-label="Neues Passwort" placeholder="Neues Passwort (mind. 12 Zeichen)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
+              <button type="submit" disabled={pending || !currentPassword.trim() || !newPassword.trim()}>Passwort ändern</button>
+            </form>
+            {passwordStatus && <p className="muted" role="status">{passwordStatus}</p>}
+          </section>}
+          {isOwnProfile && <section className="subcard">
+            <h3>Multi-Faktor-Authentifizierung</h3>
+            <p className="muted">Optional: Richte einen Authenticator-Code oder YubiKey ein. Du wirst beim Start einer Änderung nach deinem aktuellen Passwort gefragt.</p>
+            <p className="muted">Authenticator-App: {mfaStatus.totp_enabled ? 'aktiv' : 'nicht aktiv'}</p>
+            {!mfaStatus.totp_enabled && !totpSecret && <button type="button" disabled={pending} onClick={() => { setMfaPassword(''); setMfaPasswordPrompt('totp_setup') }}>Authenticator einrichten</button>}
+            {mfaStatus.totp_enabled && <button type="button" disabled={pending} onClick={() => { setMfaPassword(''); setMfaPasswordPrompt('totp_disable') }}>Authenticator entfernen</button>}
+            {mfaPasswordPrompt === 'totp_setup' && <form className="inline-form" onSubmit={(event) => { event.preventDefault(); void startTOTPSetup() }}>
+              <input type="password" aria-label="Aktuelles Passwort für MFA" placeholder="Aktuelles Passwort bestätigen" value={mfaPassword} onChange={(e) => setMfaPassword(e.target.value)} autoComplete="current-password" autoFocus />
+              <button type="submit" disabled={pending || !mfaPassword.trim()}>Fortfahren</button>
+              <button type="button" disabled={pending} onClick={() => { setMfaPassword(''); setMfaPasswordPrompt('') }}>Abbrechen</button>
+            </form>}
+            {mfaPasswordPrompt === 'totp_disable' && <form className="inline-form" onSubmit={(event) => { event.preventDefault(); void disableTOTP() }}>
+              <input type="password" aria-label="Aktuelles Passwort zum Entfernen" placeholder="Aktuelles Passwort bestätigen" value={mfaPassword} onChange={(e) => setMfaPassword(e.target.value)} autoComplete="current-password" autoFocus />
+              <button type="submit" disabled={pending || !mfaPassword.trim()}>Entfernen bestätigen</button>
+              <button type="button" disabled={pending} onClick={() => { setMfaPassword(''); setMfaPasswordPrompt('') }}>Abbrechen</button>
+            </form>}
+            {totpSecret && <form className="inline-form" onSubmit={enableTOTP}>
+              {qrDataURL && <img className="totp-qr" src={qrDataURL} alt="QR-Code für Authenticator-App" />}
+              <p className="muted">Secret: <code>{totpSecret}</code></p>
+              <p className="muted">URI für Authenticator-App: <code>{totpURI}</code></p>
+              <input aria-label="Authenticator-Code" placeholder="6-stelliger Code" value={totpCode} onChange={(e) => setTotpCode(e.target.value)} />
+              <button type="submit" disabled={pending || !totpCode.trim()}>MFA aktivieren</button>
+            </form>}
+            {recoveryCodes.length > 0 && <div>
+              <p className="muted">Wiederherstellungscodes werden nur jetzt angezeigt.</p>
+              <button type="button" disabled={pending} onClick={() => void copyRecoveryCodes()}>Codes kopieren</button>
+              {copyStatus && <p className="muted" role="status">{copyStatus}</p>}
+              <ul className="plain-list">{recoveryCodes.map((code) => <li key={code}><code>{code}</code></li>)}</ul>
+            </div>}
+            <h3>YubiKey / Sicherheitsschlüssel</h3>
+            <p className="muted">Registriere einen FIDO2/WebAuthn-Sicherheitsschlüssel als zweiten Faktor.</p>
+            {mfaStatus.security_keys.length > 0 && <ul className="plain-list">
+              {mfaStatus.security_keys.map((key) => <li key={key.id}>{key.name || 'Sicherheitsschlüssel'} · registriert am {new Date(key.created_at).toLocaleDateString('de-DE')} {key.last_used_at ? `· zuletzt genutzt ${new Date(key.last_used_at).toLocaleDateString('de-DE')}` : ''} <button type="button" disabled={pending} onClick={() => { setMfaPassword(''); setMfaPasswordPrompt(`security_key_delete:${key.id}`) }}>Entfernen</button>
+                {mfaPasswordPrompt === `security_key_delete:${key.id}` && <form className="inline-form" onSubmit={(event) => { event.preventDefault(); void deleteSecurityKey(key.id) }}>
+                  <input type="password" aria-label="Aktuelles Passwort zum Entfernen des Sicherheitsschlüssels" placeholder="Aktuelles Passwort bestätigen" value={mfaPassword} onChange={(e) => setMfaPassword(e.target.value)} autoComplete="current-password" autoFocus />
+                  <button type="submit" disabled={pending || !mfaPassword.trim()}>Entfernen bestätigen</button>
+                  <button type="button" disabled={pending} onClick={() => { setMfaPassword(''); setMfaPasswordPrompt('') }}>Abbrechen</button>
+                </form>}
+              </li>)}
+            </ul>}
+            {browserSupportsWebAuthn()
+              ? <button type="button" disabled={pending} onClick={() => { setMfaPassword(''); setMfaPasswordPrompt('security_key') }}>Sicherheitsschlüssel registrieren</button>
+              : <p className="muted">Dieser Browser unterstützt WebAuthn nicht.</p>}
+            {mfaPasswordPrompt === 'security_key' && <form className="inline-form" onSubmit={(event) => { event.preventDefault(); void registerSecurityKey() }}>
+              <input type="password" aria-label="Aktuelles Passwort für Sicherheitsschlüssel" placeholder="Aktuelles Passwort bestätigen" value={mfaPassword} onChange={(e) => setMfaPassword(e.target.value)} autoComplete="current-password" autoFocus />
+              <button type="submit" disabled={pending || !mfaPassword.trim()}>Fortfahren</button>
+              <button type="button" disabled={pending} onClick={() => { setMfaPassword(''); setMfaPasswordPrompt('') }}>Abbrechen</button>
+            </form>}
+            {securityKeyStatus && <p className="muted" role="status">{securityKeyStatus}</p>}
+          </section>}
         </section>
       )}
     </div>

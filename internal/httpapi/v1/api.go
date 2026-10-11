@@ -30,25 +30,27 @@ import (
 
 // Deps holds the dependencies shared by the v1 HTTP handlers.
 type Deps struct {
-	DB           *bun.DB
-	Auth         *auth.Service
-	CookieSecure bool
-	Players      *player.Repo
-	Characters   *character.Repo
-	Raids        *raid.Repo
-	RaidSeries   *raidseries.Repo
-	Attendance   *attendance.Repo
-	Loot         *loot.Service
-	LootRepo     *loot.Repo
-	Points       *enhancepoints.Repo
-	Polls        *poll.Repo
-	Roster       *roster.Repo
-	Audit        *audit.Repo
-	Completion   *raidcompletion.Service
-	Corrections  *raidcorrection.Service
-	Imports      *legacyimport.Service
-	Signups      *raidsignup.Service
-	Registration *registration.Service
+	DB                *bun.DB
+	Auth              *auth.Service
+	CookieSecure      bool
+	TrustProxyHeaders bool
+	PublicOrigin      string
+	Players           *player.Repo
+	Characters        *character.Repo
+	Raids             *raid.Repo
+	RaidSeries        *raidseries.Repo
+	Attendance        *attendance.Repo
+	Loot              *loot.Service
+	LootRepo          *loot.Repo
+	Points            *enhancepoints.Repo
+	Polls             *poll.Repo
+	Roster            *roster.Repo
+	Audit             *audit.Repo
+	Completion        *raidcompletion.Service
+	Corrections       *raidcorrection.Service
+	Imports           *legacyimport.Service
+	Signups           *raidsignup.Service
+	Registration      *registration.Service
 }
 
 // API holds the dependencies shared by the v1 HTTP handlers.
@@ -63,9 +65,21 @@ func NewAPI(d Deps) *API {
 
 func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/health", Health)
+	mux.HandleFunc("GET /api/v1/auth/csrf", a.csrfToken)
 	mux.HandleFunc("POST /api/v1/auth/login", a.login)
+	mux.HandleFunc("POST /api/v1/auth/mfa/verify", a.verifyMFA)
+	mux.HandleFunc("GET /api/v1/auth/mfa", RequireAuth(a.mfaStatus))
+	mux.HandleFunc("POST /api/v1/auth/mfa/totp/setup", RequireAuth(a.setupTOTP))
+	mux.HandleFunc("POST /api/v1/auth/mfa/totp/enable", RequireAuth(a.enableTOTP))
+	mux.HandleFunc("POST /api/v1/auth/mfa/totp/disable", RequireAuth(a.disableTOTP))
+	mux.HandleFunc("POST /api/v1/auth/mfa/webauthn/register/begin", RequireAuth(a.beginWebAuthnRegistration))
+	mux.HandleFunc("POST /api/v1/auth/mfa/webauthn/register/finish", RequireAuth(a.finishWebAuthnRegistration))
+	mux.HandleFunc("POST /api/v1/auth/mfa/webauthn/credentials/{id}/delete", RequireAuth(a.deleteWebAuthnCredential))
+	mux.HandleFunc("POST /api/v1/auth/mfa/webauthn/login/begin", a.beginWebAuthnMFA)
+	mux.HandleFunc("POST /api/v1/auth/mfa/webauthn/login/finish", a.finishWebAuthnMFA)
 	mux.HandleFunc("POST /api/v1/auth/logout", RequireAuth(a.logout))
 	mux.HandleFunc("GET /api/v1/auth/me", RequireAuth(a.me))
+	mux.HandleFunc("POST /api/v1/auth/password", RequireAuth(a.changeOwnPassword))
 	mux.HandleFunc("GET /api/v1/external/rising-gods/characters", a.searchRisingGodsCharacters)
 	mux.HandleFunc("POST /api/v1/auth/registration-requests", a.createRegistrationRequest)
 	mux.HandleFunc("POST /api/v1/auth/register-with-code", a.registerWithCode)

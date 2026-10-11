@@ -281,14 +281,14 @@ func TestAccountProvisioning(t *testing.T) {
 
 	status, body := do(t, client, http.MethodPut, fmt.Sprintf("%s/api/v1/players/%d/account", srv.URL, memberID), adminToken, map[string]any{
 		"username": "newbie",
-		"password": "secret",
+		"password": "valid-secret",
 		"role":     "MEMBER",
 	})
 	if status != http.StatusOK {
 		t.Fatalf("set account: status %d body %s", status, body)
 	}
 
-	memberToken := login(t, client, srv, "newbie", "secret")
+	memberToken := login(t, client, srv, "newbie", "valid-secret")
 	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/auth/me", memberToken, nil)
 	if status != http.StatusOK {
 		t.Fatalf("me: status %d body %s", status, body)
@@ -323,7 +323,7 @@ func TestPlayerListSummaryAndAccountVisibility(t *testing.T) {
 	for id, username := range map[int64]string{firstID: "first-login", secondID: "second-login"} {
 		status, body := do(t, client, http.MethodPut, fmt.Sprintf("%s/api/v1/players/%d/account", srv.URL, id), adminToken, map[string]any{
 			"username": username,
-			"password": "secret",
+			"password": "valid-secret",
 			"role":     "MEMBER",
 		})
 		if status != http.StatusOK {
@@ -373,7 +373,7 @@ func TestPlayerListSummaryAndAccountVisibility(t *testing.T) {
 		t.Fatalf("admin account fields not visible on detail: %s", body)
 	}
 
-	firstToken := login(t, client, srv, "first-login", "secret")
+	firstToken := login(t, client, srv, "first-login", "valid-secret")
 	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/players", firstToken, nil)
 	if status != http.StatusOK {
 		t.Fatalf("member list players: status %d body %s", status, body)
@@ -487,15 +487,15 @@ func TestRegistrationWithRisingGodsCode(t *testing.T) {
 		t.Fatalf("listed code missing sent_at: %s", body)
 	}
 
-	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": codeOut.Data.Code, "username": "bigdevil", "password": "secret"})
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": codeOut.Data.Code, "username": "bigdevil", "password": "valid-secret"})
 	if status != http.StatusOK {
 		t.Fatalf("redeem: status %d body %s", status, body)
 	}
-	if token := login(t, client, srv, "bigdevil", "secret"); token == "" {
+	if token := login(t, client, srv, "bigdevil", "valid-secret"); token == "" {
 		t.Fatal("new account cannot log in")
 	}
 
-	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": codeOut.Data.Code, "username": "again", "password": "secret"})
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": codeOut.Data.Code, "username": "again", "password": "valid-secret"})
 	if status != http.StatusBadRequest {
 		t.Fatalf("reuse code: want 400 got %d body %s", status, body)
 	}

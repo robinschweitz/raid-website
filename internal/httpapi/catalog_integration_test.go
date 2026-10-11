@@ -73,7 +73,7 @@ func TestCatalogRouterRestartAndMirrorFailure(t *testing.T) {
 	if err := f.db.NewRaw("SELECT COUNT(*) FROM loot_catalog_initializations").Scan(context.Background(), &count); err != nil || count != 1 {
 		t.Fatalf("cold report: %d %v", count, err)
 	}
-	if _, err := httpapi.New(f.db, httpapi.Options{AdminUsername: "admin", AdminPassword: "password"}); err != nil {
+	if _, err := httpapi.New(f.db, httpapi.Options{AdminUsername: "admin", AdminPassword: "valid-password"}); err != nil {
 		t.Fatal(err)
 	}
 	var reportJSON string
@@ -90,7 +90,7 @@ func TestCatalogRouterRestartAndMirrorFailure(t *testing.T) {
 	if _, err := f.db.ExecContext(context.Background(), "DROP TABLE loot_catalog_initializations"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := httpapi.New(f.db, httpapi.Options{AdminUsername: "admin", AdminPassword: "password"}); err == nil {
+	if _, err := httpapi.New(f.db, httpapi.Options{AdminUsername: "admin", AdminPassword: "valid-password"}); err == nil {
 		t.Fatal("router accepted failed catalog initialization")
 	}
 }

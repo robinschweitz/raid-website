@@ -12,11 +12,24 @@ export class ApiError extends Error {
   }
 }
 
+let csrfToken = ''
+
+async function ensureCSRFToken(): Promise<string> {
+  if (csrfToken) return csrfToken
+  const token = await request<{ token: string }>('GET', '/api/v1/auth/csrf')
+  csrfToken = token.token
+  return csrfToken
+}
+
 async function request<T>(method: string, path: string, body?: unknown, envelope = false): Promise<T> {
+  const headers: Record<string, string> = body !== undefined ? { 'Content-Type': 'application/json' } : {}
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    headers['X-CSRF-Token'] = await ensureCSRFToken()
+  }
   const res = await fetch(path, {
     method,
     credentials: 'include',
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
   if (res.status === 204) {

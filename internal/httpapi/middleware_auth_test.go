@@ -45,11 +45,11 @@ func TestMiddlewareAuthenticationFailures(t *testing.T) {
 			bdb, svc := middlewareAuthDB(t)
 			token := "unknown-token"
 			if scenario != "missing" && scenario != "unknown" && scenario != "closed database" {
-				if err := svc.BootstrapAdmin(ctx, "owner", "password"); err != nil {
+				if err := svc.BootstrapAdmin(ctx, "owner", "valid-password"); err != nil {
 					t.Fatal(err)
 				}
 				var err error
-				token, _, err = svc.Login(ctx, "owner", "password")
+				token, _, err = svc.Login(ctx, "owner", "valid-password")
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -108,7 +108,7 @@ func TestLoginHTTPRepositoryFailures(t *testing.T) {
 			ctx := context.Background()
 			bdb, svc := middlewareAuthDB(t)
 			if scenario == "session insert failure" {
-				if err := svc.BootstrapAdmin(ctx, "owner", "password"); err != nil {
+				if err := svc.BootstrapAdmin(ctx, "owner", "valid-password"); err != nil {
 					t.Fatal(err)
 				}
 				if _, err := bdb.DB.ExecContext(ctx, "CREATE TRIGGER reject_session AFTER INSERT ON sessions BEGIN SELECT RAISE(ABORT, 'injected failure'); END"); err != nil {
@@ -122,7 +122,7 @@ func TestLoginHTTPRepositoryFailures(t *testing.T) {
 			}
 			mux := http.NewServeMux()
 			v1.NewAPI(v1.Deps{Auth: svc}).Register(mux)
-			r := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"username":"owner","password":"password"}`))
+			r := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"username":"owner","password":"valid-password"}`))
 			w := httptest.NewRecorder()
 			authenticate(svc)(mux).ServeHTTP(w, r)
 			status, code := http.StatusInternalServerError, "internal"
@@ -143,10 +143,10 @@ func TestLoginHTTPRepositoryFailures(t *testing.T) {
 func TestLogoutHTTPRepositoryFailure(t *testing.T) {
 	ctx := context.Background()
 	bdb, svc := middlewareAuthDB(t)
-	if err := svc.BootstrapAdmin(ctx, "owner", "password"); err != nil {
+	if err := svc.BootstrapAdmin(ctx, "owner", "valid-password"); err != nil {
 		t.Fatal(err)
 	}
-	token, _, err := svc.Login(ctx, "owner", "password")
+	token, _, err := svc.Login(ctx, "owner", "valid-password")
 	if err != nil {
 		t.Fatal(err)
 	}

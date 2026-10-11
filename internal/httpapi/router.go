@@ -32,10 +32,12 @@ import (
 
 // Options controls optional runtime behaviour of the HTTP layer.
 type Options struct {
-	CookieSecure     bool
-	AdminUsername    string
-	AdminPassword    string
-	RegistrationFeed registration.ExternalClient
+	CookieSecure      bool
+	TrustProxyHeaders bool
+	PublicOrigin      string
+	AdminUsername     string
+	AdminPassword     string
+	RegistrationFeed  registration.ExternalClient
 }
 
 // New constructs the HTTP handler tree with all v1 dependencies wired.
@@ -82,25 +84,27 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 
 	corrections := raidcorrection.NewService(raidcorrection.NewRepo(db)).WithExternalClient(registrationFeed)
 	api := v1.NewAPI(v1.Deps{
-		DB:           db,
-		Auth:         authSvc,
-		CookieSecure: opts.CookieSecure,
-		Players:      players,
-		Characters:   chars,
-		Raids:        raids,
-		RaidSeries:   raidseries.NewRepo(db),
-		Attendance:   att,
-		Loot:         loot.NewService(lootRepo),
-		LootRepo:     lootRepo,
-		Points:       points,
-		Polls:        polls,
-		Roster:       rosterRepo,
-		Audit:        audits,
-		Completion:   raidcompletion.NewService(raidcompletion.NewRepo(db)),
-		Corrections:  corrections,
-		Imports:      importsSvc,
-		Signups:      raidsignup.NewService(raidsignup.NewRepo(db)),
-		Registration: registrationSvc,
+		DB:                db,
+		Auth:              authSvc,
+		CookieSecure:      opts.CookieSecure,
+		TrustProxyHeaders: opts.TrustProxyHeaders,
+		PublicOrigin:      opts.PublicOrigin,
+		Players:           players,
+		Characters:        chars,
+		Raids:             raids,
+		RaidSeries:        raidseries.NewRepo(db),
+		Attendance:        att,
+		Loot:              loot.NewService(lootRepo),
+		LootRepo:          lootRepo,
+		Points:            points,
+		Polls:             polls,
+		Roster:            rosterRepo,
+		Audit:             audits,
+		Completion:        raidcompletion.NewService(raidcompletion.NewRepo(db)),
+		Corrections:       corrections,
+		Imports:           importsSvc,
+		Signups:           raidsignup.NewService(raidsignup.NewRepo(db)),
+		Registration:      registrationSvc,
 	})
 
 	mux := http.NewServeMux()
@@ -112,5 +116,5 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		mux.Handle("/", spa)
 	}
 
-	return requestID(logging(authenticate(authSvc)(mux))), nil
+	return requestID(securityHeaders(opts.CookieSecure)(logging(csrfProtection(authenticate(authSvc)(mux))))), nil
 }

@@ -49,9 +49,11 @@ func run() (err error) {
 		return fmt.Errorf("naming pattern detection: %w", err)
 	}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
-		CookieSecure:  cfg.CookieSecure,
-		AdminUsername: cfg.AdminUsername,
-		AdminPassword: cfg.AdminPassword,
+		CookieSecure:      cfg.CookieSecure,
+		TrustProxyHeaders: cfg.TrustProxyHeaders,
+		PublicOrigin:      cfg.PublicOrigin,
+		AdminUsername:     cfg.AdminUsername,
+		AdminPassword:     cfg.AdminPassword,
 	})
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)

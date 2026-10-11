@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"raid-website/internal/auth"
 	"raid-website/internal/registration"
 )
 
@@ -36,6 +37,8 @@ func registrationError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusNotFound, "not_found", "Eintrag nicht gefunden.")
 	case errors.Is(err, registration.ErrInvalid), errors.Is(err, registration.ErrProfileRequired), errors.Is(err, registration.ErrProfileUnusable):
 		WriteError(w, http.StatusBadRequest, "registration_invalid", "Bitte einen aktiven Rising-Gods-Charakter auswählen.")
+	case errors.Is(err, auth.ErrWeakPassword):
+		WriteError(w, http.StatusUnprocessableEntity, "password_too_short", "Das Passwort muss mindestens 12 Zeichen lang sein.")
 	default:
 		WriteError(w, http.StatusInternalServerError, "internal", "Registrierung konnte nicht verarbeitet werden.")
 	}

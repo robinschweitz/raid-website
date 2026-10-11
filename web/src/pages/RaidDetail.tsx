@@ -12,6 +12,8 @@ import { matchesCatalogItem } from '../catalog'
 import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
 import { RaidQuickAdd } from '../components/RaidQuickAdd'
+import { AddonInviteExport } from '../components/AddonInviteExport'
+import { AddonLootImport } from '../components/AddonLootImport'
 
 interface Props {
   raidID: number
@@ -687,6 +689,7 @@ function RaidDetail({ raidID }: Props) {
         )}
         </RaidRosterBoard>
         <p className="muted setup-caption">Gespeicherte Aufstellung dieses Raids. Die Ersatzbank folgt derselben EP-Regel.</p>
+        {canManage && attendance.length > 0 && <AddonInviteExport raidID={raidID} rosterKey={attendance.map((row) => `${row.id}:${row.character_id}:${row.is_bench}`).join(',')} />}
       </section>
 
       <section id="raid-loot" hidden={view !== 'loot'} className="card raid-loot" aria-label="Raidloot">
@@ -754,6 +757,7 @@ function RaidDetail({ raidID }: Props) {
           </div>
         )}
         </RaidLootList>
+        {canManage && isActiveRaid && associated && <AddonLootImport raidID={raidID} onImported={load} />}
       </section>
     </div>
   )

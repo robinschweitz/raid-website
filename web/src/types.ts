@@ -444,3 +444,44 @@ export interface ImportRecord {
   completed_at: string | null
   notes: string
 }
+
+export type AwardMethod = 'MAIN' | 'SECOND' | 'ENHANCED' | 'BOE'
+
+export interface AddonInviteExport { text: string }
+
+export interface AddonLootPreviewRow {
+  line_key: string
+  line_number: number
+  looted_at: string | null
+  npc_id: string
+  item_id: string
+  item_name: string
+  recipient_name: string
+  character_id: number | null
+  character_name: string
+  catalog_boss_id: string | null
+  boss_options: CatalogBoss[]
+  award_method: AwardMethod
+  is_importable: boolean
+  is_already_imported: boolean
+  warnings: string[]
+  errors: string[]
+}
+
+export interface AddonLootPreview {
+  raid_id: number
+  header_raid_id: number
+  recorder: string
+  rows: AddonLootPreviewRow[]
+  warnings: string[]
+}
+
+export interface AddonLootImportResult {
+  line_key: string
+  line_number: number
+  status: 'created' | 'already_imported' | 'failed'
+  award_id: number | null
+  character_name: string
+  code: string
+  message: string
+}

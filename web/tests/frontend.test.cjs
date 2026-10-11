@@ -2534,3 +2534,61 @@ test('series editor stays inside its selected card and cancelling invalidates it
   assert.equal(writes(s).length, 0)
   assert.equal(nodes(view.tree, (n) => n.type === 'li' && nodes(n, (child) => child.type === 'form').length > 0).length, 0)
 })
+
+test('addon invite export loads the roster text and reloads with the bench', async () => {
+  const s = setup()
+  const view = s.mount(s.load('components/AddonInviteExport.tsx').AddonInviteExport, { raidID: 1, rosterKey: '1:10:false' })
+  assert.equal(s.requests[0].url, '/api/v1/raids/1/addon-invite-export')
+  s.requests[0].resolve({ text: 'RS1|INV|1|Raid 1|25\nShanna|HEAL|Priester|0' })
+  await flush(view)
+  const exported = nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Einladungs-Export')[0]
+  assert.equal(exported.props.value, 'RS1|INV|1|Raid 1|25\nShanna|HEAL|Priester|0')
+  assert.match(text(view.tree), /1\s+Charaktere/)
+  assert.equal(button(view, 'Für Addon kopieren').props.disabled, false)
+  checkbox(view, 'Ersatzbank einbeziehen').props.onChange({ target: { checked: true } })
+  view.render()
+  assert.equal(s.requests[1].url, '/api/v1/raids/1/addon-invite-export?bench=1')
+})
+
+test('addon loot import previews, requires a boss choice and applies the selection', async () => {
+  const s = setup()
+  let reloads = 0
+  const view = s.mount(s.load('components/AddonLootImport.tsx').AddonLootImport, { raidID: 1, onImported: async () => { reloads++ } })
+  const payload = 'RS1|LOOT|1|Rüdiger|1\n2|36612|50415|Shanna\n3|-|52027|Shanna\n4|-|50415|Fremd'
+  nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Loot-Export')[0].props.onChange(change(payload))
+  view.render()
+  button(view, 'Vorschau').props.onClick()
+  assert.deepEqual(writes(s)[0].body, { payload })
+  const row = (line, extra) => ({ line_key: `key-${line}`, line_number: line, looted_at: null, npc_id: '', item_id: '50415', item_name: `Item ${line}`, recipient_name: 'Shanna', character_id: 10, character_name: 'Shanna', catalog_boss_id: null, boss_options: [], award_method: 'MAIN', is_importable: true, is_already_imported: false, warnings: [], errors: [], ...extra })
+  const preview = { raid_id: 1, header_raid_id: 1, recorder: 'Rüdiger', warnings: [], rows: [
+    row(2, { catalog_boss_id: '36612', boss_options: [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }] }),
+    row(3, { award_method: 'SECOND', boss_options: [{ id: '37813', instance_id: '631', name: 'Saurfang' }, { id: '36626', instance_id: '631', name: 'Fauldarm' }], warnings: ['Boss nicht eindeutig – bitte auswählen'] }),
+    row(4, { recipient_name: 'Fremd', character_id: null, character_name: '', is_importable: false, errors: ['Fremd steht nicht in der Aufstellung'] }),
+  ] }
+  writes(s)[0].resolve(preview)
+  await flush(view)
+  assert.match(text(view.tree), /Fremd steht nicht in der Aufstellung/)
+  assert.equal(button(view, '2 Gegenstände übernehmen').props.disabled, true)
+  assert.match(text(view.tree), /Bitte für alle ausgewählten Zeilen einen Boss wählen/)
+  select(view, 'Boss für Zeile 3').props.onChange(change('37813'))
+  view.render()
+  select(view, 'Vergabeart für Zeile 2').props.onChange(change('ENHANCED'))
+  view.render()
+  assert.equal(button(view, '2 Gegenstände übernehmen').props.disabled, false)
+  button(view, '2 Gegenstände übernehmen').props.onClick()
+  assert.deepEqual(writes(s)[1].body, { payload, selections: [
+    { line_key: 'key-2', catalog_boss_id: '36612', character_id: 10, award_method: 'ENHANCED' },
+    { line_key: 'key-3', catalog_boss_id: '37813', character_id: 10, award_method: 'SECOND' },
+  ] })
+  writes(s)[1].resolve([
+    { line_key: 'key-2', line_number: 2, status: 'created', award_id: 5, character_name: 'Shanna', code: '', message: '' },
+    { line_key: 'key-3', line_number: 3, status: 'failed', award_id: null, character_name: '', code: 'insufficient_balance', message: 'Spieler hat keine EP für Enhanced-Loot' },
+  ])
+  await flush(view)
+  assert.equal(reloads, 1)
+  assert.deepEqual(writes(s)[2].body, { payload })
+  writes(s)[2].resolve(preview)
+  await flush(view)
+  assert.match(text(view.tree), /Zeile\s+2\s*:\s*Übernommen\s*·\s*Shanna/)
+  assert.match(text(view.tree), /Zeile\s+3\s*:\s*Fehler\s*·\s*Spieler hat keine EP für Enhanced-Loot/)
+})

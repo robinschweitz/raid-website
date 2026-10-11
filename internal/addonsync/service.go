@@ -211,10 +211,19 @@ func (s *Service) ApplyLootImport(ctx context.Context, raidID, actorID int64, te
 			result.Status, result.AwardID = ResultAlreadyImported, &award.ID
 		default:
 			award, err := s.importLine(ctx, rd, actorID, selection, line)
-			if err != nil {
+			switch {
+			case errors.Is(err, loot.ErrAlreadyRecorded):
+				// Another staff member imported the line after the pre-read.
+				existing, err := s.loot.GetByRaidRequest(ctx, rd.ID, selection.LineKey)
+				if err != nil {
+					return nil, fmt.Errorf("load imported line %s: %w", selection.LineKey, err)
+				}
+				result.Status, result.AwardID = ResultAlreadyImported, &existing.ID
+				imported[selection.LineKey] = *existing
+			case err != nil:
 				result.Status = ResultFailed
 				result.Code, result.Message = importErrorMessage(err)
-			} else {
+			default:
 				result.Status, result.AwardID = ResultCreated, &award.ID
 				// An active item lock may have moved the award to the lock owner.
 				if award.AwardedToCharacterID != nil {
@@ -286,7 +295,7 @@ func importErrorMessage(err error) (string, string) {
 		return "insufficient_balance", "Spieler hat keine EP für Enhanced-Loot"
 	case errors.Is(err, loot.ErrLockConflict):
 		return "item_lock_conflict", "Mehrere aktive Item-Locks passen auf dieses Item"
-	case errors.Is(err, loot.ErrRequestConflict):
+	case errors.Is(err, loot.ErrRequestConflict), errors.Is(err, loot.ErrAlreadyRecorded):
 		return "request_conflict", "Diese Zeile wurde bereits mit anderen Angaben importiert"
 	case errors.Is(err, loot.ErrRaidState), errors.Is(err, raidcorrection.ErrRaidState):
 		return "raid_state", "Raid erlaubt diese Änderung nicht"

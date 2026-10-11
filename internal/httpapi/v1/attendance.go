@@ -173,7 +173,7 @@ func writeCorrectionError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusBadRequest, "item_name_required", "item_name ist erforderlich")
 	case errors.Is(err, loot.ErrRoster):
 		WriteError(w, http.StatusBadRequest, "recipient_not_in_roster", "Empfaengercharakter muss im Raidkader stehen")
-	case errors.Is(err, loot.ErrRequestConflict):
+	case errors.Is(err, loot.ErrRequestConflict), errors.Is(err, loot.ErrAlreadyRecorded):
 		WriteError(w, http.StatusConflict, "request_conflict", "request_id wurde mit anderem Inhalt verwendet")
 	case errors.Is(err, loot.ErrRequestRequired):
 		WriteError(w, http.StatusBadRequest, "request_id_required", "Neues Enhanced-Loot erfordert eine nichtleere request_id")

@@ -15,17 +15,25 @@ import (
 	"raid-website/internal/validation"
 )
 
+// RaidScopedRequestPrefix marks request IDs that identify one award per raid,
+// whoever records it: lines imported from the RaidSync addon (ADR 045). Other
+// request IDs only make retries of the same staff member idempotent.
+const RaidScopedRequestPrefix = "raidsync-"
+
 var (
-	ErrRaidState              = errors.New("raid does not allow ordinary loot awards")
-	ErrNotFound               = errors.New("referenced record not found")
-	ErrOwnership              = errors.New("character does not belong to recipient")
-	ErrLockConflict           = errors.New("multiple active locks match item")
-	ErrInvalidLock            = errors.New("item lock must match an active lock for this raid and item")
-	ErrInvalidMethod          = errors.New("award_method must be MAIN, SECOND, ENHANCED or BOE")
-	ErrItemName               = errors.New("item_name is required")
-	ErrRoster                 = errors.New("recipient character must be in raid roster")
-	ErrRequestRequired        = errors.New("new enhanced awards require a nonblank request_id")
-	ErrRequestConflict        = errors.New("request id already used with different payload")
+	ErrRaidState       = errors.New("raid does not allow ordinary loot awards")
+	ErrNotFound        = errors.New("referenced record not found")
+	ErrOwnership       = errors.New("character does not belong to recipient")
+	ErrLockConflict    = errors.New("multiple active locks match item")
+	ErrInvalidLock     = errors.New("item lock must match an active lock for this raid and item")
+	ErrInvalidMethod   = errors.New("award_method must be MAIN, SECOND, ENHANCED or BOE")
+	ErrItemName        = errors.New("item_name is required")
+	ErrRoster          = errors.New("recipient character must be in raid roster")
+	ErrRequestRequired = errors.New("new enhanced awards require a nonblank request_id")
+	ErrRequestConflict = errors.New("request id already used with different payload")
+	// ErrAlreadyRecorded means a raid-scoped request ID already has an award in
+	// this raid, recorded by any staff member.
+	ErrAlreadyRecorded        = errors.New("raid-scoped request already recorded")
 	ErrCatalogContextRequired = errors.New("raid catalog instance and size are required")
 )
 
@@ -240,6 +248,18 @@ func ResolveRequest(ctx context.Context, repo *Repo, a *Award, reason string) (b
 		return false, err
 	}
 	a.RequestHash = fmt.Sprintf("%x", sha256.Sum256(encoded))
+	if strings.HasPrefix(*a.RequestID, RaidScopedRequestPrefix) {
+		// Callers hold the write reservation, so this read cannot miss an
+		// award another staff member is recording at the same time.
+		_, err := repo.GetByRaidRequest(ctx, a.RaidID, *a.RequestID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return false, ErrAlreadyRecorded
+	}
 	old, err := repo.GetByRequest(ctx, a.AwardedByPlayerID, *a.RequestID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil

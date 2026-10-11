@@ -192,7 +192,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   method (default `MAIN`, armor tokens `SECOND`) and may override the recorded recipient with any roster
   character. Lines go through the ordinary loot path (catalog, locks, Enhanced costs) with request IDs
   derived from the addon's entry ID, so repeated imports create nothing new even after a trade changed
-  the recipient.
+  the recipient. `raidsync-` request IDs are raid-scoped (`loot.RaidScopedRequestPrefix`, checked in the
+  write transaction and by `idx_loot_raid_request`), unlike ordinary per-actor request IDs.
 
 ### Loot, attendance, and character corrections
 - Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived

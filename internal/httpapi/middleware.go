@@ -40,7 +40,7 @@ func securityHeaders(enableHSTS bool) func(http.Handler) http.Handler {
 				"frame-ancestors 'none'",
 				"object-src 'none'",
 				"form-action 'self'",
-				"img-src 'self' data:",
+				"img-src 'self' data: https://wow.zamimg.com",
 				"style-src 'self' 'unsafe-inline'",
 				"script-src 'self'",
 				"connect-src 'self'",

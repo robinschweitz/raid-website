@@ -38,6 +38,21 @@ func middlewareAuthDB(t *testing.T) (*db.BunDB, *auth.Service) {
 	return bdb, auth.NewService(player.NewRepo(bdb.DB), auth.NewRepo(bdb.DB))
 }
 
+func TestSecurityHeadersAllowWowIconImages(t *testing.T) {
+	h := securityHeaders(false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, r)
+
+	csp := w.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "img-src 'self' data: https://wow.zamimg.com") {
+		t.Fatalf("Content-Security-Policy = %q; want wow icon image host allowed", csp)
+	}
+}
+
 func TestMiddlewareAuthenticationFailures(t *testing.T) {
 	for _, scenario := range []string{"missing", "unknown", "expired", "inactive", "closed database", "touch failure", "valid"} {
 		t.Run(scenario, func(t *testing.T) {

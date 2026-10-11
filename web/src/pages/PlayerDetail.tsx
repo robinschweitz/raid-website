@@ -8,7 +8,6 @@ import {
   type Character,
   type ExternalCharacter,
   type ItemLock,
-  type NameHistory,
   type Player,
   type PointsResponse,
   type GuildRank,
@@ -47,15 +46,12 @@ export function PlayerDetailPage({ playerID }: Props) {
 function PlayerDetail({ playerID }: Props) {
   const { pending, submit, isActive, isPending } = useSubmission()
   const loadVersion = useRef(0)
-  const historyVersion = useRef(0)
   const { player: me } = useAuth()
   const [player, setPlayer] = useState<Player | null>(null)
   const [characters, setCharacters] = useState<Character[]>([])
   const [points, setPoints] = useState<PointsResponse | null>(null)
   const [loot, setLoot] = useState<LootAward[]>([])
   const [locks, setLocks] = useState<ItemLock[]>([])
-  const [history, setHistory] = useState<NameHistory[] | null>(null)
-  const [historyChar, setHistoryChar] = useState<number | null>(null)
   const [ranks, setRanks] = useState<GuildRank[]>([])
   const [rankError, setRankError] = useState('')
   const [rankLoading, setRankLoading] = useState(true)
@@ -212,21 +208,6 @@ function PlayerDetail({ playerID }: Props) {
   const changeCharacter = (patch: Partial<typeof characterDraft>) => {
     if (!isActive() || isPending() || renderedCharacterEditVersion !== characterEditVersion.current) return
     setCharacterDraft((previous) => ({ ...previous, ...patch }))
-  }
-
-  const showHistory = async (c: Character) => {
-    const version = ++historyVersion.current
-    setHistory(null)
-    setHistoryChar(c.id)
-    setError('')
-    try {
-      const hs = await api.get<NameHistory[]>(`/api/v1/characters/${c.id}/name-history`)
-      if (!isActive() || version !== historyVersion.current) return
-      setHistory(hs)
-      setHistoryChar(c.id)
-    } catch (err) {
-      if (isActive() && version === historyVersion.current) setError(err instanceof ApiError ? err.message : 'Historie fehlgeschlagen')
-    }
   }
 
   const createLock = async (event: FormEvent) => {
@@ -388,7 +369,7 @@ function PlayerDetail({ playerID }: Props) {
               return <tr key={row.id}>
                 <td>{row.item_name}{row.token_award && <span className="badge">Token</span>}</td>
                 <td>{row.boss || '—'}</td>
-                <td className="character-name">{row.awarded_to_character_name || '—'}</td>
+                <td>{row.awarded_to_character_id ? <Link className="character-name" to={`/characters/${row.awarded_to_character_id}`}>{row.awarded_to_character_name || 'Charakterprofil'}</Link> : <span className="character-name">{row.awarded_to_character_name || '—'}</span>}</td>
                 <td>{LOOT_METHOD_LABELS[method]}</td>
                 <td><Link to={`/raids/${row.raid_id}`}>Raid #{row.raid_id}</Link></td>
                 <td>{new Date(row.awarded_at).toLocaleDateString('de-DE')}</td>
@@ -429,7 +410,7 @@ function PlayerDetail({ playerID }: Props) {
                   <button type="button" disabled={pending} onClick={() => editCharacter(null)}>Bearbeitung abbrechen</button>
                   {error && <p className="error" role="alert">{error}</p>}
                 </form></td> : <>
-                <td className="character-name">{c.name}</td>
+                <td><Link className="character-name" to={`/characters/${c.id}`}>{c.name}</Link></td>
                 <td>{c.class}</td>
                 <td>{c.main_spec || '—'}</td>
                 <td>{c.external_profile_url ? <a href={c.external_profile_url} target="_blank" rel="noreferrer">verknüpft</a> : <span className="muted">—</span>}</td>
@@ -441,7 +422,6 @@ function PlayerDetail({ playerID }: Props) {
                       <button disabled={pending} onClick={() => editCharacter(c)}>Bearbeiten</button>
                     </>
                   )}
-                  <button onClick={() => showHistory(c)}>Historie</button>
                 </td>
                 </>}
               </tr>
@@ -455,19 +435,6 @@ function PlayerDetail({ playerID }: Props) {
             )}
           </tbody>
         </table></div>
-        {history && (
-          <div className="subcard">
-            <h3>Namenshistorie #{historyChar}</h3>
-            <ul>
-              {history.map((h) => (
-                <li key={h.id}>
-                  {h.old_name} → {h.new_name} ({new Date(h.created_at).toLocaleDateString()})
-                </li>
-              ))}
-              {history.length === 0 && <li className="muted">Keine Änderungen.</li>}
-            </ul>
-          </div>
-        )}
         {isAdmin && (
           <details className="editor-disclosure"><summary>Charakter hinzufügen</summary>
           {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}

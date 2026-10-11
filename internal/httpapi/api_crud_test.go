@@ -79,6 +79,31 @@ func TestCharacterCRUDAndRename(t *testing.T) {
 	if status != http.StatusBadRequest {
 		t.Fatalf("unknown class: want 400 got %d", status)
 	}
+
+	seedAccount(t, bdb, "member", "pw", validation.RoleMember)
+	memberToken := login(t, client, srv, "member", "pw")
+	status, _ = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/characters/%d/reload-profile", srv.URL, charID), memberToken, nil)
+	if status != http.StatusForbidden {
+		t.Fatalf("member reload profile: want 403 got %d", status)
+	}
+	feed.characters["101"] = registration.ExternalCharacter{ProfileID: "101", Name: "RenamedOnRisingGods", Class: "Krieger", MainSpec: "Schutz (Tank)", SecondSpec: "Furor", Level: 80, ProfileURL: "https://db.rising-gods.de/?profile=load&id=101"}
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/characters/%d/reload-profile", srv.URL, charID), token, nil)
+	if status != http.StatusOK {
+		t.Fatalf("reload profile: status %d body %s", status, body)
+	}
+	var reloadOut struct {
+		Data struct {
+			Name       string `json:"name"`
+			MainSpec   string `json:"main_spec"`
+			SecondSpec string `json:"second_spec"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &reloadOut); err != nil {
+		t.Fatalf("decode reload profile: %v", err)
+	}
+	if reloadOut.Data.Name != "Newname" || reloadOut.Data.MainSpec != "Schutz (Tank)" || reloadOut.Data.SecondSpec != "Furor" {
+		t.Fatalf("unexpected reload result: %+v", reloadOut.Data)
+	}
 }
 
 func TestRosterCRUD(t *testing.T) {

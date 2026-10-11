@@ -8,6 +8,7 @@ import { DashboardPage } from './pages/Dashboard'
 import { RaidDetailPage } from './pages/RaidDetail'
 import { PlayersPage } from './pages/Players'
 import { PlayerDetailPage } from './pages/PlayerDetail'
+import { CharacterDetailPage } from './pages/CharacterDetail'
 import { RosterPage } from './pages/Roster'
 import { PollsPage } from './pages/Polls'
 import { ImportsPage } from './pages/Imports'
@@ -33,6 +34,9 @@ function Routes() {
   }
   if (parts[0] === 'players') {
     return <PlayersPage />
+  }
+  if (parts[0] === 'characters' && parts[1]) {
+    return <CharacterDetailPage characterID={Number(parts[1])} />
   }
   if (parts[0] === 'roster') {
     return <RosterPage />

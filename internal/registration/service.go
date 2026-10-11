@@ -34,6 +34,7 @@ var (
 	ErrProfileRequired = errors.New("rising-gods profile required")
 	ErrProfileUnusable = errors.New("rising-gods profile could not be used")
 	ErrProfileLinked   = errors.New("rising-gods profile already linked")
+	ErrProfileMissing  = errors.New("character has no rising-gods profile")
 )
 
 type Service struct {
@@ -116,6 +117,57 @@ func (s *Service) CreateLinkedCharacter(ctx context.Context, input LinkedCharact
 		return nil, err
 	}
 	return created, nil
+}
+
+func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterID int64) (*character.Character, error) {
+	var updated *character.Character
+	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		players := s.players.WithTx(tx)
+		chars := s.characters.WithTx(tx)
+		actor, err := players.Get(ctx, actorID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return character.ErrInvalidActor
+		}
+		if err != nil {
+			return fmt.Errorf("load reload actor: %w", err)
+		}
+		if !actor.Role.AtLeast(validation.RoleAdmin) {
+			return character.ErrForbidden
+		}
+		c, err := chars.Get(ctx, characterID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return character.ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("load character for profile reload: %w", err)
+		}
+		if c.ExternalSource != ExternalSourceRisingGods || strings.TrimSpace(c.ExternalProfileID) == "" {
+			return ErrProfileMissing
+		}
+		profile, raw, err := s.loadUsableProfile(ctx, c.ExternalProfileID)
+		if err != nil {
+			return err
+		}
+		before := mustJSON(c)
+		now := time.Now().UTC()
+		c.MainSpec = profile.MainSpec
+		c.SecondSpec = profile.SecondSpec
+		c.ExternalProfileURL = profile.ProfileURL
+		c.ExternalProfileJSON = raw
+		c.UpdatedAt = now
+		if err := chars.Update(ctx, c); err != nil {
+			return fmt.Errorf("update reloaded character: %w", err)
+		}
+		if err := audit.NewRepo(tx).Insert(ctx, &audit.Log{ActorID: &actorID, EntityType: "character", EntityID: fmt.Sprint(c.ID), Action: "reload_rising_gods_profile", BeforeJSON: before, AfterJSON: mustJSON(c), Reason: "Rising-Gods-Profil neu geladen", CreatedAt: now}); err != nil {
+			return fmt.Errorf("audit profile reload: %w", err)
+		}
+		updated = c
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 func (s *Service) loadUsableProfile(ctx context.Context, profileID string) (ExternalCharacter, string, error) {

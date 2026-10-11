@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "node --test \"tests/*.test.cjs\"",
+    "test": "node --test tests/frontend.test.cjs tests/design.test.cjs tests/boss-data.test.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

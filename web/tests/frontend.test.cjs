@@ -95,7 +95,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
       props = next
       // Detail page wrappers contain no hooks and supply the entity key.
       let type = Component, key
-      if (Component.name === 'RaidDetailPage' || Component.name === 'PlayerDetailPage') {
+      if (Component.name === 'RaidDetailPage' || Component.name === 'PlayerDetailPage' || Component.name === 'CharacterDetailPage') {
         const element = Component(props)
         type = element.type
         key = element.key
@@ -334,14 +334,14 @@ for (const existingOwner of [false, true]) {
     }))
     const field = (label, type) => nodes(view.tree, (node) => node.type === 'label' && text(node).startsWith(label))
       .flatMap((node) => nodes(node, (child) => child.type === type))[0]
-    field('Charaktername', 'input').props.onChange(change('Newmage'))
-    field('Klasse', 'select').props.onChange(change('Magier'))
+    field('Rising-Gods-Charakter', 'input').props.onChange(change('Newmage'))
+    view.render()
+    button(view, 'Suchen').props.onClick()
+    resolveIf(s, '/api/v1/external/rising-gods/characters?q=Newmage', [{ profile_id: 'rg-1', name: 'Newmage', class: 'Magier', main_spec: 'Feuer', second_spec: 'Frost', level: 80 }])
+    await flush(view)
+    nodes(view.tree, (node) => node.type === 'button' && node.props.className === 'wishlist-toggle')[0].props.onClick()
     view.render()
     assert.equal(field('Spielername', 'input').props.value, 'Newmage')
-    assert.match(text(select(view, 'Main-Spec')), /Feuer/)
-    assert.doesNotMatch(text(select(view, 'Main-Spec')), /Waffen/)
-    select(view, 'Main-Spec').props.onChange(change('Feuer'))
-    select(view, 'Second-Spec').props.onChange(change('Frost'))
     if (existingOwner) select(view, 'Charakter-Besitzer').props.onChange(change('2'))
     view.render()
     const first = form(view).props.onSubmit(event)
@@ -351,8 +351,9 @@ for (const existingOwner of [false, true]) {
     assert.equal(write.url, '/api/v1/raids/5/quick-add')
     assert.equal(write.body.player_id, existingOwner ? 2 : 0)
     assert.equal(write.body.player_name, existingOwner ? '' : 'Newmage')
-    assert.equal(write.body.main_spec, 'Feuer')
-    assert.equal(write.body.second_spec, 'Frost')
+    assert.equal(write.body.profile_id, 'rg-1')
+    assert.equal('main_spec' in write.body, false)
+    assert.equal('second_spec' in write.body, false)
     assert.equal('username' in write.body, false)
     write.reject(new Error('connection lost'))
     await first
@@ -371,17 +372,16 @@ test('profile spec dropdowns clear incompatible choices on class change and pres
   const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
   resolvePlayer(s, 1)
   await flush(view)
-  select(view, 'Main-Spec').props.onChange(change('Unheilig'))
-  view.render()
-  select(view, 'Charakterklasse').props.onChange(change('Magier'))
-  view.render()
-  assert.equal(select(view, 'Main-Spec').props.value, '')
-  assert.match(text(select(view, 'Main-Spec')), /Feuer/)
-  assert.doesNotMatch(text(select(view, 'Main-Spec')), /Unheilig/)
   button(view, 'Bearbeiten').props.onClick()
   view.render()
   assert.equal(select(view, 'Main-Spec').props.value, 'Shadow')
   assert.match(text(select(view, 'Main-Spec')), /Shadow.*gespeichert/)
+  nodes(view.tree, (node) => node.type === 'label' && text(node).startsWith('Klasse'))
+    .flatMap((node) => nodes(node, (child) => child.type === 'select'))[0].props.onChange(change('Magier'))
+  view.render()
+  assert.equal(select(view, 'Main-Spec').props.value, '')
+  assert.match(text(select(view, 'Main-Spec')), /Feuer/)
+  assert.doesNotMatch(text(select(view, 'Main-Spec')), /Unheilig/)
 })
 
 test('submission guard blocks same-tick duplicates and releases after failure', async () => {
@@ -500,6 +500,15 @@ for (const [label, submits] of [['Lock anlegen', true], ['Stornieren', false], [
     await flush(view)
     // Locate the form by its submit label; own-profile claim forms shift form positions.
     const owner = () => nodes(view.tree, (n) => n.type === 'form' && nodes(n, (b) => b.type === 'button' && text(b) === label).length > 0)[0]
+    if (label === 'Anlegen') {
+      input(view, 'Mindestens 3 Zeichen').props.onChange(change('Newmage'))
+      view.render()
+      button(view, 'Suchen').props.onClick()
+      resolveIf(s, '/api/v1/external/rising-gods/characters?q=Newmage', [{ profile_id: 'rg-1', name: 'Newmage', class: 'Magier', main_spec: 'Feuer', second_spec: 'Frost', level: 80 }])
+      await flush(view)
+      nodes(view.tree, (node) => node.type === 'button' && node.props.className === 'wishlist-toggle')[0].props.onClick()
+      view.render()
+    }
     const invoke = submits ? () => owner().props.onSubmit(event) : button(view, label).props.onClick
     const first = invoke()
     await invoke()
@@ -557,24 +566,42 @@ test('player switch ignores late successful detail loads and old mutation handle
   assert.match(text(view.tree), /Spieler 3/)
 })
 
-test('name history is latest-request-only and clears on entity switch', async () => {
+test('character profile shows old names from the header dropdown', async () => {
   const s = setup()
-  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
-  resolvePlayer(s, 1)
+  const view = s.mount(s.load('pages/CharacterDetail.tsx').CharacterDetailPage, { characterID: 10 })
+  resolveIf(s, '/api/v1/characters/10', { ...character(10, 1), external_source: 'rising-gods', external_profile_id: '10' })
   await flush(view)
-  const historyButtons = nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Historie')
-  const first = historyButtons[0].props.onClick()
-  const old = s.requests.at(-1)
-  const second = historyButtons[1].props.onClick()
-  s.requests.at(-1).resolve([{ id: 2, old_name: 'new history', new_name: 'latest' }])
-  await second
-  old.resolve([{ id: 1, old_name: 'obsolete history', new_name: 'old' }])
-  await first
+  resolveIf(s, '/api/v1/players/1', player(1))
+  resolveIf(s, '/api/v1/players/1/loot', [{ id: 1, raid_id: 2, item_name: 'Old staff', boss: 'Boss', awarded_to_character_id: 10, is_main_spec: true, award_method: 'MAIN', awarded_at: '2026-10-01T18:00:00Z' }])
+  resolveIf(s, '/api/v1/characters/10/name-history', [{ id: 2, old_name: 'Oldchar', new_name: 'Char 10', created_at: '2026-10-01T18:00:00Z' }])
+  await flush(view)
+  assert.equal(s.requests.some((request) => request.url === '/api/v1/players/1/characters' || request.url === '/api/v1/players/1/points'), false)
+  assert.doesNotMatch(text(view.tree), /Weitere Charaktere|Enhance Points/)
+  assert.doesNotMatch(text(view.tree), /Frühere Namen\s+Oldchar/)
+  nodes(view.tree, (n) => n.type === 'button' && n.props.className === 'name-history-toggle')[0].props.onClick()
   view.render()
-  assert.match(text(view.tree), /new history/)
-  assert.doesNotMatch(text(view.tree), /obsolete history/)
-  view.render({ playerID: 2 })
-  assert.doesNotMatch(text(view.tree), /new history/)
+  assert.match(text(view.tree), /Frühere Namen.*Oldchar.*Char 10/)
+  assert.match(text(view.tree), /Old staff/)
+  assert.deepEqual(nodes(view.tree, (n) => n.type === 'a').map((n) => n.props.to).filter(Boolean), ['/players/1', '/players/1', '/raids/2'])
+  button(view, 'Rising-Gods-Profil neu laden').props.onClick()
+  assert.equal(writes(s).length, 1)
+  assert.equal(writes(s)[0].url, '/api/v1/characters/10/reload-profile')
+  writes(s)[0].resolve({ ...character(10, 1), main_spec: 'Holy', second_spec: 'Shadow', external_source: 'rising-gods', external_profile_id: '10' })
+  await flush(view)
+  assert.match(text(view.tree), /Holy\s+\/\s+Shadow/)
+  assert.match(text(view.tree), /Rising-Gods-Profil wurde neu geladen/)
+})
+
+test('character profile hides old-name control without name history', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/CharacterDetail.tsx').CharacterDetailPage, { characterID: 10 })
+  resolveIf(s, '/api/v1/characters/10', character(10, 1))
+  await flush(view)
+  resolveIf(s, '/api/v1/players/1', player(1))
+  resolveIf(s, '/api/v1/players/1/loot', [])
+  resolveIf(s, '/api/v1/characters/10/name-history', [])
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.type === 'button' && n.props.className === 'name-history-toggle').length, 0)
 })
 
 for (const [role, own, allowed] of [['GUEST', true, false], ['MEMBER', true, true], ['MEMBER', false, false], ['ADMIN', false, false], ['ADMIN', true, true]]) {

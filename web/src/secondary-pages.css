@@ -180,6 +180,25 @@
 .secondary-page .raid-loot .inline-form { padding: 14px; border: 1px solid #284356; border-radius: 4px; background: #07152380; }
 .secondary-page .raid-loot .inline-form > p { flex-basis: 100%; margin: 0; }
 .secondary-page .profile-header { background: linear-gradient(100deg, #0b1c2a, #102d4380), url('/banners/icecrown.jpg') center / cover; padding: 28px; }
+.character-profile-page .character-hero { display: flex; align-items: center; gap: 18px; position: relative; overflow: visible; background: radial-gradient(circle at 14% 0%, #244a68b3, transparent 34%), linear-gradient(100deg, #091724, #102c42); }
+.character-profile-page .character-hero-main { min-width: 0; }
+.character-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative; }
+.character-title-row h1 { margin-bottom: 0; }
+.name-history-toggle { display: inline-grid; place-items: center; width: 26px; min-height: 26px; padding: 0; border-radius: 999px; color: #bcefff; background: #07152399; border-color: #31536a; }
+.name-history-toggle > span { width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform .16s ease; }
+.name-history-toggle[aria-expanded='true'] > span { transform: translateY(2px) rotate(225deg); }
+.name-history-toggle[aria-expanded='true'] { color: #06111c; background: linear-gradient(135deg, #7ad7ff, #d7f4ff); border-color: #d7f4ff; }
+.name-history-popover { position: absolute; z-index: 5; top: calc(100% + 8px); left: 0; width: min(360px, calc(100vw - 48px)); padding: 14px; border: 1px solid #456c84; border-radius: 6px; background: #071523f5; box-shadow: 0 16px 40px #0009, inset 0 1px 0 #d7f4ff14; }
+.name-history-popover .plain-list { margin: 8px 0 0; padding: 0; list-style: none; }
+.character-facts dl { display: grid; gap: 10px; margin: 0; }
+.character-facts dl > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding-bottom: 9px; border-bottom: 1px solid #28435680; }
+.character-facts dt { color: #8fb6c9; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.character-facts dd { margin: 0; color: #e7f8ff; overflow-wrap: anywhere; }
+.character-loot-history .section-heading { align-items: flex-start; }
+.setup-member-info > .setup-character-link { display: block; font-weight: 700; overflow-wrap: anywhere; }
+.setup-member-info > .setup-character-link a { color: inherit; }
+.loot-recipient .character-name a { color: inherit; }
+.secondary-page .table .character-name { font-weight: 700; }
 .profile-ledgers { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
 .configuration-grid, .poll-directory, .series-directory { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .series-directory { list-style: none; margin: 20px 0; padding: 0; }
@@ -256,5 +275,7 @@
   .secondary-page .page-heading { padding: 16px; }
   .secondary-page .inline-form > label { flex-basis: 100%; }
   .secondary-page .loot-boss-heading { align-items: flex-start; flex-direction: column; }
+  .character-profile-page .character-hero { align-items: flex-start; flex-direction: column; }
+  .character-facts dl > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .setup-member-info > .setup-edit { min-height: 42px; width: 42px; right: 0; top: 4px; }
 }

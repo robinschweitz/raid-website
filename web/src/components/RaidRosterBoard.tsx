@@ -3,6 +3,7 @@ import { rosterGroup, rosterGroups } from '../raidRoster'
 import { ClassEmblem } from './ClassEmblem'
 import type { Attendance } from '../types'
 import type { ReactNode } from 'react'
+import { Link } from '../router'
 
 interface Props {
   attendance: Attendance[]
@@ -20,7 +21,7 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
       {editingID === row.id ? <div className="in-place-editor"><h3>{row.character_name || 'Teilnahme'} bearbeiten</h3>{children}</div> : <>
       <span className="setup-sigil"><ClassEmblem characterClass={row.class ?? ''} /></span>
       <div className="setup-member-info">
-        <strong className="character-name">{row.character_name?.trim() || 'Name nicht gespeichert'}</strong>
+        <strong className="character-name setup-character-link">{row.character_id ? <Link to={`/characters/${row.character_id}`}>{row.character_name?.trim() || 'Name nicht gespeichert'}</Link> : row.character_name?.trim() || 'Name nicht gespeichert'}</strong>
         <span>{row.spec?.trim() || 'Spec unbekannt'} · {row.class?.trim() || 'Klasse unbekannt'}</span>
         <small>{playerName(row.player_id)}</small>
         <div className="setup-flags">

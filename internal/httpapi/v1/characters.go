@@ -130,6 +130,38 @@ func (a *API) updateCharacter(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]any{"data": c})
 }
 
+func (a *API) reloadCharacterProfile(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "authentication required")
+		return
+	}
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid character id")
+		return
+	}
+	c, err := a.Registration.ReloadLinkedCharacter(r.Context(), actor, id)
+	if err != nil {
+		switch {
+		case errors.Is(err, character.ErrNotFound):
+			WriteError(w, http.StatusNotFound, "not_found", "character not found")
+		case errors.Is(err, character.ErrInvalidActor):
+			WriteError(w, http.StatusUnauthorized, "invalid_actor", "actor does not exist")
+		case errors.Is(err, character.ErrForbidden):
+			WriteError(w, http.StatusForbidden, "forbidden", "character profile reload requires admin")
+		case errors.Is(err, registration.ErrProfileMissing):
+			WriteError(w, http.StatusBadRequest, "profile_missing", "character has no Rising-Gods profile")
+		case errors.Is(err, registration.ErrProfileRequired), errors.Is(err, registration.ErrProfileUnusable):
+			WriteError(w, http.StatusBadRequest, "profile_unusable", "Rising-Gods profile could not be loaded")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "could not reload character profile")
+		}
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": c})
+}
+
 func (a *API) listCharacterNameHistory(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r, "id")
 	if !ok {

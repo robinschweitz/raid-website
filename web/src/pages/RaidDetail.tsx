@@ -691,6 +691,7 @@ function RaidDetail({ raidID }: Props) {
         )}
         </RaidRosterBoard>
         <p className="muted setup-caption">Gespeicherte Aufstellung dieses Raids. Die Ersatzbank folgt derselben EP-Regel.</p>
+        {raid.scheduled_start && raid.scheduled_end && <a className="button" href={`/api/v1/raids/${raidID}/calendar.ics`} download={`raid-${raidID}.ics`}>Kalenderdatei (.ics) herunterladen</a>}
         {canManage && attendance.length > 0 && <AddonInviteExport raidID={raidID} rosterKey={attendance.map((row) => `${row.id}:${row.character_id}:${row.is_bench}`).join(',')} />}
         {canWrite && isActiveRaid && <AddonRosterImport raidID={raidID} onImported={load} onQuickAdd={(name) => { editAttendance(null); setQuickAddName(name); setQuickAdd(true) }} />}
       </section>

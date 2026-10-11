@@ -35,7 +35,8 @@ Roster:
 - Raids are often filled up in game, e.g. via the world chat. The roster import is a preview followed
   by an explicit apply, both RAIDASSISTENT and up, for planned or open raids that are not archived.
 - The preview matches each name case-insensitively against the roster (current or snapshot name), then
-  exactly against known characters. Known characters get a suggested role (their latest attendance,
+  against all known characters, also case-insensitively (an exact-case match wins, otherwise the oldest
+  character). Known characters get a suggested role (their latest attendance,
   otherwise DD) and a late-join suggestion when first seen more than 15 minutes after the raid start.
   Roster members (not bench) the addon never saw are listed for information only.
 - Apply adds only selected known characters that the export names, through the ordinary attendance
@@ -65,8 +66,12 @@ Loot:
 - Each applied line is written through the ordinary loot path, so catalog validation, roster checks,
   item locks (which may move the award to the lock owner) and Enhanced costs apply exactly as for manual
   entry. Each line uses a stable request ID derived from the raid, the recorder, the recording start and
-  the entry ID, not from the recipient. Importing the same drops again, by any staff member and even
-  after a later trade changed the recipient, creates nothing new; the preview warns when the export now
+  the entry ID, not from the recipient. Unlike ordinary loot request IDs, which only make one staff
+  member's retries idempotent, these `raidsync-` IDs are scoped to the raid: the loot write transaction
+  looks them up by raid while it holds the write reservation, and the unique index
+  `idx_loot_raid_request` on `(raid_id, request_id)` backs this up. Importing the same drops again, by
+  any staff member, concurrently, and even after a later trade changed the recipient, creates nothing
+  new; the preview warns when the export now
   names a different recipient, which staff change through the ordinary loot correction. Every line is
   reported as created, already imported or failed; nothing is overwritten.
 

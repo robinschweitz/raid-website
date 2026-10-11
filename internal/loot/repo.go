@@ -68,6 +68,14 @@ func (r *Repo) GetByRequest(ctx context.Context, actor int64, requestID string) 
 	return a, err
 }
 
+// GetByRaidRequest finds the award a raid-scoped request ID recorded in this
+// raid, whichever staff member wrote it.
+func (r *Repo) GetByRaidRequest(ctx context.Context, raidID int64, requestID string) (*Award, error) {
+	a := new(Award)
+	err := r.db.NewSelect().Model(a).Where("raid_id = ? AND request_id = ?", raidID, requestID).Scan(ctx)
+	return a, err
+}
+
 func (r *Repo) CreateAward(ctx context.Context, a *Award) error {
 	if err := a.DeriveMainSpec(); err != nil {
 		return err

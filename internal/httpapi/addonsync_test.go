@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"raid-website/internal/loot"
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/raid"
+	"raid-website/internal/raidcorrection"
 	"raid-website/internal/validation"
 )
 
@@ -494,6 +497,98 @@ func TestAddonRosterImportPermissionsAndRaidState(t *testing.T) {
 	result = f.request(http.MethodPost, "/addon-roster-import", map[string]any{"payload": payload}, http.StatusConflict)
 	if !bytes.Contains(result, []byte(`"code":"raid_state"`)) {
 		t.Fatalf("wrong code: %s", result)
+	}
+}
+
+// raidsyncAward is an addon line as importLine writes it.
+func (f *correctionFixture) raidsyncAward(requestID string, actor int64) *loot.Award {
+	now := time.Now().UTC()
+	return &loot.Award{RaidID: f.raidID, CatalogBossID: &f.ordinaryBoss, ItemID: f.ordinaryItem, AwardedToPlayerID: f.first, AwardedToCharacterID: &f.firstChar, AwardedByPlayerID: actor, Source: "manual", AwardMethod: loot.Main, RequestID: &requestID, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
+}
+
+func TestAddonLootRequestIsRaidScopedAcrossStaff(t *testing.T) {
+	f := newCorrectionFixture(t)
+	f.attend(f.first, f.firstChar)
+	assistant := seedAccount(t, f.db, "race-assistant", "password", validation.RoleRaidassistent)
+	corrections := raidcorrection.NewService(raidcorrection.NewRepo(f.db))
+	ctx := context.Background()
+	// Both staff members passed the preview's pre-read before either wrote.
+	if err := corrections.SaveLoot(ctx, f.raidsyncAward("raidsync-race", f.actor), f.actor, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := corrections.SaveLoot(ctx, f.raidsyncAward("raidsync-race", assistant), assistant, ""); !errors.Is(err, loot.ErrAlreadyRecorded) {
+		t.Fatalf("second staff member must not record the line again: %v", err)
+	}
+	// Ordinary request IDs stay per staff member.
+	if err := corrections.SaveLoot(ctx, f.raidsyncAward("manual-1", f.actor), f.actor, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := corrections.SaveLoot(ctx, f.raidsyncAward("manual-1", assistant), assistant, ""); err != nil {
+		t.Fatalf("ordinary request IDs are scoped to the actor: %v", err)
+	}
+	awards, err := loot.NewRepo(f.db).ListByRaid(ctx, f.raidID)
+	if err != nil || len(awards) != 3 {
+		t.Fatalf("awards: %+v %v", awards, err)
+	}
+}
+
+func TestLootIndexKeepsRaidsyncRequestsUniquePerRaid(t *testing.T) {
+	f := newCorrectionFixture(t)
+	assistant := seedAccount(t, f.db, "index-assistant", "password", validation.RoleRaidassistent)
+	repo := loot.NewRepo(f.db)
+	ctx := context.Background()
+	if err := repo.CreateAward(ctx, f.raidsyncAward("raidsync-index", f.actor)); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateAward(ctx, f.raidsyncAward("raidsync-index", assistant)); err == nil {
+		t.Fatal("the database must reject a second award for the same raid and RaidSync line")
+	}
+	if err := repo.CreateAward(ctx, f.raidsyncAward("manual-index", f.actor)); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateAward(ctx, f.raidsyncAward("manual-index", assistant)); err != nil {
+		t.Fatalf("ordinary request IDs of different staff members must stay allowed: %v", err)
+	}
+}
+
+func TestAddonLootImportConcurrentStaffCreateOneAward(t *testing.T) {
+	f := newCorrectionFixture(t)
+	f.attend(f.first, f.firstChar)
+	seedAccount(t, f.db, "parallel-assistant", "password", validation.RoleRaidassistent)
+	assistant := login(t, f.srv.Client(), f.srv, "parallel-assistant", "password")
+	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1|1760000100|-|%s|%s|given", f.raidID, f.ordinaryItem, f.characterName(f.firstChar))
+	key := f.addonPreview(payload).Rows[0].LineKey
+	selections := []map[string]any{{"line_key": key, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"}}
+	start := make(chan struct{})
+	results := make([][]addonImportResult, 2)
+	var wg sync.WaitGroup
+	for i, token := range []string{f.token, assistant} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			status, body := do(t, f.srv.Client(), http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/addon-loot-import", f.srv.URL, f.raidID), token, map[string]any{"payload": payload, "selections": selections})
+			var out struct{ Data []addonImportResult }
+			if status != http.StatusOK || json.Unmarshal(body, &out) != nil {
+				t.Errorf("import %d: %d %s", i, status, body)
+				return
+			}
+			results[i] = out.Data
+		}()
+	}
+	close(start)
+	wg.Wait()
+	statuses := map[string]int{}
+	for _, result := range results {
+		if len(result) == 1 {
+			statuses[result[0].Status]++
+		}
+	}
+	if statuses["created"] != 1 || statuses["already_imported"] != 1 {
+		t.Fatalf("one import must create, the other report already imported: %+v", results)
+	}
+	if awards, err := loot.NewRepo(f.db).ListByRaid(context.Background(), f.raidID); err != nil || len(awards) != 1 {
+		t.Fatalf("awards: %+v %v", awards, err)
 	}
 }
 

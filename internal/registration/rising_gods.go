@@ -742,11 +742,14 @@ func raceName(id int) string {
 	}
 }
 
+// factionName maps the profiler faction field, which Rising-Gods encodes as
+// 0 for Alliance and 1 for Horde (checked against a Gnome and a Tauren
+// profile on 2026-10-11).
 func factionName(id int) string {
-	if id == 1 {
+	if id == 0 {
 		return "Alliance"
 	}
-	if id == 2 {
+	if id == 1 {
 		return "Horde"
 	}
 	return ""

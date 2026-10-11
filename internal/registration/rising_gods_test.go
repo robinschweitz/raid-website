@@ -144,7 +144,7 @@ func TestRisingGodsSearchResolvesPastedProfileURL(t *testing.T) {
 			_, _ = w.Write([]byte(`profilah.initialize('profilah-generic', { id: 9596079 });`))
 		case r.URL.Query().Get("profile") == "load" && r.URL.Query().Get("id") == "9596079":
 			atomic.AddInt32(&profileLoads, 1)
-			_, _ = w.Write([]byte(profileBody("9596079", "Servenaja", 5, 1, 1, 80)))
+			_, _ = w.Write([]byte(profileBody("9596079", "Servenaja", 5, 1, 0, 80)))
 		default:
 			t.Fatalf("unexpected request: %s", r.URL.String())
 		}
@@ -170,8 +170,9 @@ func TestRisingGodsLoadCharacterRejectsNonAllianceOrNonLevel80(t *testing.T) {
 		level   int
 		faction int
 	}{
-		{name: "level 79", level: 79, faction: 1},
-		{name: "horde", level: 80, faction: 2},
+		{name: "level 79", level: 79, faction: 0},
+		{name: "horde", level: 80, faction: 1},
+		{name: "unknown faction", level: 80, faction: 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -270,7 +271,7 @@ func TestRisingGodsLoadCharacterUsesCachedSearchSpec(t *testing.T) {
 			t.Errorf("unexpected upstream request: %s", r.URL.String())
 			return
 		}
-		_, _ = w.Write([]byte(`$WowheadProfiler.registerProfile({"id":7,"name":"Servenaja","classs":5,"race":1,"faction":1,"level":80});`))
+		_, _ = w.Write([]byte(`$WowheadProfiler.registerProfile({"id":7,"name":"Servenaja","classs":5,"race":1,"faction":0,"level":80});`))
 	}))
 	defer srv.Close()
 

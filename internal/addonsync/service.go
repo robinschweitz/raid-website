@@ -197,8 +197,9 @@ func (s *Service) ApplyLootImport(ctx context.Context, raidID, actorID int64, te
 			result.Status, result.Code, result.Message = ResultFailed, "unknown_line", "Zeile ist nicht im Export enthalten"
 		case line.Error != "":
 			result.Status, result.Code, result.Message = ResultFailed, "invalid_line", line.Error
-		case imported[selection.LineKey] != nil:
-			result.Status, result.AwardID = ResultAlreadyImported, imported[selection.LineKey]
+		case hasAward(imported, selection.LineKey):
+			award := imported[selection.LineKey]
+			result.Status, result.AwardID = ResultAlreadyImported, &award.ID
 		default:
 			award, err := s.importLine(ctx, rd, actorID, selection, line)
 			if err != nil {
@@ -212,7 +213,7 @@ func (s *Service) ApplyLootImport(ctx context.Context, raidID, actorID int64, te
 						result.CharacterName = c.Name
 					}
 				}
-				imported[selection.LineKey] = &award.ID
+				imported[selection.LineKey] = *award
 			}
 		}
 		results = append(results, result)
@@ -323,16 +324,15 @@ func (s *Service) currentCharacterName(ctx context.Context, row attendance.Atten
 
 // importedLineKeys finds awards of this raid created from earlier imports,
 // whoever imported them, so a second import by another staff member is a no-op.
-func (s *Service) importedLineKeys(ctx context.Context, raidID int64) (map[string]*int64, error) {
+func (s *Service) importedLineKeys(ctx context.Context, raidID int64) (map[string]loot.Award, error) {
 	awards, err := s.loot.ListByRaid(ctx, raidID)
 	if err != nil {
 		return nil, fmt.Errorf("list loot for raid %d: %w", raidID, err)
 	}
-	keys := map[string]*int64{}
+	keys := map[string]loot.Award{}
 	for _, award := range awards {
 		if award.RequestID != nil && strings.HasPrefix(*award.RequestID, "raidsync-") {
-			id := award.ID
-			keys[*award.RequestID] = &id
+			keys[*award.RequestID] = award
 		}
 	}
 	return keys, nil
@@ -344,7 +344,7 @@ type resolver struct {
 	roster       []rosterEntry
 	bossesByItem map[string][]lootcatalog.Boss
 	locks        []enhancepoints.ItemLock
-	imported     map[string]*int64
+	imported     map[string]loot.Award
 	service      *Service
 	playerNames  map[int64]string
 }
@@ -390,7 +390,8 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 	}
 	lootedAt := line.LootedAt
 	row.LootedAt = &lootedAt
-	if id := r.imported[key]; id != nil {
+	existing, isImported := r.imported[key]
+	if isImported {
 		row.IsAlreadyImported = true
 		row.Warnings = append(row.Warnings, "Bereits importiert")
 	}
@@ -408,7 +409,11 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 	case len(candidates) == 1:
 		row.CatalogBossID = &candidates[0].boss.ID
 	default:
-		if hinted := r.hintedBoss(line.NPCID, candidates); hinted != "" {
+		if isImported && existing.CatalogBossID != nil {
+			// Show the boss staff chose when this line was imported.
+			bossID := *existing.CatalogBossID
+			row.CatalogBossID = &bossID
+		} else if hinted := r.hintedBoss(line.NPCID, candidates); hinted != "" {
 			row.CatalogBossID = &hinted
 		} else {
 			row.Warnings = append(row.Warnings, "Boss nicht eindeutig – bitte auswählen")
@@ -505,4 +510,9 @@ func (r *resolver) playerName(ctx context.Context, playerID int64) string {
 	}
 	r.playerNames[playerID] = name
 	return name
+}
+
+func hasAward(awards map[string]loot.Award, key string) bool {
+	_, ok := awards[key]
+	return ok
 }

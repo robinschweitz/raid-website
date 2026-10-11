@@ -256,6 +256,20 @@
 .secondary-page .wishlist-toggle svg { width: 14px; height: 14px; }
 .secondary-page .wishlist-toggle.active { color: #06111c; background: linear-gradient(135deg, #7ad7ff, #d7f4ff); border-color: #d7f4ff; }
 .secondary-page .catalog-pagination { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 16px; margin-block: 20px; }
+.statistics-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.statistics-summary .stat-card { min-width: 0; padding: 18px; border: 1px solid #31536a; border-top-color: #7ad7ff99; border-radius: 6px; background: radial-gradient(circle at 18% 0%, #244b7355, transparent 46%), linear-gradient(160deg, #10273a, #071521); box-shadow: inset 0 1px 0 #d7f4ff12; }
+.statistics-summary .stat-card span, .statistics-summary .stat-card small { display: block; color: #8fb6c9; }
+.statistics-summary .stat-card span { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.statistics-summary .stat-card strong { display: block; margin: 4px 0; color: #e7f8ff; font-size: clamp(28px, 4vw, 42px); font-family: Georgia, 'Times New Roman', serif; font-weight: 400; line-height: 1; }
+.statistics-summary .stat-card small { font-size: 12px; }
+.statistics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.statistics-chart-card, .statistics-table-card { min-width: 0; }
+.stat-bars { display: grid; gap: 14px; margin-top: 18px; }
+.stat-bar-row { display: grid; grid-template-columns: minmax(90px, 1fr) auto; gap: 8px 14px; align-items: center; }
+.stat-bar-row > span { color: #d8eef8; font-weight: 700; overflow-wrap: anywhere; }
+.stat-bar-row > strong { color: #bcefff; font-variant-numeric: tabular-nums; }
+.stat-bar-row > div { grid-column: 1 / -1; height: 8px; overflow: hidden; border: 1px solid #31536a; border-radius: 999px; background: #061421; }
+.stat-bar-row i { display: block; height: 100%; min-width: 2px; border-radius: inherit; background: linear-gradient(90deg, #4ca3c5, #bcefff); }
 
 @media (min-width: 1250px) {
   .setup-board { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -263,12 +277,14 @@
 
 @media (max-width: 1100px) {
   .profile-ledgers, .configuration-grid { grid-template-columns: minmax(0, 1fr); }
+  .statistics-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .setup-board { gap: 8px; }
   .setup-member { padding: 10px; gap: 8px; }
 }
 
 @media (max-width: 650px) {
   .setup-board, .setup-bench ul, .poll-directory, .series-directory { grid-template-columns: minmax(0, 1fr); }
+  .statistics-summary, .statistics-grid { grid-template-columns: minmax(0, 1fr); }
   .secondary-page .card { padding: 16px; }
   .secondary-page .workspace-tabs button { padding: 12px; flex: 1 1 auto; }
   .raid-detail .raid-banner-content { padding: 20px; }

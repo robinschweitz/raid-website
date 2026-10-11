@@ -14,6 +14,7 @@ import { PollsPage } from './pages/Polls'
 import { ImportsPage } from './pages/Imports'
 import { RaidSeriesPage } from './pages/RaidSeries'
 import { RaidsPage } from './pages/Raids'
+import { StatisticsPage } from './pages/Statistics'
 import { GuildCrest } from './components/GuildCrest'
 import { NavIcon } from './components/NavIcon'
 import { LootCatalogPage } from './pages/LootCatalog'
@@ -42,6 +43,7 @@ function Routes() {
     return <RosterPage />
   }
   if (parts[0] === 'raid-series') return <RaidSeriesPage />
+  if (parts[0] === 'statistics') return <StatisticsPage />
   if (parts[0] === 'loot-catalog') return <LootCatalogPage />
   if (parts[0] === 'polls') {
     return <PollsPage />
@@ -82,6 +84,7 @@ function Layout() {
           <Link className={path === '/' ? 'nav-link active' : 'nav-link'} to="/"><NavIcon name="home" />&Uuml;bersicht</Link>
           <Link className={path.startsWith('/raids') ? 'nav-link active' : 'nav-link'} to="/raids"><NavIcon name="raids" />Raids</Link>
           <Link className={path.startsWith('/players') ? 'nav-link active' : 'nav-link'} to="/players"><NavIcon name="players" />Spieler</Link>
+          <Link className={path === '/statistics' ? 'nav-link active' : 'nav-link'} to="/statistics"><NavIcon name="chart" />Statistiken</Link>
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
           <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
           <p className="sidebar-caption">Administration</p>
@@ -109,6 +112,7 @@ function Layout() {
         <Link className={path === '/' ? 'active' : ''} to="/"><NavIcon name="home" />&Uuml;bersicht</Link>
         <Link className={path.startsWith('/raids') ? 'active' : ''} to="/raids"><NavIcon name="raids" />Raids</Link>
         <Link className={path.startsWith('/players') ? 'active' : ''} to="/players"><NavIcon name="players" />Spieler</Link>
+        <Link className={path === '/statistics' ? 'active' : ''} to="/statistics"><NavIcon name="chart" />Statistik</Link>
         <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>
         <Link className={path === '/loot-catalog' ? 'active' : ''} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
       </nav>

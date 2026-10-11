@@ -49,6 +49,7 @@ function setup(player = { id: 7, name: 'Real player', role: 'MEMBER' }) {
     const requireLocal = (name) => {
       if (name === 'react') return react
       if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx }
+      if (name === 'recharts') return { ResponsiveContainer: ({ children }) => children, PieChart: ({ children }) => children, Pie: () => null, Cell: () => null, Tooltip: () => null, BarChart: ({ children }) => children, Bar: () => null, XAxis: () => null, YAxis: () => null }
       if (name.endsWith('/router')) return { Link: 'a' }
       if (name.endsWith('/auth')) return { useAuth: () => ({ player }) }
       if (name.endsWith('/api')) return { ...load('api.ts'), api: Object.fromEntries(['get', 'post', 'patch'].map((method) => [method, (url, body) => new Promise((resolve, reject) => requests.push({ method, url, body, resolve, reject }))])) }
@@ -225,6 +226,42 @@ test('dashboard ignores late reads after leaving the page', async () => {
   await flush(s)
   assert.equal(s.requests.length, count)
   assert.doesNotMatch(text(s.tree), /Late raid|Late poll/)
+})
+
+test('statistics derive only from stored raids, attendance and loot', async () => {
+  const s = setup()
+  s.mount(s.load('pages/Statistics.tsx').StatisticsPage)
+  for (const request of s.requests) {
+    if (request.url === '/api/v1/raids?include_archived=true') request.resolve([
+      { id: 1, name: 'ICC-01', status: 'COMPLETED', archived_at: '2026-10-01T18:00:00Z', created_at: '2026-10-01T18:00:00Z' },
+      { id: 2, name: 'ICC-02', status: 'PLANNED', archived_at: null, created_at: '2026-10-08T18:00:00Z' },
+    ])
+    else if (request.url === '/api/v1/players') request.resolve([{ id: 10, name: 'Arthas', active: true }, { id: 11, name: 'Jaina', active: false }])
+    else if (request.url === '/api/v1/characters') request.resolve([{ id: 1, name: 'Arthas', class: 'DEATHKNIGHT', active: true }, { id: 2, name: 'Jaina', class: 'MAGE', active: true }])
+  }
+  await flush(s)
+  assert.deepEqual(s.requests.filter((r) => r.url.startsWith('/api/v1/raids/1/')).map((r) => r.url).sort(), ['/api/v1/raids/1/attendance', '/api/v1/raids/1/loot'])
+  assert.equal(s.requests.filter((r) => r.url.startsWith('/api/v1/raids/2/')).length, 0)
+  s.requests.find((r) => r.url === '/api/v1/raids/1/attendance').resolve([
+    { player_id: 10, role: 'TANK', is_bench: false },
+    { player_id: 10, role: 'DD', is_bench: false },
+    { player_id: 11, role: 'HEAL', is_bench: true },
+  ])
+  s.requests.find((r) => r.url === '/api/v1/raids/1/loot').resolve([
+    { awarded_to_player_id: 10, award_method: 'MAIN', is_main_spec: true },
+    { awarded_to_player_id: 11, award_method: 'SECOND', is_main_spec: false },
+  ])
+  await flush(s)
+  assert.match(text(s.tree), /Statistiken/)
+  assert.match(text(s.tree), /Aktive Spieler 1/)
+  assert.match(text(s.tree), /Aktive Charaktere 2/)
+  assert.match(text(s.tree), /Archivierte Raids 1/)
+  assert.match(text(s.tree), /Loot-Eintraege 2/)
+  assert.match(text(s.tree), /1 Main-Spec \/ 1 andere/)
+  assert.match(text(s.tree), /Arthas 2/)
+  assert.match(text(s.tree), /Jaina 1/)
+  assert.match(text(s.tree), /1\s+von\s+3\s+Eintraegen waren Ersatzbank/)
+  assert.equal(s.requests.filter((r) => r.method !== 'get').length, 0)
 })
 
 test('profile contains no legacy roll endpoint, type or control', () => {

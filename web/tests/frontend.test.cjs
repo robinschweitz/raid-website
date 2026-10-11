@@ -2554,13 +2554,13 @@ test('addon loot import previews, requires a boss choice and applies the selecti
   const s = setup()
   let reloads = 0
   const view = s.mount(s.load('components/AddonLootImport.tsx').AddonLootImport, { raidID: 1, onImported: async () => { reloads++ } })
-  const payload = 'RS1|LOOT|1|Rüdiger|1\n2|36612|50415|Shanna\n3|-|52027|Shanna\n4|-|50415|Fremd'
+  const payload = 'RS1|LOOT|1|Rüdiger|1\n1|2|36612|50415|Shanna|given\n2|3|-|52027|Shanna|given\n3|4|-|50415|Fremd|given'
   nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Loot-Export')[0].props.onChange(change(payload))
   view.render()
   button(view, 'Vorschau').props.onClick()
   assert.deepEqual(writes(s)[0].body, { payload })
   const row = (line, extra) => ({ line_key: `key-${line}`, line_number: line, looted_at: null, npc_id: '', item_id: '50415', item_name: `Item ${line}`, recipient_name: 'Shanna', character_id: 10, character_name: 'Shanna', catalog_boss_id: null, boss_options: [], award_method: 'MAIN', is_importable: true, is_already_imported: false, warnings: [], errors: [], ...extra })
-  const preview = { raid_id: 1, header_raid_id: 1, recorder: 'Rüdiger', warnings: [], rows: [
+  const preview = { raid_id: 1, header_raid_id: 1, recorder: 'Rüdiger', warnings: [], recipient_options: [{ character_id: 10, character_name: 'Shanna' }], rows: [
     row(2, { catalog_boss_id: '36612', boss_options: [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }] }),
     row(3, { award_method: 'SECOND', boss_options: [{ id: '37813', instance_id: '631', name: 'Saurfang' }, { id: '36626', instance_id: '631', name: 'Fauldarm' }], warnings: ['Boss nicht eindeutig – bitte auswählen'] }),
     row(4, { recipient_name: 'Fremd', character_id: null, character_name: '', is_importable: false, errors: ['Fremd steht nicht in der Aufstellung'] }),
@@ -2569,7 +2569,7 @@ test('addon loot import previews, requires a boss choice and applies the selecti
   await flush(view)
   assert.match(text(view.tree), /Fremd steht nicht in der Aufstellung/)
   assert.equal(button(view, '2 Gegenstände übernehmen').props.disabled, true)
-  assert.match(text(view.tree), /Bitte für alle ausgewählten Zeilen einen Boss wählen/)
+  assert.match(text(view.tree), /Bitte für alle ausgewählten Zeilen Boss und Empfänger wählen/)
   select(view, 'Boss für Zeile 3').props.onChange(change('37813'))
   view.render()
   select(view, 'Vergabeart für Zeile 2').props.onChange(change('ENHANCED'))
@@ -2591,4 +2591,100 @@ test('addon loot import previews, requires a boss choice and applies the selecti
   await flush(view)
   assert.match(text(view.tree), /Zeile\s+2\s*:\s*Übernommen\s*·\s*Shanna/)
   assert.match(text(view.tree), /Zeile\s+3\s*:\s*Fehler\s*·\s*Spieler hat keine EP für Enhanced-Loot/)
+})
+
+test('addon loot import lets staff pick the winner and leaves held drops unselected', async () => {
+  const s = setup()
+  const view = s.mount(s.load('components/AddonLootImport.tsx').AddonLootImport, { raidID: 1, onImported: async () => {} })
+  const payload = 'RS1|LOOT|1|Rüdiger|1\n1|2|36612|50415|Helfer|given\n2|3|36612|50415|Rüdiger|held'
+  nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Loot-Export')[0].props.onChange(change(payload))
+  view.render()
+  button(view, 'Vorschau').props.onClick()
+  const row = (line, extra) => ({ line_key: `key-${line}`, line_number: line, looted_at: null, npc_id: '36612', item_id: '50415', item_name: `Item ${line}`, recipient_name: '', state: 'given', character_id: null, character_name: '', catalog_boss_id: '36612', boss_options: [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }], award_method: 'MAIN', is_importable: true, is_already_imported: false, warnings: [], errors: [], ...extra })
+  writes(s)[0].resolve({ raid_id: 1, header_raid_id: 1, recorder: 'Rüdiger', warnings: [], recipient_options: [{ character_id: 10, character_name: 'Rüdiger' }, { character_id: 20, character_name: 'Shanna' }], rows: [
+    row(1, { recipient_name: 'Helfer', warnings: ['Helfer steht nicht in der Aufstellung'] }),
+    row(2, { recipient_name: 'Rüdiger', state: 'held', character_id: 10, character_name: 'Rüdiger', warnings: ['Noch beim Plündermeister – Empfänger prüfen'] }),
+  ] })
+  await flush(view)
+  const boxes = nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')
+  assert.equal(boxes[0].props.checked, false)
+  assert.equal(boxes[1].props.checked, false)
+  assert.match(text(view.tree), /Addon:\s*Helfer/)
+  assert.match(text(view.tree), /beim Plündermeister/)
+  assert.equal(select(view, 'Empfänger für Zeile 2').props.value, '10')
+  boxes[0].props.onChange({ target: { checked: true } })
+  view.render()
+  assert.equal(button(view, '1 Gegenstand übernehmen').props.disabled, true)
+  assert.match(text(view.tree), /Boss und Empfänger wählen/)
+  select(view, 'Empfänger für Zeile 1').props.onChange(change('20'))
+  view.render()
+  nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')[1].props.onChange({ target: { checked: true } })
+  view.render()
+  select(view, 'Empfänger für Zeile 2').props.onChange(change('20'))
+  view.render()
+  button(view, '2 Gegenstände übernehmen').props.onClick()
+  assert.deepEqual(writes(s)[1].body, { payload, selections: [
+    { line_key: 'key-1', catalog_boss_id: '36612', character_id: 20, award_method: 'MAIN' },
+    { line_key: 'key-2', catalog_boss_id: '36612', character_id: 20, award_method: 'MAIN' },
+  ] })
+})
+
+test('addon roster import adds known characters and hands unknown ones to quick-add', async () => {
+  const s = setup()
+  let reloads = 0
+  const quickAdds = []
+  const view = s.mount(s.load('components/AddonRosterImport.tsx').AddonRosterImport, { raidID: 1, onImported: async () => { reloads++ }, onQuickAdd: (name) => quickAdds.push(name) })
+  const payload = 'RS1|ROSTER|1|Rüdiger|5\nRüdiger|MAGE|1\nShanna|PRIEST|2\nWeltchat|PALADIN|3'
+  nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Aufstellungs-Export')[0].props.onChange(change(payload))
+  view.render()
+  button(view, 'Abgleichen').props.onClick()
+  assert.equal(writes(s)[0].url, '/api/v1/raids/1/addon-roster-import/preview')
+  assert.deepEqual(writes(s)[0].body, { payload })
+  const row = (line, extra) => ({ line_number: line, name: '', class_token: '', first_seen: null, status: 'unknown', character_id: null, character_name: '', player_id: null, class: '', suggested_role: 'DD', suggest_late_join: false, errors: [], ...extra })
+  const preview = { raid_id: 1, header_raid_id: 1, recorder: 'Rüdiger', warnings: [], missing: ['Thorgrim'], rows: [
+    row(2, { name: 'Rüdiger', status: 'in_roster', character_id: 10, character_name: 'Rüdiger', class: 'Magier' }),
+    row(3, { name: 'Shanna', status: 'known', character_id: 20, character_name: 'Shanna', class: 'Priester', suggested_role: 'HEAL', suggest_late_join: true }),
+    row(4, { name: 'Weltchat' }),
+  ] }
+  writes(s)[0].resolve(preview)
+  await flush(view)
+  assert.match(text(view.tree), /im Spiel nicht gesehen:\s*Thorgrim/)
+  assert.match(text(view.tree), /Bereits in der Aufstellung/)
+  assert.equal(select(view, 'Rolle für Shanna').props.value, 'HEAL')
+  const late = nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Shanna später dazugekommen')[0]
+  assert.equal(late.props.checked, true)
+  assert.equal(nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Rüdiger übernehmen').length, 0)
+  button(view, 'Per Schnellanlage hinzufügen').props.onClick()
+  assert.deepEqual(quickAdds, ['Weltchat'])
+  select(view, 'Rolle für Shanna').props.onChange(change('DD'))
+  view.render()
+  button(view, '1 Charakter hinzufügen').props.onClick()
+  assert.equal(writes(s)[1].url, '/api/v1/raids/1/addon-roster-import')
+  assert.deepEqual(writes(s)[1].body, { payload, selections: [{ character_id: 20, role: 'DD', late_join: true }] })
+  writes(s)[1].resolve([{ character_id: 20, character_name: 'Shanna', status: 'added', attendance_id: 7, code: '', message: '' }])
+  await flush(view)
+  assert.equal(reloads, 1)
+  assert.deepEqual(writes(s)[2].body, { payload })
+  writes(s)[2].resolve(preview)
+  await flush(view)
+  assert.match(text(view.tree), /Shanna\s*:\s*Hinzugefügt/)
+})
+
+test('roster board opens the add section when the roster import hands over a character', () => {
+  const s = setup()
+  const Board = s.load('components/RaidRosterBoard.tsx').RaidRosterBoard
+  const props = { attendance: [], playerName: () => '', canWrite: true, pending: false, onEdit: () => {} }
+  const disclosure = (view) => nodes(view.tree, (n) => n.type === 'details')[0]
+  assert.equal(disclosure(s.mount(Board, props)).props.open, undefined)
+  assert.equal(disclosure(s.mount(Board, { ...props, isAddOpen: true })).props.open, true)
+})
+
+test('quick-add starts with the name handed over from the roster import', () => {
+  const s = setup()
+  const view = s.mount(s.load('components/RaidQuickAdd.tsx').RaidQuickAdd, { raidID: 1, players: [], options: {}, needsReason: false, pending: false, submit: async (action) => action(), isActive: () => true, onAdded: async () => {}, onCancel: () => {}, initialQuery: 'Weltchat' })
+  const field = input(view, 'Mindestens 3 Zeichen')
+  assert.equal(field.props.value, 'Weltchat')
+  assert.equal(field.props.autoFocus, true)
+  assert.equal(button(view, 'Suchen').props.disabled, false)
+  assert.equal(s.requests.length, 0)
 })

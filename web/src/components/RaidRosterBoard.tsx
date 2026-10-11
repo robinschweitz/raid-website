@@ -12,10 +12,11 @@ interface Props {
   pending: boolean
   onEdit: (row: Attendance) => void
   editingID?: number
+  isAddOpen?: boolean
   children?: ReactNode
 }
 
-export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, children }: Props) {
+export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, isAddOpen, children }: Props) {
   const member = (row: Attendance) => (
     <li key={row.id} className={`setup-member ${characterClassName(row.class?.trim() ?? '')}${editingID === row.id ? ' is-editing' : ''}`}>
       {editingID === row.id ? <div className="in-place-editor"><h3>{row.character_name || 'Teilnahme'} bearbeiten</h3>{children}</div> : <>
@@ -58,6 +59,6 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
       <header><h3>Ersatzbank</h3><span className="badge">{bench.length}</span></header>
       {bench.length ? <ul>{bench.map(member)}</ul> : <p className="muted">Keine Teilnehmer auf der Ersatzbank.</p>}
     </section>
-    {canWrite && editingID == null && <details className="editor-disclosure"><summary>Teilnahme hinzufügen</summary>{children}</details>}
+    {canWrite && editingID == null && <details className="editor-disclosure" open={isAddOpen || undefined}><summary>Teilnahme hinzufügen</summary>{children}</details>}
   </>
 }

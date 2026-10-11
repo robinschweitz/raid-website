@@ -14,6 +14,7 @@ import { SpecSelect } from '../components/SpecSelect'
 import { RaidQuickAdd } from '../components/RaidQuickAdd'
 import { AddonInviteExport } from '../components/AddonInviteExport'
 import { AddonLootImport } from '../components/AddonLootImport'
+import { AddonRosterImport } from '../components/AddonRosterImport'
 
 interface Props {
   raidID: number
@@ -108,6 +109,7 @@ function RaidDetail({ raidID }: Props) {
   const [characters, setCharacters] = useState<Character[]>([])
   const [characterSearch, setCharacterSearch] = useState('')
   const [quickAdd, setQuickAdd] = useState(false)
+  const [quickAddName, setQuickAddName] = useState('')
   const { options: classSpecs, error: optionsError, reload: reloadOptions } = useCharacterOptions()
   const [attEditing, setAttEditing] = useState<Attendance | null>(null)
   const [attDetails, setAttDetails] = useState({ is_bench: false, late_join: false, early_leave: false })
@@ -639,12 +641,12 @@ function RaidDetail({ raidID }: Props) {
 
       <section id="raid-roster" hidden={view !== 'roster'} className="card raid-roster" aria-label="Raidroster">
         <div className="section-heading"><h2>Raidaufstellung</h2><span className="muted">{attendance.filter((row) => !row.is_bench).length} im Raid · {attendance.filter((row) => row.is_bench).length} auf der Ersatzbank</span></div>
-        <RaidRosterBoard attendance={attendance} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id}>
+        <RaidRosterBoard attendance={attendance} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
         {canWrite && (
           <div>
             {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
-            {!attEditing && !quickAdd && <button type="button" disabled={pending} onClick={() => setQuickAdd(true)}>Neuen Charakter anlegen</button>}
-            {quickAdd ? <RaidQuickAdd raidID={raidID} players={players} options={classSpecs} needsReason={attNeedsReason} pending={pending} submit={submit} isActive={isActive} onCancel={() => setQuickAdd(false)} onAdded={async () => { setQuickAdd(false); await load() }} /> :
+            {!attEditing && !quickAdd && <button type="button" disabled={pending} onClick={() => { setQuickAddName(''); setQuickAdd(true) }}>Neuen Charakter anlegen</button>}
+            {quickAdd ? <RaidQuickAdd key={quickAddName} initialQuery={quickAddName} raidID={raidID} players={players} options={classSpecs} needsReason={attNeedsReason} pending={pending} submit={submit} isActive={isActive} onCancel={() => setQuickAdd(false)} onAdded={async () => { setQuickAdd(false); await load() }} /> :
             <form className="inline-form" onSubmit={addAttendance}>
               <label>Charakter suchen<input type="search" autoFocus={attEditing != null} disabled={pending} value={characterSearch} onChange={(event) => setCharacterSearch(event.target.value)} placeholder="Charaktername oder Spieler" /></label>
               <select aria-label="Teilnahme-Charakter" disabled={pending || characters.length === 0} value={attCharacter} onChange={(e) => {
@@ -690,6 +692,7 @@ function RaidDetail({ raidID }: Props) {
         </RaidRosterBoard>
         <p className="muted setup-caption">Gespeicherte Aufstellung dieses Raids. Die Ersatzbank folgt derselben EP-Regel.</p>
         {canManage && attendance.length > 0 && <AddonInviteExport raidID={raidID} rosterKey={attendance.map((row) => `${row.id}:${row.character_id}:${row.is_bench}`).join(',')} />}
+        {canWrite && isActiveRaid && <AddonRosterImport raidID={raidID} onImported={load} onQuickAdd={(name) => { editAttendance(null); setQuickAddName(name); setQuickAdd(true) }} />}
       </section>
 
       <section id="raid-loot" hidden={view !== 'loot'} className="card raid-loot" aria-label="Raidloot">

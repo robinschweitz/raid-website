@@ -12,11 +12,12 @@ interface Props {
   pending: boolean
   submit: (action: () => Promise<void>) => Promise<void>
   isActive: () => boolean
+  initialQuery?: string
 }
 
-export function RaidQuickAdd({ raidID, players, options, needsReason, onAdded, onCancel, pending, submit, isActive }: Props) {
+export function RaidQuickAdd({ raidID, players, options, needsReason, onAdded, onCancel, pending, submit, isActive, initialQuery = '' }: Props) {
   void options
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
   const [results, setResults] = useState<ExternalCharacter[]>([])
   const [selected, setSelected] = useState<ExternalCharacter | null>(null)
   const [owner, setOwner] = useState('new')
@@ -70,7 +71,7 @@ export function RaidQuickAdd({ raidID, players, options, needsReason, onAdded, o
     <h3>Neuen Charakter anlegen</h3>
     {error && <p className="error" role="alert">{error}</p>}
     <fieldset disabled={pending || uncertain} className="inline-form">
-      <label>Rising-Gods-Charakter<input required value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
+      <label>Rising-Gods-Charakter<input required autoFocus={initialQuery !== ''} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
       <button type="button" disabled={pending || query.trim().length < 3} onClick={() => void search()}>{searching ? 'Suche…' : 'Suchen'}</button>
       <label>Spieler<select aria-label="Charakter-Besitzer" value={owner} onChange={(event) => setOwner(event.target.value)}>
         <option value="new">Neuer Spieler</option>{players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}

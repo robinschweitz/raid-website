@@ -46,6 +46,17 @@ func (r *Repo) Exists(ctx context.Context, raidID, playerID, characterID int64) 
 	return count > 0, nil
 }
 
+// LatestByCharacter returns the character's most recent attendance in any raid.
+func (r *Repo) LatestByCharacter(ctx context.Context, characterID int64) (*Attendance, error) {
+	a := new(Attendance)
+	err := r.db.NewSelect().Model(a).
+		Where("character_id = ?", characterID).
+		Order("created_at DESC", "id DESC").
+		Limit(1).
+		Scan(ctx)
+	return a, err
+}
+
 func (r *Repo) ListByRaid(ctx context.Context, raidID int64) ([]Attendance, error) {
 	var as []Attendance
 	err := r.db.NewSelect().Model(&as).

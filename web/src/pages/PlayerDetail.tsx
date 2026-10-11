@@ -62,6 +62,7 @@ function PlayerDetail({ playerID }: Props) {
   const [charQuery, setCharQuery] = useState('')
   const [charResults, setCharResults] = useState<ExternalCharacter[]>([])
   const [charSelected, setCharSelected] = useState<ExternalCharacter | null>(null)
+  const [charSearching, setCharSearching] = useState(false)
   const { options: classSpecs, error: optionsError, reload: reloadOptions } = useCharacterOptions()
   const [charIsMain, setCharIsMain] = useState(false)
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null)
@@ -77,6 +78,7 @@ function PlayerDetail({ playerID }: Props) {
   const [claimQuery, setClaimQuery] = useState('')
   const [claimResults, setClaimResults] = useState<ExternalCharacter[]>([])
   const [claimSelected, setClaimSelected] = useState<ExternalCharacter | null>(null)
+  const [claimSearching, setClaimSearching] = useState(false)
   const [claimCode, setClaimCode] = useState('')
   const [claimStatus, setClaimStatus] = useState('')
 
@@ -158,12 +160,15 @@ function PlayerDetail({ playerID }: Props) {
     await submit(async () => {
       setError('')
       setCharSelected(null)
+      setCharSearching(true)
       try {
         const rows = await api.get<ExternalCharacter[]>(`/api/v1/external/rising-gods/characters?q=${encodeURIComponent(charQuery.trim())}`)
         if (isActive()) setCharResults(rows)
         if (isActive() && rows.length === 0) setError('Charakter nicht gefunden. Nur aktive Rising-Gods-Charaktere können angelegt werden.')
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Charaktersuche fehlgeschlagen')
+      } finally {
+        if (isActive()) setCharSearching(false)
       }
     })
   }
@@ -253,12 +258,15 @@ function PlayerDetail({ playerID }: Props) {
       setError('')
       setClaimStatus('')
       setClaimSelected(null)
+      setClaimSearching(true)
       try {
         const rows = await api.get<ExternalCharacter[]>(`/api/v1/external/rising-gods/characters?q=${encodeURIComponent(claimQuery.trim())}`)
         if (isActive()) setClaimResults(rows)
         if (isActive() && rows.length === 0) setError('Charakter nicht gefunden. Nur aktive Rising-Gods-Charaktere können beansprucht werden.')
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Charaktersuche fehlgeschlagen')
+      } finally {
+        if (isActive()) setClaimSearching(false)
       }
     })
   }
@@ -440,13 +448,14 @@ function PlayerDetail({ playerID }: Props) {
           {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
           <form className="inline-form" onSubmit={createCharacter}>
             <label>Rising-Gods-Charakter<input value={charQuery} onChange={(e) => setCharQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
-            <button type="button" disabled={pending || charQuery.trim().length < 3} onClick={() => void searchNewCharacters()}>Suchen</button>
+            <button type="button" disabled={pending || charQuery.trim().length < 3} onClick={() => void searchNewCharacters()}>{charSearching ? 'Suche…' : 'Suchen'}</button>
             <label className="check">
               <input type="checkbox" checked={charIsMain} onChange={(e) => setCharIsMain(e.target.checked)} /> Main
             </label>
             <button type="submit" disabled={pending || !charSelected}>Anlegen</button>
             {charSelected && <p className="muted">Ausgewählt: {charSelected.name} · {charSelected.class} · {charSelected.main_spec}</p>}
           </form>
+          {charSearching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft…</p>}
           {charResults.length > 0 && <div className="plain-list">{charResults.map((row) => <button key={row.profile_id} type="button" className={charSelected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setCharSelected(row)}>{row.name} · {row.class} · {row.main_spec || 'Spec unbekannt'} · Stufe {row.level || '—'}</button>)}</div>}
           </details>
         )}
@@ -455,8 +464,9 @@ function PlayerDetail({ playerID }: Props) {
           <p className="muted">Suche deinen Rising-Gods-Charakter. Ein Admin sendet dir den Code ingame an diesen Charakter.</p>
           <div className="inline-form">
             <label>Charakter suchen<input value={claimQuery} onChange={(e) => setClaimQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
-            <button type="button" disabled={pending || claimQuery.trim().length < 3} onClick={() => void searchClaimCharacters()}>Suchen</button>
+            <button type="button" disabled={pending || claimQuery.trim().length < 3} onClick={() => void searchClaimCharacters()}>{claimSearching ? 'Suche…' : 'Suchen'}</button>
           </div>
+          {claimSearching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft…</p>}
           {claimResults.length > 0 && <div className="plain-list">{claimResults.map((row) => <button key={row.profile_id} type="button" className={claimSelected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setClaimSelected(row)}>{row.name} · {row.class} · Stufe {row.level || '—'}</button>)}</div>}
           <form className="inline-form" onSubmit={requestClaim}>
             <button type="submit" disabled={pending || !claimSelected}>Anfrage erstellen</button>

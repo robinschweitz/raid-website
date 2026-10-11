@@ -25,12 +25,14 @@ export function RaidQuickAdd({ raidID, players, options, needsReason, onAdded, o
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const [uncertain, setUncertain] = useState(false)
+  const [searching, setSearching] = useState(false)
   const request = useRef<{ payload: string; id: string } | null>(null)
   const search = async () => {
     if (query.trim().length < 3) { setError('Bitte mindestens 3 Zeichen eingeben.'); return }
     await submit(async () => {
       setError('')
       setSelected(null)
+      setSearching(true)
       try {
         const rows = await api.get<ExternalCharacter[]>(`/api/v1/external/rising-gods/characters?q=${encodeURIComponent(query.trim())}`)
         if (!isActive()) return
@@ -38,6 +40,8 @@ export function RaidQuickAdd({ raidID, players, options, needsReason, onAdded, o
         if (rows.length === 0) setError('Charakter nicht gefunden. Nur aktive Rising-Gods-Charaktere können angelegt werden.')
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Charaktersuche fehlgeschlagen')
+      } finally {
+        if (isActive()) setSearching(false)
       }
     })
   }
@@ -67,7 +71,7 @@ export function RaidQuickAdd({ raidID, players, options, needsReason, onAdded, o
     {error && <p className="error" role="alert">{error}</p>}
     <fieldset disabled={pending || uncertain} className="inline-form">
       <label>Rising-Gods-Charakter<input required value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
-      <button type="button" disabled={pending || query.trim().length < 3} onClick={() => void search()}>Suchen</button>
+      <button type="button" disabled={pending || query.trim().length < 3} onClick={() => void search()}>{searching ? 'Suche…' : 'Suchen'}</button>
       <label>Spieler<select aria-label="Charakter-Besitzer" value={owner} onChange={(event) => setOwner(event.target.value)}>
         <option value="new">Neuer Spieler</option>{players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}
       </select></label>
@@ -75,6 +79,7 @@ export function RaidQuickAdd({ raidID, players, options, needsReason, onAdded, o
       <label>Rolle im Raid<select value={role} onChange={(event) => setRole(event.target.value as AttendanceRole)}><option value="DD">DD</option><option value="TANK">Tank</option><option value="HEAL">Heal</option></select></label>
       {needsReason && <label>Begründung (Pflicht)<input required value={reason} onChange={(event) => setReason(event.target.value)} /></label>}
     </fieldset>
+    {searching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft…</p>}
     {results.length > 0 && <div className="plain-list">{results.map((row) => <button key={row.profile_id} type="button" className={selected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setSelected(row)}>{row.name} · {row.class} · {row.main_spec || 'Spec unbekannt'} · Stufe {row.level || '—'}</button>)}</div>}
     {selected && <p className="muted">Ausgewählt: {selected.name} · {selected.class} · {selected.main_spec}</p>}
     <p className="muted">Charakter und Teilnahme werden gemeinsam gespeichert. Neue Spieler benötigen hier keine Zugangsdaten.</p>

@@ -144,17 +144,13 @@ func (s *Service) prepareCharacterLinks(ctx context.Context, source, sheetID str
 	return links, nil
 }
 
-func (s *Service) lookupCharacterLink(ctx context.Context, planned CharacterPlan) (characterLink, bool) {
+func characterLinkFromRows(planned CharacterPlan, rows []registration.ExternalCharacter) (characterLink, bool) {
 	name := strings.TrimSpace(planned.Name)
 	if len([]rune(name)) < 3 {
 		return characterLink{}, false
 	}
-	results, err := s.external.SearchCharacters(ctx, name)
-	if err != nil {
-		return characterLink{}, false
-	}
 	exactMatches := make([]registration.ExternalCharacter, 0, 1)
-	for _, result := range results {
+	for _, result := range rows {
 		if strings.EqualFold(strings.TrimSpace(result.Name), name) {
 			exactMatches = append(exactMatches, result)
 		}
@@ -170,6 +166,18 @@ func (s *Service) lookupCharacterLink(ctx context.Context, planned CharacterPlan
 		return characterLink{}, false
 	}
 	return characterLink{Profile: profile}, true
+}
+
+func (s *Service) lookupCharacterLink(ctx context.Context, planned CharacterPlan) (characterLink, bool) {
+	name := strings.TrimSpace(planned.Name)
+	if len([]rune(name)) < 3 {
+		return characterLink{}, false
+	}
+	results, err := s.external.SearchCharacters(ctx, name)
+	if err != nil {
+		return characterLink{}, false
+	}
+	return characterLinkFromRows(planned, results)
 }
 
 func planFromSheet(data SheetData) (Plan, int, error) {

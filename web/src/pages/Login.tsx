@@ -18,6 +18,7 @@ export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'request' | 'redeem'>('login')
   const [requestStatus, setRequestStatus] = useState('')
   const [error, setError] = useState('')
+  const [searching, setSearching] = useState(false)
   const { pending: busy, submit, isActive } = useSubmission()
 
   const onSubmit = async (event: FormEvent) => {
@@ -38,12 +39,15 @@ export function LoginPage() {
       setError('')
       setRequestStatus('')
       setSelected(null)
+      setSearching(true)
       try {
         const rows = await api.get<ExternalCharacter[]>(`/api/v1/external/rising-gods/characters?q=${encodeURIComponent(query.trim())}`)
         if (isActive()) setResults(rows)
         if (isActive() && rows.length === 0) setError('Charakter nicht gefunden. Nur aktive Rising-Gods-Charaktere können registriert werden.')
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Charaktersuche fehlgeschlagen.')
+      } finally {
+        if (isActive()) setSearching(false)
       }
     })
   }
@@ -103,8 +107,9 @@ export function LoginPage() {
           <p className="muted">Suche deinen Rising-Gods-Charakter. Ein Admin sendet dir danach einen Code ingame an genau diesen Charakter.</p>
           <div className="login-search">
             <label>Charakter suchen<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
-            <button type="button" disabled={busy || query.trim().length < 3} onClick={() => void searchCharacters()}>Suchen</button>
+            <button type="button" disabled={busy || query.trim().length < 3} onClick={() => void searchCharacters()}>{searching ? 'Suche…' : 'Suchen'}</button>
           </div>
+          {searching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft…</p>}
           {results.length > 0 && <div className="login-results">{results.map((row) => <button key={row.profile_id} type="button" className={selected?.profile_id === row.profile_id ? 'active' : ''} onClick={() => setSelected(row)}>
             <strong>{row.name}</strong><span>{row.class} · Stufe {row.level || '—'}</span>
           </button>)}</div>}

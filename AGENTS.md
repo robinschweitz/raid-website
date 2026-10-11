@@ -101,6 +101,11 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   character and optionally its new player through atomic raid quick-add (ADR 037). New player
   names default to the character name and are editable; these players use the existing GUEST
   default without login credentials. General account administration remains Admin-only.
+- Interactive Rising-Gods character lookup is restricted to Alliance level-80 characters. Pasted
+  normal Rising-Gods profile URLs may be resolved server-side to the faster profiler load endpoint;
+  broad name search remains available and uses targeted filtered Rising-Gods queries with
+  caching/coalescing where practical. Broad Rising-Gods listviews are capped and must not be treated
+  as complete character indexes (ADR 044).
 
 ### Raids
 - Lifecycle: `PLANNED` → `OPEN` → `COMPLETED`, with cancellation as `CANCELLED`.
@@ -210,6 +215,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   rewritten.
 - The sheet raid key is the catalog context: `ICC25-01` → instance `631`, `raid_size` `25`, applied
   only to raids this import creates.
+- Rising-Gods enrichment during import uses exact per-character lookup. This remains best-effort
+  metadata enrichment and never blocks historical imports (ADR 044).
 
 ### Core hardening decisions (ADR 017-020)
 - Only one matching active item lock may exist per raid. Competing locks are rejected;

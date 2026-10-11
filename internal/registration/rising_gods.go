@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"raid-website/internal/validation"
@@ -35,6 +36,16 @@ var (
 	profileFaction    = regexp.MustCompile(`"faction"\s*:\s*(\d+)`)
 	profileName       = regexp.MustCompile(`"name"\s*:\s*"([^"]+)"`)
 	profileTalent     = regexp.MustCompile(`"talents"\s*:\s*"([0-9]+)"`)
+	profilePageID     = regexp.MustCompile(`profilah\.initialize\([^)]*\{\s*id\s*:\s*(\d+)`)
+
+	defaultRisingGodsCache = newRisingGodsCache()
+)
+
+const (
+	risingGodsSearchTTL  = 10 * time.Minute
+	risingGodsProfileTTL = 10 * time.Minute
+	risingGodsSlugTTL    = 24 * time.Hour
+	risingGodsListCap    = 300
 )
 
 type ExternalClient interface {
@@ -44,6 +55,42 @@ type ExternalClient interface {
 
 type RisingGodsClient struct {
 	HTTPClient *http.Client
+	cache      *risingGodsCache
+}
+
+type risingGodsCache struct {
+	mu       sync.Mutex
+	searches map[string]cachedSearch
+	profiles map[string]cachedProfile
+	slugs    map[string]cachedSlug
+	inflight map[string]*risingGodsCall
+}
+
+type cachedSearch struct {
+	rows      []ExternalCharacter
+	expiresAt time.Time
+	complete  bool
+}
+
+type cachedProfile struct {
+	profile   ExternalCharacter
+	raw       string
+	expiresAt time.Time
+}
+
+type cachedSlug struct {
+	id        string
+	expiresAt time.Time
+}
+
+type risingGodsCall struct {
+	done chan struct{}
+	val  any
+	err  error
+}
+
+func newRisingGodsCache() *risingGodsCache {
+	return &risingGodsCache{searches: map[string]cachedSearch{}, profiles: map[string]cachedProfile{}, slugs: map[string]cachedSlug{}, inflight: map[string]*risingGodsCall{}}
 }
 
 func (c RisingGodsClient) client() *http.Client {
@@ -53,12 +100,58 @@ func (c RisingGodsClient) client() *http.Client {
 	return &http.Client{Timeout: 10 * time.Second}
 }
 
+func (c RisingGodsClient) sharedCache() *risingGodsCache {
+	if c.cache != nil {
+		return c.cache
+	}
+	return defaultRisingGodsCache
+}
+
 func (c RisingGodsClient) SearchCharacters(ctx context.Context, query string) ([]ExternalCharacter, error) {
 	q := strings.TrimSpace(query)
 	if len([]rune(q)) < 3 {
 		return nil, ErrExternalInvalid
 	}
-	u := risingGodsBaseURL + "/?profiles=eu.rising-gods&filter=" + url.QueryEscape("na="+q)
+	if profileRef, ok := risingGodsProfileReference(q); ok {
+		profile, _, err := c.loadProfileReference(ctx, profileRef)
+		if err != nil {
+			return nil, err
+		}
+		return []ExternalCharacter{profile}, nil
+	}
+	cacheKey := "search:" + strings.ToLower(q)
+	if rows, ok := c.sharedCache().getSearch(cacheKey); ok {
+		return rows, nil
+	}
+	if rows, ok := c.sharedCache().getCompletePrefixSearch(q); ok {
+		return rows, nil
+	}
+	rowsAny, err := c.sharedCache().do(cacheKey, func() (any, error) {
+		if rows, ok := c.sharedCache().getSearch(cacheKey); ok {
+			return rows, nil
+		}
+		if rows, ok := c.sharedCache().getCompletePrefixSearch(q); ok {
+			return rows, nil
+		}
+		rows, err := c.searchCharactersLive(ctx, q)
+		if err != nil {
+			return nil, err
+		}
+		c.sharedCache().setSearch(cacheKey, rows, len(rows) < risingGodsListCap, risingGodsSearchTTL)
+		return rows, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return rowsAny.([]ExternalCharacter), nil
+}
+
+func (c RisingGodsClient) searchCharactersLive(ctx context.Context, q string) ([]ExternalCharacter, error) {
+	return c.searchCharactersByFilter(ctx, "si=1;minle=80;maxle=80;na="+q)
+}
+
+func (c RisingGodsClient) searchCharactersByFilter(ctx context.Context, filter string) ([]ExternalCharacter, error) {
+	u := risingGodsBaseURL + "/?profiles=eu.rising-gods&filter=" + url.QueryEscape(filter)
 	body, err := c.fetch(ctx, u)
 	if err != nil {
 		return nil, err
@@ -83,10 +176,10 @@ func (c RisingGodsClient) SearchCharacters(ctx context.Context, query string) ([
 		tree2, _ := strconv.Atoi(firstSubmatch(listviewTree2, raw))
 		tree3, _ := strconv.Atoi(firstSubmatch(listviewTree3, raw))
 		class := className(classID)
-		if id == "" || name == "" || class == "" {
+		if id == "" || name == "" || class == "" || level != 80 {
 			continue
 		}
-		results = append(results, ExternalCharacter{ProfileID: id, Name: name, Class: class, MainSpec: specFromTreeTotals(class, [3]int{tree1, tree2, tree3}), Level: level, ProfileURL: profileURL(id)})
+		results = append(results, ExternalCharacter{ProfileID: id, Name: name, Class: class, MainSpec: specFromTreeTotals(class, [3]int{tree1, tree2, tree3}), Level: level, Faction: "Alliance", ProfileURL: profileURL(id)})
 	}
 	return results, nil
 }
@@ -96,6 +189,29 @@ func (c RisingGodsClient) LoadCharacter(ctx context.Context, profileID string) (
 	if id == "" {
 		return ExternalCharacter{}, "", ErrExternalInvalid
 	}
+	cacheKey := "profile:" + id
+	if profile, raw, ok := c.sharedCache().getProfile(cacheKey); ok {
+		return profile, raw, nil
+	}
+	profileAny, err := c.sharedCache().do(cacheKey, func() (any, error) {
+		if profile, raw, ok := c.sharedCache().getProfile(cacheKey); ok {
+			return cachedProfile{profile: profile, raw: raw}, nil
+		}
+		profile, raw, err := c.loadCharacterLive(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		c.sharedCache().setProfile(cacheKey, profile, raw, risingGodsProfileTTL)
+		return cachedProfile{profile: profile, raw: raw}, nil
+	})
+	if err != nil {
+		return ExternalCharacter{}, "", err
+	}
+	cached := profileAny.(cachedProfile)
+	return cached.profile, cached.raw, nil
+}
+
+func (c RisingGodsClient) loadCharacterLive(ctx context.Context, id string) (ExternalCharacter, string, error) {
 	body, err := c.fetch(ctx, risingGodsBaseURL+"/?profile=load&id="+url.QueryEscape(id))
 	if err != nil {
 		return ExternalCharacter{}, "", err
@@ -111,7 +227,8 @@ func (c RisingGodsClient) LoadCharacter(ctx context.Context, profileID string) (
 	factionID, _ := strconv.Atoi(firstSubmatch(profileFaction, raw))
 	name := firstSubmatch(profileName, raw)
 	class := className(classID)
-	if loadedID != id || name == "" || class == "" {
+	faction := factionName(factionID)
+	if loadedID != id || name == "" || class == "" || level != 80 || faction != "Alliance" {
 		return ExternalCharacter{}, "", ErrExternalInvalid
 	}
 	talentMatches := profileTalent.FindAllStringSubmatch(raw, 2)
@@ -137,8 +254,49 @@ func (c RisingGodsClient) LoadCharacter(ctx context.Context, profileID string) (
 	if mainSpec == "" {
 		return ExternalCharacter{}, "", ErrExternalInvalid
 	}
-	profile := ExternalCharacter{ProfileID: id, Name: name, Class: class, MainSpec: mainSpec, SecondSpec: secondSpec, Level: level, Race: raceName(raceID), Faction: factionName(factionID), ProfileURL: profileURL(id)}
+	profile := ExternalCharacter{ProfileID: id, Name: name, Class: class, MainSpec: mainSpec, SecondSpec: secondSpec, Level: level, Race: raceName(raceID), Faction: faction, ProfileURL: profileURL(id)}
 	return profile, raw, nil
+}
+
+func (c RisingGodsClient) loadProfileReference(ctx context.Context, ref string) (ExternalCharacter, string, error) {
+	if id := profileLoadID(ref); id != "" {
+		return c.LoadCharacter(ctx, id)
+	}
+	id, err := c.resolveProfileSlug(ctx, ref)
+	if err != nil {
+		return ExternalCharacter{}, "", err
+	}
+	return c.LoadCharacter(ctx, id)
+}
+
+func (c RisingGodsClient) resolveProfileSlug(ctx context.Context, ref string) (string, error) {
+	slugURL, err := normalizedRisingGodsProfileURL(ref)
+	if err != nil {
+		return "", err
+	}
+	cacheKey := "slug:" + strings.ToLower(slugURL)
+	if id, ok := c.sharedCache().getSlug(cacheKey); ok {
+		return id, nil
+	}
+	idAny, err := c.sharedCache().do(cacheKey, func() (any, error) {
+		if id, ok := c.sharedCache().getSlug(cacheKey); ok {
+			return id, nil
+		}
+		body, err := c.fetch(ctx, slugURL)
+		if err != nil {
+			return "", err
+		}
+		id := firstSubmatch(profilePageID, body)
+		if id == "" {
+			return "", ErrExternalInvalid
+		}
+		c.sharedCache().setSlug(cacheKey, id, risingGodsSlugTTL)
+		return id, nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return idAny.(string), nil
 }
 
 func (c RisingGodsClient) fetch(ctx context.Context, u string) (string, error) {
@@ -162,6 +320,165 @@ func (c RisingGodsClient) fetch(ctx context.Context, u string) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func (c *risingGodsCache) getSearch(key string) ([]ExternalCharacter, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cached, ok := c.searches[key]
+	if !ok || time.Now().After(cached.expiresAt) {
+		return nil, false
+	}
+	rows := append([]ExternalCharacter(nil), cached.rows...)
+	return rows, true
+}
+
+func (c *risingGodsCache) getCompletePrefixSearch(query string) ([]ExternalCharacter, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	q := strings.ToLower(strings.TrimSpace(query))
+	var best cachedSearch
+	bestPrefix := ""
+	for key, cached := range c.searches {
+		if !cached.complete || now.After(cached.expiresAt) || !strings.HasPrefix(key, "search:") {
+			continue
+		}
+		prefix := strings.TrimPrefix(key, "search:")
+		if len(prefix) < 3 || len(prefix) >= len(q) || !strings.HasPrefix(q, prefix) || len(prefix) <= len(bestPrefix) {
+			continue
+		}
+		best = cached
+		bestPrefix = prefix
+	}
+	if bestPrefix == "" {
+		return nil, false
+	}
+	return filterRowsByName(best.rows, q), true
+}
+
+func (c *risingGodsCache) setSearch(key string, rows []ExternalCharacter, complete bool, ttl time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.searches[key] = cachedSearch{rows: append([]ExternalCharacter(nil), rows...), expiresAt: time.Now().Add(ttl), complete: complete}
+}
+
+func (c *risingGodsCache) getProfile(key string) (ExternalCharacter, string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cached, ok := c.profiles[key]
+	if !ok || time.Now().After(cached.expiresAt) {
+		return ExternalCharacter{}, "", false
+	}
+	return cached.profile, cached.raw, true
+}
+
+func (c *risingGodsCache) setProfile(key string, profile ExternalCharacter, raw string, ttl time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.profiles[key] = cachedProfile{profile: profile, raw: raw, expiresAt: time.Now().Add(ttl)}
+}
+
+func (c *risingGodsCache) getSlug(key string) (string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cached, ok := c.slugs[key]
+	if !ok || time.Now().After(cached.expiresAt) {
+		return "", false
+	}
+	return cached.id, true
+}
+
+func (c *risingGodsCache) setSlug(key string, id string, ttl time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.slugs[key] = cachedSlug{id: id, expiresAt: time.Now().Add(ttl)}
+}
+
+func (c *risingGodsCache) do(key string, fn func() (any, error)) (any, error) {
+	c.mu.Lock()
+	if call, ok := c.inflight[key]; ok {
+		c.mu.Unlock()
+		<-call.done
+		return call.val, call.err
+	}
+	call := &risingGodsCall{done: make(chan struct{})}
+	c.inflight[key] = call
+	c.mu.Unlock()
+
+	call.val, call.err = fn()
+
+	c.mu.Lock()
+	delete(c.inflight, key)
+	close(call.done)
+	c.mu.Unlock()
+	return call.val, call.err
+}
+
+func risingGodsProfileReference(input string) (string, bool) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return "", false
+	}
+	if strings.HasPrefix(strings.ToLower(trimmed), "https://db.rising-gods.de/") || strings.HasPrefix(strings.ToLower(trimmed), "http://db.rising-gods.de/") {
+		u, err := url.Parse(trimmed)
+		if err != nil {
+			return "", false
+		}
+		profile := strings.TrimSpace(u.Query().Get("profile"))
+		if profile == "" {
+			return "", false
+		}
+		return trimmed, true
+	}
+	if strings.HasPrefix(strings.ToLower(trimmed), "eu.rising-gods.") {
+		return trimmed, true
+	}
+	return "", false
+}
+
+func profileLoadID(ref string) string {
+	u, err := url.Parse(ref)
+	if err != nil {
+		return ""
+	}
+	if u.Query().Get("profile") != "load" {
+		return ""
+	}
+	return strings.TrimSpace(u.Query().Get("id"))
+}
+
+func normalizedRisingGodsProfileURL(ref string) (string, error) {
+	trimmed := strings.TrimSpace(ref)
+	if strings.HasPrefix(strings.ToLower(trimmed), "eu.rising-gods.") {
+		return risingGodsBaseURL + "/?profile=" + url.QueryEscape(trimmed), nil
+	}
+	u, err := url.Parse(trimmed)
+	if err != nil {
+		return "", err
+	}
+	if !strings.EqualFold(u.Host, "db.rising-gods.de") {
+		return "", ErrExternalInvalid
+	}
+	profile := strings.TrimSpace(u.Query().Get("profile"))
+	if profile == "" || profile == "load" {
+		return "", ErrExternalInvalid
+	}
+	return risingGodsBaseURL + "/?profile=" + url.QueryEscape(profile), nil
+}
+
+func filterRowsByName(rows []ExternalCharacter, query string) []ExternalCharacter {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return []ExternalCharacter{}
+	}
+	matches := make([]ExternalCharacter, 0, len(rows))
+	for _, row := range rows {
+		if strings.Contains(strings.ToLower(strings.TrimSpace(row.Name)), q) {
+			matches = append(matches, row)
+		}
+	}
+	return matches
 }
 
 func splitJSObjects(data string) []string {

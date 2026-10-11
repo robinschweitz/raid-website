@@ -188,6 +188,38 @@ func TestRisingGodsLoadCharacterRejectsNonAllianceOrNonLevel80(t *testing.T) {
 	}
 }
 
+func TestRisingGodsLoadCharacterCalculatesAddonGearScore(t *testing.T) {
+	body := `g_items.add(49998, {"quality":4,"jsonequip":{"id":49998,"classs":4,"subclass":1,"slot":5,"level":264,"gearscore":1}});` +
+		`g_items.add(51335, {"quality":4,"jsonequip":{"id":51335,"classs":4,"subclass":-3,"slot":2,"level":264,"gearscore":9999}});` +
+		profileBody("9596079", "Servenaja", 5, 1, 0, 80)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	client := testRisingGodsClient(srv.URL)
+	profile, _, err := client.LoadCharacter(context.Background(), "9596079")
+	if err != nil {
+		t.Fatalf("load character: %v", err)
+	}
+	expected := gearScoreItemScore(264, 4, "INVTYPE_CHEST") + gearScoreItemScore(264, 4, "INVTYPE_NECK")
+	if profile.GearScore == nil || *profile.GearScore != expected {
+		t.Fatalf("expected addon gearscore %d, got %#v", expected, profile.GearScore)
+	}
+}
+
+func TestGearScoreCalculationAppliesHunterWeaponWeights(t *testing.T) {
+	body := `g_items.add(51406, {"quality":4,"jsonequip":{"id":51406,"classs":2,"subclass":15,"slot":21,"level":264}});` +
+		`g_items.add(51531, {"quality":4,"jsonequip":{"id":51531,"classs":2,"subclass":19,"slot":15,"level":264}});`
+	gearScore := calculateGearScoreFromProfileBody(body, "Jäger")
+	mainHand := float64(gearScoreItemScore(264, 4, "INVTYPE_WEAPONMAINHAND")) * 0.3164
+	ranged := float64(gearScoreItemScore(264, 4, "INVTYPE_RANGEDRIGHT")) * 5.3224
+	expected := int(mainHand + ranged)
+	if gearScore == nil || *gearScore != expected {
+		t.Fatalf("expected hunter gearscore %d, got %#v", expected, gearScore)
+	}
+}
+
 func TestRisingGodsSearchServesStaleWhileRefreshing(t *testing.T) {
 	var searches int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -117,6 +117,7 @@ function CharacterDetail({ characterID }: Props) {
       <dl>
         <div><dt>Main-Spec</dt><dd>{character.main_spec || '—'}</dd></div>
         <div><dt>Second-Spec</dt><dd>{character.second_spec || '—'}</dd></div>
+        <div><dt>GearScore</dt><dd>{character.gear_score ?? '—'}</dd></div>
         <div><dt>Status</dt><dd>{character.active ? 'Aktiv' : 'Inaktiv'}</dd></div>
         <div><dt>Angelegt</dt><dd>{formatDate(character.created_at)}</dd></div>
         <div><dt>Letzte Namensänderung</dt><dd>{formatDate(character.name_changed_at)}</dd></div>

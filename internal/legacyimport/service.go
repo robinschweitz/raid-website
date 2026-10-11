@@ -599,6 +599,7 @@ func (s *Service) linkImportedCharacter(ctx context.Context, row *character.Char
 	row.ExternalProfileID = profile.ProfileID
 	row.ExternalProfileURL = profile.ProfileURL
 	row.ExternalProfileJSON = link.Raw
+	row.GearScore = profile.GearScore
 	row.UpdatedAt = now
 	if row.ID != 0 {
 		return s.chars.Update(ctx, row)

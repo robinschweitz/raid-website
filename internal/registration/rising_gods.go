@@ -2,9 +2,11 @@ package registration
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -37,6 +39,7 @@ var (
 	profileName       = regexp.MustCompile(`"name"\s*:\s*"([^"]+)"`)
 	profileTalent     = regexp.MustCompile(`"talents"\s*:\s*"([0-9]+)"`)
 	profilePageID     = regexp.MustCompile(`profilah\.initialize\([^)]*\{\s*id\s*:\s*(\d+)`)
+	risingGodsItemAdd = regexp.MustCompile(`g_items\.add\(\d+,\s*`)
 
 	defaultRisingGodsCache = newRisingGodsCache()
 )
@@ -298,8 +301,242 @@ func (c RisingGodsClient) loadCharacterLive(ctx context.Context, id string) (Ext
 	if mainSpec == "" {
 		return ExternalCharacter{}, "", ErrExternalInvalid
 	}
-	profile := ExternalCharacter{ProfileID: id, Name: name, Class: class, MainSpec: mainSpec, SecondSpec: secondSpec, Level: level, Race: raceName(raceID), Faction: faction, ProfileURL: profileURL(id)}
+	profile := ExternalCharacter{ProfileID: id, Name: name, Class: class, MainSpec: mainSpec, SecondSpec: secondSpec, GearScore: calculateGearScoreFromProfileBody(body, class), Level: level, Race: raceName(raceID), Faction: faction, ProfileURL: profileURL(id)}
 	return profile, raw, nil
+}
+
+type risingGodsProfileItem struct {
+	Quality   int `json:"quality"`
+	JSONEquip struct {
+		Class    int     `json:"classs"`
+		Subclass int     `json:"subclass"`
+		Level    float64 `json:"level"`
+		Slot     int     `json:"slot"`
+		SlotBak  int     `json:"slotbak"`
+	} `json:"jsonequip"`
+}
+
+type gearScoreItem struct {
+	inventorySlot int
+	equipLoc      string
+	score         int
+}
+
+type gearScoreItemType struct {
+	slotMod  float64
+	itemSlot int
+}
+
+var gearScoreItemTypes = map[string]gearScoreItemType{
+	"INVTYPE_RELIC":          {slotMod: 0.3164, itemSlot: 18},
+	"INVTYPE_TRINKET":        {slotMod: 0.5625, itemSlot: 33},
+	"INVTYPE_2HWEAPON":       {slotMod: 2.0000, itemSlot: 16},
+	"INVTYPE_WEAPONMAINHAND": {slotMod: 1.0000, itemSlot: 16},
+	"INVTYPE_WEAPONOFFHAND":  {slotMod: 1.0000, itemSlot: 17},
+	"INVTYPE_RANGED":         {slotMod: 0.3164, itemSlot: 18},
+	"INVTYPE_THROWN":         {slotMod: 0.3164, itemSlot: 18},
+	"INVTYPE_RANGEDRIGHT":    {slotMod: 0.3164, itemSlot: 18},
+	"INVTYPE_SHIELD":         {slotMod: 1.0000, itemSlot: 17},
+	"INVTYPE_WEAPON":         {slotMod: 1.0000, itemSlot: 36},
+	"INVTYPE_HOLDABLE":       {slotMod: 1.0000, itemSlot: 17},
+	"INVTYPE_HEAD":           {slotMod: 1.0000, itemSlot: 1},
+	"INVTYPE_NECK":           {slotMod: 0.5625, itemSlot: 2},
+	"INVTYPE_SHOULDER":       {slotMod: 0.7500, itemSlot: 3},
+	"INVTYPE_CHEST":          {slotMod: 1.0000, itemSlot: 5},
+	"INVTYPE_ROBE":           {slotMod: 1.0000, itemSlot: 5},
+	"INVTYPE_WAIST":          {slotMod: 0.7500, itemSlot: 6},
+	"INVTYPE_LEGS":           {slotMod: 1.0000, itemSlot: 7},
+	"INVTYPE_FEET":           {slotMod: 0.7500, itemSlot: 8},
+	"INVTYPE_WRIST":          {slotMod: 0.5625, itemSlot: 9},
+	"INVTYPE_HAND":           {slotMod: 0.7500, itemSlot: 10},
+	"INVTYPE_FINGER":         {slotMod: 0.5625, itemSlot: 31},
+	"INVTYPE_CLOAK":          {slotMod: 0.5625, itemSlot: 15},
+}
+
+func calculateGearScoreFromProfileBody(body, class string) *int {
+	items := gearScoreItemsFromProfileBody(body)
+	if len(items) == 0 {
+		return nil
+	}
+	titanGrip := 1.0
+	hasMain := false
+	hasOff := false
+	for _, item := range items {
+		if item.inventorySlot == 16 {
+			hasMain = true
+		}
+		if item.inventorySlot == 17 {
+			hasOff = true
+		}
+	}
+	if hasMain && hasOff {
+		for _, item := range items {
+			if (item.inventorySlot == 16 || item.inventorySlot == 17) && item.equipLoc == "INVTYPE_2HWEAPON" {
+				titanGrip = 0.5
+				break
+			}
+		}
+	}
+	total := 0.0
+	for _, item := range items {
+		score := float64(item.score)
+		if class == "Jäger" {
+			if item.inventorySlot == 16 || item.inventorySlot == 17 {
+				score *= 0.3164
+			}
+			if item.inventorySlot == 18 {
+				score *= 5.3224
+			}
+		}
+		if item.inventorySlot == 16 || item.inventorySlot == 17 {
+			score *= titanGrip
+		}
+		total += score
+	}
+	if total <= 0 {
+		return nil
+	}
+	gearScore := int(math.Floor(total))
+	return &gearScore
+}
+
+func gearScoreItemsFromProfileBody(body string) []gearScoreItem {
+	matches := risingGodsItemAdd.FindAllStringIndex(body, -1)
+	items := make([]gearScoreItem, 0, len(matches))
+	for _, match := range matches {
+		object := extractJSONObjectAt(body, match[1])
+		if object == "" {
+			continue
+		}
+		var parsed risingGodsProfileItem
+		if err := json.Unmarshal([]byte(object), &parsed); err != nil {
+			continue
+		}
+		item, ok := gearScoreItemFromProfileItem(parsed)
+		if ok {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
+func gearScoreItemFromProfileItem(item risingGodsProfileItem) (gearScoreItem, bool) {
+	equipLoc, inventorySlot := risingGodsEquipLoc(item)
+	if equipLoc == "" || inventorySlot == 4 {
+		return gearScoreItem{}, false
+	}
+	score := gearScoreItemScore(item.JSONEquip.Level, item.Quality, equipLoc)
+	if score < 0 {
+		return gearScoreItem{}, false
+	}
+	return gearScoreItem{inventorySlot: inventorySlot, equipLoc: equipLoc, score: score}, true
+}
+
+func risingGodsEquipLoc(item risingGodsProfileItem) (string, int) {
+	slot := item.JSONEquip.Slot
+	switch slot {
+	case 1:
+		return "INVTYPE_HEAD", 1
+	case 2:
+		return "INVTYPE_NECK", 2
+	case 3:
+		return "INVTYPE_SHOULDER", 3
+	case 4:
+		return "INVTYPE_BODY", 4
+	case 5, 20:
+		return "INVTYPE_CHEST", 5
+	case 6:
+		return "INVTYPE_WAIST", 6
+	case 7:
+		return "INVTYPE_LEGS", 7
+	case 8:
+		return "INVTYPE_FEET", 8
+	case 9:
+		return "INVTYPE_WRIST", 9
+	case 10:
+		return "INVTYPE_HAND", 10
+	case 11:
+		return "INVTYPE_FINGER", 11
+	case 12:
+		return "INVTYPE_TRINKET", 13
+	case 13:
+		return "INVTYPE_WEAPON", 16
+	case 15, 26:
+		return "INVTYPE_RANGEDRIGHT", 18
+	case 16:
+		return "INVTYPE_CLOAK", 15
+	case 17:
+		return "INVTYPE_2HWEAPON", 16
+	case 21:
+		return "INVTYPE_WEAPONMAINHAND", 16
+	case 22:
+		return "INVTYPE_WEAPONOFFHAND", 17
+	case 23:
+		return "INVTYPE_HOLDABLE", 17
+	case 25:
+		return "INVTYPE_THROWN", 18
+	case 28:
+		return "INVTYPE_RELIC", 18
+	}
+	return "", 0
+}
+
+func gearScoreItemScore(itemLevel float64, itemRarity int, equipLoc string) int {
+	itemType, ok := gearScoreItemTypes[equipLoc]
+	if !ok {
+		return -1
+	}
+	qualityScale := 1.0
+	if itemRarity == 5 {
+		qualityScale = 1.3
+		itemRarity = 4
+	} else if itemRarity == 1 || itemRarity == 0 {
+		qualityScale = 0.005
+		itemRarity = 2
+	}
+	if itemRarity == 7 {
+		itemRarity = 3
+		itemLevel = 187.05
+	}
+	formula, ok := gearScoreFormula(itemLevel, itemRarity)
+	if !ok {
+		return -1
+	}
+	score := math.Floor(((itemLevel - formula.a) / formula.b) * itemType.slotMod * 1.8618 * qualityScale)
+	if score < 0 {
+		return 0
+	}
+	return int(score)
+}
+
+type gearScoreFormulaRow struct {
+	a float64
+	b float64
+}
+
+func gearScoreFormula(itemLevel float64, rarity int) (gearScoreFormulaRow, bool) {
+	if itemLevel > 120 {
+		switch rarity {
+		case 4:
+			return gearScoreFormulaRow{a: 91.4500, b: 0.6500}, true
+		case 3:
+			return gearScoreFormulaRow{a: 81.3750, b: 0.8125}, true
+		case 2:
+			return gearScoreFormulaRow{a: 73.0000, b: 1.0000}, true
+		}
+	} else {
+		switch rarity {
+		case 4:
+			return gearScoreFormulaRow{a: 26.0000, b: 1.2000}, true
+		case 3:
+			return gearScoreFormulaRow{a: 0.7500, b: 1.8000}, true
+		case 2:
+			return gearScoreFormulaRow{a: 8.0000, b: 2.0000}, true
+		case 1:
+			return gearScoreFormulaRow{a: 0.0000, b: 2.2500}, true
+		}
+	}
+	return gearScoreFormulaRow{}, false
 }
 
 func (c RisingGodsClient) loadProfileReference(ctx context.Context, ref string) (ExternalCharacter, string, error) {
@@ -641,6 +878,46 @@ func extractRegisterProfileObject(body string) string {
 		return ""
 	}
 	start += len(marker)
+	if start >= len(body) || body[start] != '{' {
+		return ""
+	}
+	depth := 0
+	inString := false
+	escaped := false
+	for i := start; i < len(body); i++ {
+		ch := body[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		if ch == '"' {
+			inString = true
+			continue
+		}
+		switch ch {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return body[start : i+1]
+			}
+		}
+	}
+	return ""
+}
+
+func extractJSONObjectAt(body string, start int) string {
 	if start >= len(body) || body[start] != '{' {
 		return ""
 	}

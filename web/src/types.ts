@@ -41,6 +41,7 @@ export interface Character {
   class: string
   main_spec: string
   second_spec: string
+  gear_score: number | null
   is_main: boolean
   active: boolean
   external_source: string
@@ -56,6 +57,7 @@ export interface ExternalCharacter {
   class: string
   main_spec: string
   second_spec: string
+  gear_score: number | null
   level: number
   race: string
   faction: string

@@ -152,6 +152,7 @@ func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterI
 		now := time.Now().UTC()
 		c.MainSpec = profile.MainSpec
 		c.SecondSpec = profile.SecondSpec
+		c.GearScore = profile.GearScore
 		c.ExternalProfileURL = profile.ProfileURL
 		c.ExternalProfileJSON = raw
 		c.UpdatedAt = now
@@ -191,7 +192,7 @@ func (s *Service) CreateRequest(ctx context.Context, requesterID *int64, profile
 		purpose = PurposeClaim
 	}
 	now := time.Now().UTC()
-	req := &Request{RequesterPlayerID: requesterID, Status: StatusPending, Purpose: purpose, ExternalSource: ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, CharacterName: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, Level: profile.Level, Race: profile.Race, Faction: profile.Faction, RawProfileJSON: raw, CreatedAt: now, UpdatedAt: now}
+	req := &Request{RequesterPlayerID: requesterID, Status: StatusPending, Purpose: purpose, ExternalSource: ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, CharacterName: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, GearScore: profile.GearScore, Level: profile.Level, Race: profile.Race, Faction: profile.Faction, RawProfileJSON: raw, CreatedAt: now, UpdatedAt: now}
 	if err := s.repo.CreateRequest(ctx, req); err != nil {
 		return nil, fmt.Errorf("create registration request: %w", err)
 	}
@@ -416,6 +417,7 @@ func (s *Service) attachCharacter(ctx context.Context, tx bun.Tx, chars *charact
 	c.Class = req.Class
 	c.MainSpec = req.MainSpec
 	c.SecondSpec = req.SecondSpec
+	c.GearScore = req.GearScore
 	c.Active = true
 	c.ExternalSource = req.ExternalSource
 	c.ExternalProfileID = req.ExternalProfileID
@@ -433,11 +435,11 @@ func (s *Service) attachCharacter(ctx context.Context, tx bun.Tx, chars *charact
 }
 
 func characterFromProfile(playerID int64, profile ExternalCharacter, raw string, now time.Time) *character.Character {
-	return &character.Character{PlayerID: playerID, Name: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, Active: true, ExternalSource: ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, ExternalProfileJSON: raw, CreatedAt: now, UpdatedAt: now}
+	return &character.Character{PlayerID: playerID, Name: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, GearScore: profile.GearScore, Active: true, ExternalSource: ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, ExternalProfileJSON: raw, CreatedAt: now, UpdatedAt: now}
 }
 
 func characterFromRequest(playerID int64, req *Request, now time.Time) *character.Character {
-	return &character.Character{PlayerID: playerID, Name: req.CharacterName, Class: req.Class, MainSpec: req.MainSpec, SecondSpec: req.SecondSpec, Active: true, ExternalSource: req.ExternalSource, ExternalProfileID: req.ExternalProfileID, ExternalProfileURL: req.ExternalProfileURL, ExternalProfileJSON: req.RawProfileJSON, CreatedAt: now, UpdatedAt: now}
+	return &character.Character{PlayerID: playerID, Name: req.CharacterName, Class: req.Class, MainSpec: req.MainSpec, SecondSpec: req.SecondSpec, GearScore: req.GearScore, Active: true, ExternalSource: req.ExternalSource, ExternalProfileID: req.ExternalProfileID, ExternalProfileURL: req.ExternalProfileURL, ExternalProfileJSON: req.RawProfileJSON, CreatedAt: now, UpdatedAt: now}
 }
 
 func mustJSON(v any) string {

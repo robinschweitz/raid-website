@@ -86,7 +86,8 @@ func TestCharacterCRUDAndRename(t *testing.T) {
 	if status != http.StatusForbidden {
 		t.Fatalf("member reload profile: want 403 got %d", status)
 	}
-	feed.characters["101"] = registration.ExternalCharacter{ProfileID: "101", Name: "RenamedOnRisingGods", Class: "Krieger", MainSpec: "Schutz (Tank)", SecondSpec: "Furor", Level: 80, ProfileURL: "https://db.rising-gods.de/?profile=load&id=101"}
+	gearScore := 6123
+	feed.characters["101"] = registration.ExternalCharacter{ProfileID: "101", Name: "RenamedOnRisingGods", Class: "Krieger", MainSpec: "Schutz (Tank)", SecondSpec: "Furor", GearScore: &gearScore, Level: 80, ProfileURL: "https://db.rising-gods.de/?profile=load&id=101"}
 	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/characters/%d/reload-profile", srv.URL, charID), token, nil)
 	if status != http.StatusOK {
 		t.Fatalf("reload profile: status %d body %s", status, body)
@@ -96,12 +97,13 @@ func TestCharacterCRUDAndRename(t *testing.T) {
 			Name       string `json:"name"`
 			MainSpec   string `json:"main_spec"`
 			SecondSpec string `json:"second_spec"`
+			GearScore  *int   `json:"gear_score"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &reloadOut); err != nil {
 		t.Fatalf("decode reload profile: %v", err)
 	}
-	if reloadOut.Data.Name != "Newname" || reloadOut.Data.MainSpec != "Schutz (Tank)" || reloadOut.Data.SecondSpec != "Furor" {
+	if reloadOut.Data.Name != "Newname" || reloadOut.Data.MainSpec != "Schutz (Tank)" || reloadOut.Data.SecondSpec != "Furor" || reloadOut.Data.GearScore == nil || *reloadOut.Data.GearScore != gearScore {
 		t.Fatalf("unexpected reload result: %+v", reloadOut.Data)
 	}
 }

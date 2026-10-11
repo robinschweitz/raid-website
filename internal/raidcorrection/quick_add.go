@@ -117,7 +117,7 @@ func (s *Service) AddNewCharacter(ctx context.Context, raidID, actor int64, inpu
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		c := &character.Character{PlayerID: ownerID, Name: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, Active: true, ExternalSource: registration.ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, ExternalProfileJSON: raw, CreatedAt: now, UpdatedAt: now}
+		c := &character.Character{PlayerID: ownerID, Name: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, GearScore: profile.GearScore, Active: true, ExternalSource: registration.ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, ExternalProfileJSON: raw, CreatedAt: now, UpdatedAt: now}
 		if err := r.characters.Create(ctx, c); err != nil {
 			return err
 		}

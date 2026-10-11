@@ -16,6 +16,7 @@ type Character struct {
 	Class               string     `bun:"class,notnull" json:"class"`
 	MainSpec            string     `bun:"main_spec,notnull" json:"main_spec"`
 	SecondSpec          string     `bun:"second_spec,notnull" json:"second_spec"`
+	GearScore           *int       `bun:"gear_score,nullzero" json:"gear_score"`
 	IsMain              bool       `bun:"is_main,notnull,default:false" json:"is_main"`
 	Active              bool       `bun:"active,notnull,default:true" json:"active"`
 	ExternalSource      string     `bun:"external_source,notnull" json:"external_source"`

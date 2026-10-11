@@ -32,6 +32,7 @@ type Request struct {
 	Class              string    `bun:"class,notnull" json:"class"`
 	MainSpec           string    `bun:"main_spec,notnull" json:"main_spec"`
 	SecondSpec         string    `bun:"second_spec,notnull" json:"second_spec"`
+	GearScore          *int      `bun:"gear_score,nullzero" json:"gear_score"`
 	Level              int       `bun:"level,notnull" json:"level"`
 	Race               string    `bun:"race,notnull" json:"race"`
 	Faction            string    `bun:"faction,notnull" json:"faction"`
@@ -68,6 +69,7 @@ type ExternalCharacter struct {
 	Class      string `json:"class"`
 	MainSpec   string `json:"main_spec"`
 	SecondSpec string `json:"second_spec"`
+	GearScore  *int   `json:"gear_score"`
 	Level      int    `json:"level"`
 	Race       string `json:"race"`
 	Faction    string `json:"faction"`

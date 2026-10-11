@@ -396,6 +396,7 @@ function PlayerDetail({ playerID }: Props) {
               <th>Name</th>
               <th>Klasse</th>
               <th>Main-Spec</th>
+              <th>GearScore</th>
               <th>Rising Gods</th>
               <th>Main</th>
               <th></th>
@@ -404,7 +405,7 @@ function PlayerDetail({ playerID }: Props) {
           <tbody>
             {ownedCharacters.map((c) => (
               <tr key={c.id} className={characterClassName(c.class)}>
-                {editingCharacter?.id === c.id ? <td colSpan={6}><form className="inline-form in-place-editor" onSubmit={saveCharacter}>
+                {editingCharacter?.id === c.id ? <td colSpan={7}><form className="inline-form in-place-editor" onSubmit={saveCharacter}>
                   <label>Name<input autoFocus aria-label="Charakter bearbeiten: Name" disabled={pending} required value={characterDraft.name} onChange={(e) => changeCharacter({ name: e.target.value })} /></label>
                   <label>Klasse<select disabled={pending} value={characterDraft.class} onChange={(e) => changeCharacter({ class: e.target.value, main_spec: '', second_spec: '' })}>
                     {!CLASSES.includes(characterDraft.class) && <option value={characterDraft.class}>{characterDraft.class}</option>}
@@ -421,6 +422,7 @@ function PlayerDetail({ playerID }: Props) {
                 <td><Link className="character-name" to={`/characters/${c.id}`}>{c.name}</Link></td>
                 <td>{c.class}</td>
                 <td>{c.main_spec || '—'}</td>
+                <td>{c.gear_score ?? '—'}</td>
                 <td>{c.external_profile_url ? <a href={c.external_profile_url} target="_blank" rel="noreferrer">verknüpft</a> : <span className="muted">—</span>}</td>
                 <td>{c.is_main ? '★' : ''}</td>
                 <td className="actions">
@@ -436,7 +438,7 @@ function PlayerDetail({ playerID }: Props) {
             ))}
             {ownedCharacters.length === 0 && (
               <tr>
-                <td colSpan={6} className="muted">
+                <td colSpan={7} className="muted">
                   Keine Charaktere.
                 </td>
               </tr>

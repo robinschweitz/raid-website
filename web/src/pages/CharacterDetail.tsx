@@ -123,6 +123,7 @@ function CharacterDetail({ characterID }: Props) {
         </div>}
         <p><strong>{character.class}</strong>{character.main_spec && ` · ${character.main_spec}`}{character.second_spec && ` / ${character.second_spec}`} {character.is_main && <span className="badge">Main</span>} {!character.active && <span className="badge bad">Inaktiv</span>}</p>
         {owner && <p className="muted">Gehört zu <Link to={`/players/${owner.id}`}>{owner.name}</Link>.</p>}
+        {canRetryLink && <div className="actions character-profile-actions"><button type="button" disabled={pending} onClick={() => void retryLink()}>{pending ? 'Suche Profil…' : 'Rising-Gods-Verknüpfung erneut versuchen'}</button></div>}
         {canReloadProfile && <div className="actions character-profile-actions"><button type="button" disabled={pending} onClick={() => void reloadProfile()}>{pending ? 'Lade neu…' : 'Rising-Gods-Profil neu laden'}</button></div>}
       </div>
     </header>

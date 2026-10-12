@@ -401,6 +401,48 @@ func TestRisingGodsSearchClassifiesUpstreamRejectionAsUnavailable(t *testing.T) 
 	}
 }
 
+func TestRisingGodsSearchDoesNotCacheFailedResponses(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		firstStatus int
+		firstBody  string
+	}{
+		{name: "upstream error", firstStatus: http.StatusBadGateway, firstBody: "Bad Gateway"},
+		{name: "missing search data", firstStatus: http.StatusOK, firstBody: "<html>Temporary upstream error</html>"},
+		{name: "incomplete search data", firstStatus: http.StatusOK, firstBody: `{"data":[{"id":1}]`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if atomic.AddInt32(&requests, 1) == 1 {
+					w.WriteHeader(tc.firstStatus)
+					_, _ = w.Write([]byte(tc.firstBody))
+					return
+				}
+				_, _ = w.Write([]byte(`{"data":[{"id":1,"name":"Servenaja","classs":5,"level":80,"talenttree1":0,"talenttree2":51,"talenttree3":20}],"parent":{}}`))
+			}))
+			defer srv.Close()
+
+			client := testRisingGodsClient(srv.URL)
+			if _, err := client.SearchCharacters(context.Background(), "Serv"); !errors.Is(err, ErrExternalUnavailable) {
+				t.Fatalf("expected upstream failure, got %v", err)
+			}
+			if _, _, ok := client.cache.getSearch("search:serv"); ok {
+				t.Fatal("failed search should not be cached")
+			}
+			for i := 0; i < 2; i++ {
+				rows, err := client.SearchCharacters(context.Background(), "Serv")
+				if err != nil || len(rows) != 1 || rows[0].Name != "Servenaja" {
+					t.Fatalf("expected successful retry, got rows=%#v err=%v", rows, err)
+				}
+			}
+			if got := atomic.LoadInt32(&requests); got != 2 {
+				t.Fatalf("expected failure and one successful cached retry, got %d requests", got)
+			}
+		})
+	}
+}
+
 func testRisingGodsClient(base string) RisingGodsClient {
 	return RisingGodsClient{HTTPClient: &http.Client{Transport: rewriteTransport{base: base}}, cache: newRisingGodsCache()}
 }

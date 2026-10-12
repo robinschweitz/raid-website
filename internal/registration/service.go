@@ -141,7 +141,10 @@ func (s *Service) RetryCharacterLink(ctx context.Context, actorID, characterID i
 	if existing.ExternalProfileID != "" || existing.ExternalSource != "" {
 		return nil, ErrProfileLinked
 	}
-	matches, err := s.external.SearchCharacters(ctx, existing.Name)
+	// Existing characters do not yet have a profile ID. Rising-Gods profile
+	// slugs are deterministic, so resolve the exact profile instead of using a
+	// broad list search for every retry.
+	matches, err := s.external.SearchCharacters(ctx, "eu.rising-gods."+strings.ToLower(strings.TrimSpace(existing.Name)))
 	if err != nil {
 		return nil, err
 	}

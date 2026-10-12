@@ -14,13 +14,15 @@ import (
 
 type retryExternalClient struct {
 	matches []registration.ExternalCharacter
+	queries []string
 }
 
-func (client retryExternalClient) SearchCharacters(_ context.Context, _ string) ([]registration.ExternalCharacter, error) {
+func (client *retryExternalClient) SearchCharacters(_ context.Context, query string) ([]registration.ExternalCharacter, error) {
+	client.queries = append(client.queries, query)
 	return client.matches, nil
 }
 
-func (client retryExternalClient) LoadCharacter(_ context.Context, profileID string) (registration.ExternalCharacter, string, error) {
+func (client *retryExternalClient) LoadCharacter(_ context.Context, profileID string) (registration.ExternalCharacter, string, error) {
 	for _, match := range client.matches {
 		if match.ProfileID == profileID {
 			return match, "{}", nil
@@ -32,15 +34,19 @@ func (client retryExternalClient) LoadCharacter(_ context.Context, profileID str
 func TestRetryCharacterLinkPreservesCharacterAndAudits(t *testing.T) {
 	f := newCharacterCorrectionFixture(t)
 	defer f.srv.Close()
-	service := registration.NewService(f.db, player.NewRepo(f.db), character.NewRepo(f.db), audit.NewRepo(f.db), nil, retryExternalClient{
+	external := &retryExternalClient{
 		matches: []registration.ExternalCharacter{{ProfileID: "123", Name: "Original", Class: "Magier", MainSpec: "Feuer", ProfileURL: "https://db.rising-gods.de/?profile=123"}},
-	})
+	}
+	service := registration.NewService(f.db, player.NewRepo(f.db), character.NewRepo(f.db), audit.NewRepo(f.db), nil, external)
 	linked, err := service.RetryCharacterLink(context.Background(), f.actorID, f.initial.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if linked.ID != f.initial.ID || linked.PlayerID != f.initial.PlayerID || linked.ExternalProfileID != "123" {
 		t.Fatalf("incorrect linked character: %+v", linked)
+	}
+	if len(external.queries) != 1 || external.queries[0] != "eu.rising-gods.original" {
+		t.Fatalf("retry lookup queries = %v, want exact Rising-Gods slug", external.queries)
 	}
 	logs, err := audit.NewRepo(f.db).ListByEntity(context.Background(), "character", fmt.Sprint(f.initial.ID))
 	if err != nil {
@@ -57,7 +63,7 @@ func TestRetryCharacterLinkPreservesCharacterAndAudits(t *testing.T) {
 func TestRetryCharacterLinkDoesNotGuessAmbiguousProfile(t *testing.T) {
 	f := newCharacterCorrectionFixture(t)
 	defer f.srv.Close()
-	service := registration.NewService(f.db, player.NewRepo(f.db), character.NewRepo(f.db), audit.NewRepo(f.db), nil, retryExternalClient{
+	service := registration.NewService(f.db, player.NewRepo(f.db), character.NewRepo(f.db), audit.NewRepo(f.db), nil, &retryExternalClient{
 		matches: []registration.ExternalCharacter{
 			{ProfileID: "123", Name: "Original", MainSpec: "Feuer"},
 			{ProfileID: "456", Name: "Original", MainSpec: "Feuer"},

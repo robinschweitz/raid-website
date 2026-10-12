@@ -498,14 +498,14 @@ func gearScoreItemScore(itemLevel float64, itemRarity int, equipLoc string) int 
 		return -1
 	}
 	qualityScale := 1.0
-	if itemRarity == 5 {
+	switch itemRarity {
+	case 5:
 		qualityScale = 1.3
 		itemRarity = 4
-	} else if itemRarity == 1 || itemRarity == 0 {
+	case 1, 0:
 		qualityScale = 0.005
 		itemRarity = 2
-	}
-	if itemRarity == 7 {
+	case 7:
 		itemRarity = 3
 		itemLevel = 187.05
 	}

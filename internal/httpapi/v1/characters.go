@@ -7,17 +7,11 @@ import (
 
 	"raid-website/internal/character"
 	"raid-website/internal/registration"
-	"raid-website/internal/validation"
 )
 
 type createCharacterRequest struct {
 	ProfileID string `json:"profile_id"`
 	IsMain    *bool  `json:"is_main"`
-}
-
-func validClass(class string) bool {
-	_, ok := validation.ClassSpecs[class]
-	return ok
 }
 
 func (a *API) listPlayerCharacters(w http.ResponseWriter, r *http.Request) {

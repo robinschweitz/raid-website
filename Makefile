@@ -7,7 +7,7 @@ vet:
 	go vet ./...
 
 lint:
-	@echo "golangci-lint not installed in PATH; skipping if missing"
+	golangci-lint run
 
 test:
 	go test ./...
@@ -18,4 +18,4 @@ frontend:
 build: frontend
 	go build -o bin/ ./cmd/server
 
-all: fmt vet build test
+all: fmt vet lint build test

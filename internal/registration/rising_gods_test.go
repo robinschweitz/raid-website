@@ -403,9 +403,9 @@ func TestRisingGodsSearchClassifiesUpstreamRejectionAsUnavailable(t *testing.T) 
 
 func TestRisingGodsSearchDoesNotCacheFailedResponses(t *testing.T) {
 	for _, tc := range []struct {
-		name       string
+		name        string
 		firstStatus int
-		firstBody  string
+		firstBody   string
 	}{
 		{name: "upstream error", firstStatus: http.StatusBadGateway, firstBody: "Bad Gateway"},
 		{name: "missing search data", firstStatus: http.StatusOK, firstBody: "<html>Temporary upstream error</html>"},

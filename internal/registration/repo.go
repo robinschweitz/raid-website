@@ -59,7 +59,7 @@ func (r *Repo) ListRequests(ctx context.Context, statuses []string) ([]Request, 
 	var rows []Request
 	query := r.db.NewSelect().Model(&rows).Order("created_at DESC", "id DESC")
 	if len(statuses) > 0 {
-		query.Where("status IN (?)", bun.In(statuses))
+		query.Where("status IN (?)", bun.List(statuses))
 	}
 	err := query.Scan(ctx)
 	return rows, err

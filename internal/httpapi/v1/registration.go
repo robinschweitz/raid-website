@@ -35,6 +35,8 @@ func registrationError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusConflict, "profile_already_linked", "Dieser Rising-Gods-Charakter ist bereits verknüpft.")
 	case errors.Is(err, registration.ErrRequestNotFound), errors.Is(err, registration.ErrCodeNotFound):
 		WriteError(w, http.StatusNotFound, "not_found", "Eintrag nicht gefunden.")
+	case errors.Is(err, registration.ErrExternalUnavailable):
+		WriteError(w, http.StatusBadGateway, "rising_gods_unavailable", "Die Rising-Gods-Charaktersuche ist vorübergehend nicht erreichbar. Bitte versuche es später erneut.")
 	case errors.Is(err, registration.ErrInvalid), errors.Is(err, registration.ErrProfileRequired), errors.Is(err, registration.ErrProfileUnusable):
 		WriteError(w, http.StatusBadRequest, "registration_invalid", "Bitte einen aktiven Rising-Gods-Charakter auswählen.")
 	case errors.Is(err, auth.ErrWeakPassword):

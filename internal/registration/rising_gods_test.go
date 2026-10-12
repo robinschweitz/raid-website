@@ -332,29 +332,16 @@ func TestRisingGodsSearchCacheStaysBounded(t *testing.T) {
 	}
 }
 
-func TestWarmSearchCacheSkipsFreshEntries(t *testing.T) {
-	var searches int32
+func TestRisingGodsSearchClassifiesUpstreamRejectionAsUnavailable(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if filter := r.URL.Query().Get("filter"); filter != "si=1;minle=80;maxle=80;na=Bravo" {
-			t.Errorf("unexpected filter: %q", filter)
-		}
-		atomic.AddInt32(&searches, 1)
-		_, _ = w.Write([]byte(`{"data":[{"id":2,"name":"Bravo","classs":8,"level":80,"talenttree1":17,"talenttree2":0,"talenttree3":53}],"parent":{}}`))
+		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer srv.Close()
 
 	client := testRisingGodsClient(srv.URL)
-	client.cache.setSearch("search:alpha", []ExternalCharacter{{ProfileID: "1", Name: "Alpha"}}, true, time.Hour)
-
-	warmed, failed := WarmSearchCache(context.Background(), client, []string{"Alpha", "Bravo"}, 2)
-	if warmed != 2 || failed != 0 {
-		t.Fatalf("unexpected warm result: warmed=%d failed=%d", warmed, failed)
-	}
-	if got := atomic.LoadInt32(&searches); got != 1 {
-		t.Fatalf("expected only the missing name to be fetched, got %d upstream searches", got)
-	}
-	if _, fresh, ok := client.cache.getSearch("search:bravo"); !ok || !fresh {
-		t.Fatal("expected Bravo to be cached fresh")
+	_, err := client.SearchCharacters(context.Background(), "Servenaja")
+	if !errors.Is(err, ErrExternalUnavailable) {
+		t.Fatalf("expected unavailable error, got %v", err)
 	}
 }
 

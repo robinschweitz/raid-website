@@ -34,9 +34,9 @@ used for picking a character; the chosen profile is always loaded again before a
 stale search row never ends up in local data. The number of cached searches is bounded because the
 search endpoint is public. Shared upstream fetches run detached from the request that started them, so
 one cancelled request does not fail the other callers waiting for the same lookup. A profile load that
-lacks talent data takes the spec from a cached search row before falling back to a live search. The
-server refreshes the cached searches for all active local character names at startup and every 6 hours,
-with at most two concurrent upstream requests.
+lacks talent data takes the spec from a cached search row before falling back to a live search.
+Proactive cache warming was removed by ADR 048; upstream searches are made only for user-requested
+queries.
 
 Legacy import Rising-Gods enrichment uses exact per-character lookup. Failed or ambiguous matches
 remain best-effort metadata enrichment and do not block historical imports.

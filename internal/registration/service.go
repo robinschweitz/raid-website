@@ -174,7 +174,7 @@ func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterI
 func (s *Service) loadUsableProfile(ctx context.Context, profileID string) (ExternalCharacter, string, error) {
 	profile, raw, err := s.external.LoadCharacter(ctx, profileID)
 	if err != nil {
-		return ExternalCharacter{}, "", fmt.Errorf("load rising-gods profile: %w", ErrProfileUnusable)
+		return ExternalCharacter{}, "", fmt.Errorf("load rising-gods profile: %w: %w", ErrProfileUnusable, err)
 	}
 	if profile.ProfileID == "" || profile.Name == "" || profile.Class == "" || profile.MainSpec == "" {
 		return ExternalCharacter{}, "", ErrProfileRequired

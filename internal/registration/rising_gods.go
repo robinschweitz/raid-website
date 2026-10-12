@@ -21,8 +21,9 @@ import (
 const risingGodsBaseURL = "https://db.rising-gods.de"
 
 var (
-	ErrExternalNotFound = errors.New("rising-gods character not found")
-	ErrExternalInvalid  = errors.New("rising-gods profile invalid")
+	ErrExternalNotFound    = errors.New("rising-gods character not found")
+	ErrExternalInvalid     = errors.New("rising-gods profile invalid")
+	ErrExternalUnavailable = errors.New("rising-gods unavailable")
 
 	listviewProfileID = regexp.MustCompile(`"id"\s*:\s*(\d+)`)
 	listviewName      = regexp.MustCompile(`"name"\s*:\s*"([^"]+)"`)
@@ -145,22 +146,6 @@ func (c RisingGodsClient) SearchCharacters(ctx context.Context, query string) ([
 		return nil, err
 	}
 	return rowsAny.([]ExternalCharacter), nil
-}
-
-// WarmSearch makes sure the cache holds a fresh result for query. Unlike
-// SearchCharacters it waits for the upstream fetch instead of serving a stale
-// entry, so the caller controls how many upstream requests run at once.
-func (c RisingGodsClient) WarmSearch(ctx context.Context, query string) error {
-	q := strings.TrimSpace(query)
-	if len([]rune(q)) < 3 {
-		return ErrExternalInvalid
-	}
-	cacheKey := "search:" + strings.ToLower(q)
-	if _, fresh, ok := c.sharedCache().getSearch(cacheKey); ok && fresh {
-		return nil
-	}
-	_, err := c.sharedCache().do(ctx, cacheKey, c.refreshSearch(ctx, cacheKey, q))
-	return err
 }
 
 func (c RisingGodsClient) refreshSearch(ctx context.Context, cacheKey, q string) func() (any, error) {
@@ -589,18 +574,18 @@ func (c RisingGodsClient) fetch(ctx context.Context, u string) (string, error) {
 	}
 	resp, err := c.client().Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %w", ErrExternalUnavailable, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
 		return "", ErrExternalNotFound
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("rising-gods status %d", resp.StatusCode)
+		return "", fmt.Errorf("%w: status %d", ErrExternalUnavailable, resp.StatusCode)
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 5<<20))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: read response: %w", ErrExternalUnavailable, err)
 	}
 	return string(b), nil
 }

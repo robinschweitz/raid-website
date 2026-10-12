@@ -288,7 +288,8 @@ test('shell exposes the current version and an in-app changelog', () => {
   const changelog = fs.readFileSync(path.resolve(__dirname, '../src/pages/Changelog.tsx'), 'utf8')
   assert.match(source, /to="\/changelog".*Version \{appVersion\}/)
   assert.match(source, /parts\[0\] === 'changelog'/)
-  assert.match(release, /appVersion = '1\.0\.0'/)
+  assert.match(release, /appVersion = '\d+\.\d+\.\d+'/)
+  assert.match(release, /changelog = \[\s*\{\s*version: appVersion/)
   assert.match(changelog, /Changelog/)
 })
 

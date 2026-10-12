@@ -334,6 +334,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   frontend must be built **before** the Go binary. `web/go.mod` exists only to keep `node_modules`
   out of the root Go module.
 - User-facing text is German.
+- The visible application version and changelog live in `web/src/release.ts`. Every user-facing
+  change increments the patch version and adds a concise German changelog entry in the same change.
 - Visual identity: "Bratwurst des Schicksals", dark premium ICC-inspired navy/black panels,
   icy blue/cyan/silver accents, original SVG/CSS crest and atmosphere, class-colored details,
   restrained frost borders/glow, readable typography, desktop sidebar and mobile companion

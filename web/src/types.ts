@@ -92,6 +92,7 @@ export interface RegistrationCode {
   sent_at: string | null
   used_at: string | null
   used_by_player_id: number | null
+  used_by_username: string | null
   revoked_at: string | null
 }
 

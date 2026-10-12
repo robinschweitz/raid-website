@@ -2,6 +2,9 @@ package registration
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -17,7 +20,25 @@ func (r *Repo) WithTx(tx bun.Tx) *Repo { return &Repo{db: tx} }
 
 func (r *Repo) CreateRequest(ctx context.Context, req *Request) error {
 	_, err := r.db.NewInsert().Model(req).Exec(ctx)
+	if err != nil && strings.Contains(err.Error(), "active_registration_request_exists") {
+		return ErrRequestExists
+	}
 	return err
+}
+
+func (r *Repo) FindBlockingRequest(ctx context.Context, source, profileID string) (*Request, error) {
+	req := new(Request)
+	err := r.db.NewSelect().Model(req).
+		Where("external_source = ?", source).
+		Where("external_profile_id = ?", profileID).
+		Where("status IN (?, ?, ?)", StatusPending, StatusApproved, StatusConsumed).
+		Order("created_at DESC", "id DESC").
+		Limit(1).
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return req, err
 }
 
 func (r *Repo) UpdateRequest(ctx context.Context, req *Request) error {
@@ -34,9 +55,13 @@ func (r *Repo) GetRequest(ctx context.Context, id int64) (*Request, error) {
 	return req, nil
 }
 
-func (r *Repo) ListRequests(ctx context.Context) ([]Request, error) {
+func (r *Repo) ListRequests(ctx context.Context, statuses []string) ([]Request, error) {
 	var rows []Request
-	err := r.db.NewSelect().Model(&rows).Order("created_at DESC", "id DESC").Scan(ctx)
+	query := r.db.NewSelect().Model(&rows).Order("created_at DESC", "id DESC")
+	if len(statuses) > 0 {
+		query.Where("status IN (?)", bun.In(statuses))
+	}
+	err := query.Scan(ctx)
 	return rows, err
 }
 

@@ -36,6 +36,7 @@ var (
 	ErrProfileLinked    = errors.New("rising-gods profile already linked")
 	ErrProfileAmbiguous = errors.New("multiple rising-gods profiles match character name")
 	ErrProfileMissing   = errors.New("character has no rising-gods profile")
+	ErrRequestExists    = errors.New("registration request already exists for profile")
 )
 
 type Service struct {
@@ -277,6 +278,11 @@ func (s *Service) loadUsableProfile(ctx context.Context, profileID string) (Exte
 }
 
 func (s *Service) CreateRequest(ctx context.Context, requesterID *int64, profileID string) (*Request, error) {
+	if existing, err := s.repo.FindBlockingRequest(ctx, ExternalSourceRisingGods, profileID); err != nil {
+		return nil, err
+	} else if existing != nil {
+		return nil, ErrRequestExists
+	}
 	profile, raw, err := s.loadUsableProfile(ctx, profileID)
 	if err != nil {
 		return nil, err
@@ -293,12 +299,29 @@ func (s *Service) CreateRequest(ctx context.Context, requesterID *int64, profile
 	return req, nil
 }
 
-func (s *Service) ListRequests(ctx context.Context) ([]Request, error) {
-	return s.repo.ListRequests(ctx)
+func (s *Service) ListRequests(ctx context.Context, statuses []string) ([]Request, error) {
+	return s.repo.ListRequests(ctx, statuses)
 }
 
 func (s *Service) ListCodesByRequest(ctx context.Context, requestID int64) ([]Code, error) {
-	return s.repo.ListCodesByRequest(ctx, requestID)
+	codes, err := s.repo.ListCodesByRequest(ctx, requestID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range codes {
+		if codes[i].UsedByPlayerID == nil {
+			continue
+		}
+		p, err := s.players.Get(ctx, *codes[i].UsedByPlayerID)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		codes[i].UsedByUsername = p.Username
+	}
+	return codes, nil
 }
 
 func (s *Service) CreateCode(ctx context.Context, actorID, requestID int64) (*GeneratedCode, error) {

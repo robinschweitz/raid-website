@@ -53,6 +53,7 @@ type Code struct {
 	SentAt            *time.Time `bun:"sent_at,nullzero" json:"sent_at"`
 	UsedAt            *time.Time `bun:"used_at,nullzero" json:"used_at"`
 	UsedByPlayerID    *int64     `bun:"used_by_player_id,nullzero" json:"used_by_player_id"`
+	UsedByUsername    *string    `bun:"used_by_username,scanonly" json:"used_by_username"`
 	RevokedAt         *time.Time `bun:"revoked_at,nullzero" json:"revoked_at"`
 }
 

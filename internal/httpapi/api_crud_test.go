@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -493,6 +494,16 @@ func TestRegistrationWithRisingGodsCode(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("redeem: status %d body %s", status, body)
 	}
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/registration-requests/%d/codes", srv.URL, requestOut.Data.ID), adminToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("list redeemed code: status %d body %s", status, body)
+	}
+	if err := json.Unmarshal(body, &codesOut); err != nil {
+		t.Fatalf("decode redeemed codes: %v", err)
+	}
+	if len(codesOut.Data) != 1 || codesOut.Data[0].UsedByUsername == nil || *codesOut.Data[0].UsedByUsername != "bigdevil" {
+		t.Fatalf("redeemed code does not identify its account: %s", body)
+	}
 	if token := login(t, client, srv, "bigdevil", "valid-secret"); token == "" {
 		t.Fatal("new account cannot log in")
 	}
@@ -500,6 +511,61 @@ func TestRegistrationWithRisingGodsCode(t *testing.T) {
 	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": codeOut.Data.Code, "username": "again", "password": "valid-secret"})
 	if status != http.StatusBadRequest {
 		t.Fatalf("reuse code: want 400 got %d body %s", status, body)
+	}
+}
+
+func TestRegistrationRequestBlocksDuplicatesButAllowsRetryAfterRejection(t *testing.T) {
+	feed := fakeRegistrationFeed{characters: map[string]registration.ExternalCharacter{
+		"71": {ProfileID: "71", Name: "Retryhero", Class: "Magier", MainSpec: "Arkan", Level: 80, ProfileURL: "https://db.rising-gods.de/?profile=load&id=71"},
+	}}
+	srv, bdb := setupServerWithOptions(t, httpapi.Options{RegistrationFeed: feed})
+	client := srv.Client()
+	seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	adminToken := login(t, client, srv, "admin", "pw")
+
+	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/registration-requests", "", map[string]any{"profile_id": "71"})
+	if status != http.StatusCreated {
+		t.Fatalf("create request: status %d body %s", status, body)
+	}
+	var first struct {
+		Data registration.Request `json:"data"`
+	}
+	if err := json.Unmarshal(body, &first); err != nil {
+		t.Fatalf("decode first request: %v", err)
+	}
+	duplicate := first.Data
+	duplicate.ID = 0
+	if err := registration.NewRepo(bdb).CreateRequest(t.Context(), &duplicate); !errors.Is(err, registration.ErrRequestExists) {
+		t.Fatalf("database duplicate guard: want ErrRequestExists, got %v", err)
+	}
+
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/registration-requests", "", map[string]any{"profile_id": "71"})
+	if status != http.StatusConflict || !strings.Contains(string(body), `"code":"registration_request_exists"`) {
+		t.Fatalf("active duplicate: want 409 registration_request_exists, got %d body %s", status, body)
+	}
+
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/registration-requests/%d/reject", srv.URL, first.Data.ID), adminToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("reject request: status %d body %s", status, body)
+	}
+
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/registration-requests", "", map[string]any{"profile_id": "71"})
+	if status != http.StatusCreated {
+		t.Fatalf("retry rejected request: status %d body %s", status, body)
+	}
+	var retry struct {
+		Data registration.Request `json:"data"`
+	}
+	if err := json.Unmarshal(body, &retry); err != nil {
+		t.Fatalf("decode retry request: %v", err)
+	}
+	if _, err := bdb.NewUpdate().Model((*registration.Request)(nil)).Set("status = ?", registration.StatusConsumed).Where("id = ?", retry.Data.ID).Exec(t.Context()); err != nil {
+		t.Fatalf("mark request consumed: %v", err)
+	}
+
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/registration-requests", "", map[string]any{"profile_id": "71"})
+	if status != http.StatusConflict || !strings.Contains(string(body), `"code":"registration_request_exists"`) {
+		t.Fatalf("consumed duplicate: want 409 registration_request_exists, got %d body %s", status, body)
 	}
 }
 

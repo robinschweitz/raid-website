@@ -33,6 +33,8 @@ func registrationError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusForbidden, "registration_forbidden", "Dieser Code passt nicht zu dieser Aktion.")
 	case errors.Is(err, registration.ErrProfileLinked):
 		WriteError(w, http.StatusConflict, "profile_already_linked", "Dieser Rising-Gods-Charakter ist bereits verknüpft.")
+	case errors.Is(err, registration.ErrRequestExists):
+		WriteError(w, http.StatusConflict, "registration_request_exists", "Für diesen Rising-Gods-Charakter besteht bereits eine offene Anfrage oder ein Konto.")
 	case errors.Is(err, registration.ErrRequestNotFound), errors.Is(err, registration.ErrCodeNotFound):
 		WriteError(w, http.StatusNotFound, "not_found", "Eintrag nicht gefunden.")
 	case errors.Is(err, registration.ErrExternalUnavailable):
@@ -95,7 +97,18 @@ func (a *API) createCharacterClaimRequest(w http.ResponseWriter, r *http.Request
 }
 
 func (a *API) listRegistrationRequests(w http.ResponseWriter, r *http.Request) {
-	rows, err := a.Registration.ListRequests(r.Context())
+	statuses := make([]string, 0, 2)
+	for _, status := range strings.Split(r.URL.Query().Get("status"), ",") {
+		switch status {
+		case registration.StatusPending, registration.StatusApproved, registration.StatusRejected, registration.StatusConsumed:
+			statuses = append(statuses, status)
+		case "":
+		default:
+			BadRequest(w, "invalid registration request status")
+			return
+		}
+	}
+	rows, err := a.Registration.ListRequests(r.Context(), statuses)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list registration requests")
 		return

@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS registration_requests_block_duplicate_active;

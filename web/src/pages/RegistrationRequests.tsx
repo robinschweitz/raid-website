@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import { Link } from '../router'
 import type { GeneratedRegistrationCode, RegistrationCode, RegistrationRequest } from '../types'
 import { useSubmission } from '../useSubmission'
+
+const pageSize = 20
 
 export function RegistrationRequestsPage() {
   const { pending, submit, isActive } = useSubmission()
@@ -11,18 +13,26 @@ export function RegistrationRequestsPage() {
   const [error, setError] = useState('')
   const [generated, setGenerated] = useState<Record<number, { code: string; codeId: number; characterName: string }>>({})
   const [copied, setCopied] = useState(false)
+  const [view, setView] = useState<'active' | 'history'>('active')
+  const [page, setPage] = useState(0)
+  const [openRequestID, setOpenRequestID] = useState<number | null>(null)
 
-  const load = () => {
+  const load = useCallback(() => {
     setError('')
-    api.get<RegistrationRequest[]>('/api/v1/registration-requests')
-      .then(async (rows) => {
-        const loaded = await Promise.all(rows.map(async (request) => [request.id, await api.get<RegistrationCode[]>(`/api/v1/registration-requests/${request.id}/codes`).catch(() => [])] as const))
-        if (isActive()) { setRequests(rows); setCodes(Object.fromEntries(loaded)) }
-      })
+    const statuses = view === 'active' ? 'PENDING,APPROVED' : 'REJECTED,CONSUMED'
+    api.get<RegistrationRequest[]>(`/api/v1/registration-requests?status=${statuses}`)
+      .then((rows) => { if (isActive()) setRequests(rows) })
       .catch((err) => { if (isActive()) setError(err instanceof ApiError ? err.message : 'Anfragen konnten nicht geladen werden.') })
-  }
+  }, [isActive, view])
 
-  useEffect(load, [isActive])
+  useEffect(() => { load() }, [load])
+
+  const changeView = (next: 'active' | 'history') => {
+    setView(next)
+    setPage(0)
+    setOpenRequestID(null)
+    setCodes({})
+  }
 
   const createCode = async (request: RegistrationRequest) => {
     await submit(async () => {
@@ -31,7 +41,9 @@ export function RegistrationRequestsPage() {
         const result = await api.post<GeneratedRegistrationCode>(`/api/v1/registration-requests/${request.id}/code`)
         if (!isActive()) return
         setGenerated((values) => ({ ...values, [request.id]: { code: result.code, codeId: result.code_record.id, characterName: request.character_name } }))
+        setCodes((values) => ({ ...values, [request.id]: [result.code_record, ...(values[request.id] ?? [])] }))
         setCopied(false)
+        setOpenRequestID(request.id)
         load()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Code konnte nicht erstellt werden.')
@@ -44,23 +56,28 @@ export function RegistrationRequestsPage() {
       setError('')
       try {
         await api.post<RegistrationRequest>(`/api/v1/registration-requests/${request.id}/reject`)
-        if (isActive()) load()
+        if (isActive()) {
+          setOpenRequestID(null)
+          load()
+        }
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Anfrage konnte nicht abgelehnt werden.')
       }
     })
   }
 
+  const updateCode = (updated: RegistrationCode) => {
+    setCodes((values) => ({ ...values, [updated.request_id]: (values[updated.request_id] ?? []).map((code) => code.id === updated.id ? updated : code) }))
+    setGenerated((values) => Object.fromEntries(Object.entries(values).filter(([, value]) => value.codeId !== updated.id)))
+    setCopied(false)
+  }
+
   const revoke = async (code: RegistrationCode) => {
     await submit(async () => {
       setError('')
       try {
-        await api.post<RegistrationCode>(`/api/v1/registration-codes/${code.id}/revoke`)
-        if (isActive()) {
-          setGenerated((values) => Object.fromEntries(Object.entries(values).filter(([, value]) => value.codeId !== code.id)))
-          setCopied(false)
-          load()
-        }
+        const updated = await api.post<RegistrationCode>(`/api/v1/registration-codes/${code.id}/revoke`)
+        if (isActive()) updateCode(updated)
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Code konnte nicht widerrufen werden.')
       }
@@ -71,12 +88,8 @@ export function RegistrationRequestsPage() {
     await submit(async () => {
       setError('')
       try {
-        await api.post<RegistrationCode>(`/api/v1/registration-codes/${code.id}/sent`)
-        if (isActive()) {
-          setGenerated((values) => Object.fromEntries(Object.entries(values).filter(([, value]) => value.codeId !== code.id)))
-          setCopied(false)
-          load()
-        }
+        const updated = await api.post<RegistrationCode>(`/api/v1/registration-codes/${code.id}/sent`)
+        if (isActive()) updateCode(updated)
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Code konnte nicht als gesendet markiert werden.')
       }
@@ -84,46 +97,46 @@ export function RegistrationRequestsPage() {
   }
 
   const markExportedSent = async () => {
-    const codeIDs = Object.entries(generated)
-      .filter(([requestID, generatedCode]) => {
-        const code = (codes[Number(requestID)] ?? []).find((row) => row.id === generatedCode.codeId)
-        return !code || (!code.sent_at && !code.used_at && !code.revoked_at)
-      })
-      .map(([, generatedCode]) => generatedCode.codeId)
+    const codeIDs = Object.values(generated).map((code) => code.codeId)
     if (codeIDs.length === 0) return
     await submit(async () => {
       setError('')
       try {
-        await Promise.all(codeIDs.map((codeID) => api.post<RegistrationCode>(`/api/v1/registration-codes/${codeID}/sent`)))
-        if (isActive()) {
-          setGenerated((values) => Object.fromEntries(Object.entries(values).filter(([, value]) => !codeIDs.includes(value.codeId))))
-          setCopied(false)
-          load()
-        }
+        const updated = await Promise.all(codeIDs.map((codeID) => api.post<RegistrationCode>(`/api/v1/registration-codes/${codeID}/sent`)))
+        if (isActive()) updated.forEach(updateCode)
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Codes konnten nicht als gesendet markiert werden.')
       }
     })
   }
 
-  const addonCodes = Object.entries(generated)
-    .filter(([requestID, generatedCode]) => {
-      const code = (codes[Number(requestID)] ?? []).find((row) => row.id === generatedCode.codeId)
-      return !code || (!code.sent_at && !code.used_at && !code.revoked_at)
-    })
-    .map(([, generatedCode]) => `${generatedCode.characterName}:${generatedCode.code}`)
-    .join('\n')
+  const toggleDetails = (request: RegistrationRequest) => {
+    if (openRequestID === request.id) {
+      setOpenRequestID(null)
+      return
+    }
+    setOpenRequestID(request.id)
+    if (codes[request.id]) return
+    api.get<RegistrationCode[]>(`/api/v1/registration-requests/${request.id}/codes`)
+      .then((rows) => { if (isActive()) setCodes((values) => ({ ...values, [request.id]: rows })) })
+      .catch((err) => { if (isActive()) setError(err instanceof ApiError ? err.message : 'Codes konnten nicht geladen werden.') })
+  }
 
+  const addonCodes = Object.values(generated).map((code) => `${code.characterName}:${code.code}`).join('\n')
   const copyAddonCodes = async () => {
     if (!addonCodes) return
     await navigator.clipboard.writeText(addonCodes)
     setCopied(true)
   }
 
-  return <div>
+  const lastPage = Math.max(0, Math.ceil(requests.length / pageSize) - 1)
+  const currentPage = Math.min(page, lastPage)
+  const visibleRequests = requests.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+
+  return <div className="registration-requests">
     <p><Link to="/roster">← Gildenkonfiguration</Link></p>
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Registrierungsanfragen</h1></div></div>
-    <p className="muted">Code erstellen und per Ingame-Post oder Whisper an den angezeigten Charakter senden. Codes werden nur einmal angezeigt.</p>
+    <p className="muted">Codes werden nur einmal angezeigt. Die aktive Ansicht enthält nur offene Anfragen und aktive Codes.</p>
     {error && <p className="error" role="alert">{error}</p>}
     {addonCodes && <section className="card">
       <h2>Addon-Export</h2>
@@ -135,23 +148,34 @@ export function RegistrationRequestsPage() {
         {copied && <span className="muted" role="status">Kopiert.</span>}
       </div>
     </section>}
-    <div className="grid">
-      {requests.map((request) => <article className="card" key={request.id}>
-        <h2>{request.character_name}</h2>
-        <p>{request.class} · {request.main_spec}{request.second_spec ? ` / ${request.second_spec}` : ''} · Stufe {request.level || '—'}</p>
-        <p className="muted">Status: {request.status} · Zweck: {request.purpose === 'CLAIM_CHARACTER' ? 'Charakter beanspruchen' : 'Neues Konto'}</p>
-        <p><a href={request.external_profile_url} target="_blank" rel="noreferrer">Rising-Gods-Profil öffnen</a></p>
-        {generated[request.id] && <p role="status"><strong>Code: {generated[request.id].code}</strong></p>}
-        {(codes[request.id] ?? []).length > 0 && <div className="subcard">
-          <h3>Codes</h3>
-          {(codes[request.id] ?? []).map((code) => <p key={code.id}>#{code.id} · gültig bis {new Date(code.expires_at).toLocaleDateString('de-DE')} · {code.used_at ? 'verwendet' : code.revoked_at ? 'widerrufen' : code.sent_at ? 'gesendet' : 'offen'} {!code.used_at && !code.revoked_at && !code.sent_at && <button disabled={pending} onClick={() => void markSent(code)}>Als gesendet markieren</button>} {!code.used_at && !code.revoked_at && <button disabled={pending} onClick={() => void revoke(code)}>Widerrufen</button>}</p>)}
-        </div>}
-        <div className="actions">
-          <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void createCode(request)}>Code erstellen</button>
-          <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void reject(request)}>Ablehnen</button>
-        </div>
-      </article>)}
+    <div className="workspace-tabs registration-tabs" role="group" aria-label="Anfragen filtern">
+      <button type="button" aria-pressed={view === 'active'} onClick={() => changeView('active')}>Aktiv</button>
+      <button type="button" aria-pressed={view === 'history'} onClick={() => changeView('history')}>Verlauf</button>
     </div>
-    {requests.length === 0 && <p className="muted">Keine Registrierungsanfragen.</p>}
+    <p className="muted" role="status">{requests.length} {view === 'active' ? 'aktive' : 'historische'} Anfragen</p>
+    {visibleRequests.length > 0 && <div className="registration-table-wrap"><table className="table registration-table">
+      <thead><tr><th>Charakter</th><th>Anfrage</th><th>Status</th><th aria-label="Details" /><th>Aktionen</th></tr></thead>
+      <tbody>{visibleRequests.map((request) => <Fragment key={request.id}>
+        <tr>
+          <td><strong>{request.character_name}</strong><small>{request.class} · {request.main_spec}{request.second_spec ? ` / ${request.second_spec}` : ''} · Stufe {request.level || '—'}</small></td>
+          <td><small>{request.purpose === 'CLAIM_CHARACTER' ? 'Charakter beanspruchen' : 'Neues Konto'}<br />{new Date(request.created_at).toLocaleDateString('de-DE')}</small></td>
+          <td><span className={`registration-status ${request.status.toLowerCase()}`}>{request.status}</span></td>
+          <td><button type="button" className="registration-details" aria-expanded={openRequestID === request.id} onClick={() => toggleDetails(request)}>{openRequestID === request.id ? 'Schließen' : 'Details'}</button></td>
+          <td className="actions">
+            <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void createCode(request)}>Code erstellen</button>
+            <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void reject(request)}>Ablehnen</button>
+          </td>
+        </tr>
+        {openRequestID === request.id && <tr className="registration-details-row"><td colSpan={5}>
+          <div className="registration-details-content">
+            <p><a href={request.external_profile_url} target="_blank" rel="noreferrer">Rising-Gods-Profil öffnen</a></p>
+            {generated[request.id] && <p role="status"><strong>Neuer Code: {generated[request.id].code}</strong></p>}
+            {codes[request.id] ? <div className="registration-codes"><strong>Codes</strong>{codes[request.id].length === 0 ? <p className="muted">Noch keine Codes erstellt.</p> : codes[request.id].map((code) => <div key={code.id}><span>#{code.id} · gültig bis {new Date(code.expires_at).toLocaleDateString('de-DE')} · {code.used_at ? `verwendet${code.used_by_username ? ` von @${code.used_by_username}` : ''}` : code.revoked_at ? 'widerrufen' : code.sent_at ? 'gesendet' : 'offen'}</span>{!code.used_at && !code.revoked_at && !code.sent_at && <button disabled={pending} onClick={() => void markSent(code)}>Als gesendet markieren</button>}{!code.used_at && !code.revoked_at && <button disabled={pending} onClick={() => void revoke(code)}>Widerrufen</button>}</div>)}</div> : <p className="muted">Codes werden geladen…</p>}
+          </div>
+        </td></tr>}
+      </Fragment>)}</tbody>
+    </table></div>}
+    {requests.length === 0 && <p className="muted">{view === 'active' ? 'Keine aktiven Registrierungsanfragen.' : 'Keine historischen Registrierungsanfragen.'}</p>}
+    {requests.length > pageSize && <div className="catalog-pagination"><button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Zurück</button><span>Seite {currentPage + 1} / {lastPage + 1}</span><button type="button" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>Weiter</button></div>}
   </div>
 }

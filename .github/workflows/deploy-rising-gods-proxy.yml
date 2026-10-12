@@ -1,0 +1,25 @@
+name: Deploy Rising-Gods proxy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/**'
+      - '.github/workflows/deploy-rising-gods-proxy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 9e91efb25b81b296f5f55438bd65407b
+          wranglerVersion: '3.114.0'
+          workingDirectory: workers
+          command: deploy

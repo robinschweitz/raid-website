@@ -609,7 +609,14 @@ func (c RisingGodsClient) fetch(ctx context.Context, u string) (string, error) {
 		return "", ErrExternalNotFound
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("%w: status %d", ErrExternalUnavailable, resp.StatusCode)
+		details := fmt.Sprintf("status %d", resp.StatusCode)
+		if upstreamStatus := strings.TrimSpace(resp.Header.Get("X-Rising-Gods-Proxy-Upstream-Status")); upstreamStatus != "" {
+			details += ", proxy upstream status " + upstreamStatus
+		}
+		if requestID := strings.TrimSpace(resp.Header.Get("X-Rising-Gods-Proxy-Request-ID")); requestID != "" {
+			details += ", proxy request " + requestID
+		}
+		return "", fmt.Errorf("%w: %s", ErrExternalUnavailable, details)
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 5<<20))
 	if err != nil {

@@ -382,6 +382,8 @@ func TestWarmSearchCacheSkipsFreshEntries(t *testing.T) {
 
 func TestRisingGodsSearchClassifiesUpstreamRejectionAsUnavailable(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Rising-Gods-Proxy-Upstream-Status", "502")
+		w.Header().Set("X-Rising-Gods-Proxy-Request-ID", "proxy-request-1")
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer srv.Close()
@@ -390,6 +392,9 @@ func TestRisingGodsSearchClassifiesUpstreamRejectionAsUnavailable(t *testing.T) 
 	_, err := client.SearchCharacters(context.Background(), "Servenaja")
 	if !errors.Is(err, ErrExternalUnavailable) {
 		t.Fatalf("expected unavailable error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "proxy upstream status 502") || !strings.Contains(err.Error(), "proxy request proxy-request-1") {
+		t.Fatalf("expected proxy diagnostics, got %v", err)
 	}
 }
 

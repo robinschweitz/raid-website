@@ -2,6 +2,7 @@ package v1
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"raid-website/internal/character"
@@ -157,6 +158,7 @@ func (a *API) retryCharacterLink(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, registration.ErrProfileRequired):
 			WriteError(w, http.StatusNotFound, "profile_not_found", "Kein passendes Rising-Gods-Profil gefunden.")
 		case errors.Is(err, registration.ErrExternalUnavailable):
+			log.Printf("rising-gods retry-link unavailable character_id=%d: %v", id, err)
 			WriteError(w, http.StatusBadGateway, "rising_gods_unavailable", "Rising Gods ist momentan nicht erreichbar.")
 		case errors.Is(err, registration.ErrProfileUnusable):
 			WriteError(w, http.StatusBadRequest, "profile_unusable", "Rising-Gods-Profil konnte nicht verwendet werden.")

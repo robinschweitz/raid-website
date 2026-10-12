@@ -144,7 +144,7 @@ func (r *Repo) charactersByName(ctx context.Context, name string) ([]character.C
 }
 
 func (r *Repo) isCharacterMergeAlias(ctx context.Context, name string, targetID int64) (bool, error) {
- return r.db.NewSelect().TableExpr("character_merge_aliases").Where("source_name = ? AND target_character_id = ?", name, targetID).Exists(ctx)
+	return r.db.NewSelect().TableExpr("character_merge_aliases").Where("source_name = ? AND target_character_id = ?", name, targetID).Exists(ctx)
 }
 
 // transaction holds the application's single SQLite connection through planning and merge.

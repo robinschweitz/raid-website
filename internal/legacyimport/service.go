@@ -523,8 +523,10 @@ func (s *Service) mergeCharacters(ctx context.Context, playerIDs map[string]int6
 		}
 		pid := playerIDs[c.PlayerName]
 		for _, existing := range matches {
-            alias, err := s.imports.isCharacterMergeAlias(ctx, c.Name, existing.ID)
-            if err != nil { return nil, fmt.Errorf("check character merge alias %q: %w", c.Name, err) }
+			alias, err := s.imports.isCharacterMergeAlias(ctx, c.Name, existing.ID)
+			if err != nil {
+				return nil, fmt.Errorf("check character merge alias %q: %w", c.Name, err)
+			}
 			if existing.PlayerID == pid || alias {
 				ids[c.Name] = existing.ID
 				if err := s.linkImportedCharacter(ctx, &existing, &c, links[c.Name], now); err != nil {

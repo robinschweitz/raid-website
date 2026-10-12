@@ -95,6 +95,9 @@ function PlayerDetail({ playerID }: Props) {
   const [mergePlayers, setMergePlayers] = useState<Player[]>([])
   const [mergeSourceID, setMergeSourceID] = useState('')
   const [mergeReason, setMergeReason] = useState('')
+  const [mergeCharacterTarget, setMergeCharacterTarget] = useState('')
+  const [mergeCharacterSource, setMergeCharacterSource] = useState('')
+  const [mergeCharacterReason, setMergeCharacterReason] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordStatus, setPasswordStatus] = useState('')
@@ -397,6 +400,28 @@ function PlayerDetail({ playerID }: Props) {
     })
   }
 
+  const mergeCharacter = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isAdmin || !mergeCharacterTarget || !mergeCharacterSource || mergeCharacterTarget === mergeCharacterSource || !mergeCharacterReason.trim()) return
+    if (!window.confirm('Doppelten Charakter wirklich zusammenführen? Historische Einträge werden auf den Zielcharakter korrigiert.')) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post(`/api/v1/characters/${mergeCharacterTarget}/merge`, {
+          source_character_id: Number(mergeCharacterSource),
+          reason: mergeCharacterReason.trim(),
+        })
+        if (!isActive()) return
+        setMergeCharacterSource('')
+        setMergeCharacterTarget('')
+        setMergeCharacterReason('')
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Charaktere zusammenführen fehlgeschlagen')
+      }
+    })
+  }
+
   const startTOTPSetup = async () => {
     if (!isOwnProfile || !mfaPassword.trim()) return
     await submit(async () => {
@@ -581,6 +606,20 @@ function PlayerDetail({ playerID }: Props) {
 
       <section id="profile-characters" hidden={view !== 'characters'} className="card">
         <h2>Charaktere</h2>
+        {isAdmin && ownedCharacters.filter((c) => c.active).length > 1 && <form className="inline-form" onSubmit={mergeCharacter}>
+          <h3>Doppelte Charaktere zusammenführen</h3>
+          <p className="muted">Nur für fehlerhaft doppelt angelegte Charaktere desselben Spielers. Raid- und Loot-Zuordnungen werden korrigiert; bei Konflikten wird nichts verändert.</p>
+          <label>Zielcharakter behalten<select required disabled={pending} value={mergeCharacterTarget} onChange={(e) => setMergeCharacterTarget(e.target.value)}>
+            <option value="">Auswählen</option>
+            {ownedCharacters.filter((c) => c.active).map((c) => <option key={c.id} value={c.id}>{c.name} (#{c.id})</option>)}
+          </select></label>
+          <label>Doppelten Charakter zusammenführen<select required disabled={pending} value={mergeCharacterSource} onChange={(e) => setMergeCharacterSource(e.target.value)}>
+            <option value="">Auswählen</option>
+            {ownedCharacters.filter((c) => c.active && String(c.id) !== mergeCharacterTarget).map((c) => <option key={c.id} value={c.id}>{c.name} (#{c.id})</option>)}
+          </select></label>
+          <label>Grund<input required disabled={pending} value={mergeCharacterReason} onChange={(e) => setMergeCharacterReason(e.target.value)} placeholder="Falsch importierter Charaktername" /></label>
+          <button type="submit" disabled={pending || !mergeCharacterTarget || !mergeCharacterSource || mergeCharacterTarget === mergeCharacterSource || !mergeCharacterReason.trim()}>Charaktere zusammenführen</button>
+        </form>}
         <div className="table-scroll"><table className="table">
           <thead>
             <tr>

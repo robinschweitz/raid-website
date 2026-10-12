@@ -130,6 +130,44 @@ func (a *API) updateCharacter(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]any{"data": c})
 }
 
+func (a *API) retryCharacterLink(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "authentication required")
+		return
+	}
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid character id")
+		return
+	}
+	c, err := a.Registration.RetryCharacterLink(r.Context(), actor, id)
+	if err != nil {
+		switch {
+		case errors.Is(err, character.ErrNotFound):
+			WriteError(w, http.StatusNotFound, "not_found", "character not found")
+		case errors.Is(err, character.ErrInvalidActor):
+			WriteError(w, http.StatusUnauthorized, "invalid_actor", "actor does not exist")
+		case errors.Is(err, character.ErrForbidden):
+			WriteError(w, http.StatusForbidden, "forbidden", "character link requires admin")
+		case errors.Is(err, registration.ErrProfileLinked):
+			WriteError(w, http.StatusConflict, "profile_already_linked", "Rising-Gods-Profil ist bereits verknüpft.")
+		case errors.Is(err, registration.ErrProfileAmbiguous):
+			WriteError(w, http.StatusConflict, "profile_ambiguous", "Mehrere Rising-Gods-Profile mit diesem Namen gefunden.")
+		case errors.Is(err, registration.ErrProfileRequired):
+			WriteError(w, http.StatusNotFound, "profile_not_found", "Kein passendes Rising-Gods-Profil gefunden.")
+		case errors.Is(err, registration.ErrExternalUnavailable):
+			WriteError(w, http.StatusBadGateway, "rising_gods_unavailable", "Rising Gods ist momentan nicht erreichbar.")
+		case errors.Is(err, registration.ErrProfileUnusable):
+			WriteError(w, http.StatusBadRequest, "profile_unusable", "Rising-Gods-Profil konnte nicht verwendet werden.")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "Rising-Gods-Verknüpfung fehlgeschlagen.")
+		}
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": c})
+}
+
 func (a *API) reloadCharacterProfile(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {

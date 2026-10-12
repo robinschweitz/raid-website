@@ -8,6 +8,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/accountmerge"
 	"raid-website/internal/addonsync"
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
@@ -105,6 +106,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Imports:           importsSvc,
 		Signups:           raidsignup.NewService(raidsignup.NewRepo(db)),
 		Registration:      registrationSvc,
+		AccountMerge:      accountmerge.NewService(accountmerge.NewRepo(db)),
 	})
 
 	mux := http.NewServeMux()

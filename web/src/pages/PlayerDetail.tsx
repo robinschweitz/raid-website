@@ -92,6 +92,9 @@ function PlayerDetail({ playerID }: Props) {
   const [accUser, setAccUser] = useState('')
   const [accPass, setAccPass] = useState('')
   const [accRole, setAccRole] = useState<Role>('MEMBER')
+  const [mergePlayers, setMergePlayers] = useState<Player[]>([])
+  const [mergeSourceID, setMergeSourceID] = useState('')
+  const [mergeReason, setMergeReason] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordStatus, setPasswordStatus] = useState('')
@@ -151,6 +154,17 @@ function PlayerDetail({ playerID }: Props) {
   }, [isOwnProfile, isActive])
 
   useEffect(() => { void loadMFAStatus() }, [loadMFAStatus])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    let active = true
+    api.get<Player[]>('/api/v1/players').then((rows) => {
+      if (active) setMergePlayers(rows.filter((row) => row.active && row.id !== playerID))
+    }).catch(() => {
+      if (active) setError('Spielerliste für Kontozusammenführung konnte nicht geladen werden.')
+    })
+    return () => { active = false }
+  }, [isAdmin, playerID])
 
   useEffect(() => {
     let active = true
@@ -359,6 +373,26 @@ function PlayerDetail({ playerID }: Props) {
         await load()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Konto speichern fehlgeschlagen')
+      }
+    })
+  }
+
+  const mergeAccount = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isAdmin || !mergeSourceID || !mergeReason.trim()) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post(`/api/v1/players/${playerID}/merge`, {
+          source_player_id: Number(mergeSourceID),
+          reason: mergeReason.trim(),
+        })
+        if (!isActive()) return
+        setMergeSourceID('')
+        setMergeReason('')
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Konten zusammenführen fehlgeschlagen')
       }
     })
   }
@@ -689,7 +723,7 @@ function PlayerDetail({ playerID }: Props) {
           <h2>Konto</h2>
           {isAdmin && <section className="subcard">
             <h3>Kontodaten</h3>
-            <form className="inline-form" onSubmit={setAccount}>
+           <form className="inline-form" onSubmit={setAccount}>
               <input aria-label="Benutzername" placeholder="Benutzername" value={accUser} onChange={(e) => setAccUser(e.target.value)} required />
               {!isOwnProfile && <input
                 type="password"
@@ -708,8 +742,20 @@ function PlayerDetail({ playerID }: Props) {
               <button type="submit" disabled={pending}>Speichern</button>
             </form>
             {isOwnProfile && <p className="muted">Dein eigenes Passwort änderst du im separaten Bereich darunter.</p>}
-          </section>}
-          {isOwnProfile && <section className="subcard">
+           </section>}
+           {isAdmin && <section className="subcard">
+             <h3>Konto zusammenführen</h3>
+             <p className="muted">Der Quellaccount wird deaktiviert. Seine Charaktere, Locks und sein EP-Guthaben werden diesem Konto zugeordnet; Quell-Sitzungen und MFA werden widerrufen.</p>
+             <form className="inline-form" onSubmit={mergeAccount}>
+               <label>Quellspieler<select aria-label="Quellspieler" value={mergeSourceID} onChange={(event) => setMergeSourceID(event.target.value)} required>
+                 <option value="">Bitte wählen</option>
+                 {mergePlayers.map((row) => <option key={row.id} value={row.id}>{row.name} (#{row.id})</option>)}
+               </select></label>
+               <label>Grund<input aria-label="Grund für Kontozusammenführung" value={mergeReason} onChange={(event) => setMergeReason(event.target.value)} required /></label>
+               <button type="submit" disabled={pending || !mergeSourceID || !mergeReason.trim()}>Zusammenführen</button>
+             </form>
+           </section>}
+           {isOwnProfile && <section className="subcard">
             <h3>Passwort ändern</h3>
             <form className="inline-form" onSubmit={changeOwnPassword}>
               <input type="password" aria-label="Aktuelles Passwort" placeholder="Aktuelles Passwort" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" />

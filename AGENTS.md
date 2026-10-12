@@ -97,6 +97,9 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Character names are mutable because players rename in game. Therefore **no DB-level global
   `UNIQUE(name)`**; records are addressed by stable IDs and renames are recorded in name history
   (ADR 013).
+- ADMIN may merge an active source account into a distinct target with a required reason. The target
+  keeps credentials, role, and MFA; source authentication is revoked, characters/locks transfer,
+  EP moves via paired compensating ledger entries, and the source is archived as inactive (ADR 050).
 - Raid attendance selection is character-first. RAIDASSISTENT and higher may create a new
   character and optionally its new player through atomic raid quick-add (ADR 037). New player
   names default to the character name and are editable; these players use the existing GUEST

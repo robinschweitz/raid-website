@@ -8,6 +8,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/accountmerge"
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
 	"raid-website/internal/auth"
@@ -51,6 +52,7 @@ type Deps struct {
 	Imports           *legacyimport.Service
 	Signups           *raidsignup.Service
 	Registration      *registration.Service
+	AccountMerge      *accountmerge.Service
 }
 
 // API holds the dependencies shared by the v1 HTTP handlers.
@@ -96,6 +98,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/players", RequireRole(validation.RoleAdmin, a.createPlayer))
 	mux.HandleFunc("GET /api/v1/players/{id}", RequireAuth(a.getPlayer))
 	mux.HandleFunc("PUT /api/v1/players/{id}/account", RequireRole(validation.RoleAdmin, a.setAccount))
+	mux.HandleFunc("POST /api/v1/players/{id}/merge", RequireRole(validation.RoleAdmin, a.mergePlayer))
 	mux.HandleFunc("GET /api/v1/players/{id}/characters", RequireAuth(a.listPlayerCharacters))
 	mux.HandleFunc("POST /api/v1/players/{id}/characters", RequireRole(validation.RoleAdmin, a.createCharacter))
 

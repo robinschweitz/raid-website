@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,8 +26,7 @@ func NewService(repo *Repo) *Service {
 	return &Service{repo: repo}
 }
 
-// Merge archives source after moving its live ownership records to target.
-// Historical records deliberately retain their original player reference.
+// Merge deletes source after moving every reference to target.
 func (s *Service) Merge(ctx context.Context, targetID, sourceID, actorID int64, reason string) error {
 	reason = strings.TrimSpace(reason)
 	if sourceID <= 0 {
@@ -107,21 +105,8 @@ func (s *Service) Merge(ctx context.Context, targetID, sourceID, actorID int64, 
 			}
 		}
 
-		balance, err := repo.Balance(ctx, sourceID)
-		if err != nil {
-			return fmt.Errorf("load source balance: %w", err)
-		}
-		if balance != 0 {
-			refID := strconv.FormatInt(sourceID, 10) + ":" + strconv.FormatInt(targetID, 10)
-			if err := repo.InsertPointTransaction(ctx, &enhancepoints.Transaction{PlayerID: sourceID, Amount: -balance, Type: "account_merge", Reason: reason, RefType: "account_merge", RefID: refID, ActorID: actorID, CreatedAt: now}); err != nil {
-				return fmt.Errorf("debit source balance: %w", err)
-			}
-			if err := repo.InsertPointTransaction(ctx, &enhancepoints.Transaction{PlayerID: targetID, Amount: balance, Type: "account_merge", Reason: reason, RefType: "account_merge", RefID: refID, ActorID: actorID, CreatedAt: now}); err != nil {
-				return fmt.Errorf("credit target balance: %w", err)
-			}
-			if err := repo.Audit(ctx, actorID, "enhance_points", refID, "account_merge_transfer", map[string]any{"player_id": sourceID, "balance": balance}, map[string]any{"player_id": targetID, "balance": balance}, reason, now); err != nil {
-				return err
-			}
+		if err := repo.MoveHistoricalReferences(ctx, sourceID, targetID); err != nil {
+			return fmt.Errorf("transfer historical references: %w", err)
 		}
 
 		revoked, err := repo.RevokeSourceAuth(ctx, sourceID)
@@ -132,17 +117,14 @@ func (s *Service) Merge(ctx context.Context, targetID, sourceID, actorID int64, 
 			return err
 		}
 
-		beforeSource, afterSource := *source, *source
-		afterSource.Active = false
-		afterSource.UpdatedAt = now
-		if err := repo.ArchivePlayer(ctx, sourceID, now); err != nil {
-			return fmt.Errorf("archive source player: %w", err)
-		}
-		if err := repo.Audit(ctx, actorID, "player", sourceID, "account_merge_archive", beforeSource, afterSource, reason, now); err != nil {
+		if err := repo.Audit(ctx, actorID, "player", sourceID, "account_merge_delete", *source, map[string]any{"id": sourceID, "deleted": true, "merged_into": targetID}, reason, now); err != nil {
 			return err
 		}
 		if err := repo.Audit(ctx, actorID, "player", targetID, "account_merge_target", *target, *target, reason, now); err != nil {
 			return err
+		}
+		if err := repo.DeletePlayer(ctx, sourceID); err != nil {
+			return fmt.Errorf("delete source player: %w", err)
 		}
 		return nil
 	})

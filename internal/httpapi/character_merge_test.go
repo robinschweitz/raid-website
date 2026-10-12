@@ -54,8 +54,7 @@ func TestMergeDuplicateMovesHistoricalPlayerReferencesWithCharacter(t *testing.T
 	if storedAward.AwardedToPlayerID != f.actorID || storedAward.AwardedToCharacterID == nil || *storedAward.AwardedToCharacterID != f.initial.ID || storedAward.AwardedToCharacterName != f.initial.Name {
 		t.Fatalf("loot not moved consistently: %+v", storedAward)
 	}
-	sourceAfter, err := character.NewRepo(f.db).Get(ctx, source.ID)
-	if err != nil || sourceAfter.Active {
-		t.Fatalf("source character not archived: %+v, %v", sourceAfter, err)
+	if _, err := character.NewRepo(f.db).Get(ctx, source.ID); err == nil {
+		t.Fatal("source character was not deleted")
 	}
 }

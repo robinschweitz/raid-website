@@ -383,6 +383,7 @@ function PlayerDetail({ playerID }: Props) {
   const mergeAccount = async (event: FormEvent) => {
     event.preventDefault()
     if (!isAdmin || !mergeSourceID || !mergeReason.trim()) return
+    if (!window.confirm('Quellspielerkonto wirklich zusammenführen und danach endgültig löschen?')) return
     await submit(async () => {
       setError('')
       try {
@@ -403,7 +404,7 @@ function PlayerDetail({ playerID }: Props) {
   const mergeCharacter = async (event: FormEvent) => {
     event.preventDefault()
     if (!isAdmin || !mergeCharacterTarget || !mergeCharacterSource || mergeCharacterTarget === mergeCharacterSource || !mergeCharacterReason.trim()) return
-    if (!window.confirm('Doppelten Charakter wirklich zusammenführen? Historische Einträge werden auf den Zielcharakter korrigiert.')) return
+    if (!window.confirm('Doppelten Charakter wirklich zusammenführen und danach endgültig löschen? Historische Einträge werden auf den Zielcharakter korrigiert.')) return
     await submit(async () => {
       setError('')
       try {

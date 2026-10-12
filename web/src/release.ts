@@ -1,8 +1,15 @@
-export const appVersion = '1.0.1'
+export const appVersion = '1.0.2'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Zusammenführungen',
+    changes: [
+      'Doppelte Charaktere und zusammengeführte Spielerkonten werden nach der Übertragung gelöscht.',
+    ],
+  },
+  {
+    version: '1.0.1',
     title: 'Registrierungsverwaltung',
     changes: [
       'Registrierungsanfragen sind kompakter, nach aktivem Verlauf getrennt und zeigen Codes erst bei Bedarf.',

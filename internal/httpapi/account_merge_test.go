@@ -61,12 +61,11 @@ func TestAdminAccountMergeTransfersOwnershipAndRevokesSourceAuth(t *testing.T) {
 		t.Fatalf("merge status %d: %s", status, body)
 	}
 
-	source, err := player.NewRepo(bdb).Get(ctx, sourceID)
-	if err != nil || source.Active {
-		t.Fatalf("source should be archived: %+v, %v", source, err)
+	if _, err := player.NewRepo(bdb).Get(ctx, sourceID); err == nil {
+		t.Fatal("source player was not deleted")
 	}
 	target, err := player.NewRepo(bdb).Get(ctx, targetID)
-	if err != nil || target.Role != validation.RoleMember || target.PasswordHash == source.PasswordHash {
+	if err != nil || target.Role != validation.RoleMember {
 		t.Fatalf("target credentials or role changed: %+v, %v", target, err)
 	}
 	if char, err := character.NewRepo(bdb).Get(ctx, char.ID); err != nil || char.PlayerID != targetID {
@@ -76,9 +75,6 @@ func TestAdminAccountMergeTransfersOwnershipAndRevokesSourceAuth(t *testing.T) {
 		t.Fatalf("lock owner = %+v, %v", lock, err)
 	}
 	points := enhancepoints.NewRepo(bdb)
-	if balance, err := points.Balance(ctx, sourceID); err != nil || balance != 0 {
-		t.Fatalf("source balance = %d, %v", balance, err)
-	}
 	if balance, err := points.Balance(ctx, targetID); err != nil || balance != 44 {
 		t.Fatalf("target balance = %d, %v", balance, err)
 	}

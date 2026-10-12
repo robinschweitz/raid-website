@@ -93,8 +93,38 @@ func (r *Repo) RevokeSourceAuth(ctx context.Context, playerID int64) (map[string
 	return counts, nil
 }
 
-func (r *Repo) ArchivePlayer(ctx context.Context, id int64, updatedAt time.Time) error {
-	_, err := r.db.NewUpdate().Table("players").Set("active = ?", false).Set("updated_at = ?", updatedAt).Where("id = ?", id).Exec(ctx)
+func (r *Repo) MoveHistoricalReferences(ctx context.Context, sourceID, targetID int64) error {
+	// Keep both awards when an actor-scoped request ID collides after the merge.
+	if _, err := r.db.NewUpdate().Table("loot_awards").Set("request_id = 'account-merge-' || ? || '-' || id", sourceID).Where("awarded_by_player_id = ?", sourceID).Where("request_id IS NOT NULL").Where("EXISTS (SELECT 1 FROM loot_awards AS target WHERE target.awarded_by_player_id = ? AND target.request_id = loot_awards.request_id)", targetID).Exec(ctx); err != nil {
+		return err
+	}
+	// Poll votes and quick-add requests have per-player unique keys. The target's existing
+	// key wins; the source key cannot survive after its player is deleted.
+	if _, err := r.db.NewDelete().Table("poll_votes").Where("player_id = ?", sourceID).Where("EXISTS (SELECT 1 FROM poll_votes AS target WHERE target.poll_id = poll_votes.poll_id AND target.player_id = ?)", targetID).Exec(ctx); err != nil {
+		return err
+	}
+	if _, err := r.db.NewDelete().Table("raid_quick_add_requests").Where("actor_id = ?", sourceID).Where("EXISTS (SELECT 1 FROM raid_quick_add_requests AS target WHERE target.raid_id = raid_quick_add_requests.raid_id AND target.actor_id = ? AND target.request_id = raid_quick_add_requests.request_id)", targetID).Exec(ctx); err != nil {
+		return err
+	}
+	statements := []struct{ table, column string }{
+		{"character_name_history", "actor_id"}, {"raid_series", "raid_leader_id"}, {"raids", "raid_leader_id"},
+		{"raid_attendance", "player_id"}, {"raid_signups", "player_id"}, {"character_wishlist", "player_id"},
+		{"loot_awards", "awarded_to_player_id"}, {"loot_awards", "awarded_by_player_id"}, {"enhance_point_transactions", "player_id"},
+		{"enhance_point_transactions", "actor_id"}, {"item_locks", "actor_id"}, {"polls", "created_by"},
+		{"poll_votes", "player_id"}, {"legacy_imports", "actor_id"}, {"audit_log", "actor_id"},
+		{"raid_quick_add_requests", "actor_id"}, {"registration_requests", "requester_player_id"},
+		{"registration_codes", "created_by_player_id"}, {"registration_codes", "used_by_player_id"},
+	}
+	for _, statement := range statements {
+		if _, err := r.db.NewUpdate().Table(statement.table).Set(statement.column+" = ?", targetID).Where(statement.column+" = ?", sourceID).Exec(ctx); err != nil {
+			return fmt.Errorf("move %s.%s: %w", statement.table, statement.column, err)
+		}
+	}
+	return nil
+}
+
+func (r *Repo) DeletePlayer(ctx context.Context, id int64) error {
+	_, err := r.db.NewDelete().Table("players").Where("id = ?", id).Exec(ctx)
 	return err
 }
 

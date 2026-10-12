@@ -22,7 +22,7 @@ var (
 )
 
 // MergeDuplicate corrects a mistakenly duplicated character. This is not an in-game rename.
-// The source ID remains an inactive, audited historical record; no EP transaction is changed.
+// The source is deleted after all of its references have moved to the target.
 // Both characters must belong to the same player (use the account merge first).
 func (s *Service) MergeDuplicate(ctx context.Context, actorID, targetID, sourceID int64, reason string) error {
 	reason = strings.TrimSpace(reason)
@@ -90,6 +90,7 @@ func (s *Service) MergeDuplicate(ctx context.Context, actorID, targetID, sourceI
 			query string
 			args  []any
 		}{
+			{"UPDATE character_name_history SET character_id=? WHERE character_id=?", []any{targetID, sourceID}},
 			{"UPDATE raid_attendance SET player_id=?, character_id=?, character_name=?, updated_at=? WHERE character_id=?", []any{target.PlayerID, targetID, target.Name, now, sourceID}},
 			{"UPDATE loot_awards SET awarded_to_player_id=?, awarded_to_character_id=?, awarded_to_character_name=?, updated_at=? WHERE awarded_to_character_id=?", []any{target.PlayerID, targetID, target.Name, now, sourceID}},
 			{"UPDATE raid_signups SET player_id=?, character_id=?, updated_at=? WHERE character_id=?", []any{target.PlayerID, targetID, now, sourceID}},
@@ -104,15 +105,15 @@ func (s *Service) MergeDuplicate(ctx context.Context, actorID, targetID, sourceI
 		if _, err := tx.ExecContext(ctx, "INSERT INTO character_merge_aliases (source_name, target_character_id, source_character_id, created_at) VALUES (?, ?, ?, ?)", source.Name, targetID, sourceID, now); err != nil {
 			return fmt.Errorf("store character alias: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, "UPDATE characters SET active=0, updated_at=? WHERE id=?", now, sourceID); err != nil {
-			return err
-		}
 		audits := audit.NewRepo(tx)
-		if err := audits.Insert(ctx, &audit.Log{ActorID: &actorID, EntityType: "character", EntityID: fmt.Sprint(sourceID), Action: "merge_duplicate_source", BeforeJSON: fmt.Sprintf("{\"id\":%d,\"name\":%q,\"active\":true}", sourceID, source.Name), AfterJSON: fmt.Sprintf("{\"id\":%d,\"active\":false,\"merged_into\":%d}", sourceID, targetID), Reason: reason, CreatedAt: now}); err != nil {
+		if err := audits.Insert(ctx, &audit.Log{ActorID: &actorID, EntityType: "character", EntityID: fmt.Sprint(sourceID), Action: "merge_duplicate_source", BeforeJSON: fmt.Sprintf("{\"id\":%d,\"name\":%q,\"active\":true}", sourceID, source.Name), AfterJSON: fmt.Sprintf("{\"id\":%d,\"deleted\":true,\"merged_into\":%d}", sourceID, targetID), Reason: reason, CreatedAt: now}); err != nil {
 			return err
 		}
 		if err := audits.Insert(ctx, &audit.Log{ActorID: &actorID, EntityType: "character", EntityID: fmt.Sprint(targetID), Action: "merge_duplicate_target", BeforeJSON: fmt.Sprintf("{\"id\":%d,\"name\":%q}", targetID, target.Name), AfterJSON: fmt.Sprintf("{\"id\":%d,\"merged_source\":%d}", targetID, sourceID), Reason: reason, CreatedAt: now}); err != nil {
 			return err
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM characters WHERE id=?", sourceID); err != nil {
+			return fmt.Errorf("delete source character: %w", err)
 		}
 		return nil
 	})

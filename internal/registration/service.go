@@ -119,6 +119,90 @@ func (s *Service) CreateLinkedCharacter(ctx context.Context, input LinkedCharact
 	return created, nil
 }
 
+func (s *Service) RetryCharacterLink(ctx context.Context, actorID, characterID int64) (*character.Character, error) {
+	actor, err := s.players.Get(ctx, actorID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, character.ErrInvalidActor
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !actor.Role.AtLeast(validation.RoleAdmin) {
+		return nil, character.ErrForbidden
+	}
+	existing, err := s.characters.Get(ctx, characterID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, character.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if existing.ExternalProfileID != "" || existing.ExternalSource != "" {
+		return nil, ErrProfileLinked
+	}
+	matches, err := s.external.SearchCharacters(ctx, existing.Name)
+	if err != nil {
+		return nil, err
+	}
+	var profileID string
+	for _, match := range matches {
+		if !strings.EqualFold(match.Name, existing.Name) {
+			continue
+		}
+		if profileID != "" && profileID != match.ProfileID {
+			return nil, ErrProfileAmbiguous
+		}
+		profileID = match.ProfileID
+	}
+	if profileID == "" {
+		return nil, ErrProfileRequired
+	}
+	profile, raw, err := s.loadUsableProfile(ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.EqualFold(profile.Name, existing.Name) {
+		return nil, ErrProfileUnusable
+	}
+	var linked *character.Character
+	err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		chars := s.characters.WithTx(tx)
+		c, err := chars.Get(ctx, characterID)
+		if err != nil {
+			return err
+		}
+		if c.ExternalProfileID != "" || c.ExternalSource != "" || !strings.EqualFold(c.Name, profile.Name) {
+			return ErrProfileLinked
+		}
+		if other, err := chars.FindByExternalProfile(ctx, ExternalSourceRisingGods, profile.ProfileID); err == nil {
+			if other.ID != c.ID {
+				return ErrProfileLinked
+			}
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		before := mustJSON(c)
+		now := time.Now().UTC()
+		c.ExternalSource = ExternalSourceRisingGods
+		c.ExternalProfileID = profile.ProfileID
+		c.ExternalProfileURL = profile.ProfileURL
+		c.ExternalProfileJSON = raw
+		c.MainSpec = profile.MainSpec
+		c.SecondSpec = profile.SecondSpec
+		c.GearScore = profile.GearScore
+		c.UpdatedAt = now
+		if err := chars.Update(ctx, c); err != nil {
+			return err
+		}
+		if err := audit.NewRepo(tx).Insert(ctx, &audit.Log{ActorID: &actorID, EntityType: "character", EntityID: fmt.Sprint(c.ID), Action: "link_rising_gods_profile", BeforeJSON: before, AfterJSON: mustJSON(c), Reason: "Manueller Rising-Gods-Verknüpfungsversuch", CreatedAt: now}); err != nil {
+			return err
+		}
+		linked = c
+		return nil
+	})
+	return linked, err
+}
+
 func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterID int64) (*character.Character, error) {
 	var updated *character.Character
 	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {

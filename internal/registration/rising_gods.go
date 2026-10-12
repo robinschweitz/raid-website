@@ -209,11 +209,11 @@ func (c RisingGodsClient) searchCharactersByFilter(ctx context.Context, filter s
 	}
 	dataStart := strings.Index(body, `"data":[`)
 	if dataStart < 0 {
-		return []ExternalCharacter{}, nil
+		return nil, fmt.Errorf("%w: missing profiler search data", ErrExternalUnavailable)
 	}
 	dataEnd := strings.Index(body[dataStart:], `,"parent"`)
 	if dataEnd < 0 {
-		return []ExternalCharacter{}, nil
+		return nil, fmt.Errorf("%w: incomplete profiler search data", ErrExternalUnavailable)
 	}
 	data := body[dataStart : dataStart+dataEnd]
 	objects := splitJSObjects(data)

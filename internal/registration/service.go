@@ -25,17 +25,17 @@ import (
 const codeTTL = 14 * 24 * time.Hour
 
 var (
-	ErrInvalid         = errors.New("registration request invalid")
-	ErrInvalidCode     = errors.New("registration code invalid or expired")
-	ErrForbidden       = errors.New("registration action forbidden")
-	ErrUsernameTaken   = errors.New("username already in use")
-	ErrRequestNotFound = errors.New("registration request not found")
-	ErrCodeNotFound    = errors.New("registration code not found")
-	ErrProfileRequired = errors.New("rising-gods profile required")
-	ErrProfileUnusable = errors.New("rising-gods profile could not be used")
-	ErrProfileLinked   = errors.New("rising-gods profile already linked")
-	ErrProfileAmbiguous  = errors.New("multiple rising-gods profiles match character name")
-	ErrProfileMissing  = errors.New("character has no rising-gods profile")
+	ErrInvalid          = errors.New("registration request invalid")
+	ErrInvalidCode      = errors.New("registration code invalid or expired")
+	ErrForbidden        = errors.New("registration action forbidden")
+	ErrUsernameTaken    = errors.New("username already in use")
+	ErrRequestNotFound  = errors.New("registration request not found")
+	ErrCodeNotFound     = errors.New("registration code not found")
+	ErrProfileRequired  = errors.New("rising-gods profile required")
+	ErrProfileUnusable  = errors.New("rising-gods profile could not be used")
+	ErrProfileLinked    = errors.New("rising-gods profile already linked")
+	ErrProfileAmbiguous = errors.New("multiple rising-gods profiles match character name")
+	ErrProfileMissing   = errors.New("character has no rising-gods profile")
 )
 
 type Service struct {

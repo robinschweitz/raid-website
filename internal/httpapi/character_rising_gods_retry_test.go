@@ -2,12 +2,12 @@ package httpapi_test
 
 import (
 	"context"
-	"fmt"
 	"errors"
+	"fmt"
 	"testing"
 
 	"raid-website/internal/audit"
-		"raid-website/internal/character"
+	"raid-website/internal/character"
 	"raid-website/internal/player"
 	"raid-website/internal/registration"
 )

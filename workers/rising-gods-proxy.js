@@ -23,7 +23,6 @@ async function handleRequest(request) {
   try {
     const response = await fetch(upstream + url.search, {
       headers: { 'User-Agent': 'Bratwurst-des-Schicksals/1.0' },
-      cf: { cacheTtl: 300, cacheEverything: true },
     })
     const headers = diagnosticHeaders(requestID, String(response.status))
     headers.set('Content-Type', response.headers.get('Content-Type') ?? 'text/html; charset=utf-8')

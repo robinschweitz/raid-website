@@ -34,6 +34,7 @@ var (
 	ErrProfileRequired = errors.New("rising-gods profile required")
 	ErrProfileUnusable = errors.New("rising-gods profile could not be used")
 	ErrProfileLinked   = errors.New("rising-gods profile already linked")
+	ErrProfileAmbiguous  = errors.New("multiple rising-gods profiles match character name")
 	ErrProfileMissing  = errors.New("character has no rising-gods profile")
 )
 

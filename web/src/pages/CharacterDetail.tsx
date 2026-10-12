@@ -71,6 +71,24 @@ function CharacterDetail({ characterID }: Props) {
   const hasNameHistory = history.length > 0
   const canReloadProfile = Boolean(me && atLeast(me.role, 'ADMIN') && character.external_source === 'rising-gods' && character.external_profile_id)
 
+  const canRetryLink = Boolean(me && atLeast(me.role, 'ADMIN') && !character.external_profile_id && !character.external_source)
+
+  const retryLink = async () => {
+    if (!canRetryLink) return
+    await submit(async () => {
+      setError('')
+      setStatus('')
+      try {
+        const linked = await api.post<Character>(`/api/v1/characters/${character.id}/retry-link`)
+        if (!isActive()) return
+        setCharacter(linked)
+        setStatus('Rising-Gods-Profil wurde erfolgreich verknüpft.')
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Rising-Gods-Verknüpfung fehlgeschlagen')
+      }
+    })
+  }
+
   const reloadProfile = async () => {
     if (!canReloadProfile) return
     await submit(async () => {

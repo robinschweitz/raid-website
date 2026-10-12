@@ -145,6 +145,12 @@ func (s *Service) RetryCharacterLink(ctx context.Context, actorID, characterID i
 	// slugs are deterministic, so resolve the exact profile instead of using a
 	// broad list search for every retry.
 	matches, err := s.external.SearchCharacters(ctx, "eu.rising-gods."+strings.ToLower(strings.TrimSpace(existing.Name)))
+	if errors.Is(err, ErrExternalNotFound) {
+		return nil, ErrProfileRequired
+	}
+	if errors.Is(err, ErrExternalInvalid) {
+		return nil, ErrProfileUnusable
+	}
 	if err != nil {
 		return nil, err
 	}

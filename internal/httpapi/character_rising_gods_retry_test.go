@@ -13,12 +13,16 @@ import (
 )
 
 type retryExternalClient struct {
-	matches []registration.ExternalCharacter
-	queries []string
+	matches   []registration.ExternalCharacter
+	queries   []string
+	searchErr error
 }
 
 func (client *retryExternalClient) SearchCharacters(_ context.Context, query string) ([]registration.ExternalCharacter, error) {
 	client.queries = append(client.queries, query)
+	if client.searchErr != nil {
+		return nil, client.searchErr
+	}
 	return client.matches, nil
 }
 
@@ -75,5 +79,14 @@ func TestRetryCharacterLinkDoesNotGuessAmbiguousProfile(t *testing.T) {
 	stored, err := character.NewRepo(f.db).Get(context.Background(), f.initial.ID)
 	if err != nil || stored.ExternalProfileID != "" {
 		t.Fatalf("unexpected profile link: %+v, %v", stored, err)
+	}
+}
+
+func TestRetryCharacterLinkMapsMissingDirectProfileToNotFound(t *testing.T) {
+	f := newCharacterCorrectionFixture(t)
+	defer f.srv.Close()
+	service := registration.NewService(f.db, player.NewRepo(f.db), character.NewRepo(f.db), audit.NewRepo(f.db), nil, &retryExternalClient{searchErr: registration.ErrExternalNotFound})
+	if _, err := service.RetryCharacterLink(context.Background(), f.actorID, f.initial.ID); !errors.Is(err, registration.ErrProfileRequired) {
+		t.Fatalf("expected profile required error, got %v", err)
 	}
 }

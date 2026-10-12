@@ -147,7 +147,7 @@ function PlayerDetail({ playerID }: Props) {
     if (!isOwnProfile) return
     try {
       const status = await api.get<MFAStatus>('/api/v1/auth/mfa')
-      if (isActive()) setMfaStatus(status)
+      if (isActive()) setMfaStatus({ totp_enabled: status.totp_enabled, security_keys: status.security_keys ?? [] })
     } catch {
       if (isActive()) setError('MFA-Status konnte nicht geladen werden.')
     }

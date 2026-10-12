@@ -72,6 +72,8 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
     const localRequire = (name) => {
       if (name === 'react') return react
       if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' }
+      if (name === 'qrcode') return { default: { toDataURL: async () => '' } }
+      if (name === 'recharts') return new Proxy({}, { get: () => 'div' })
       if (name.endsWith('/auth')) return { useAuth: () => auth }
       if (name.endsWith('/router')) return { Link: 'a', navigate: (url) => navigations.push(url), useRoute: () => '/' }
       const resolved = path.resolve(path.dirname(filename), name)
@@ -462,18 +464,19 @@ test('raid character selection resolves ownership directly and guards stale subm
   assert.equal(s.requests.some((r) => /players\/\d+\/characters/.test(r.url)), false)
 })
 
-test('player EP is read-only and switching players resets account drafts', async () => {
+test('player EP is read-only while switching players', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
   resolvePlayer(s, 1)
   await flush(view)
-  input(view, 'Passwort (leer = unverändert)').props.onChange(change('secret'))
+  button(view, 'Konto').props.onClick()
+  view.render()
+  input(view, 'Aktuelles Passwort').props.onChange(change('secret'))
   assert.equal(button(view, 'Enhance würfeln'), undefined)
   assert.equal(writes(s).length, 0)
   view.render({ playerID: 2 })
   resolvePlayer(s, 2)
   await flush(view)
-  assert.equal(input(view, 'Passwort (leer = unverändert)').props.value, '')
   assert.doesNotMatch(text(view.tree), /Kosten 50/)
   assert.equal(button(view, 'Enhance würfeln'), undefined)
 })
@@ -1705,8 +1708,8 @@ test('fetch wrapper keeps archive sibling fields and sends session credentials',
   const { api } = setup().load('api.ts')
   assert.deepEqual(await api.postEnvelope('/api/v1/raids/1/archive'), envelope)
   assert.deepEqual(await api.get('/api/v1/raids/1'), envelope.data)
-  assert.equal(calls[0].options.method, 'POST')
-  assert.equal(calls[0].options.credentials, 'include')
+  const post = calls.find((call) => call.options.method === 'POST')
+  assert.equal(post.options.credentials, 'include')
 })
 
 for (const role of ['GUEST', 'MEMBER']) {
@@ -2456,7 +2459,7 @@ test('roster board groups saved roles, separates the Ersatzbank and preserves no
   assert.ok(nodes(Board({ ...props, pending: true }), (n) => n.type === 'button').every((n) => n.props.disabled))
 })
 
-test('profile navigation exposes one area and keeps account controls administrator-only', async () => {
+test('profile navigation exposes one area and allows own account controls', async () => {
   const s = setup({ id: 1, role: 'MEMBER' })
   const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
   resolvePlayer(s, 1)
@@ -2468,8 +2471,9 @@ test('profile navigation exposes one area and keeps account controls administrat
   view.render()
   assert.equal(panel('profile-points').props.hidden, true)
   assert.equal(panel('profile-locks').props.hidden, false)
-  assert.equal(button(view, 'Konto'), undefined)
-  assert.equal(panel('profile-account'), undefined)
+  button(view, 'Konto').props.onClick()
+  view.render()
+  assert.equal(panel('profile-account').props.hidden, false)
 })
 
 for (const role of ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN']) {

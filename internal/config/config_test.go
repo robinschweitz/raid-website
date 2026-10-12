@@ -46,3 +46,29 @@ func TestDevelopmentDefaults(t *testing.T) {
 		t.Fatal("development defaults changed")
 	}
 }
+
+func TestRisingGodsProxyConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		name, proxyURL, token string
+		valid                 bool
+	}{
+		{"disabled", "", "", true},
+		{"missing token", "https://proxy.example", "", false},
+		{"missing URL", "", "token", false},
+		{"non HTTPS URL", "http://proxy.example", "token", false},
+		{"URL path", "https://proxy.example/path", "token", false},
+		{"enabled", "https://proxy.example/", "token", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("RISING_GODS_PROXY_URL", tc.proxyURL)
+			t.Setenv("RISING_GODS_PROXY_TOKEN", tc.token)
+			cfg, err := Load()
+			if (err == nil) != tc.valid {
+				t.Fatalf("Load error = %v, want valid %v", err, tc.valid)
+			}
+			if tc.valid && tc.proxyURL != "" && cfg.RisingGodsProxyURL != "https://proxy.example" {
+				t.Fatalf("unexpected normalized proxy URL %q", cfg.RisingGodsProxyURL)
+			}
+		})
+	}
+}

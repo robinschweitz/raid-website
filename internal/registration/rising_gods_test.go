@@ -43,6 +43,28 @@ func TestRisingGodsSearchUsesAllianceLevel80FilterAndCache(t *testing.T) {
 	}
 }
 
+func TestRisingGodsProxyUsesBearerToken(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-Rising-Gods-Proxy-Token"); got != "proxy-secret" {
+			t.Fatalf("X-Rising-Gods-Proxy-Token = %q", got)
+		}
+		if r.URL.Query().Get("profiles") != "eu.rising-gods" {
+			t.Fatalf("unexpected query: %s", r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"data":[],"parent":{}}`))
+	}))
+	defer srv.Close()
+
+	client := RisingGodsClient{HTTPClient: srv.Client(), ProxyURL: srv.URL, ProxyToken: "proxy-secret", cache: newRisingGodsCache()}
+	rows, err := client.SearchCharacters(context.Background(), "Test")
+	if err != nil {
+		t.Fatalf("search through proxy: %v", err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("unexpected rows: %#v", rows)
+	}
+}
+
 func TestRisingGodsSearchUsesTargetedQueryForSubstringMatches(t *testing.T) {
 	var searchRequests int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

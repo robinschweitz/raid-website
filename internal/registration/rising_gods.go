@@ -65,6 +65,8 @@ type ExternalClient interface {
 
 type RisingGodsClient struct {
 	HTTPClient *http.Client
+	ProxyURL   string
+	ProxyToken string
 	cache      *risingGodsCache
 }
 
@@ -108,6 +110,13 @@ func (c RisingGodsClient) client() *http.Client {
 		return c.HTTPClient
 	}
 	return &http.Client{Timeout: risingGodsFetchTimeout}
+}
+
+func (c RisingGodsClient) upstreamURL() string {
+	if c.ProxyURL != "" {
+		return strings.TrimRight(c.ProxyURL, "/")
+	}
+	return risingGodsBaseURL
 }
 
 func (c RisingGodsClient) sharedCache() *risingGodsCache {
@@ -191,7 +200,7 @@ func (c RisingGodsClient) searchCharactersLive(ctx context.Context, q string) ([
 }
 
 func (c RisingGodsClient) searchCharactersByFilter(ctx context.Context, filter string) ([]ExternalCharacter, error) {
-	u := risingGodsBaseURL + "/?profiles=eu.rising-gods&filter=" + url.QueryEscape(filter)
+	u := c.upstreamURL() + "/?profiles=eu.rising-gods&filter=" + url.QueryEscape(filter)
 	body, err := c.fetch(ctx, u)
 	if err != nil {
 		return nil, err
@@ -254,7 +263,7 @@ func (c RisingGodsClient) LoadCharacter(ctx context.Context, profileID string) (
 }
 
 func (c RisingGodsClient) loadCharacterLive(ctx context.Context, id string) (ExternalCharacter, string, error) {
-	body, err := c.fetch(ctx, risingGodsBaseURL+"/?profile=load&id="+url.QueryEscape(id))
+	body, err := c.fetch(ctx, c.upstreamURL()+"/?profile=load&id="+url.QueryEscape(id))
 	if err != nil {
 		return ExternalCharacter{}, "", err
 	}
@@ -551,7 +560,7 @@ func (c RisingGodsClient) loadProfileReference(ctx context.Context, ref string) 
 }
 
 func (c RisingGodsClient) resolveProfileSlug(ctx context.Context, ref string) (string, error) {
-	slugURL, err := normalizedRisingGodsProfileURL(ref)
+	slugURL, err := c.normalizedRisingGodsProfileURL(ref)
 	if err != nil {
 		return "", err
 	}
@@ -586,6 +595,9 @@ func (c RisingGodsClient) fetch(ctx context.Context, u string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return "", err
+	}
+	if c.ProxyToken != "" {
+		req.Header.Set("X-Rising-Gods-Proxy-Token", c.ProxyToken)
 	}
 	resp, err := c.client().Do(req)
 	if err != nil {
@@ -791,10 +803,10 @@ func profileLoadID(ref string) string {
 	return strings.TrimSpace(u.Query().Get("id"))
 }
 
-func normalizedRisingGodsProfileURL(ref string) (string, error) {
+func (c RisingGodsClient) normalizedRisingGodsProfileURL(ref string) (string, error) {
 	trimmed := strings.TrimSpace(ref)
 	if strings.HasPrefix(strings.ToLower(trimmed), "eu.rising-gods.") {
-		return risingGodsBaseURL + "/?profile=" + url.QueryEscape(trimmed), nil
+		return c.upstreamURL() + "/?profile=" + url.QueryEscape(trimmed), nil
 	}
 	u, err := url.Parse(trimmed)
 	if err != nil {
@@ -807,7 +819,7 @@ func normalizedRisingGodsProfileURL(ref string) (string, error) {
 	if profile == "" || profile == "load" {
 		return "", ErrExternalInvalid
 	}
-	return risingGodsBaseURL + "/?profile=" + url.QueryEscape(profile), nil
+	return c.upstreamURL() + "/?profile=" + url.QueryEscape(profile), nil
 }
 
 func filterRowsByName(rows []ExternalCharacter, query string) []ExternalCharacter {

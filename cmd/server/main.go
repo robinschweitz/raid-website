@@ -48,19 +48,21 @@ func run() (err error) {
 	if err := detectNamingPatterns(ctx, bdb.DB); err != nil {
 		return fmt.Errorf("naming pattern detection: %w", err)
 	}
+	risingGods := registration.RisingGodsClient{ProxyURL: cfg.RisingGodsProxyURL, ProxyToken: cfg.RisingGodsProxyToken}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
 		CookieSecure:      cfg.CookieSecure,
 		TrustProxyHeaders: cfg.TrustProxyHeaders,
 		PublicOrigin:      cfg.PublicOrigin,
 		AdminUsername:     cfg.AdminUsername,
 		AdminPassword:     cfg.AdminPassword,
+		RegistrationFeed:  risingGods,
 	})
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)
 	}
 	warmCtx, stopWarm := context.WithCancel(ctx)
 	defer stopWarm()
-	go registration.RunSearchCacheWarmer(warmCtx, character.NewRepo(bdb.DB), registration.RisingGodsClient{}, 6*time.Hour)
+	go registration.RunSearchCacheWarmer(warmCtx, character.NewRepo(bdb.DB), risingGods, 6*time.Hour)
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("listening on %s", addr)
 	if err := http.ListenAndServe(addr, h); err != nil && err != http.ErrServerClosed {

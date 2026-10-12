@@ -10,6 +10,7 @@ import (
 
 	"raid-website/internal/character"
 	"raid-website/internal/httpapi"
+	"raid-website/internal/player"
 	"raid-website/internal/registration"
 	"raid-website/internal/validation"
 )
@@ -514,6 +515,63 @@ func TestRegistrationSearchReportsRisingGodsUnavailable(t *testing.T) {
 	status, body = do(t, srv.Client(), http.MethodPost, srv.URL+"/api/v1/auth/registration-requests", "", map[string]any{"profile_id": "1"})
 	if status != http.StatusBadGateway || !strings.Contains(string(body), `"code":"rising_gods_unavailable"`) {
 		t.Fatalf("request: status %d body %s", status, body)
+	}
+}
+
+func TestRegistrationClaimsImportedCharacterOwner(t *testing.T) {
+	feed := fakeRegistrationFeed{characters: map[string]registration.ExternalCharacter{
+		"42": {ProfileID: "42", Name: "ImportedHero", Class: "Magier", MainSpec: "Arkan", Level: 80, ProfileURL: "https://db.rising-gods.de/?profile=load&id=42"},
+	}}
+	srv, bdb := setupServerWithOptions(t, httpapi.Options{RegistrationFeed: feed})
+	client := srv.Client()
+	seedAccount(t, bdb, "admin", "pw", validation.RoleAdmin)
+	now := time.Now().UTC()
+	importedOwner := &player.Player{Name: "Legacy owner", Role: validation.RoleGuest, Active: true, CreatedAt: now, UpdatedAt: now}
+	if _, err := bdb.NewInsert().Model(importedOwner).Exec(t.Context()); err != nil {
+		t.Fatalf("create imported owner: %v", err)
+	}
+	importedCharacter := &character.Character{PlayerID: importedOwner.ID, Name: "ImportedHero", Class: "Magier", MainSpec: "Arkan", Active: true, CreatedAt: now, UpdatedAt: now}
+	if _, err := bdb.NewInsert().Model(importedCharacter).Exec(t.Context()); err != nil {
+		t.Fatalf("create imported character: %v", err)
+	}
+	adminToken := login(t, client, srv, "admin", "pw")
+
+	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/registration-requests", "", map[string]any{"profile_id": "42"})
+	if status != http.StatusCreated {
+		t.Fatalf("create request: status %d body %s", status, body)
+	}
+	var requestOut struct {
+		Data registration.Request `json:"data"`
+	}
+	if err := json.Unmarshal(body, &requestOut); err != nil {
+		t.Fatalf("decode request: %v", err)
+	}
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/registration-requests/%d/code", srv.URL, requestOut.Data.ID), adminToken, nil)
+	if status != http.StatusCreated {
+		t.Fatalf("create code: status %d body %s", status, body)
+	}
+	var codeOut struct {
+		Data struct {
+			Code string `json:"code"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &codeOut); err != nil {
+		t.Fatalf("decode code: %v", err)
+	}
+
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": codeOut.Data.Code, "username": "importedhero", "password": "valid-secret"})
+	if status != http.StatusOK {
+		t.Fatalf("redeem: status %d body %s", status, body)
+	}
+	claimedOwner := new(player.Player)
+	if err := bdb.NewSelect().Model(claimedOwner).Where("id = ?", importedOwner.ID).Scan(t.Context()); err != nil {
+		t.Fatalf("load claimed owner: %v", err)
+	}
+	if claimedOwner.Username == nil || *claimedOwner.Username != "importedhero" || claimedOwner.PasswordHash == "" {
+		t.Fatalf("imported owner did not receive credentials: %#v", claimedOwner)
+	}
+	if token := login(t, client, srv, "importedhero", "valid-secret"); token == "" {
+		t.Fatal("claimed imported owner cannot log in")
 	}
 }
 

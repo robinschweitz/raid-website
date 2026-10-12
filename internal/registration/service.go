@@ -316,6 +316,44 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 		}
 		players := s.players.WithTx(tx)
 		chars := s.characters.WithTx(tx)
+		if existing, err := chars.FindByExternalProfile(ctx, req.ExternalSource, req.ExternalProfileID); err == nil {
+			p, err := players.Get(ctx, existing.PlayerID)
+			if err != nil {
+				return 0, err
+			}
+			if p.Username != nil || p.PasswordHash != "" {
+				return 0, ErrProfileLinked
+			}
+			p.Username = &uname
+			p.PasswordHash = hash
+			p.UpdatedAt = now
+			if err := players.Update(ctx, p); err != nil {
+				return 0, err
+			}
+			created = p
+			return p.ID, nil
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return 0, err
+		}
+		if existing, err := chars.FindByName(ctx, req.CharacterName); err == nil {
+			p, err := players.Get(ctx, existing.PlayerID)
+			if err != nil {
+				return 0, err
+			}
+			if p.Username != nil || p.PasswordHash != "" {
+				return 0, ErrProfileLinked
+			}
+			p.Username = &uname
+			p.PasswordHash = hash
+			p.UpdatedAt = now
+			if err := players.Update(ctx, p); err != nil {
+				return 0, err
+			}
+			created = p
+			return p.ID, nil
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return 0, err
+		}
 		p := &player.Player{Name: req.CharacterName, Username: &uname, PasswordHash: hash, Role: validation.RoleGuest, Active: true, CreatedAt: now, UpdatedAt: now}
 		if err := players.Create(ctx, p); err != nil {
 			return 0, err

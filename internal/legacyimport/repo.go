@@ -138,7 +138,7 @@ func (r *Repo) hasLegacyProvenanceGap(ctx context.Context, source, sheetID strin
 func (r *Repo) charactersByName(ctx context.Context, name string) ([]character.Character, error) {
 	var rows []character.Character
 	err := r.db.NewSelect().Model(&rows).
-		Where("character.name = ? OR EXISTS (SELECT 1 FROM character_name_history AS history WHERE history.character_id = character.id AND (history.old_name = ? OR history.new_name = ?))", name, name, name).
+		Where("character.active = ? AND (character.name = ? OR EXISTS (SELECT 1 FROM character_name_history AS history WHERE history.character_id = character.id AND (history.old_name = ? OR history.new_name = ?)) OR EXISTS (SELECT 1 FROM character_merge_aliases AS alias WHERE alias.target_character_id = character.id AND alias.source_name = ?))", true, name, name, name, name).
 		Scan(ctx)
 	return rows, err
 }

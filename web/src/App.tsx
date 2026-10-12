@@ -19,6 +19,8 @@ import { GuildCrest } from './components/GuildCrest'
 import { NavIcon } from './components/NavIcon'
 import { LootCatalogPage } from './pages/LootCatalog'
 import { RegistrationRequestsPage } from './pages/RegistrationRequests'
+import { ChangelogPage } from './pages/Changelog'
+import { appVersion } from './release'
 
 function Routes() {
   const path = useRoute()
@@ -52,6 +54,7 @@ function Routes() {
     return <ImportsPage />
   }
   if (parts[0] === 'registration-requests') return <RegistrationRequestsPage />
+  if (parts[0] === 'changelog') return <ChangelogPage />
   return <p className="muted">Seite nicht gefunden.</p>
 }
 
@@ -95,6 +98,10 @@ function Layout() {
             <Link className={path === '/registration-requests' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/registration-requests"><NavIcon name="players" />Registrierung</Link>
           </>}
         </nav>
+        <div className="sidebar-footer">
+          <Link to="/changelog">Version {appVersion}</Link>
+          <span>Changelog ansehen</span>
+        </div>
       </aside>
       <div className="main-shell">
       <header className="topbar">

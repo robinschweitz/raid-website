@@ -282,6 +282,16 @@ test('shell separates real dashboard from raid creation and provides accessible 
   assert.doesNotMatch(css, /@import|https?:\/\//)
 })
 
+test('shell exposes the current version and an in-app changelog', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/App.tsx'), 'utf8')
+  const release = fs.readFileSync(path.resolve(__dirname, '../src/release.ts'), 'utf8')
+  const changelog = fs.readFileSync(path.resolve(__dirname, '../src/pages/Changelog.tsx'), 'utf8')
+  assert.match(source, /to="\/changelog".*Version \{appVersion\}/)
+  assert.match(source, /parts\[0\] === 'changelog'/)
+  assert.match(release, /appVersion = '1\.0\.0'/)
+  assert.match(changelog, /Changelog/)
+})
+
 const emptyCatalog = { sources: [], instances: [], bosses: [], items: [], drops: [] }
 const dataset = {
   source: { id: 'reviewed-source', revision: 'pinned-revision', url: 'https://example.test/source', license: 'Reviewed license', attribution: 'Source authors' },

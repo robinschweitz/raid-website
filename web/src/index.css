@@ -553,9 +553,28 @@ label.inline-choice {
 }
 
 .sidebar-footer span {
+  display: block;
+  margin-top: 2px;
   color: var(--muted);
   font: 10px system-ui, sans-serif;
   letter-spacing: .03em;
+}
+
+.sidebar-footer a {
+  color: #b9cada;
+}
+
+.sidebar-footer a:hover {
+  color: var(--accent);
+}
+
+.changelog-release ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.changelog-release li + li {
+  margin-top: .45rem;
 }
 
 .main-shell {

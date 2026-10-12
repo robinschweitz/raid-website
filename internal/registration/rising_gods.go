@@ -19,6 +19,7 @@ import (
 )
 
 const risingGodsBaseURL = "https://db.rising-gods.de"
+const risingGodsUserAgent = "Mozilla/5.0 (compatible; Bratwurst-des-Schicksals/1.0)"
 
 var (
 	ErrExternalNotFound    = errors.New("rising-gods character not found")
@@ -600,6 +601,7 @@ func (c RisingGodsClient) fetch(ctx context.Context, u string) (string, error) {
 	if c.ProxyToken != "" {
 		req.Header.Set("X-Rising-Gods-Proxy-Token", c.ProxyToken)
 	}
+	req.Header.Set("User-Agent", risingGodsUserAgent)
 	resp, err := c.client().Do(req)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrExternalUnavailable, err)

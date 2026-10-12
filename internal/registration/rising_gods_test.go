@@ -48,6 +48,9 @@ func TestRisingGodsProxyUsesBearerToken(t *testing.T) {
 		if got := r.Header.Get("X-Rising-Gods-Proxy-Token"); got != "proxy-secret" {
 			t.Fatalf("X-Rising-Gods-Proxy-Token = %q", got)
 		}
+		if got := r.Header.Get("User-Agent"); got != risingGodsUserAgent {
+			t.Fatalf("User-Agent = %q", got)
+		}
 		if r.URL.Query().Get("profiles") != "eu.rising-gods" {
 			t.Fatalf("unexpected query: %s", r.URL.RawQuery)
 		}

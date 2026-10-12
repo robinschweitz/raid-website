@@ -380,6 +380,19 @@ func TestWarmSearchCacheSkipsFreshEntries(t *testing.T) {
 	}
 }
 
+func TestRisingGodsSearchClassifiesUpstreamRejectionAsUnavailable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+
+	client := testRisingGodsClient(srv.URL)
+	_, err := client.SearchCharacters(context.Background(), "Servenaja")
+	if !errors.Is(err, ErrExternalUnavailable) {
+		t.Fatalf("expected unavailable error, got %v", err)
+	}
+}
+
 func testRisingGodsClient(base string) RisingGodsClient {
 	return RisingGodsClient{HTTPClient: &http.Client{Transport: rewriteTransport{base: base}}, cache: newRisingGodsCache()}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -498,6 +499,21 @@ func TestRegistrationWithRisingGodsCode(t *testing.T) {
 	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": codeOut.Data.Code, "username": "again", "password": "valid-secret"})
 	if status != http.StatusBadRequest {
 		t.Fatalf("reuse code: want 400 got %d body %s", status, body)
+	}
+}
+
+func TestRegistrationSearchReportsRisingGodsUnavailable(t *testing.T) {
+	feed := fakeRegistrationFeed{searchErr: registration.ErrExternalUnavailable, loadErr: registration.ErrExternalUnavailable}
+	srv, _ := setupServerWithOptions(t, httpapi.Options{RegistrationFeed: feed})
+
+	status, body := do(t, srv.Client(), http.MethodGet, srv.URL+"/api/v1/external/rising-gods/characters?q=Big", "", nil)
+	if status != http.StatusBadGateway || !strings.Contains(string(body), `"code":"rising_gods_unavailable"`) {
+		t.Fatalf("search: status %d body %s", status, body)
+	}
+
+	status, body = do(t, srv.Client(), http.MethodPost, srv.URL+"/api/v1/auth/registration-requests", "", map[string]any{"profile_id": "1"})
+	if status != http.StatusBadGateway || !strings.Contains(string(body), `"code":"rising_gods_unavailable"`) {
+		t.Fatalf("request: status %d body %s", status, body)
 	}
 }
 

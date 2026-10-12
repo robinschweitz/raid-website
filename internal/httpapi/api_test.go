@@ -58,9 +58,14 @@ func setupServerWithOptions(t *testing.T, opts httpapi.Options) (*httptest.Serve
 
 type fakeRegistrationFeed struct {
 	characters map[string]registration.ExternalCharacter
+	searchErr  error
+	loadErr    error
 }
 
 func (f fakeRegistrationFeed) SearchCharacters(ctx context.Context, query string) ([]registration.ExternalCharacter, error) {
+	if f.searchErr != nil {
+		return nil, f.searchErr
+	}
 	var rows []registration.ExternalCharacter
 	for _, row := range f.characters {
 		if strings.Contains(strings.ToLower(row.Name), strings.ToLower(query)) {
@@ -71,6 +76,9 @@ func (f fakeRegistrationFeed) SearchCharacters(ctx context.Context, query string
 }
 
 func (f fakeRegistrationFeed) LoadCharacter(ctx context.Context, profileID string) (registration.ExternalCharacter, string, error) {
+	if f.loadErr != nil {
+		return registration.ExternalCharacter{}, "", f.loadErr
+	}
 	row, ok := f.characters[profileID]
 	if !ok {
 		return registration.ExternalCharacter{}, "", registration.ErrExternalNotFound

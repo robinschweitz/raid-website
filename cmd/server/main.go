@@ -8,10 +8,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/uptrace/bun"
-	"raid-website/internal/character"
 	"raid-website/internal/config"
 	"raid-website/internal/db"
 	"raid-website/internal/httpapi"
@@ -60,9 +58,6 @@ func run() (err error) {
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)
 	}
-	warmCtx, stopWarm := context.WithCancel(ctx)
-	defer stopWarm()
-	go registration.RunSearchCacheWarmer(warmCtx, character.NewRepo(bdb.DB), risingGods, 6*time.Hour)
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("listening on %s", addr)
 	if err := http.ListenAndServe(addr, h); err != nil && err != http.ErrServerClosed {

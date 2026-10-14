@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+
+	"raid-website/internal/validation"
 )
 
 // sourceConflicts compares source versions, independently of later website edits.
@@ -146,6 +148,17 @@ func (s *Service) sourceConflicts(ctx context.Context, source, sheetID string, d
 			}
 		}
 	}
+	// A newly planned successor owns the next live setup block only once the
+	// imported predecessor is archived. This one-time handoff is validated
+	// in SyncCurrentSetup against the previously archived setup snapshot.
+	// Once the successor has its own baseline, historical edits remain conflicts.
+	if !archiveSetup {
+		pending, err := s.pendingCurrentSetupHandoff(ctx, source, sheetID)
+		if err != nil {
+			return nil, err
+		}
+		archiveSetup = pending
+	}
 	if len(old.Setup) > 0 && !archiveSetup {
 		oldSetupPlan, newSetupPlan := Plan{}, Plan{}
 		before, _, err := parseSetup(old.Setup, &oldSetupPlan)
@@ -171,4 +184,46 @@ func (s *Service) sourceConflicts(ctx context.Context, source, sheetID string, d
 		conflicts = append(conflicts, newSetupPlan.Errors...)
 	}
 	return conflicts, nil
+}
+
+// pendingCurrentSetupHandoff only lifts source-baseline immutability for the
+// first adoption of a later active raid. It does not itself perform any write.
+// SyncCurrentSetup still requires a distinct, proven old roster snapshot.
+func (s *Service) pendingCurrentSetupHandoff(ctx context.Context, source, sheetID string) (bool, error) {
+	mapping, err := s.imports.setupMapping(ctx, source, sheetID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	imported, err := s.raids.Get(ctx, mapping.RaidID)
+	if err != nil {
+		return false, err
+	}
+	if imported.ArchivedAt == nil || imported.Status != validation.RaidStatusCompleted || imported.ScheduledStart == nil {
+		return false, nil
+	}
+	seriesRaids, err := s.raids.ListBySeries(ctx, mapping.SeriesID)
+	if err != nil {
+		return false, err
+	}
+	var targetID int64
+	for _, rd := range seriesRaids {
+		if rd.ArchivedAt != nil || (rd.Status != validation.RaidStatusPlanned && rd.Status != validation.RaidStatusOpen) {
+			continue
+		}
+		if targetID != 0 || rd.ScheduledStart == nil || !rd.ScheduledStart.After(*imported.ScheduledStart) {
+			return false, nil
+		}
+		targetID = rd.ID
+	}
+	if targetID == 0 || targetID == mapping.RaidID {
+		return false, nil
+	}
+	_, err = s.imports.setupBaseline(ctx, source, sheetID, targetID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return true, nil
+	}
+	return false, err
 }

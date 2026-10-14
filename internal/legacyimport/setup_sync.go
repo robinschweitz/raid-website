@@ -26,10 +26,14 @@ type SetupSyncReport struct {
 // to the single active raid of the imported series. Conflicting edits are reported
 // before any change is committed. Archived raids and unknown players are never
 // modified automatically.
-func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, sheetID string) (SetupSyncReport, error) {
+func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, sheetID, expectedHash string) (SetupSyncReport, error) {
     var report SetupSyncReport
     data, err := s.fetcher.Fetch(ctx, sheetID)
     if err != nil { return report, err }
+    if data.Hash != expectedHash {
+        report.Conflicts = append(report.Conflicts, "Google Sheet wurde während des laufenden Abgleichs verändert; nächster Lauf erforderlich")
+        return report, nil
+    }
     plan := Plan{}
     entries, _, err := parseSetup(data.Setup, &plan)
     if err != nil { return report, err }

@@ -148,10 +148,10 @@ func (s *Service) sourceConflicts(ctx context.Context, source, sheetID string, d
 			}
 		}
 	}
-	// A newly planned successor owns the next live setup block only once the
-	// imported predecessor is archived. This one-time handoff is validated
-	// in SyncCurrentSetup against the previously archived setup snapshot.
-	// Once the successor has its own baseline, historical edits remain conflicts.
+	// ICC25 Raidsetup is the live roster of the next occurrence once the
+	// imported predecessor is archived. It may change on this first handoff
+	// (including the run that creates the next raid). After the target has
+	// a source baseline, changes to established participation still conflict.
 	if !archiveSetup {
 		pending, err := s.pendingCurrentSetupHandoff(ctx, source, sheetID)
 		if err != nil {
@@ -186,9 +186,9 @@ func (s *Service) sourceConflicts(ctx context.Context, source, sheetID string, d
 	return conflicts, nil
 }
 
-// pendingCurrentSetupHandoff only lifts source-baseline immutability for the
-// first adoption of a later active raid. It does not itself perform any write.
-// SyncCurrentSetup still requires a distinct, proven old roster snapshot.
+// pendingCurrentSetupHandoff lifts old source immutability only when
+// the imported predecessor has been archived and the next ICC25 occurrence
+// has not yet received its own setup baseline. It performs no writes.
 func (s *Service) pendingCurrentSetupHandoff(ctx context.Context, source, sheetID string) (bool, error) {
 	mapping, err := s.imports.setupMapping(ctx, source, sheetID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -218,7 +218,16 @@ func (s *Service) pendingCurrentSetupHandoff(ctx context.Context, source, sheetI
 		}
 		targetID = rd.ID
 	}
-	if targetID == 0 || targetID == mapping.RaidID {
+	if targetID == 0 {
+		series, err := s.series.Get(ctx, mapping.SeriesID)
+		if err != nil {
+			return false, err
+		}
+		// An absent future raid is now creatable from the proven ICC25
+		// archive plus the explicitly configured recurrence.
+		return series.Name == "ICC25" && series.NameTemplate == "ICC25-{number}", nil
+	}
+	if targetID == mapping.RaidID {
 		return false, nil
 	}
 	_, err = s.imports.setupBaseline(ctx, source, sheetID, targetID)

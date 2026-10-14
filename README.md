@@ -100,7 +100,7 @@ SHEET_SYNC_SERVICE_ACCOUNT_JSON='{"type":"service_account","client_email":"...",
 
 **Servicekonto-Schutz:** Die GUI zeigt die Zugangsdaten nach dem Hochladen
 nicht mehr an. Sie werden verschlüsselt in SQLite abgelegt, der lokale
-Schlüssel `<DATENBANKPFAD>.sheet-sync.key` ist separat (Dateimodus 0600)
+Schlüssel `<DATENBANKPFAD>.sheet-sync.key` ist separat (Unix: Modus 0600, Windows: geschützte ACL)
 gespeichert. **Für ein vollständiges Backup/Restore beide Dateien aufbewahren**
 und vor unbefugtem Zugriff schützen. Der Schlüssel darf nicht ins Repository.
 Eine gespeicherte GUI-Konfiguration hat Vorrang vor den alten Env-Werten.

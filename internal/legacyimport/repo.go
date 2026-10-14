@@ -237,6 +237,23 @@ func (r *Repo) setupBaseline(ctx context.Context, source, sheetID string, raidID
 	err := r.db.NewSelect().TableExpr("sheet_setup_baselines").ColumnExpr("setup_csv").Where("source=? AND sheet_id=? AND raid_id=?", source, sheetID, raidID).Scan(ctx, &raw)
 	return raw, err
 }
+// latestArchivedSetupBaseline returns the last explicitly synchronized setup
+// for an earlier archived raid of this series. It is evidence that the live
+// setup tab changed before the next raid can adopt it.
+func (r *Repo) latestArchivedSetupBaseline(ctx context.Context, source, sheetID string, seriesID int64, before time.Time) (string, error) {
+	var raw string
+	err := r.db.NewSelect().
+		TableExpr("sheet_setup_baselines AS baseline").
+		Join("JOIN raids AS raid ON raid.id = baseline.raid_id").
+		ColumnExpr("baseline.setup_csv").
+		Where("baseline.source = ? AND baseline.sheet_id = ?", source, sheetID).
+		Where("raid.series_id = ? AND raid.scheduled_start < ?", seriesID, before.UTC()).
+		Where("raid.status = ? AND raid.archived_at IS NOT NULL", validation.RaidStatusCompleted).
+		OrderExpr("raid.scheduled_start DESC, raid.id DESC").
+		Limit(1).Scan(ctx, &raw)
+	return raw, err
+}
+
 func (r *Repo) saveSetupBaseline(ctx context.Context, source, sheetID string, raidID int64, raw []byte) error {
 	_, err := r.db.ExecContext(ctx, "INSERT INTO sheet_setup_baselines(source,sheet_id,raid_id,setup_csv) VALUES(?,?,?,?) ON CONFLICT(source,sheet_id,raid_id) DO UPDATE SET setup_csv=excluded.setup_csv", source, sheetID, raidID, string(raw))
 	return err

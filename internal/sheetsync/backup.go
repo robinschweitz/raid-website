@@ -56,15 +56,21 @@ func (g *GoogleWriter) VerifyWorkingCopy(ctx context.Context, sheetID string) er
 		return errors.New("sync must target the authorized working copy, never the original")
 	}
 	token, err := g.token(ctx)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	var metadata struct {
 		Sheets []struct {
 			Properties sheetTab `json:"properties"`
 		} `json:"sheets"`
 	}
 	path := url.PathEscape(sheetID) + "?fields=sheets(properties(title,sheetId))"
-	if err := g.request(ctx, token, http.MethodGet, path, nil, &metadata); err != nil { return err }
+	if err := g.request(ctx, token, http.MethodGet, path, nil, &metadata); err != nil {
+		return err
+	}
 	var found []sheetTab
-	for _, tab := range metadata.Sheets { found = append(found, tab.Properties) }
+	for _, tab := range metadata.Sheets {
+		found = append(found, tab.Properties)
+	}
 	return matchingBackupTabs(found, found)
 }

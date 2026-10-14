@@ -293,8 +293,17 @@ func readCredentialKey(path string, create bool) ([]byte, error) {
 		}
 		f, openErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 		if openErr == nil {
+			// Set Windows DACLs before writing a key. Unix permissions
+			// are verified here too, rather than assuming OpenFile's
+			// mode is applied identically on every operating system.
+			if err := secureCredentialKey(path); err != nil {
+				_ = f.Close()
+				_ = os.Remove(path)
+				return nil, fmt.Errorf("secure service-account key: %w", err)
+			}
 			_, writeErr := f.Write(key)
 			if err := errors.Join(writeErr, f.Close()); err != nil {
+				_ = os.Remove(path)
 				return nil, err
 			}
 			return key, nil
@@ -307,8 +316,14 @@ func readCredentialKey(path string, create bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() || info.Mode().Perm() != 0600 {
-		return nil, errors.New("service-account key file must be regular and mode 0600")
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("service-account key file must be regular")
+	}
+	// Windows reports Unix permission bits as 0666 for writable files.
+	// Enforce an owner/system/admin DACL there instead of rejecting it as
+	// non-0600. On Unix, preserve the strict 0600 requirement.
+	if err := secureCredentialKey(path); err != nil {
+		return nil, fmt.Errorf("insecure service-account key: %w", err)
 	}
 	key, err := os.ReadFile(path)
 	if err != nil {

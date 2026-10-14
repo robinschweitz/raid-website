@@ -55,7 +55,15 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 	err = s.transaction(ctx, true, func(bound *Service) error {
 		mapping, err := bound.imports.setupMapping(ctx, source, sheetID)
 		if errors.Is(err, sql.ErrNoRows) {
-			report.Warnings = append(report.Warnings, "Raidsetup noch nicht erstimportiert; zuerst die bestehende Import-Vorschau mit Raidsetup verwenden")
+			// A missing setup mapping means no explicitly configured ICC25
+			// series exists. The sync must not report success while silently
+			// skipping creation of the requested next planned raid.
+			report.Conflicts = append(report.Conflicts,
+				"raidsetup_initialization_required: Keine importierte ICC25-Raidserie vorhanden. "+
+					"Unter Administration > Importe > Google-Sheet importieren die Option "+
+					"\"ICC25 Raidsetup (A-F) einmalig als Raid und Serie übernehmen\" "+
+					"mit dem nächsten geplanten Termin, Uhrzeit und Raidleitung "+
+					"einrichten, Vorschau prüfen und dann Zusammenführen ausführen.")
 			return nil
 		}
 		if err != nil {

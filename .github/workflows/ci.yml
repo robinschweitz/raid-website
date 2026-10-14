@@ -36,6 +36,7 @@ jobs:
       - name: Check Go formatting
         shell: bash
         run: |
+          gofmt -d internal/legacyimport/setup_successor.go
           unformatted="$(gofmt -l cmd internal)"
           if [ -n "$unformatted" ]; then
             printf 'Run gofmt -w cmd internal. Unformatted files:\n%s\n' "$unformatted"

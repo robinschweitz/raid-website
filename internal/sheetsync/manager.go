@@ -70,7 +70,7 @@ func NewManager(ctx context.Context, db *bun.DB, defaults Settings, envCredentia
 	m := &Manager{db: db, factory: factory, keyPath: keyPath, envCredentials: envCredentials}
 	m.config.Settings = defaults
 	var raw, secret string
-	err := db.NewSelect().TableExpr("sheet_sync_config").ColumnExpr("config_json", "credentials_ciphertext").Where("id = 1").Scan(ctx, &raw, &secret)
+	err := db.NewSelect().TableExpr("sheet_sync_config").Column("config_json", "credentials_ciphertext").Where("id = 1").Scan(ctx, &raw, &secret)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("load sheet sync settings: %w", err)
 	}

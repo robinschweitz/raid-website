@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -60,8 +61,10 @@ func TestManagerSettingsSurviveRestartWithoutEnv(t *testing.T) {
 	if err != nil || !got.CredentialsConfigured || !got.Enabled || factoryCalls != 1 {
 		t.Fatalf("save: %+v %v, calls=%d", got, err, factoryCalls)
 	}
-	if info, err := os.Stat(keyPath); err != nil || info.Mode().Perm() != 0600 {
-		t.Fatalf("secret key permissions: %v %v", info, err)
+	if info, err := os.Stat(keyPath); err != nil || !info.Mode().IsRegular() {
+		t.Fatalf("secret key is not a regular file: %v %v", info, err)
+	} else if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
+		t.Fatalf("secret key Unix permissions must be 0600, got %v", info.Mode().Perm())
 	}
 	var stored string
 	if err := db.NewSelect().TableExpr("sheet_sync_config").Column("credentials_ciphertext").Where("id = 1").Scan(ctx, &stored); err != nil {
@@ -69,6 +72,12 @@ func TestManagerSettingsSurviveRestartWithoutEnv(t *testing.T) {
 	}
 	if stored == "" || strings.Contains(stored, "private_key") || strings.Contains(stored, "PRIVATE KEY") {
 		t.Fatal("service-account secret must be encrypted at rest")
+	}
+	// On Windows, stat reports 0666 regardless of OpenFile's 0600.
+	// The saved ciphertext must still be decryptable on every subsequent
+	// save and restart, with the Windows ACL protecting the key.
+	if decrypted, err := decryptCredential(keyPath, stored); err != nil || decrypted != secret {
+		t.Fatalf("failed to re-read safely stored credentials: %v", err)
 	}
 	withoutReplacement, err := m.Save(ctx, SettingsUpdate{Settings: Settings{Enabled: true, SheetID: AuthorizedCopyID, Reason: "Updated", Interval: "10m"}})
 	if err != nil || !withoutReplacement.CredentialsConfigured || factoryCalls != 2 {

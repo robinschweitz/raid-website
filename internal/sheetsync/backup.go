@@ -18,8 +18,17 @@ type sheetTab struct {
 // matchingBackupTabs checks the original imported tables, including their IDs.
 // The original may later gain "Website ..." export tabs absent from the backup.
 func matchingBackupTabs(original, backup []sheetTab) error {
-	if len(backup) < 5 {
-		return errors.New("backup does not contain the original workbook")
+	// The source workbook has 17 tabs. Website snapshots are added later and
+	// must never be required in the immutable pre-sync backup.
+	required := []string{
+		"Fun Stats", "Saurfang", "Fauldarm", "Raid-Overview",
+		"Erklärung zum Sheet", "Raidsetup Orientierungshilfe", "ICC25 Loot",
+		"ICC25 Raidsetup", "Raid Archive", "Loot Archive", "Stammies",
+		"Punkte", "Charaktere", "Helpertabelle", "ICC10 Raidsetup",
+		"09-02-2026-ICC-Raid", "ICC25",
+	}
+	if len(backup) < len(required) {
+		return errors.New("backup does not contain all 17 source tabs")
 	}
 	toMap := func(tabs []sheetTab) map[string]int64 {
 		out := make(map[string]int64, len(tabs))
@@ -30,7 +39,7 @@ func matchingBackupTabs(original, backup []sheetTab) error {
 	}
 	orig := toMap(original)
 	saved := toMap(backup)
-	for _, title := range []string{"Raid Archive", "Loot Archive", "Charaktere", "Punkte", "ICC25 Raidsetup"} {
+	for _, title := range required {
 		a, hasOriginal := orig[title]
 		b, hasBackup := saved[title]
 		if !hasOriginal || !hasBackup || a != b {

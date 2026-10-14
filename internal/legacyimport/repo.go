@@ -239,6 +239,7 @@ func (r *Repo) setupBaseline(ctx context.Context, source, sheetID string, raidID
 	err := r.db.NewSelect().TableExpr("sheet_setup_baselines").ColumnExpr("setup_csv").Where("source=? AND sheet_id=? AND raid_id=?", source, sheetID, raidID).Scan(ctx, &raw)
 	return raw, err
 }
+
 // latestArchivedSetupBaseline returns the last explicitly synchronized setup
 // for an earlier archived raid of this series. It is evidence that the live
 // setup tab changed before the next raid can adopt it.

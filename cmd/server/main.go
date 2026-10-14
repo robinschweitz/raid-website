@@ -56,7 +56,6 @@ func run() (err error) {
 		RegistrationFeed:        risingGods,
 		SheetSyncEnabled:        cfg.SheetSyncEnabled,
 		SheetSyncSheetID:        cfg.SheetSyncSheetID,
-		SheetSyncBackupSheetID:  cfg.SheetSyncBackupSheetID,
 		SheetSyncReason:         cfg.SheetSyncReason,
 		SheetSyncInterval:       cfg.SheetSyncInterval,
 		SheetSyncServiceAccount: cfg.SheetSyncServiceAccount,

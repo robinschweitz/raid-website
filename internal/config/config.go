@@ -21,6 +21,7 @@ type Config struct {
 	RisingGodsProxyToken    string
 	SheetSyncEnabled        bool
 	SheetSyncSheetID        string
+	SheetSyncBackupSheetID  string
 	SheetSyncReason         string
 	SheetSyncInterval       time.Duration
 	SheetSyncServiceAccount string
@@ -41,6 +42,7 @@ func Load() (*Config, error) {
 		RisingGodsProxyToken:    strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
 		SheetSyncEnabled:        getEnv("SHEET_SYNC_ENABLED", "") == "true",
 		SheetSyncSheetID:        strings.TrimSpace(getEnv("SHEET_SYNC_SHEET_ID", "")),
+		SheetSyncBackupSheetID:  strings.TrimSpace(getEnv("SHEET_SYNC_BACKUP_SHEET_ID", "")),
 		SheetSyncReason:         strings.TrimSpace(getEnv("SHEET_SYNC_REASON", "")),
 		SheetSyncServiceAccount: strings.TrimSpace(getEnv("SHEET_SYNC_SERVICE_ACCOUNT_JSON", "")),
 	}
@@ -54,8 +56,8 @@ func Load() (*Config, error) {
 		}
 	}
 	if c.SheetSyncEnabled {
-		if c.SheetSyncSheetID == "" || c.SheetSyncReason == "" || c.SheetSyncServiceAccount == "" {
-			return nil, errors.New("SHEET_SYNC_SHEET_ID, SHEET_SYNC_REASON and SHEET_SYNC_SERVICE_ACCOUNT_JSON required when SHEET_SYNC_ENABLED=true")
+		if c.SheetSyncSheetID == "" || c.SheetSyncBackupSheetID == "" || c.SheetSyncSheetID == c.SheetSyncBackupSheetID || c.SheetSyncReason == "" || c.SheetSyncServiceAccount == "" {
+			return nil, errors.New("distinct SHEET_SYNC_SHEET_ID and SHEET_SYNC_BACKUP_SHEET_ID, SHEET_SYNC_REASON and SHEET_SYNC_SERVICE_ACCOUNT_JSON required when SHEET_SYNC_ENABLED=true")
 		}
 		interval, err := time.ParseDuration(getEnv("SHEET_SYNC_INTERVAL", "10m"))
 		if err != nil || interval < time.Minute {

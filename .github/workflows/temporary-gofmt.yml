@@ -1,0 +1,24 @@
+name: Temporary feature-branch formatter
+on:
+  push:
+    branches:
+      - feat/continuous-google-sheets-sync
+permissions:
+  contents: write
+jobs:
+  gofmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Format new sync files
+        run: |
+          gofmt -w internal/legacyimport/setup_sync.go internal/legacyimport/setup_sync_test.go internal/legacyimport/fetcher_config.go internal/sheetsync/*.go internal/httpapi/v1/sheetsync.go internal/config/config.go internal/httpapi/router.go internal/httpapi/v1/api.go cmd/server/main.go
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add internal/legacyimport/setup_sync.go internal/legacyimport/setup_sync_test.go internal/legacyimport/fetcher_config.go internal/sheetsync internal/httpapi/v1/sheetsync.go internal/config/config.go internal/httpapi/router.go internal/httpapi/v1/api.go cmd/server/main.go
+          if ! git diff --cached --quiet; then
+            git commit -m "style(sync): apply gofmt to sync implementation"
+            git push origin HEAD:feat/continuous-google-sheets-sync
+          fi

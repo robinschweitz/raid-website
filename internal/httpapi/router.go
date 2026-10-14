@@ -48,6 +48,7 @@ type Options struct {
 	SheetSyncReason         string
 	SheetSyncInterval       time.Duration
 	SheetSyncServiceAccount string
+	SheetSyncKeyPath        string
 }
 
 // New constructs the HTTP handler tree with all v1 dependencies wired.
@@ -92,21 +93,40 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		return nil, fmt.Errorf("bootstrap admin: %w", err)
 	}
 
-	var syncService *sheetsync.Service
-	if opts.SheetSyncEnabled {
-		admin, err := players.FindByUsername(context.Background(), strings.ToLower(strings.TrimSpace(opts.AdminUsername)))
+	admin, err := players.FindByUsername(context.Background(), strings.ToLower(strings.TrimSpace(opts.AdminUsername)))
+	if err != nil {
+		return nil, fmt.Errorf("find sheet-sync administrator: %w", err)
+	}
+	syncFactory := func(settings sheetsync.Settings, credentials string) (*sheetsync.Service, error) {
+		writer, err := sheetsync.NewGoogleWriter(credentials)
 		if err != nil {
-			return nil, fmt.Errorf("find sheet-sync administrator: %w", err)
+			return nil, err
 		}
-		writer, err := sheetsync.NewGoogleWriter(opts.SheetSyncServiceAccount)
+		// Do not mutate the separate legacy-import fetcher while requests run.
+		syncImporter := legacyimport.NewService(
+			legacyimport.NewRepo(db), players, chars, raids, att, lootRepo, points,
+			raidseries.NewRepo(db), sheetsync.AuthenticatedFetcher{Writer: writer},
+		).WithExternalClient(registrationFeed)
+		interval, err := time.ParseDuration(settings.Interval)
 		if err != nil {
-			return nil, fmt.Errorf("configure sheet sync: %w", err)
+			return nil, err
 		}
-		importsSvc.UseFetcher(sheetsync.AuthenticatedFetcher{Writer: writer})
-		syncService, err = sheetsync.New(db, importsSvc, writer, opts.SheetSyncSheetID, admin.ID, opts.SheetSyncReason, opts.SheetSyncInterval)
-		if err != nil {
-			return nil, fmt.Errorf("create sheet sync: %w", err)
-		}
+		return sheetsync.New(db, syncImporter, writer, settings.SheetID, admin.ID, settings.Reason, interval)
+	}
+	interval := opts.SheetSyncInterval
+	if interval == 0 {
+		interval = 10 * time.Minute
+	}
+	keyPath := opts.SheetSyncKeyPath
+	if keyPath == "" {
+		keyPath = "raid.db.sheet-sync.key"
+	}
+	syncManager, err := sheetsync.NewManager(context.Background(), db, sheetsync.Settings{
+		Enabled: opts.SheetSyncEnabled, Automatic: opts.SheetSyncEnabled && opts.SheetSyncAutoRun,
+		SheetID: opts.SheetSyncSheetID, Reason: opts.SheetSyncReason, Interval: interval.String(),
+	}, opts.SheetSyncServiceAccount, keyPath, syncFactory)
+	if err != nil {
+		return nil, fmt.Errorf("configure sheet sync: %w", err)
 	}
 
 	corrections := raidcorrection.NewService(raidcorrection.NewRepo(db)).WithExternalClient(registrationFeed)
@@ -130,7 +150,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Completion:        raidcompletion.NewService(raidcompletion.NewRepo(db)),
 		Corrections:       corrections,
 		Imports:           importsSvc,
-		SheetSync:         syncService,
+		SheetSync:         syncManager,
 		Signups:           raidsignup.NewService(raidsignup.NewRepo(db)),
 		Registration:      registrationSvc,
 		AccountMerge:      accountmerge.NewService(accountmerge.NewRepo(db)),
@@ -145,8 +165,5 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		mux.Handle("/", spa)
 	}
 
-	if syncService != nil && opts.SheetSyncAutoRun {
-		syncService.Start(context.Background())
-	}
 	return requestID(securityHeaders(opts.CookieSecure)(logging(csrfProtection(authenticate(authSvc)(mux))))), nil
 }

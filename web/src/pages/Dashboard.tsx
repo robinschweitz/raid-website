@@ -73,11 +73,12 @@ export function DashboardPage() {
 
   useEffect(() => {
     let active = true
+    if (!player) return
     Promise.all(polls.map(async (poll) => [poll.id, await api.get<Vote[]>(`/api/v1/polls/${poll.id}/votes`)] as const))
       .then((rows) => { if (active) setVotes(Object.fromEntries(rows)) })
       .catch((err) => { if (active) setVotesError(err instanceof ApiError ? err.message : 'Stimmen konnten nicht geladen werden.') })
     return () => { active = false }
-  }, [polls])
+  }, [polls, player])
 
   const confirmedCount = attendance?.filter((a) => !a.is_bench).length ?? 0
   const totalCount = attendance?.length ?? 0
@@ -153,7 +154,7 @@ export function DashboardPage() {
               <div className="option-label"><span>{choice}</span><span className="votes">{count} Stimmen</span></div>
               <div className="bar-track"><div className="bar-fill" style={{ width: `${(count / totalVotes) * 100}%` }} /></div>
             </div>)}
-            <div className="section-heading"><span className="muted">{pollVotes ? `${totalVotes} abgegebene Stimmen` : 'Stimmen werden geladen…'}</span><Link to="/polls">Zur Abstimmung &rarr;</Link></div>
+            <div className="section-heading"><span className="muted">{!player ? 'Zum Abstimmen anmelden' : pollVotes ? `${totalVotes} abgegebene Stimmen` : 'Stimmen werden geladen…'}</span><Link to="/polls">Zur Abstimmung &rarr;</Link></div>
           </div>
         })}
         {!loading && !error && polls.length === 0 && <p className="muted">Aktuell keine offenen Umfragen.</p>}
@@ -185,11 +186,11 @@ export function DashboardPage() {
         <StatisticsCharts raids={raids} />
       </section> */}
 
-      <section className="card widget-profile">
+      {player && <section className="card widget-profile">
         <div className="section-heading"><h2>Mein Profil</h2></div>
         {player && <PlayerProfilePanel player={player} characters={characters} points={points} />}
         {pointsError && <p className="error" role="alert">{pointsError}</p>}
-      </section>
+      </section>}
 
       <section className="card widget-agenda">
         <div className="section-heading"><h2>Raidagenda</h2><span className="eyebrow">Gespeicherte Termine</span></div>

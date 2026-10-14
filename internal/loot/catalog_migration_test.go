@@ -43,7 +43,7 @@ func TestCatalogAwardMigrationPreservesHistoryAndForeignKey(t *testing.T) {
 		apply("008_catalog_awards.up.sql")
 		// Inspect the version-eight schema without requiring later columns.
 		var awards []Award
-		err := database.DB.NewSelect().Model(&awards).ExcludeColumn("awarded_to_character_name").Where("raid_id = ?", 1).Scan(ctx)
+		err := database.DB.NewSelect().Model(&awards).ExcludeColumn("awarded_to_character_name", "withdrawn_at", "withdrawn_by_player_id", "withdrawn_reason").Where("raid_id = ?", 1).Scan(ctx)
 		if err != nil || len(awards) != 1 {
 			t.Fatalf("history: %v %v", awards, err)
 		}
@@ -67,7 +67,8 @@ func TestCatalogAwardMigrationPreservesHistoryAndForeignKey(t *testing.T) {
 	}
 	for pass := 0; pass < 2; pass++ {
 		apply("012_loot_character_name.up.sql")
-		awards, err := NewRepo(database.DB).ListByRaid(ctx, 1)
+		var awards []Award
+		err := database.DB.NewSelect().Model(&awards).ExcludeColumn("withdrawn_at", "withdrawn_by_player_id", "withdrawn_reason").Where("raid_id = ?", 1).Order("id ASC").Scan(ctx)
 		if err != nil || len(awards) != 1 {
 			t.Fatalf("character snapshot migration: %+v %v", awards, err)
 		}

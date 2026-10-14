@@ -94,7 +94,7 @@ function Layout() {
           {atLeast(player.role, 'ADMIN') && <>
             <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
             <Link className={path === '/raid-series' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/raid-series"><NavIcon name="series" />Raidserien</Link>
-            <Link className={path === '/imports' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/imports"><NavIcon name="import" />Importe</Link>
+            <Link className={path === '/imports' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/imports"><NavIcon name="import" />Synchronisierung</Link>
             <Link className={path === '/registration-requests' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/registration-requests"><NavIcon name="players" />Registrierung</Link>
           </>}
         </nav>

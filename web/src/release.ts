@@ -1,8 +1,39 @@
-export const appVersion = '1.0.2'
+export const appVersion = '1.0.6'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Zusammengeführte Sheet-Identitäten',
+    changes: [
+      'Die historische Sheet-Zuordnung erkennt Charaktere weiter über die Alias-Historie nach einer Zusammenführung.',
+    ],
+  },
+  {
+    version: '1.0.5',
+    title: 'Historische Sheet-Zuordnung',
+    changes: [
+      'Bestehende historische Raids können nach einer Vorschau mit einem Google Sheet verknüpft werden.',
+      'Mehrdeutige Spieler- und Charakterbesitzer werden vor der auditierten Übernahme ausdrücklich ausgewählt.',
+    ],
+  },
+  {
+    version: '1.0.4',
+    title: 'Google-Sheets-Synchronisierung',
+    changes: [
+      'Die Synchronisierung prüft eingehende Änderungen zuerst als Vorschau und überträgt ausstehende Website-Änderungen vor dem Anwenden.',
+      'Historische Importe bleiben als schreibgeschützte Historie sichtbar; ausgehende Übertragungen können separat erneut gesendet werden.',
+    ],
+  },
+  {
+    version: '1.0.3',
+    title: 'Google-Sheet-Verknüpfungen',
+    changes: [
+      'Raid-Details zeigen die verknüpfte Google-Sheet-Quelle; Admins können Sheet und Raid-Schlüssel mit Begründung hinterlegen.',
+      'Loot aus verknüpften Raids kann in beide Richtungen auditiert synchronisiert und bei Übertragungsfehlern erneut gesendet werden.',
+    ],
+  },
+  {
+    version: '1.0.2',
     title: 'Zusammenführungen',
     changes: [
       'Doppelte Charaktere und zusammengeführte Spielerkonten werden nach der Übertragung gelöscht.',

@@ -1,14 +1,17 @@
 package legacyimport
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/csv"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -54,6 +57,9 @@ type GoogleFetcher struct {
 	Names   SheetNames
 	BaseURL string
 	Client  *http.Client
+	Sheets  interface {
+		Values(context.Context, string, string) ([][]string, error)
+	}
 }
 
 func (g GoogleFetcher) Fetch(ctx context.Context, sheetID string) (SheetData, error) {
@@ -71,6 +77,25 @@ func (g GoogleFetcher) Fetch(ctx context.Context, sheetID string) (SheetData, er
 	}
 
 	fetch := func(name, columns string) ([]byte, error) {
+		if g.Sheets != nil {
+			rangeName := "'" + strings.ReplaceAll(name, "'", "''") + "'"
+			if columns != "" {
+				rangeName += "!" + columns
+			}
+			values, err := g.Sheets.Values(ctx, sheetID, rangeName)
+			if err != nil {
+				return nil, fmt.Errorf("fetch %q: %w", name, err)
+			}
+			var out bytes.Buffer
+			writer := csv.NewWriter(&out)
+			if err := writer.WriteAll(values); err != nil {
+				return nil, fmt.Errorf("encode %q: %w", name, err)
+			}
+			if out.Len() > 8<<20 {
+				return nil, fmt.Errorf("fetch %q: %w", name, ErrSourceTooLarge)
+			}
+			return out.Bytes(), nil
+		}
 		u := fmt.Sprintf("%s/spreadsheets/d/%s/gviz/tq?tqx=out:csv&sheet=%s",
 			base, url.PathEscape(sheetID), url.QueryEscape(name))
 		if columns != "" {

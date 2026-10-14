@@ -127,6 +127,7 @@ func (r *Repo) PlayerHasMainSpecAward(ctx context.Context, raidID, playerID int6
 		Where("raid_id = ?", raidID).
 		Where("awarded_to_player_id = ?", playerID).
 		Where("is_main_spec = ?", true).
+		Where("withdrawn_at IS NULL").
 		Count(ctx)
 	if err != nil {
 		return false, err

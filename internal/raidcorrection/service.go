@@ -15,6 +15,7 @@ import (
 	"raid-website/internal/loot"
 	"raid-website/internal/registration"
 	"raid-website/internal/validation"
+	"raid-website/internal/websheetsync"
 )
 
 var (
@@ -30,12 +31,18 @@ var (
 type Service struct {
 	repo     *Repo
 	external registration.ExternalClient
+	sync     *websheetsync.Service
 }
 
 func NewService(repo *Repo) *Service { return &Service{repo: repo} }
 
 func (s *Service) WithExternalClient(external registration.ExternalClient) *Service {
 	s.external = external
+	return s
+}
+
+func (s *Service) WithWebsiteSync(sync *websheetsync.Service) *Service {
+	s.sync = sync
 	return s
 }
 
@@ -284,6 +291,14 @@ func (s *Service) CorrectLoot(ctx context.Context, raidID, id, actor int64, reas
 	return row, err
 }
 
+// CorrectImportedLoot corrects an imported award without applying current catalog or
+// Enhanced-cost rules to historical sheet data.
+func (s *Service) CorrectImportedLoot(ctx context.Context, raidID, id, actor int64, reason string, patch func(*loot.Award)) (*loot.Award, error) {
+	row := &loot.Award{ID: id, RaidID: raidID}
+	err := s.saveLoot(ctx, row, actor, reason, patch, true)
+	return row, err
+}
+
 func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, reason string, patch func(*loot.Award), imported bool) error {
 	return s.repo.InTransaction(ctx, func(r *Repo) error {
 		if row.ID == 0 && !imported {
@@ -310,7 +325,9 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 				row.RaidID = old.RaidID
 			}
 			row.CreatedAt = old.CreatedAt
-			row.AwardedAt = old.AwardedAt
+			if !imported {
+				row.AwardedAt = old.AwardedAt
+			}
 			row.AwardedByPlayerID = old.AwardedByPlayerID
 			row.Source = old.Source
 			row.RequestID = old.RequestID
@@ -331,7 +348,10 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 			row.AwardedAt = row.UpdatedAt
 			row.AwardedByPlayerID = actor
 			row.Source = "manual"
-			return loot.AwardInTransaction(ctx, r.loot, row, reason)
+			if err := loot.AwardInTransaction(ctx, r.loot, row, reason); err != nil {
+				return err
+			}
+			return s.enqueueWebsiteSync(ctx, r, row, actor)
 		}
 		oldAward, _ := before.(*loot.Award)
 		if !imported {
@@ -358,7 +378,7 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		row.UpdatedAt = time.Now().UTC()
 		old, _ := before.(*loot.Award)
 		recipientChanged := old != nil && (old.AwardedToPlayerID != row.AwardedToPlayerID || !sameCharacter(old.AwardedToCharacterID, row.AwardedToCharacterID))
-		if recipientChanged {
+		if recipientChanged && !imported {
 			row.AwardedToCharacterName = ""
 		} else if old != nil {
 			row.AwardedToCharacterName = old.AwardedToCharacterName
@@ -405,8 +425,66 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 				return err
 			}
 		}
-		return s.log(ctx, r, "loot_award", row.ID, actor, reason, before, row)
+		if err := s.log(ctx, r, "loot_award", row.ID, actor, reason, before, row); err != nil {
+			return err
+		}
+		return s.enqueueWebsiteSync(ctx, r, row, actor)
 	})
+}
+
+// WithdrawLoot retains the award and its audit history while removing its loot
+// consequences. Only website-created manual awards can be delivered as a sheet withdrawal.
+func (s *Service) WithdrawLoot(ctx context.Context, raidID, id, actor int64, reason string) (*loot.Award, error) {
+	row := &loot.Award{}
+	err := s.repo.InTransaction(ctx, func(r *Repo) error {
+		old, err := r.loot.Get(ctx, id)
+		if err != nil {
+			return referenceError(err)
+		}
+		if old.RaidID != raidID || old.Source != "manual" || old.WithdrawnAt != nil {
+			return ErrInvalid
+		}
+		completed, err := s.check(ctx, r, raidID, actor, reason, false)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(reason) == "" {
+			return ErrReason
+		}
+		var eligibilityBefore map[int64]int
+		if completed {
+			eligibilityBefore, err = s.pointEligibility(ctx, r, raidID)
+			if err != nil {
+				return err
+			}
+		}
+		*row = *old
+		now := time.Now().UTC()
+		row.WithdrawnAt, row.WithdrawnByPlayerID = &now, &actor
+		withdrawnReason := strings.TrimSpace(reason)
+		row.WithdrawnReason = &withdrawnReason
+		row.UpdatedAt = now
+		if err := r.loot.Update(ctx, row); err != nil {
+			return err
+		}
+		if completed {
+			if err := s.reconcilePoints(ctx, r, raidID, actor, reason, eligibilityBefore); err != nil {
+				return err
+			}
+		}
+		if err := s.log(ctx, r, "loot_award", row.ID, actor, reason, old, row); err != nil {
+			return err
+		}
+		return s.enqueueWebsiteSync(ctx, r, row, actor)
+	})
+	return row, err
+}
+
+func (s *Service) enqueueWebsiteSync(ctx context.Context, r *Repo, row *loot.Award, actor int64) error {
+	if s.sync == nil {
+		return nil
+	}
+	return s.sync.EnqueueAward(ctx, r.db, row, actor)
 }
 
 func sameCharacter(a, b *int64) bool {

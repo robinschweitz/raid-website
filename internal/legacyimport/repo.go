@@ -2,6 +2,7 @@ package legacyimport
 
 import (
 	"context"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -78,6 +79,55 @@ func (r *Repo) raidMapping(ctx context.Context, source, sheetID, key string) (*r
 	return row, err
 }
 
+func (r *Repo) raidMappingByRaidID(ctx context.Context, source, sheetID string, raidID int64) (*raidMapping, error) {
+	row := new(raidMapping)
+	err := r.db.NewSelect().Model(row).Where("source = ?", source).Where("sheet_id = ?", sheetID).Where("raid_id = ?", raidID).Scan(ctx)
+	return row, err
+}
+
+type syncRaidMapping struct {
+	RaidID int64 `bun:"raid_id"`
+}
+
+func (r *Repo) syncRaidMapping(ctx context.Context, source, sheetID, key string) (*syncRaidMapping, error) {
+	row := new(syncRaidMapping)
+	err := r.db.NewSelect().TableExpr("legacy_sync_raid_mappings").Column("raid_id").Where("source = ? AND sheet_id = ? AND raid_key = ?", source, sheetID, key).Scan(ctx, row)
+	return row, err
+}
+
+func (r *Repo) syncRaidMappingByRaidID(ctx context.Context, source, sheetID string, raidID int64) (string, error) {
+	var key string
+	err := r.db.NewSelect().TableExpr("legacy_sync_raid_mappings").Column("raid_key").Where("source = ? AND sheet_id = ? AND raid_id = ?", source, sheetID, raidID).Scan(ctx, &key)
+	return key, err
+}
+
+func (r *Repo) insertSyncRaidMapping(ctx context.Context, source, sheetID, key string, raidID, actorID int64, now time.Time) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO legacy_sync_raid_mappings (source, sheet_id, raid_key, raid_id, adopted_by_player_id, adopted_at) VALUES (?, ?, ?, ?, ?, ?)", source, sheetID, key, raidID, actorID, now)
+	return err
+}
+
+func (r *Repo) syncPlayerID(ctx context.Context, source, sheetID, name string) (int64, error) {
+	var id int64
+	err := r.db.NewSelect().TableExpr("legacy_sync_player_mappings").Column("player_id").Where("source = ? AND sheet_id = ? AND player_name = ?", source, sheetID, name).Scan(ctx, &id)
+	return id, err
+}
+
+func (r *Repo) insertSyncPlayerMapping(ctx context.Context, source, sheetID, name string, playerID, actorID int64, now time.Time) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO legacy_sync_player_mappings (source, sheet_id, player_name, player_id, adopted_by_player_id, adopted_at) VALUES (?, ?, ?, ?, ?, ?)", source, sheetID, name, playerID, actorID, now)
+	return err
+}
+
+func (r *Repo) syncCharacterID(ctx context.Context, source, sheetID, name, playerName string) (int64, error) {
+	var id int64
+	err := r.db.NewSelect().TableExpr("legacy_sync_character_mappings").Column("character_id").Where("source = ? AND sheet_id = ? AND character_name = ? AND player_name = ?", source, sheetID, name, playerName).Scan(ctx, &id)
+	return id, err
+}
+
+func (r *Repo) insertSyncCharacterMapping(ctx context.Context, source, sheetID, name, playerName string, characterID, playerID, actorID int64, now time.Time) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO legacy_sync_character_mappings (source, sheet_id, character_name, player_name, character_id, player_id, adopted_by_player_id, adopted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", source, sheetID, name, playerName, characterID, playerID, actorID, now)
+	return err
+}
+
 func (r *Repo) insertRaidMapping(ctx context.Context, row *raidMapping) error {
 	_, err := r.db.NewInsert().Model(row).Exec(ctx)
 	return err
@@ -91,6 +141,28 @@ func (r *Repo) mappings(ctx context.Context, source, sheetID string) ([]lootMapp
 
 func (r *Repo) insertMapping(ctx context.Context, row *lootMapping) error {
 	_, err := r.db.NewInsert().Model(row).Exec(ctx)
+	return err
+}
+
+type lootSyncState struct {
+	bun.BaseModel    `bun:"table:legacy_loot_sync_states"`
+	ID               int64 `bun:"id,pk,autoincrement"`
+	Source           string
+	SheetID          string
+	RaidKey          string
+	RawHash          string
+	SyncedByPlayerID int64
+	SyncedAt         time.Time
+	SyncRaidID       *int64
+}
+
+func (r *Repo) insertLootSyncState(ctx context.Context, row *lootSyncState) error {
+	_, err := r.db.NewInsert().Model(row).Exec(ctx)
+	return err
+}
+
+func (r *Repo) insertLootSyncEvent(ctx context.Context, stateID, mappingID, awardID int64, eventType string, actorID int64, reason string, now time.Time) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO legacy_loot_sync_events (sync_state_id, legacy_loot_mapping_id, loot_award_id, event_type, actor_id, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", stateID, mappingID, awardID, eventType, actorID, reason, now)
 	return err
 }
 
@@ -140,6 +212,12 @@ func (r *Repo) charactersByName(ctx context.Context, name string) ([]character.C
 	err := r.db.NewSelect().Model(&rows).
 		Where("character.active = ? AND (character.name = ? OR EXISTS (SELECT 1 FROM character_name_history AS history WHERE history.character_id = character.id AND (history.old_name = ? OR history.new_name = ?)) OR EXISTS (SELECT 1 FROM character_merge_aliases AS alias WHERE alias.target_character_id = character.id AND alias.source_name = ?))", true, name, name, name, name).
 		Scan(ctx)
+	return rows, err
+}
+
+func (r *Repo) charactersExactByName(ctx context.Context, name string) ([]character.Character, error) {
+	var rows []character.Character
+	err := r.db.NewSelect().Model(&rows).Where("character.active = ? AND character.name = ?", true, name).Scan(ctx)
 	return rows, err
 }
 

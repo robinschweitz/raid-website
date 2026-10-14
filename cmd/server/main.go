@@ -12,7 +12,9 @@ import (
 	"github.com/uptrace/bun"
 	"raid-website/internal/config"
 	"raid-website/internal/db"
+	"raid-website/internal/googlesheets"
 	"raid-website/internal/httpapi"
+	"raid-website/internal/legacyimport"
 	"raid-website/internal/migrations"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
@@ -47,6 +49,16 @@ func run() (err error) {
 		return fmt.Errorf("naming pattern detection: %w", err)
 	}
 	risingGods := registration.RisingGodsClient{ProxyURL: cfg.RisingGodsProxyURL, ProxyToken: cfg.RisingGodsProxyToken}
+	importFetcher := legacyimport.Fetcher(legacyimport.GoogleFetcher{})
+	var websiteSheets *googlesheets.Client
+	if cfg.GoogleServiceAccountFile != "" {
+		sheets, err := googlesheets.NewFromFile(cfg.GoogleServiceAccountFile)
+		if err != nil {
+			return fmt.Errorf("Google Sheets service account: %w", err)
+		}
+		importFetcher = legacyimport.GoogleFetcher{Sheets: sheets}
+		websiteSheets = sheets
+	}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
 		CookieSecure:      cfg.CookieSecure,
 		TrustProxyHeaders: cfg.TrustProxyHeaders,
@@ -54,6 +66,8 @@ func run() (err error) {
 		AdminUsername:     cfg.AdminUsername,
 		AdminPassword:     cfg.AdminPassword,
 		RegistrationFeed:  risingGods,
+		ImportFetcher:     importFetcher,
+		WebsiteSheets:     websiteSheets,
 	})
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)

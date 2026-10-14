@@ -248,8 +248,9 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   imported opening balances and never recreates historical raid rewards. Token visibility follows
   the corrected loot award; consumed locks are not implicitly revived.
 - Incremental loot imports use an optional permanent, unique `Import ID` source column.
-  Edited IDs, duplicate IDs, and ambiguous no-ID changes are conflicts, not overwrites.
-  A conflict rejects the entire merge with a report and no domain writes.
+  The Import ID is authoritative for bidirectional legacy loot sync: changed source
+  rows are audited corrections, omissions withdraw, and reappearances restore the
+  linked award (ADR 057). Duplicate IDs and ambiguous no-ID changes remain conflicts.
 - Import raid identity is scoped to source and sheet provenance. New rows in existing
   imported raids require audited correction consequences and an explicit reason when archived; name
   collisions without provenance and additions to cancelled raids are conflicts.
@@ -356,7 +357,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 
 Environment variables: `PORT` (default `8080`), `DATABASE_URL` (default
 `file:raid.db?_pragma=journal_mode(WAL)`), `ENV`, `COOKIE_SECURE`, `ADMIN_USERNAME`,
-`ADMIN_PASSWORD`.
+`ADMIN_PASSWORD`, `GOOGLE_SERVICE_ACCOUNT_FILE` (optional path to the untracked Google
+service-account JSON used for private-sheet imports and two-way loot sync).
 
 Build order matters: `make build` runs the frontend build first, then `go build`.
 

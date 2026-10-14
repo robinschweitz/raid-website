@@ -70,7 +70,7 @@ func TestImportSetupAndArchivedAdditionsAreAdminOnly(t *testing.T) {
 		return w
 	}
 	for _, role := range []validation.Role{validation.RoleGuest, validation.RoleMember, validation.RoleRaidassistent, validation.RoleRaidleader} {
-		for _, path := range []string{"/api/v1/imports/dry-run", "/api/v1/imports"} {
+		for _, path := range []string{"/api/v1/imports/dry-run", "/api/v1/imports", "/api/v1/sync/dry-run", "/api/v1/sync"} {
 			w := request(path, role, "", "")
 			if w.Code != http.StatusForbidden {
 				t.Fatalf("%s %s: %d %s", role, path, w.Code, w.Body.String())
@@ -79,6 +79,26 @@ func TestImportSetupAndArchivedAdditionsAreAdminOnly(t *testing.T) {
 	}
 	if fetcher.calls != 0 {
 		t.Fatal("unauthorized request fetched source")
+	}
+	syncRequest := func(path string) *httptest.ResponseRecorder {
+		t.Helper()
+		body, err := json.Marshal(map[string]any{"sheet_id": "sheet"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(body))
+		r = r.WithContext(v1.WithActor(r.Context(), actor))
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, r)
+		return w
+	}
+	syncPreview := syncRequest("/api/v1/sync/dry-run")
+	if syncPreview.Code != http.StatusOK || !bytes.Contains(syncPreview.Body.Bytes(), []byte(`"sync_unmapped_raid: ICC25-01"`)) {
+		t.Fatalf("sync preview: %d %s", syncPreview.Code, syncPreview.Body.String())
+	}
+	setupRejected := request("/api/v1/sync/dry-run", validation.RoleAdmin, "", "")
+	if setupRejected.Code != http.StatusBadRequest {
+		t.Fatalf("sync setup accepted: %d %s", setupRejected.Code, setupRejected.Body.String())
 	}
 	decode := func(w *httptest.ResponseRecorder) legacyimport.Report {
 		t.Helper()

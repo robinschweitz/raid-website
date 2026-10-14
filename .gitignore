@@ -39,6 +39,9 @@ internal/webui/dist/
 .env.test.local
 .env.production.local
 
+# Google service-account credentials
+raid-app-sync-*.json
+
 # IDE
 .vscode/
 .idea/

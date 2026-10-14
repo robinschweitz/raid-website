@@ -1,0 +1,6 @@
+DROP TRIGGER website_loot_delivery_events_no_delete;
+DROP TRIGGER website_loot_delivery_events_no_update;
+DROP INDEX idx_website_loot_delivery_events_outbox;
+DROP TABLE website_loot_delivery_events;
+DROP INDEX idx_website_loot_delivery_outbox_pending;
+DROP TABLE website_loot_delivery_outbox;

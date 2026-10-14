@@ -81,7 +81,7 @@ func TestStableIncrementalImport(t *testing.T) {
 }
 
 func TestImportConflictsAreAtomic(t *testing.T) {
-	for _, scenario := range []string{"edited", "duplicate", "no_id_added", "no_id_removed", "legacy", "owner"} {
+	for _, scenario := range []string{"duplicate", "no_id_added", "no_id_removed", "legacy", "owner"} {
 		t.Run(scenario, func(t *testing.T) {
 			s, actor := importFixture(t)
 			ctx := context.Background()
@@ -106,8 +106,6 @@ func TestImportConflictsAreAtomic(t *testing.T) {
 			}
 			changed := initial
 			switch scenario {
-			case "edited":
-				changed = strings.ReplaceAll(initial, "Blutfall", "Edited")
 			case "duplicate":
 				changed += stableDrop + "a\n"
 			case "no_id_added":
@@ -143,6 +141,79 @@ func TestImportConflictsAreAtomic(t *testing.T) {
 				t.Fatal("rejected hash persisted")
 			}
 		})
+	}
+}
+
+func TestPermanentImportIDCorrectsWithdrawsAndRestores(t *testing.T) {
+	s, actor := importFixture(t)
+	ctx := context.Background()
+	initial := stableHeader + stableDrop + "stable\n"
+	setLoot(s, initial, "first")
+	previewImport(t, s, "source", "sheet")
+	if _, err := s.Merge(ctx, actor, "source", "sheet", "first", "initial history"); err != nil {
+		t.Fatal(err)
+	}
+
+	changed := strings.ReplaceAll(initial, ",Main,", ",Second,")
+	setLoot(s, changed, "changed")
+	preview := previewImport(t, s, "source", "sheet")
+	if preview.Updated != 1 || preview.Created.Loot != 0 {
+		t.Fatalf("correction preview: %+v", preview)
+	}
+	rep, err := s.Merge(ctx, actor, "source", "sheet", "changed", "sheet correction")
+	if err != nil || rep.Updated != 1 {
+		t.Fatalf("correction merge: %+v %v", rep, err)
+	}
+	mappings, err := s.imports.mappings(ctx, "source", "sheet")
+	if err != nil || len(mappings) != 1 {
+		t.Fatalf("mapping: %+v %v", mappings, err)
+	}
+	award, err := s.loot.Get(ctx, mappings[0].LootAwardID)
+	if err != nil || award.AwardMethod != "SECOND" || award.WithdrawnAt != nil {
+		t.Fatalf("corrected award: %+v %v", award, err)
+	}
+	pointCorrections, err := s.imports.db.NewSelect().TableExpr("enhance_point_transactions").Where("type = ?", "correction_no_mainspec_loot").Where("reason = ?", "sheet correction").Count(ctx)
+	if err != nil || pointCorrections != 1 {
+		t.Fatalf("correction EP: %d %v", pointCorrections, err)
+	}
+	lootAudits, err := s.imports.db.NewSelect().TableExpr("audit_log").Where("entity_type = ?", "loot_award").Where("reason = ?", "sheet correction").Count(ctx)
+	if err != nil || lootAudits != 1 {
+		t.Fatalf("correction audit: %d %v", lootAudits, err)
+	}
+
+	setLoot(s, stableHeader, "omitted")
+	preview = previewImport(t, s, "source", "sheet")
+	if preview.Withdrawn != 1 {
+		t.Fatalf("withdraw preview: %+v", preview)
+	}
+	rep, err = s.Merge(ctx, actor, "source", "sheet", "omitted", "missing from sheet")
+	if err != nil || rep.Withdrawn != 1 {
+		t.Fatalf("withdraw merge: %+v %v", rep, err)
+	}
+	award, err = s.loot.Get(ctx, award.ID)
+	if err != nil || award.WithdrawnAt == nil || award.WithdrawnReason == nil || *award.WithdrawnReason != "missing from sheet" {
+		t.Fatalf("withdrawn award: %+v %v", award, err)
+	}
+
+	setLoot(s, changed, "restored")
+	preview = previewImport(t, s, "source", "sheet")
+	if preview.Restored != 1 {
+		t.Fatalf("restore preview: %+v", preview)
+	}
+	rep, err = s.Merge(ctx, actor, "source", "sheet", "restored", "returned to sheet")
+	if err != nil || rep.Restored != 1 {
+		t.Fatalf("restore merge: %+v %v", rep, err)
+	}
+	award, err = s.loot.Get(ctx, award.ID)
+	if err != nil || award.WithdrawnAt != nil {
+		t.Fatalf("restored award: %+v %v", award, err)
+	}
+	var events []struct{ EventType string }
+	if err := s.imports.db.NewSelect().TableExpr("legacy_loot_sync_events").Column("event_type").Order("id ASC").Scan(ctx, &events); err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 3 || events[0].EventType != "CORRECTED" || events[1].EventType != "WITHDRAWN" || events[2].EventType != "RESTORED" {
+		t.Fatalf("sync events: %+v", events)
 	}
 }
 

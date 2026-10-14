@@ -68,6 +68,9 @@ type LootPlan struct {
 	IsToken       bool
 	Boss          string
 	CatalogBossID string
+	MappingID     int64
+	LootAwardID   int64
+	SyncAction    string
 }
 
 // IsMainSpec reports whether the award blocks the +10 EP archive reward. An armor token

@@ -39,7 +39,9 @@ and a real-data dashboard. No external artwork, fake progression, or new UI depe
   use Raid Archive's source values. Older missing snapshots are shown as unavailable,
   not guessed from current characters. Final archive requires a complete active roster.
 - Incremental Loot Archive rows should have a unique, permanent `Import ID` column.
-  Changed or ambiguous source rows produce a conflict report, never an overwrite.
+  For explicitly linked two-way raids, a changed ID row is an audited correction,
+  omission withdraws the award, and a reappearance restores it. Rows without an ID
+  remain conflict-only after the initial import.
 - EP is tracking-only: there is no website roll or standalone spend action. The shifted
   outside range is `1 + X` to `100 + X`, where `X = min(balance, 50)`. Only an enhanced
   loot winner pays, as part of staff recording that outside outcome.
@@ -127,5 +129,14 @@ Include `"reason":"..."` when adding rows to an existing imported raid; these ch
 use the same audited correction and ledger rules as manual corrections.
 Both routes are Admin-only. A changed source requires a new preview; report errors prevent
 all domain writes. Identical replay returns the saved report without reprocessing.
+
+## Google Sheets Sync
+
+Set `GOOGLE_SERVICE_ACCOUNT_FILE` to an untracked service-account JSON credential and share
+the target sheet with its `client_email` as an Editor. An Admin can link an existing raid to a
+sheet ID and raid key in Raidplanung. Manual website loot changes for linked raids are queued
+durably; use **Website zu Google Sheets** in Importe to deliver or retry them. The sheet uses
+the `Import ID`, `Website Award ID`, `Website Sync ID`, `Website Updated At`, and `Website Sync
+Status` columns and retains an append-only `Website Sync Audit` tab.
 
 See ARCHITECTURE.md and docs/decisions/ for details.

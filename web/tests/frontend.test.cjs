@@ -309,9 +309,48 @@ function resolveRaid(s, id, options = {}) {
       : r.url === '/api/v1/character-options' ? { Priester: ['Disziplin', 'Heilig', 'Schatten'], Magier: ['Feuer', 'Frost'] }
       : r.url.endsWith('/attendance') ? options.attendance ?? []
       : r.url.endsWith('/loot') ? options.loot ?? []
+      : r.url.endsWith('/legacy-link') ? options.legacyLink ?? null
       : r.url === '/api/v1/loot-catalog' ? options.catalog ?? emptyCatalog() : [])
   }
 }
+
+test('raid detail displays an explicit Google-Sheet link and lets only admins replace it', async () => {
+  const linked = {
+    source: 'google_sheets', sheet_id: 'sheet-123', raid_key: 'ICC25-01',
+    linked_by_player_id: 2, linked_at: '2026-10-13T18:00:00Z', link_reason: 'Historische Zuordnung geprüft',
+  }
+  const s = setup(player(1, 'ADMIN'))
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { legacyLink: linked })
+  await flush(view)
+  assert.match(text(view.tree), /Google-Sheet-Verknüpfung.*sheet-123.*ICC25-01.*Historische Zuordnung geprüft/)
+  button(view, 'Planung & Details').props.onClick()
+  view.render()
+  const field = (label) => nodes(view.tree, (node) => node.type === 'input' && node.props['aria-label'] === label)[0]
+  field('Legacy-Sheet-ID').props.onChange(change('sheet-456'))
+  field('Legacy-Raid-Schlüssel').props.onChange(change('ICC25-02'))
+  field('Legacy-Link-Begründung').props.onChange(change('Neu geprüft'))
+  view.render()
+  const linkForm = nodes(view.tree, (node) => node.type === 'form' && nodes(node, (child) => child.type === 'button' && text(child) === 'Google-Sheet-Verknüpfung speichern').length > 0)[0]
+  linkForm.props.onSubmit(event)
+  assert.equal(writes(s).length, 1)
+  assert.equal(writes(s)[0].url, '/api/v1/raids/1/legacy-link')
+  assert.deepEqual(writes(s)[0].body, {
+    source: 'google_sheets', sheet_id: 'sheet-456', raid_key: 'ICC25-02', reason: 'Neu geprüft',
+  })
+  writes(s)[0].resolve({ ...linked, sheet_id: 'sheet-456', raid_key: 'ICC25-02', link_reason: 'Neu geprüft' })
+  await flush(view)
+  assert.match(text(view.tree), /sheet-456.*ICC25-02.*Neu geprüft/)
+
+  const member = setup(player(1, 'MEMBER'))
+  const memberView = member.mount(member.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(member, 1, { legacyLink: linked })
+  await flush(memberView)
+  assert.match(text(memberView.tree), /sheet-123.*ICC25-01/)
+  assert.equal(button(memberView, 'Google-Sheet-Verknüpfung speichern'), undefined)
+  assert.equal(nodes(memberView.tree, (node) => node.type === 'input' && /^Legacy-/.test(node.props['aria-label'] ?? '')).length, 0)
+})
+
 function resolvePlayer(s, id) {
   for (const r of s.requests.filter((r) => r.method === 'get' && !r.resolved)) {
     r.resolved = true
@@ -650,85 +689,57 @@ for (const [file, component, label] of [
 }
 
 const report = (errors = []) => ({ mode: 'dry_run', raw_hash: 'preview-hash', created: { players: 2, characters: 3, raids: 4, attendance: 5, loot: 6, tokens: 7, points: 8 }, errors, warnings: [], rows_read: 10 })
-test('import merge requires error-free preview of unchanged source and shows counts/errors', async () => {
+test('sync uses preview-first safety and no historical bootstrap setup', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-  await button(view, 'Zusammenführen').props.onClick()
-  assert.equal(writes(s).length, 0)
-  const first = form(view).props.onSubmit(event)
-  // The form handler intentionally starts work without returning its promise.
-  await first
   form(view).props.onSubmit(event)
   assert.equal(writes(s).length, 1)
-  writes(s)[0].resolve(report(['invalid date']))
+  assert.equal(writes(s)[0].url, '/api/v1/sync/dry-run')
+  assert.equal('setup' in writes(s)[0].body, false)
+  writes(s)[0].resolve(report())
   await flush(view)
-  assert.match(text(view.tree), /invalid date/)
-  assert.match(text(view.tree), /Geplante neue Einträge/)
-  assert.match(text(view.tree), /Spieler:\s+2/)
-  assert.match(text(view.tree), /EP-Transaktionen \(einschließlich Korrekturen\):\s+8/)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-  form(view).props.onSubmit(event)
-  writes(s).at(-1).resolve(report())
-  await flush(view)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, false)
-  const sheet = nodes(view.tree, (n) => n.type === 'input')[0]
-  const source = sheet.props.value
-  sheet.props.onChange(change('different-source'))
-  view.render()
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-  assert.doesNotMatch(text(view.tree), /Geplante neue Einträge/)
-  nodes(view.tree, (n) => n.type === 'input')[0].props.onChange(change(source))
-  view.render()
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
+  assert.equal(button(view, 'Synchronisierung anwenden').props.disabled, false)
+  assert.match(text(view.tree), /Geplante Änderungen/)
 })
 
-test('import ignores preview response after source edit and guards merge duplicates', async () => {
+test('sync ignores preview response after source edit and guards apply duplicates', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
   form(view).props.onSubmit(event)
   nodes(view.tree, (n) => n.type === 'input')[0].props.onChange(change('new-source'))
   writes(s)[0].resolve(report())
   await flush(view)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
+  assert.equal(button(view, 'Synchronisierung anwenden').props.disabled, true)
   assert.doesNotMatch(text(view.tree), /Geplante neue Einträge/)
   form(view).props.onSubmit(event)
   writes(s).at(-1).resolve(report())
   await flush(view)
-  const merge = button(view, 'Zusammenführen').props.onClick
-  const first = merge()
-  await merge()
-  assert.equal(writes(s).filter((r) => r.url === '/api/v1/imports').length, 1)
+  const apply = button(view, 'Synchronisierung anwenden').props.onClick()
+  assert.equal(writes(s).at(-1).url, '/api/v1/website-sync/flush')
+  writes(s).at(-1).resolve({ sent: 2, failed: 0 })
+  await flush(view)
+  assert.equal(writes(s).at(-1).url, '/api/v1/sync')
   assert.equal(writes(s).at(-1).body.sheet_id, 'new-source')
   assert.equal(writes(s).at(-1).body.raw_hash, 'preview-hash')
-  writes(s).at(-1).reject(new Error('offline'))
-  await first
+  writes(s).at(-1).resolve({ ...report(), mode: 'merge' })
+  await apply
   view.render()
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
+  assert.ok(button(view, 'Ausgehende Änderungen erneut senden'))
 })
 
-test('import setup sends explicit owner settings and schedule edits invalidate preview and stale handlers', async () => {
+test('sync requests never send historical bootstrap setup fields', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
   form(view).props.onSubmit(event)
-  assert.deepEqual(JSON.parse(JSON.stringify(writes(s)[0].body.setup)), {
-    name: 'ICC25', leader: 'Oxora', first_date: '2026-10-05', start_time: '19:00',
-    timezone: 'Europe/Berlin', weekdays: [1], interval_weeks: 1,
-  })
+  assert.equal('setup' in writes(s)[0].body, false)
   writes(s)[0].resolve(report())
   await flush(view)
-  const staleMerge = button(view, 'Zusammenführen').props.onClick
-  nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'time')[0].props.onChange(change('20:00'))
+  const staleMerge = button(view, 'Synchronisierung anwenden').props.onClick
+  nodes(view.tree, (n) => n.type === 'input')[0].props.onChange(change('changed-sheet'))
   await staleMerge()
   view.render()
   assert.equal(writes(s).length, 1)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-  form(view).props.onSubmit(event)
-  assert.equal(writes(s).at(-1).body.setup.start_time, '20:00')
-  nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')[0].props.onChange({ target: { checked: false } })
-  writes(s).at(-1).resolve(report())
-  await flush(view)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
+  assert.equal(button(view, 'Synchronisierung anwenden').props.disabled, true)
   form(view).props.onSubmit(event)
   assert.equal('setup' in writes(s).at(-1).body, false)
 })
@@ -1135,54 +1146,6 @@ test('correction reason_required remains visible with draft preserved', async ()
   assert.equal(input(view, 'Loot-Begründung').props.value, 'my reason')
 })
 
-test('import hash is mandatory and stale merge handlers cannot bypass source edits', async () => {
-  const s = setup()
-  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  form(view).props.onSubmit(event)
-  writes(s)[0].resolve({ ...report(), raw_hash: '' })
-  await flush(view)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-  await button(view, 'Zusammenführen').props.onClick()
-  assert.equal(writes(s).length, 1)
-  form(view).props.onSubmit(event)
-  writes(s).at(-1).resolve({ ...report(), raw_hash: 'latest-preview-hash' })
-  await flush(view)
-  const oldMerge = button(view, 'Zusammenführen').props.onClick
-  nodes(view.tree, (n) => n.type === 'input')[0].props.onChange(change('changed-sheet'))
-  await oldMerge()
-  assert.equal(writes(s).filter((r) => r.url === '/api/v1/imports').length, 0)
-})
-
-test('source_changed clears merge permission and next preview provides the new hash', async () => {
-  const s = setup()
-  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  form(view).props.onSubmit(event)
-  assert.equal('raw_hash' in writes(s)[0].body, false)
-  writes(s)[0].resolve(report())
-  await flush(view)
-  const first = button(view, 'Zusammenführen').props.onClick()
-  assert.equal(writes(s).at(-1).body.raw_hash, 'preview-hash')
-  const { ApiError } = s.load('api.ts')
-  writes(s).at(-1).reject(new ApiError(409, 'source_changed', 'source changed'))
-  await first
-  view.render()
-  assert.match(text(view.tree), /neue Vorschau/)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-  form(view).props.onSubmit(event)
-  writes(s).at(-1).resolve({ ...report(), raw_hash: 'new-hash' })
-  await flush(view)
-  const next = button(view, 'Zusammenführen').props.onClick()
-  assert.equal(writes(s).at(-1).body.raw_hash, 'new-hash')
-  const failedReport = { ...report(['conflicting row']), mode: 'merge', created: { players: 0, characters: 0, raids: 0, attendance: 0, loot: 0, tokens: 0, points: 0 } }
-  writes(s).at(-1).resolve(failedReport)
-  await next
-  view.render()
-  assert.match(text(view.tree), /conflicting row/)
-  assert.match(text(view.tree), /keine Einträge geschrieben/)
-  assert.match(text(view.tree), /Import ID/)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-})
-
 for (const status of ['PLANNED', 'OPEN', 'COMPLETED']) {
   for (const kind of ['attendance', 'loot']) {
     test(`${status} unarchived ${kind} edit needs no reason and guards pending PATCH`, async () => {
@@ -1302,138 +1265,6 @@ test('in-place character editor saves without reason, guards duplicates and pres
   await first
   view.render()
   assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Charakter bearbeiten: Name')[0].props.value, ' New name ')
-})
-
-const historicalPreview = () => ({ ...report(), warnings: ['raid "ICC25-01": reason_required for audited additions to existing imported raid'] })
-
-test('historical preview remains valid but merge requires trimmed nonblank reason', async () => {
-  const s = setup()
-  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  form(view).props.onSubmit(event)
-  assert.equal('reason' in writes(s)[0].body, false)
-  writes(s)[0].resolve(historicalPreview())
-  await flush(view)
-  assert.match(text(view.tree), /Die Vorschau ist gültig/)
-  assert.doesNotMatch(text(view.tree), /Der Bericht enthält Fehler/)
-  assert.equal(input(view, 'Import-Begründung').props['aria-required'], true)
-  assert.equal(input(view, 'Import-Begründung').props.required, undefined)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-  await button(view, 'Zusammenführen').props.onClick()
-  assert.equal(writes(s).length, 1)
-  input(view, 'Import-Begründung').props.onChange(change(' \t '))
-  view.render()
-  await button(view, 'Zusammenführen').props.onClick()
-  assert.equal(writes(s).length, 1)
-  input(view, 'Import-Begründung').props.onChange(change('  fehlendes historisches Loot  '))
-  view.render()
-  assert.equal(button(view, 'Zusammenführen').props.disabled, false)
-  const merge = button(view, 'Zusammenführen').props.onClick
-  const first = merge()
-  await merge()
-  assert.equal(writes(s).length, 2)
-  const write = writes(s).at(-1)
-  assert.equal(write.body.reason, 'fehlendes historisches Loot')
-  assert.equal(write.body.raw_hash, 'preview-hash')
-  assert.equal(write.body.sheet_id, nodes(view.tree, (n) => n.type === 'input')[0].props.value)
-  view.render()
-  assert.equal(input(view, 'Import-Begründung').props.disabled, true)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-  write.reject(new Error('offline'))
-  await first
-  view.render()
-  assert.equal(input(view, 'Import-Begründung').props.disabled, false)
-  assert.equal(input(view, 'Import-Begründung').props.value, '  fehlendes historisches Loot  ')
-})
-
-test('initial import permits blank reason and unrelated preview warnings', async () => {
-  const s = setup()
-  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  input(view, 'Import-Begründung').props.onChange(change('  '))
-  view.render()
-  form(view).props.onSubmit(event)
-  writes(s)[0].resolve({ ...report(), warnings: ['optional column missing'] })
-  await flush(view)
-  assert.equal(input(view, 'Import-Begründung').props['aria-required'], false)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, false)
-  const first = button(view, 'Zusammenführen').props.onClick()
-  assert.equal(writes(s).at(-1).body.reason, '')
-  assert.equal(writes(s).at(-1).body.raw_hash, 'preview-hash')
-  writes(s).at(-1).resolve({ ...report(), mode: 'merge' })
-  await first
-  view.render()
-  assert.match(text(view.tree), /EP-Transaktionen \(einschließlich Korrekturen\):\s+8/)
-})
-
-test('historical reason draft survives source change without reusing old preview or handler', async () => {
-  const s = setup()
-  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  input(view, 'Import-Begründung').props.onChange(change('  historical additions  '))
-  view.render()
-  form(view).props.onSubmit(event)
-  writes(s)[0].resolve(historicalPreview())
-  await flush(view)
-  const oldMerge = button(view, 'Zusammenführen').props.onClick
-  nodes(view.tree, (n) => n.type === 'input')[0].props.onChange(change('new-sheet'))
-  await oldMerge()
-  assert.equal(writes(s).length, 1)
-  view.render()
-  assert.equal(input(view, 'Import-Begründung').props.value, '  historical additions  ')
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-  form(view).props.onSubmit(event)
-  writes(s).at(-1).resolve({ ...historicalPreview(), raw_hash: 'new-sheet-hash' })
-  await flush(view)
-  const first = button(view, 'Zusammenführen').props.onClick()
-  const write = writes(s).at(-1)
-  assert.equal(write.body.sheet_id, 'new-sheet')
-  assert.equal(write.body.raw_hash, 'new-sheet-hash')
-  assert.equal(write.body.reason, 'historical additions')
-  // Even an obsolete response arriving after a source change cannot render a report.
-  nodes(view.tree, (n) => n.type === 'input')[0].props.onChange(change('third-sheet'))
-  write.resolve({ ...report(), mode: 'merge' })
-  await first
-  view.render()
-  assert.doesNotMatch(text(view.tree), /Neu angelegte Einträge/)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-  assert.equal(input(view, 'Import-Begründung').props.value, '  historical additions  ')
-})
-
-test('reason warning does not prevent a new preview with a blank reason', async () => {
-  const s = setup()
-  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  form(view).props.onSubmit(event)
-  writes(s)[0].resolve(historicalPreview())
-  await flush(view)
-  assert.equal(input(view, 'Import-Begründung').props.required, undefined)
-  form(view).props.onSubmit(event)
-  assert.equal(writes(s).length, 2)
-  assert.equal(writes(s)[1].url, '/api/v1/imports/dry-run')
-  assert.equal('reason' in writes(s)[1].body, false)
-  writes(s)[1].resolve(historicalPreview())
-  await flush(view)
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
-})
-
-test('missing historical reason merge report shows no writes and requires a fresh preview', async () => {
-  const s = setup()
-  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  form(view).props.onSubmit(event)
-  writes(s)[0].resolve(report())
-  await flush(view)
-  const first = button(view, 'Zusammenführen').props.onClick()
-  assert.equal(writes(s).at(-1).body.reason, '')
-  writes(s).at(-1).resolve({
-    ...historicalPreview(), mode: 'merge', errors: ['reason_required: additions to existing imported raids require an explicit correction reason'],
-    created: { players: 0, characters: 0, raids: 0, attendance: 0, loot: 0, tokens: 0, points: 0 },
-  })
-  await first
-  view.render()
-  assert.match(text(view.tree), /keine Einträge geschrieben/)
-  assert.match(text(view.tree), /Bitte eine Begründung eingeben/)
-  assert.match(text(view.tree), /EP-Transaktionen \(einschließlich Korrekturen\):\s+0/)
-  assert.doesNotMatch(text(view.tree), /Die Vorschau ist gültig/)
-  input(view, 'Import-Begründung').props.onChange(change('now explained'))
-  view.render()
-  assert.equal(button(view, 'Zusammenführen').props.disabled, true)
 })
 
 test('archive preserves successor, invalidates old submits and requires reasons for later changes', async () => {

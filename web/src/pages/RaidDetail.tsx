@@ -7,7 +7,7 @@ import { RaidLootList } from '../components/RaidLootList'
 import { RaidBanner } from '../components/RaidBanner'
 import { RaidRosterBoard } from '../components/RaidRosterBoard'
 import { RaidSignups } from '../components/RaidSignups'
-import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Attendance, type AttendanceRole, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
+import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Attendance, type AttendanceRole, type CatalogBoss, type CatalogItemDrop, type Character, type LegacyRaidLink, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
 import { matchesCatalogItem } from '../catalog'
 import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
@@ -22,6 +22,7 @@ interface Props {
 
 type AwardMethod = 'MAIN' | 'SECOND' | 'ENHANCED' | 'BOE'
 type RecordedLoot = LootAward & { award_method?: AwardMethod; enhanced_cost?: number | null; catalog_boss_id?: string | null }
+const googleSheetsSource = 'google_sheets'
 const dropKey = (item: CatalogItemDrop) => JSON.stringify([item.boss_id, item.item_id, item.raid_size, item.mode])
 const awardLabels: Record<AwardMethod, string> = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
 const awardMethod = (row: RecordedLoot): AwardMethod => row.award_method ?? (row.is_main_spec ? 'MAIN' : 'SECOND')
@@ -102,6 +103,10 @@ function RaidDetail({ raidID }: Props) {
   const [seriesID, setSeriesID] = useState('')
   const [scheduled, setScheduled] = useState('')
   const [archiveResult, setArchiveResult] = useState<ArchiveResponse | null>(null)
+  const [legacyLink, setLegacyLink] = useState<LegacyRaidLink | null>(null)
+  const [legacySheetID, setLegacySheetID] = useState('')
+  const [legacyRaidKey, setLegacyRaidKey] = useState('')
+  const [legacyLinkReason, setLegacyLinkReason] = useState('')
 
   const [attPlayer, setAttPlayer] = useState('')
   const [attCharacter, setAttCharacter] = useState('')
@@ -137,6 +142,7 @@ function RaidDetail({ raidID }: Props) {
   const [catalogStatus, setCatalogStatus] = useState('')
 
   const canManage = me ? atLeast(me.role, 'RAIDASSISTENT') : false
+  const isAdmin = me ? atLeast(me.role, 'ADMIN') : false
   const isActiveRaid = !!raid && !raid.archived_at && (raid.status === 'PLANNED' || raid.status === 'OPEN')
   const canWrite = canManage && !!raid && (isActiveRaid || raid.status === 'COMPLETED')
   const attNeedsReason = !!raid?.archived_at
@@ -170,13 +176,17 @@ function RaidDetail({ raidID }: Props) {
     const version = ++loadVersion.current
     setError('')
     try {
-      const [r, a, l, p, s, cs] = await Promise.all([
+      const [r, a, l, p, s, cs, link] = await Promise.all([
         api.get<Raid>(`/api/v1/raids/${raidID}`),
         api.get<Attendance[]>(`/api/v1/raids/${raidID}/attendance`),
         api.get<RecordedLoot[]>(`/api/v1/raids/${raidID}/loot`),
         api.get<Player[]>('/api/v1/players'),
         api.get<RaidSeries[]>('/api/v1/raid-series'),
         api.get<Character[]>('/api/v1/characters'),
+		api.get<LegacyRaidLink>(`/api/v1/raids/${raidID}/legacy-link`).catch((err: unknown) => {
+			if (err instanceof ApiError && err.code === 'legacy_link_not_found') return null
+			throw err
+		}),
       ])
       if (isActive() && version === loadVersion.current) {
         const context = JSON.stringify([r.catalog_instance_id ?? '', r.raid_size ?? null])
@@ -198,6 +208,10 @@ function RaidDetail({ raidID }: Props) {
         setRaidName(r.name)
         setSeriesID(r.series_id ? String(r.series_id) : '')
         setScheduled(localStart(r.scheduled_start))
+        setLegacyLink(link)
+        setLegacySheetID(link?.sheet_id ?? '')
+        setLegacyRaidKey(link?.raid_key ?? '')
+		setLegacyLinkReason(link?.reason ?? link?.link_reason ?? '')
       }
     } catch (err) {
       if (isActive() && version === loadVersion.current) {
@@ -541,6 +555,46 @@ function RaidDetail({ raidID }: Props) {
     })
   }
 
+	const withdrawLoot = async () => {
+		if (!lootEditing || !canWrite || (lootNeedsReason && !lootReason.trim())) return
+		await submit(async () => {
+			setError('')
+			try {
+				await api.post<LootAward>(`/api/v1/raids/${raidID}/loot/${lootEditing.id}/withdraw`, {
+					...(lootNeedsReason ? { reason: lootReason.trim() } : {}),
+				})
+				if (!isActive()) return
+				editLoot(null)
+				await load()
+			} catch (err) {
+				if (isActive()) setError(raidError(err, 'Loot konnte nicht zurückgezogen werden.'))
+			}
+		})
+	}
+
+  const saveLegacyLink = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isAdmin || !legacySheetID.trim() || !legacyRaidKey.trim() || !legacyLinkReason.trim()) return
+    await submit(async () => {
+      setError('')
+      try {
+        const saved = await api.post<LegacyRaidLink>(`/api/v1/raids/${raidID}/legacy-link`, {
+          source: googleSheetsSource,
+          sheet_id: legacySheetID.trim(),
+          raid_key: legacyRaidKey.trim(),
+			reason: legacyLinkReason.trim(),
+        })
+        if (!isActive()) return
+        setLegacyLink(saved)
+        setLegacySheetID(saved.sheet_id)
+        setLegacyRaidKey(saved.raid_key)
+		setLegacyLinkReason(saved.reason ?? saved.link_reason ?? '')
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Google-Sheet-Verknüpfung speichern fehlgeschlagen')
+      }
+    })
+  }
+
   if (!raid) {
     return (
       <div>
@@ -587,6 +641,23 @@ function RaidDetail({ raidID }: Props) {
         ? <Link to={`/raids/${archiveResult.next_raid.id}`}>Nächster Raid: {archiveResult.next_raid.name}{archiveResult.next_raid.scheduled_start ? ` (${new Date(archiveResult.next_raid.scheduled_start).toLocaleString()})` : ''}</Link>
         : 'Kein Nachfolger erstellt.'}</p>}
       {canWrite && <p className="muted">Änderungen werden mit Vorher/Nachher protokolliert. Nur im Archiv ist eine Begründung erforderlich; betroffene EP werden automatisch ausgeglichen; Tokens folgen dem Loot.</p>}
+
+      <section className="subcard" aria-label="Google-Sheet-Verknüpfung">
+        <h3>Google-Sheet-Verknüpfung</h3>
+        {legacyLink ? <>
+          <p>Quelle: {legacyLink.source}</p>
+          <p>Sheet-ID: {legacyLink.sheet_id}</p>
+          <p>Raid-Schlüssel: {legacyLink.raid_key}</p>
+          <p>Verknüpft von: {playerName(legacyLink.linked_by_player_id)} · {new Date(legacyLink.linked_at).toLocaleString('de-DE')}</p>
+			<p>Begründung: {legacyLink.reason ?? legacyLink.link_reason}</p>
+        </> : <p className="muted">Für diesen Raid ist keine Google-Sheet-Verknüpfung hinterlegt.</p>}
+        {isAdmin && view === 'planning' && <form className="inline-form" onSubmit={saveLegacyLink}>
+          <label>Sheet-ID<input aria-label="Legacy-Sheet-ID" disabled={pending} value={legacySheetID} onChange={(e) => setLegacySheetID(e.target.value)} required /></label>
+          <label>Raid-Schlüssel<input aria-label="Legacy-Raid-Schlüssel" disabled={pending} value={legacyRaidKey} onChange={(e) => setLegacyRaidKey(e.target.value)} required /></label>
+          <label>Begründung<input aria-label="Legacy-Link-Begründung" disabled={pending} value={legacyLinkReason} onChange={(e) => setLegacyLinkReason(e.target.value)} required /></label>
+          <button type="submit" disabled={pending || !legacySheetID.trim() || !legacyRaidKey.trim() || !legacyLinkReason.trim()}>Google-Sheet-Verknüpfung speichern</button>
+        </form>}
+      </section>
 
       {canManage && isActiveRaid && <section className="card">
         <h2>Raidplanung</h2>
@@ -754,8 +825,9 @@ function RaidDetail({ raidID }: Props) {
               <label>Notizen<input disabled={pending} placeholder="Loot-Notizen" value={lootNotes} onChange={(e) => changeLoot(() => setLootNotes(e.target.value))} /></label>
               {lootNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Loot-Begründung" value={lootReason} onChange={(e) => changeLoot(() => setLootReason(e.target.value))} required /></label>}
               {lootEditing && error && <p className="error" role="alert">{error}</p>}
-              <button type="submit" disabled={pending || !lootItem.trim() || !hasLootRecipient || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : 'Vergeben'}</button>
-              {lootEditing && <button type="button" disabled={pending} onClick={() => editLoot(null)}>Bearbeitung abbrechen</button>}
+               <button type="submit" disabled={pending || !lootItem.trim() || !hasLootRecipient || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : 'Vergeben'}</button>
+				{lootEditing && <button type="button" disabled={pending || (lootNeedsReason && !lootReason.trim())} onClick={() => void withdrawLoot()}>Loot zurückziehen</button>}
+               {lootEditing && <button type="button" disabled={pending} onClick={() => editLoot(null)}>Bearbeitung abbrechen</button>}
             </form>
           </div>
         )}

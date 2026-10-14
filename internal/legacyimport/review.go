@@ -5,13 +5,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"raid-website/internal/loot"
 	"raid-website/internal/raid"
 	"raid-website/internal/validation"
 	"sort"
 )
 
 // review resolves provenance and database conflicts before any mutation.
-func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, rep *Report) (Plan, error) {
+func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, rep *Report, syncOnly bool) (Plan, error) {
 	gap, err := s.imports.hasLegacyProvenanceGap(ctx, source, sheetID)
 	if err != nil {
 		return p, err
@@ -29,10 +30,13 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 	}
 	known := map[string]lootMapping{}
 	noID := map[string]bool{}
+	permanent := map[string]bool{}
 	for _, row := range mappings {
 		known[row.Identity] = row
 		if row.ExternalID == "" {
 			noID[row.Identity] = true
+		} else {
+			permanent[row.Identity] = true
 		}
 	}
 	history, err := s.imports.List(ctx)
@@ -51,8 +55,23 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 			delete(noID, row.Identity)
 		}
 		if previous, ok := known[row.Identity]; ok {
-			if previous.Fingerprint != row.Fingerprint {
-				rep.Errors = append(rep.Errors, fmt.Sprintf("Import ID %q edited: conflict; existing loot will not be overwritten", row.ExternalID))
+			if row.ExternalID != "" {
+				delete(permanent, row.Identity)
+				stored, err := s.loot.Get(ctx, previous.LootAwardID)
+				if err != nil {
+					return p, err
+				}
+				if !lootPlanMatchesAward(row, stored) {
+					row.SyncAction = "correct"
+				} else if stored.WithdrawnAt != nil {
+					row.SyncAction = "restore"
+				}
+				if row.SyncAction != "" {
+					row.MappingID, row.LootAwardID = previous.ID, previous.LootAwardID
+					newLoot = append(newLoot, row)
+				}
+			} else if previous.Fingerprint != row.Fingerprint {
+				rep.Errors = append(rep.Errors, fmt.Sprintf("loot row without Import ID edited: conflict; existing loot will not be overwritten"))
 			}
 			continue
 		}
@@ -62,6 +81,17 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 		}
 		newLoot = append(newLoot, row)
 	}
+	for identity := range permanent {
+		previous := known[identity]
+		stored, err := s.loot.Get(ctx, previous.LootAwardID)
+		if err != nil {
+			return p, err
+		}
+		if stored.WithdrawnAt != nil {
+			continue
+		}
+		newLoot = append(newLoot, LootPlan{MappingID: previous.ID, LootAwardID: previous.LootAwardID, RaidKey: "", SyncAction: "withdraw"})
+	}
 	if len(noID) > 0 {
 		rep.Errors = append(rep.Errors, "ambiguous no-ID loot: removed content or changed multiplicity")
 	}
@@ -69,17 +99,55 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 	if err := s.deriveLootBosses(ctx, p.Loot, rep); err != nil {
 		return p, err
 	}
+	checkedSyncRaids := map[int64]bool{}
+	for _, row := range p.Loot {
+		if row.SyncAction == "" {
+			continue
+		}
+		stored, err := s.loot.Get(ctx, row.LootAwardID)
+		if err != nil {
+			return p, err
+		}
+		if checkedSyncRaids[stored.RaidID] {
+			continue
+		}
+		checkedSyncRaids[stored.RaidID] = true
+		rd, err := s.raids.Get(ctx, stored.RaidID)
+		if err != nil {
+			return p, err
+		}
+		if rd.Status == validation.RaidStatusCancelled || (rd.ArchivedAt != nil && rd.Status != validation.RaidStatusCompleted) {
+			rep.Errors = append(rep.Errors, fmt.Sprintf("raid %d: loot sync forbidden for cancelled or inconsistent archived raid", rd.ID))
+			continue
+		}
+		if rd.ArchivedAt != nil {
+			p.RequiresReason = true
+			rep.Warnings = append(rep.Warnings, fmt.Sprintf("raid %d: reason_required for audited loot sync", rd.ID))
+		}
+	}
 	playerIDs := map[string]int64{}
 	for _, pl := range p.Players {
-		existing, err := s.players.FindByName(ctx, pl.Name)
+		var existingID int64
+		var err error
+		if syncOnly {
+			existingID, err = s.imports.syncPlayerID(ctx, source, sheetID, pl.Name)
+		} else {
+			row, findErr := s.players.FindByName(ctx, pl.Name)
+			err = findErr
+			if err == nil {
+				existingID = row.ID
+			}
+		}
 		if errors.Is(err, sql.ErrNoRows) {
-			rep.Created.Players++
+			if !syncOnly {
+				rep.Created.Players++
+			}
 		} else if err != nil {
 			return p, err
 		} else {
-			playerIDs[pl.Name] = existing.ID
+			playerIDs[pl.Name] = existingID
 		}
-		if pl.HasPoints && pl.Points != 0 {
+		if !syncOnly && pl.HasPoints && pl.Points != 0 {
 			has := false
 			if playerIDs[pl.Name] != 0 {
 				has, err = s.points.HasTransactionType(ctx, playerIDs[pl.Name], "legacy_open")
@@ -94,6 +162,17 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 	}
 	charIDs := map[string]int64{}
 	for _, c := range p.Characters {
+		if syncOnly {
+			id, err := s.imports.syncCharacterID(ctx, source, sheetID, c.Name, c.PlayerName)
+			if err == nil {
+				charIDs[c.Name] = id
+				continue
+			}
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			return p, err
+		}
 		matches, err := s.imports.charactersByName(ctx, c.Name)
 		if err != nil {
 			return p, err
@@ -116,9 +195,24 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 		rp := &p.Raids[i]
 		raidID := int64(0)
 		var existing *raid.Raid
-		mapping, err := s.imports.raidMapping(ctx, source, sheetID, rp.Key)
+		var mappingRaidID int64
+		var mappingErr error
+		if syncOnly {
+			var mapping *syncRaidMapping
+			mapping, mappingErr = s.imports.syncRaidMapping(ctx, source, sheetID, rp.Key)
+			if mapping != nil {
+				mappingRaidID = mapping.RaidID
+			}
+		} else {
+			var mapping *raidMapping
+			mapping, mappingErr = s.imports.raidMapping(ctx, source, sheetID, rp.Key)
+			if mapping != nil {
+				mappingRaidID = mapping.RaidID
+			}
+		}
+		err = mappingErr
 		if err == nil {
-			existing, err = s.raids.Get(ctx, mapping.RaidID)
+			existing, err = s.raids.Get(ctx, mappingRaidID)
 			if errors.Is(err, sql.ErrNoRows) {
 				rep.Errors = append(rep.Errors, fmt.Sprintf("raid %q: mapped raid missing; provenance conflict", rp.Key))
 				continue
@@ -134,6 +228,9 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 				rep.Warnings = append(rep.Warnings, fmt.Sprintf("raid %q: reason_required to classify existing imported history as archived without awarding EP again", rp.Key))
 			}
 		} else if errors.Is(err, sql.ErrNoRows) {
+			if syncOnly {
+				continue
+			}
 			_, err = s.raids.FindByName(ctx, rp.Key)
 			if err == nil {
 				rep.Errors = append(rep.Errors, fmt.Sprintf("raid %q: name collision without source/sheet provenance", rp.Key))
@@ -148,7 +245,7 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 		}
 		newRows := 0
 		for _, row := range newLoot {
-			if row.RaidKey == rp.Key {
+			if row.RaidKey == rp.Key && row.SyncAction == "" {
 				newRows++
 			}
 		}
@@ -235,14 +332,25 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 			}
 		}
 	}
-	rep.Created.Loot = len(newLoot)
+	for _, row := range newLoot {
+		switch row.SyncAction {
+		case "correct":
+			rep.Updated++
+		case "withdraw":
+			rep.Withdrawn++
+		case "restore":
+			rep.Restored++
+		default:
+			rep.Created.Loot++
+		}
+	}
 	if p.Setup != nil {
 		rep.Created.Series++
 		rep.Created.Raids++
 		rep.Created.Attendance += len(p.Setup.Entries)
 	}
 	for _, row := range newLoot {
-		if row.IsToken {
+		if row.SyncAction == "" && row.IsToken {
 			rep.Created.Tokens++
 		}
 	}
@@ -251,6 +359,13 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 		rep.ArchivedRaids = 0
 	}
 	return p, nil
+}
+
+func lootPlanMatchesAward(row LootPlan, stored *loot.Award) bool {
+	if row.ItemID != stored.ItemID || row.Item != stored.ItemName || row.CharacterName != stored.AwardedToCharacterName || row.Method != stored.AwardMethod {
+		return false
+	}
+	return row.Date == nil || row.Date.Equal(stored.AwardedAt)
 }
 
 // deriveLootBosses fills the boss of every imported loot row whose bundled catalog item

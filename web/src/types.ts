@@ -133,6 +133,16 @@ export interface Raid {
   updated_at: string
 }
 
+export interface LegacyRaidLink {
+  source: string
+  sheet_id: string
+  raid_key: string
+  linked_by_player_id: number
+  linked_at: string
+	reason?: string
+	link_reason?: string
+}
+
 export type AttendanceRole = 'TANK' | 'HEAL' | 'DD'
 
 export interface RaidSignup {
@@ -410,9 +420,7 @@ export interface ImportCounts {
   points: number
 }
 
-export interface ImportReport {
-	archived_raids?: number
-	setup?: { name: string; leader: string; scheduled_start: string; timezone: string; weekdays: number[]; interval_weeks: number; attendance: number; already_imported: boolean }
+export interface SyncReport {
   mode: string
   source: string
   raw_hash: string
@@ -428,6 +436,17 @@ export interface ImportReport {
   skipped: boolean
   warnings: string[] | null
   errors: string[] | null
+}
+
+export interface SyncAdoption {
+  raids: { raid_key: string; raid_ids: number[]; mapped_raid_id?: number }[]
+  players: { player_name: string; player_ids: number[]; mapped_player_id?: number; requires_selection: boolean }[]
+  characters: {
+    character_name: string
+    player_name: string
+    characters: { character_id: number; player_id: number }[]
+    mapped_character_id?: number
+  }[]
 }
 
 export interface ImportRecord {

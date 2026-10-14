@@ -54,6 +54,9 @@ type Report struct {
 	Tokens        int          `json:"tokens"`
 	PointsEntries int          `json:"points_entries"`
 	Created       Counts       `json:"created"`
+	Updated       int          `json:"updated"`
+	Withdrawn     int          `json:"withdrawn"`
+	Restored      int          `json:"restored"`
 	Skipped       bool         `json:"skipped"`
 	Warnings      []string     `json:"warnings"`
 	Errors        []string     `json:"errors"`
@@ -274,7 +277,7 @@ func (s *Service) DryRunWithSetup(ctx context.Context, source, sheetID string, c
 		rep = reportFromPlan("dry_run", source, data, p, rows)
 		rep.Setup = setupReport
 		logger.Info("legacy import dry-run reviewing source=%s sheet=%s rows=%d players=%d characters=%d raids=%d loot=%d", source, sheetID, rows, rep.Players, rep.Characters, rep.Raids, rep.Loot)
-		_, err = bound.review(ctx, source, sheetID, p, &rep)
+		_, err = bound.review(ctx, source, sheetID, p, &rep, false)
 		if err != nil {
 			return err
 		}
@@ -368,7 +371,7 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 			}
 			return err
 		}
-		p, err = s.review(ctx, source, sheetID, p, &rep)
+		p, err = s.review(ctx, source, sheetID, p, &rep, false)
 		if err != nil {
 			return err
 		}
@@ -403,7 +406,7 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 			return err
 		}
 		logger.Info("legacy import merge raids done source=%s sheet=%s created=%d attendance=%d", source, sheetID, rep.Created.Raids, rep.Created.Attendance)
-		if err := s.mergeLoot(ctx, source, sheetID, reason, raidIDs, playerIDs, charIDs, actorID, p, now, &rep); err != nil {
+		if err := s.mergeLoot(ctx, source, sheetID, data.Hash, reason, raidIDs, playerIDs, charIDs, actorID, p, now, &rep, false); err != nil {
 			return err
 		}
 		logger.Info("legacy import merge loot done source=%s sheet=%s created=%d tokens=%d", source, sheetID, rep.Created.Loot, rep.Created.Tokens)
@@ -437,7 +440,7 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 			WarningsCount:  len(rep.Warnings),
 			ErrorsCount:    len(rep.Errors),
 			CreatedCount:   rep.Created.Series + rep.Created.Players + rep.Created.Characters + rep.Created.Raids + rep.Created.Attendance + rep.Created.Loot + rep.Created.Tokens + rep.Created.Points,
-			UpdatedCount:   rep.ArchivedRaids,
+			UpdatedCount:   rep.ArchivedRaids + rep.Updated + rep.Withdrawn + rep.Restored,
 			UnchangedCount: 0,
 			StartedAt:      &started,
 			CompletedAt:    &completed,
@@ -685,12 +688,83 @@ func (s *Service) mergeRaids(ctx context.Context, source, sheetID, reason string
 	return ids, nil
 }
 
-func (s *Service) mergeLoot(ctx context.Context, source, sheetID, reason string, raidIDs, playerIDs, charIDs map[string]int64, actorID int64, p Plan, now time.Time, rep *Report) error {
+func (s *Service) mergeLoot(ctx context.Context, source, sheetID, rawHash, reason string, raidIDs, playerIDs, charIDs map[string]int64, actorID int64, p Plan, now time.Time, rep *Report, syncOnly bool) error {
 	existingRaids := map[string]bool{}
 	for _, rp := range p.Raids {
 		existingRaids[rp.Key] = rp.ExistingID != 0
 	}
+	syncStates := map[string]int64{}
 	for _, l := range p.Loot {
+		if l.SyncAction != "" {
+			stored, err := s.loot.Get(ctx, l.LootAwardID)
+			if err != nil {
+				return err
+			}
+			var raidKey string
+			if syncOnly {
+				raidKey, err = s.imports.syncRaidMappingByRaidID(ctx, source, sheetID, stored.RaidID)
+			} else {
+				mapping, mappingErr := s.imports.raidMappingByRaidID(ctx, source, sheetID, stored.RaidID)
+				err = mappingErr
+				if mapping != nil {
+					raidKey = mapping.RaidKey
+				}
+			}
+			if err != nil {
+				return err
+			}
+			stateID := syncStates[raidKey]
+			if stateID == 0 {
+				raidID := stored.RaidID
+				state := &lootSyncState{Source: source, SheetID: sheetID, RaidKey: raidKey, RawHash: rawHash, SyncedByPlayerID: actorID, SyncedAt: now, SyncRaidID: &raidID}
+				if err := s.imports.insertLootSyncState(ctx, state); err != nil {
+					return err
+				}
+				stateID = state.ID
+				syncStates[raidKey] = stateID
+			}
+			eventType := ""
+			switch l.SyncAction {
+			case "withdraw":
+				withdrawnAt, withdrawnBy, withdrawnReason := now, actorID, strings.TrimSpace(reason)
+				_, err = s.corrections.CorrectImportedLoot(ctx, stored.RaidID, stored.ID, actorID, reason, func(row *loot.Award) {
+					row.WithdrawnAt, row.WithdrawnByPlayerID, row.WithdrawnReason = &withdrawnAt, &withdrawnBy, &withdrawnReason
+				})
+				eventType = "WITHDRAWN"
+			case "restore":
+				_, err = s.corrections.CorrectImportedLoot(ctx, stored.RaidID, stored.ID, actorID, reason, func(row *loot.Award) {
+					row.WithdrawnAt, row.WithdrawnByPlayerID, row.WithdrawnReason = nil, nil, nil
+				})
+				eventType = "RESTORED"
+			case "correct":
+				pid, cid := playerIDs[l.PlayerName], charIDs[l.CharacterName]
+				if pid == 0 || cid == 0 {
+					return fmt.Errorf("corrected loot %q references unknown player/character", l.Item)
+				}
+				_, err = s.corrections.CorrectImportedLoot(ctx, stored.RaidID, stored.ID, actorID, reason, func(row *loot.Award) {
+					row.Boss, row.ItemID, row.ItemName = l.Boss, l.ItemID, l.Item
+					row.AwardedToPlayerID, row.AwardedToCharacterID, row.AwardedToCharacterName = pid, &cid, l.CharacterName
+					row.AwardMethod = l.Method
+					if l.Date != nil {
+						row.AwardedAt = *l.Date
+					}
+					if l.CatalogBossID == "" {
+						row.CatalogBossID = nil
+					} else {
+						bossID := l.CatalogBossID
+						row.CatalogBossID = &bossID
+					}
+				})
+				eventType = "CORRECTED"
+			}
+			if err != nil {
+				return fmt.Errorf("sync loot award %d: %w", stored.ID, err)
+			}
+			if err := s.imports.insertLootSyncEvent(ctx, stateID, l.MappingID, stored.ID, eventType, actorID, strings.TrimSpace(reason), now); err != nil {
+				return err
+			}
+			continue
+		}
 		raidID := raidIDs[l.RaidKey]
 		pid := playerIDs[l.PlayerName]
 		cid := charIDs[l.CharacterName]

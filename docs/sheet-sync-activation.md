@@ -10,20 +10,17 @@ Archivierungen im Sheet folgen derselben Regel.
 
 1. Eine konsistente SQLite-Sicherung über die Backupfunktion erstellen. Eine
    laufende WAL-Datenbank nicht nur durch Kopieren der `.db`-Datei sichern.
-2. Neue Migrationen 058/059 zuerst auf einer separaten Datenbankkopie anwenden.
-   Sie ergänzen Baseline-/Provenienztabellen; sie archivieren und buchen nichts.
-3. Testserver ausdrücklich mit dieser Testdatenbank und ausschließlich der
-   freigegebenen Sheet-Kopie konfigurieren:
-
-   ```sh
-   SHEET_SYNC_ENABLED=true
-   SHEET_SYNC_AUTORUN=false
-   SHEET_SYNC_SHEET_ID=10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8
-   SHEET_SYNC_INTERVAL=10m
-   SHEET_SYNC_REASON="Geprüfter Abgleich mit der freigegebenen Kopie"
-   # Servicekonto sicher serverseitig bereitstellen, nur die Kopie freigeben.
-   # DATABASE_URL ausdrücklich auf die separate Testdatenbank setzen.
-   ```
+2. Neue Migrationen 058/059/060 zuerst auf einer separaten Datenbankkopie anwenden.
+   Sie ergänzen Baseline-/Provenienz- und Konfigurationstabellen; sie archivieren und buchen nichts.
+3. Testserver mit `DATABASE_URL` ausdrücklich auf die separate Testdatenbank
+   verweisen. Anschließend als Admin unter **Importe** die Sync-Konfiguration
+   öffnen, das Servicekonto-JSON einmalig hochladen (nur die Kopie freigeben),
+   eine Begründung und ein Intervall (z. B. `10m`) festlegen und
+   **Synchronisierung aktivieren**, aber den **automatischen Zeitplan deaktiviert**
+   lassen. Die Sheet-ID ist auf die freigegebene Kopie festgelegt.
+   Env-Bootstrap bleibt alternativ möglich; bei GUI-Speicherung werden die
+   Einstellungen ohne Neustart wirksam. Schlüsseldatei
+   `<DB-Datei>.sheet-sync.key` bei Backups zusammen mit der DB schützen.
 
 4. Als Admin unter Importe „Vorabprüfung ohne Änderungen“ verwenden oder
    `POST /api/v1/sheet-sync/preflight` aufrufen. Die Vorschau zeigt geplante
@@ -35,7 +32,7 @@ Archivierungen im Sheet folgen derselben Regel.
 6. Bei `ready=true` einen manuellen Abgleich in der Testumgebung und identische
    Wiederholung prüfen. Erst nach erfolgreicher Prüfung des tatsächlichen
    Datenbankstands und gesicherter Ausgangsdaten den geplanten Rollout durchführen
-   und den automatischen Zeitplan bewusst mit `SHEET_SYNC_AUTORUN=true` aktivieren.
+   und den automatischen Zeitplan bewusst in der GUI aktivieren (bei Env-Bootstrap alternativ `SHEET_SYNC_AUTORUN=true`).
 
 ## Übernahmeregeln
 

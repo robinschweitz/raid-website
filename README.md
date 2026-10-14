@@ -117,6 +117,18 @@ Teilnehmer aus `ICC25 Raidsetup`; die Website exportiert Daten in eigene
 Für die erste Einrichtung von Raidserie und geplantem Raid gilt weiterhin der
 vorhandene manuelle Initialimport.
 
+**Aktueller Raidsetup-Block (ADR 061):** Nach dem Erstimport übernimmt der
+laufende Sync den ersten nummerierten `ICC25 Raidsetup`-Block in den einzigen
+anstehenden, aktiven PLANNED/OPEN-Raid der importierten Serie (kein zusätzlicher
+Raid). Beim Wechsel zum nächsten Raid wird zuerst geprüft, dass der
+ursprünglich importierte Raid archiviert ist und eine archivierte vorherige
+Aufstellung als Baseline vorliegt. Die Aufstellung muss sich tatsächlich
+gegenüber der zuletzt archivierten unterscheiden; sonst wird die veraltete
+Aufstellung nicht in den Nachfolger kopiert. Die Vorabprüfung zeigt den
+Zielraid, seine ID, die Zahl neuer Teilnehmer und eventuelle Hinweise.
+Unbekannte Spieler/Charaktere, geänderte Teilnahmen und mehrere aktive Raids
+bleiben Konflikte. Schon importierte historische Teilnahmen bleiben unverändert.
+
 **Sheet-Archivierung wird übernommen (ADR 059):** Ein Raid im `Raid Archive`
 zählt auch auf der Website als abgeschlossen und archiviert. Der Sync übernimmt
 Loot und die bereits verbuchten Teilnehmer-EP gemeinsam, mit append-only

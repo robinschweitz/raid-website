@@ -222,7 +222,7 @@ export function ImportsPage() {
 
       <section className="card">
         <h2>Fortlaufende Google-Sheets-Synchronisierung</h2>
-        <p className="muted">Im Sheet archivierte Raids werden einschließlich Loot und bereits verbuchter EP als abgeschlossen übernommen. Abschluss-EP werden dabei nicht nochmals vergeben. Das aktuelle ICC25 Raidsetup ergänzt nur eindeutig bekannte Teilnehmer des aktiven Raids. Die Website veröffentlicht ihre Daten in separaten „Website …“-Tabs. Widersprüche werden gemeldet, niemals automatisch überschrieben oder gelöscht.</p>
+        <p className="muted">Im Sheet archivierte Raids werden einschließlich Loot und bereits verbuchter EP als abgeschlossen übernommen. Abschluss-EP werden dabei nicht nochmals vergeben. „ICC25 Raidsetup“ ist die Aufstellung für den nächsten geplanten Raid. Ist nach ICC25-35 noch kein Serien-Raid aktiv, plant der Sync ICC25-36 anhand der konfigurierten Raidserie und übernimmt die eindeutig zugeordneten Teilnehmer. Die Website veröffentlicht ihre Daten in separaten „Website …“-Tabs. Widersprüche werden gemeldet, niemals automatisch überschrieben oder gelöscht.</p>
         {syncConfig && <form className="subcard" onSubmit={saveSyncConfig}>
           <h3>Synchronisierung einrichten</h3>
           <p className="muted">Diese Einstellungen werden serverseitig gespeichert. Die Google-Zugangsdaten werden nicht zurück an den Browser gesendet. Nur die freigegebene Arbeitskopie ist erlaubt.</p>

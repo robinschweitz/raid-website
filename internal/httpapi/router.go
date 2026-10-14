@@ -44,7 +44,6 @@ type Options struct {
 	RegistrationFeed        registration.ExternalClient
 	SheetSyncEnabled        bool
 	SheetSyncSheetID        string
-	SheetSyncBackupSheetID  string
 	SheetSyncReason         string
 	SheetSyncInterval       time.Duration
 	SheetSyncServiceAccount string

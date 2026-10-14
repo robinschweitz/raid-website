@@ -193,7 +193,7 @@ func (m *Manager) Save(ctx context.Context, req SettingsUpdate) (Settings, error
 	if secret != "" {
 		next.Ciphertext, err = encryptCredential(m.keyPath, secret)
 		if err != nil {
-			return Settings{}, fmt.Errorf("Servicekonto konnte nicht sicher gespeichert werden: %w", err)
+			return Settings{}, fmt.Errorf("servicekonto konnte nicht sicher gespeichert werden: %w", err)
 		}
 	}
 	raw, err := json.Marshal(next.Settings)
@@ -291,17 +291,16 @@ func readCredentialKey(path string, create bool) ([]byte, error) {
 		if _, err := rand.Read(key); err != nil {
 			return nil, err
 		}
-		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-		if err == nil {
+		f, openErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if openErr == nil {
 			_, writeErr := f.Write(key)
-			err = errors.Join(writeErr, f.Close())
-			if err != nil {
+			if err := errors.Join(writeErr, f.Close()); err != nil {
 				return nil, err
 			}
 			return key, nil
 		}
-		if !errors.Is(err, os.ErrExist) {
-			return nil, err
+		if !errors.Is(openErr, os.ErrExist) {
+			return nil, openErr
 		}
 		info, err = os.Lstat(path)
 	}

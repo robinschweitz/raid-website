@@ -10,8 +10,23 @@ interface SheetSyncStatus {
   last_run?: string
   last_success?: string
   last_error?: string
-  current_setup?: { raid_id: number; added: number; warnings: string[]; conflicts: string[] }
+  current_setup?: SheetSetupResult
   last_import?: ImportReport
+}
+
+interface SheetSetupResult {
+  raid_id: number
+  raid_name?: string
+  added: number
+  warnings: string[]
+  conflicts: string[]
+}
+
+interface SheetSyncPreflight {
+  ready: boolean
+  blockers: string[]
+  import?: ImportReport
+  setup?: SheetSetupResult
 }
 
 interface SheetSyncConfig {
@@ -38,7 +53,7 @@ export function ImportsPage() {
   const [configBusy, setConfigBusy] = useState(false)
   const [configMessage, setConfigMessage] = useState('')
   const [syncBusy, setSyncBusy] = useState(false)
-  const [syncPreview, setSyncPreview] = useState<{ ready: boolean; blockers: string[]; import?: ImportReport } | null>(null)
+  const [syncPreview, setSyncPreview] = useState<SheetSyncPreflight | null>(null)
   const [report, setReport] = useState<ImportReport | null>(null)
   const [sheetID, setSheetID] = useState(DEFAULT_SHEET_ID)
   const [reason, setReason] = useState('')
@@ -127,7 +142,7 @@ export function ImportsPage() {
     setSyncBusy(true)
     setSyncPreview(null)
     try {
-      const result = await api.post<{ ready: boolean; blockers: string[]; import?: ImportReport }>('/api/v1/sheet-sync/preflight', {})
+      const result = await api.post<SheetSyncPreflight>('/api/v1/sheet-sync/preflight', {})
       if (isActive()) setSyncPreview(result)
     } catch (err) {
       if (isActive()) setSyncPreview({ ready: false, blockers: [err instanceof ApiError ? err.message : 'Vorabprüfung fehlgeschlagen'] })
@@ -246,10 +261,12 @@ export function ImportsPage() {
             <p role="status">{syncStatus.last_error ? 'Synchronisierung benötigt Prüfung' : syncStatus.last_success ? 'Letzter Abgleich erfolgreich' : 'Synchronisierung aktiviert'}</p>
             <p className="muted">Letzter Versuch: {formatTime(syncStatus.last_run ?? null)} · Letzter Erfolg: {formatTime(syncStatus.last_success ?? null)}</p>
             {!!syncStatus.last_error && <p className="error">{syncStatus.last_error}</p>}
-            {syncStatus.current_setup && <p className="muted">Raidsetup: Raid #{syncStatus.current_setup.raid_id || '—'}, {syncStatus.current_setup.added} neue Teilnahmen.</p>}
+            {syncStatus.current_setup && <p className="muted">Raidsetup: {syncStatus.current_setup.raid_name || 'Raid'} #{syncStatus.current_setup.raid_id || '—'}, {syncStatus.current_setup.added} neue Teilnahmen.</p>}
             {!!syncStatus.current_setup?.warnings?.length && <ul className="plain-list">{syncStatus.current_setup.warnings.map((message, i) => <li key={i}>{message}</li>)}</ul>}
             {syncPreview && <p role="status">{syncPreview.ready ? 'Vorabprüfung bestanden. Der Abgleich prüft den Stand vor jedem Schreiben erneut.' : 'Aktivierung blockiert: Altbestand oder Quellenkonflikt zuerst prüfen.'}</p>}
             {!!syncPreview?.blockers.length && <ul className="plain-list">{syncPreview.blockers.map((message, i) => <li key={i}>{message}</li>)}</ul>}
+            {syncPreview?.setup && syncPreview.setup.raid_id > 0 && <p className="muted">Anstehender Raid für „ICC25 Raidsetup“: {syncPreview.setup.raid_name || 'Raid'} #{syncPreview.setup.raid_id} · {syncPreview.setup.added} geplante neue Teilnahmen.</p>}
+            {!!syncPreview?.setup?.warnings?.length && <ul className="plain-list">{syncPreview.setup.warnings.map((message, i) => <li key={i}>{message}</li>)}</ul>}
             <p className="muted">Die Vorabprüfung zeigt Archivübernahmen und EP-Ausgleiche, ohne Daten zu verändern. Alte Import-Zuordnungen werden geprüft; widersprüchliche Aufstellungen, unbekannter Website-Loot oder parallele EP-Änderungen blockieren den Abgleich.</p>
             {!!syncPreview?.import?.archive_transfers?.length && <>
               <h3>Geplante Archivübernahme</h3>

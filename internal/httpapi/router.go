@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
+	"time"
 	"net/http"
 
 	"github.com/uptrace/bun"
@@ -28,6 +30,7 @@ import (
 	"raid-website/internal/raidsignup"
 	"raid-website/internal/registration"
 	"raid-website/internal/roster"
+	"raid-website/internal/sheetsync"
 	"raid-website/internal/webui"
 )
 
@@ -39,6 +42,11 @@ type Options struct {
 	AdminUsername     string
 	AdminPassword     string
 	RegistrationFeed  registration.ExternalClient
+	SheetSyncEnabled bool
+	SheetSyncSheetID string
+	SheetSyncReason string
+	SheetSyncInterval time.Duration
+	SheetSyncServiceAccount string
 }
 
 // New constructs the HTTP handler tree with all v1 dependencies wired.
@@ -83,6 +91,16 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		return nil, fmt.Errorf("bootstrap admin: %w", err)
 	}
 
+	var syncService *sheetsync.Service
+	if opts.SheetSyncEnabled {
+		admin, err := players.FindByUsername(context.Background(), strings.ToLower(strings.TrimSpace(opts.AdminUsername)))
+		if err != nil { return nil, fmt.Errorf("find sheet-sync administrator: %w", err) }
+		writer, err := sheetsync.NewGoogleWriter(opts.SheetSyncServiceAccount)
+		if err != nil { return nil, fmt.Errorf("configure sheet sync: %w", err) }
+		syncService, err = sheetsync.New(db, importsSvc, writer, opts.SheetSyncSheetID, admin.ID, opts.SheetSyncReason, opts.SheetSyncInterval)
+		if err != nil { return nil, fmt.Errorf("create sheet sync: %w", err) }
+	}
+
 	corrections := raidcorrection.NewService(raidcorrection.NewRepo(db)).WithExternalClient(registrationFeed)
 	api := v1.NewAPI(v1.Deps{
 		DB:                db,
@@ -104,6 +122,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Completion:        raidcompletion.NewService(raidcompletion.NewRepo(db)),
 		Corrections:       corrections,
 		Imports:           importsSvc,
+		SheetSync:        syncService,
 		Signups:           raidsignup.NewService(raidsignup.NewRepo(db)),
 		Registration:      registrationSvc,
 		AccountMerge:      accountmerge.NewService(accountmerge.NewRepo(db)),
@@ -118,5 +137,6 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		mux.Handle("/", spa)
 	}
 
+	if syncService != nil { syncService.Start(context.Background()) }
 	return requestID(securityHeaders(opts.CookieSecure)(logging(csrfProtection(authenticate(authSvc)(mux))))), nil
 }

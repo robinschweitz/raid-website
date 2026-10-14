@@ -120,7 +120,9 @@ func (s *Service) RunOnce(ctx context.Context) (Status, error) {
 	status.LastRun = &now
 	status.LastError = ""
 	// No import or export writes until the separately stored workbook copy is accessible.
-	var backupVerifier, ok = s.writer.(interface{ VerifyBackup(context.Context, string, string) error })
+	var backupVerifier, ok = s.writer.(interface {
+		VerifyBackup(context.Context, string, string) error
+	})
 	var backupErr error
 	if !ok {
 		backupErr = errors.New("sheet writer must verify the backup before any sync")

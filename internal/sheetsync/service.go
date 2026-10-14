@@ -103,6 +103,20 @@ func (s *Service) GetStatus(ctx context.Context) (Status, error) {
 	return s.load(ctx)
 }
 
+// ensureWebsiteOnlyArchival prevents the periodic Sheet importer from either
+// creating already-archived raids or classifying an existing raid as archived.
+// Historical one-off imports remain an explicit action in the website's admin UI.
+// New raids must be created/finalized through the website workflow.
+func ensureWebsiteOnlyArchival(preview legacyimport.Report) error {
+	if preview.Created.Raids > 0 {
+		return fmt.Errorf("%d new historical raids found in Sheet: create/finalize raids through the website; automatic import disabled", preview.Created.Raids)
+	}
+	if preview.ArchivedRaids > 0 {
+		return fmt.Errorf("%d raid archive transitions found in Sheet: archive exclusively through the website", preview.ArchivedRaids)
+	}
+	return nil
+}
+
 // RunOnce first reconciles append-only historical sheet rows, then imports only
 // new, known participants from ICC25 Raidsetup, then exports website snapshots.
 // Import conflicts prevent the export, preserving evidence for an administrator.
@@ -134,6 +148,9 @@ func (s *Service) RunOnce(ctx context.Context) (Status, error) {
 	}
 	if err == nil && len(preview.Errors) > 0 {
 		err = fmt.Errorf("historical sheet conflicts: %s", strings.Join(preview.Errors, "; "))
+	}
+	if err == nil {
+		err = ensureWebsiteOnlyArchival(preview)
 	}
 	if err == nil {
 		var merged legacyimport.Report

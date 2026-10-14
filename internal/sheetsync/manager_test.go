@@ -26,7 +26,7 @@ func testCredential(t *testing.T) string {
 	}
 	encoded, err := json.Marshal(map[string]string{
 		"client_email": "sync-test@example.iam.gserviceaccount.com",
-		"private_key": string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: raw})),
+		"private_key":  string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: raw})),
 	})
 	if err != nil {
 		t.Fatal(err)

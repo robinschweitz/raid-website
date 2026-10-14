@@ -117,19 +117,20 @@ Teilnehmer aus `ICC25 Raidsetup`; die Website exportiert Daten in eigene
 Für die erste Einrichtung von Raidserie und geplantem Raid gilt weiterhin der
 vorhandene manuelle Initialimport.
 
-**Aktueller Raidsetup-Block (ADR 061):** Nach dem Erstimport übernimmt der
-laufende Sync den ersten nummerierten `ICC25 Raidsetup`-Block in den einzigen
-anstehenden, aktiven PLANNED/OPEN-Raid der importierten Serie (kein zusätzlicher
-Raid). Beim Wechsel zum nächsten Raid wird zuerst geprüft, dass der
-ursprünglich importierte Raid archiviert ist. Bevorzugt wird der
-Vergleich mit der zuletzt gespeicherten Setup-Baseline; bei älteren Imports
-ohne Baseline wird die letzte belegte archivierte Website-Aufstellung derselben
-Serie verglichen. Die aktuelle Aufstellung muss sich tatsächlich
-gegenüber der zuletzt archivierten unterscheiden; sonst wird die veraltete
-Aufstellung nicht in den Nachfolger kopiert. Die Vorabprüfung zeigt den
-Zielraid, seine ID, die Zahl neuer Teilnehmer und eventuelle Hinweise.
-Unbekannte Spieler/Charaktere, geänderte Teilnahmen und mehrere aktive Raids
-bleiben Konflikte. Schon importierte historische Teilnahmen bleiben unverändert.
+**Aktueller Raidsetup-Block und nächste Planung (ADR 062):** Der erste
+nummerierte A:F-Block von `ICC25 Raidsetup` ist die aktuelle Aufstellung des
+**nächsten** geplanten Raids. Nach einer belegten Archivierung von
+`ICC25-35` erzeugt der Abgleich automatisch `ICC25-36` als `PLANNED`,
+sofern kein aktiver Serien-Raid existiert und die explizit importierte
+ICC25-Serie mit Nummernvorlage `ICC25-{number}` und Wiederholungstermin
+eindeutig konfiguriert ist. Der Termin folgt den Zeitzonen- und
+Wochentagsregeln der Serie. Die Aufstellung darf dieselben Spieler wie der
+archivierte Raid enthalten. Neue Teilnehmer werden ausschließlich nach
+Spieler-/Charakterzuordnung ergänzt; bestehende Website-Einträge werden nicht
+stillschweigend gelöscht oder überschrieben. Die Vorabprüfung zeigt
+`ICC25-36`, den Termin und die geplanten Teilnahmen **ohne Änderungen**.
+Kein Initial-Setup-Mapping, unklare Namensnummerierung oder mehrdeutige
+Teilnahme bedeutet keine automatische Raid-Erzeugung.
 
 **Sheet-Archivierung wird übernommen (ADR 059):** Ein Raid im `Raid Archive`
 zählt auch auf der Website als abgeschlossen und archiviert. Der Sync übernimmt

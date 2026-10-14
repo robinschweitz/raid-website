@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -19,8 +18,10 @@ import (
 // A missing or changed source row never deletes or silently rewrites website data.
 type SetupSyncReport struct {
 	RaidID    int64    `json:"raid_id"`
-	RaidName  string   `json:"raid_name,omitempty"`
-	Added     int      `json:"added"`
+	RaidName       string     `json:"raid_name,omitempty"`
+	ScheduledStart *time.Time `json:"scheduled_start,omitempty"`
+	CreatedRaid    bool       `json:"created_raid,omitempty"`
+	Added          int        `json:"added"`
 	Warnings  []string `json:"warnings"`
 	Conflicts []string `json:"conflicts"`
 }
@@ -71,8 +72,24 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 			}
 		}
 		if len(active) == 0 {
-			report.Warnings = append(report.Warnings, "Kein aktiver Raid in der importierten Serie; Raidsetup wird nicht verändert")
-			return nil
+			// The last proven ICC25 raid was archived through the Sheet.
+			// The current sheet setup belongs to its next scheduled occurrence.
+			// A missing occurrence is created in the same rollbackable sync.
+			created, warning, createErr := bound.createUpcomingSetupRaid(ctx, actorID, source, sheetID, mapping, data)
+			if createErr != nil {
+				report.Conflicts = append(report.Conflicts, createErr.Error())
+				return nil
+			}
+			if warning != "" {
+				report.Warnings = append(report.Warnings, warning)
+				return nil
+			}
+			if created == nil {
+				report.Warnings = append(report.Warnings, "Kein aktiver Raid und kein belegbarer Folgetermin in der importierten Serie")
+				return nil
+			}
+			active = append(active, created.ID)
+			report.CreatedRaid = true
 		}
 		if len(active) != 1 {
 			report.Conflicts = append(report.Conflicts, fmt.Sprintf("%d aktive Raids in der importierten Serie: Zuordnung des Sheets nicht eindeutig", len(active)))
@@ -84,13 +101,14 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 			return err
 		}
 		report.RaidName = targetRaid.Name
+		report.ScheduledStart = targetRaid.ScheduledStart
 		previous, previousErr := bound.imports.setupBaseline(ctx, source, sheetID, report.RaidID)
 		if previousErr != nil && !errors.Is(previousErr, sql.ErrNoRows) {
 			return previousErr
 		}
-		// A new successor may only receive a changed main roster block.
-		// Notes/secondary tables and subsequent edits to archived raids do not
-		// prove that the sheet belongs to the next occurrence.
+		// ICC25 Raidsetup is the owner's live roster for the next occurrence,
+		// even when some of its players are the same as in the archived raid.
+		// The occurrence must still follow the originally imported raid.
 		if report.RaidID != mapping.RaidID && errors.Is(previousErr, sql.ErrNoRows) {
 			imported, err := bound.raids.Get(ctx, mapping.RaidID)
 			if err != nil {
@@ -99,79 +117,7 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 			if imported.ArchivedAt == nil || imported.Status != validation.RaidStatusCompleted ||
 				imported.ScheduledStart == nil || targetRaid.ScheduledStart == nil ||
 				!targetRaid.ScheduledStart.After(*imported.ScheduledStart) {
-				report.Conflicts = append(report.Conflicts, "ICC25 Raidsetup: bisheriger Import-Raid nicht abgeschlossen oder nächster Termin nicht eindeutig nachgewiesen")
-				return nil
-			}
-			last, err := bound.imports.latestArchivedSetupBaseline(ctx, source, sheetID, mapping.SeriesID, *targetRaid.ScheduledStart)
-			sameAsArchived := false
-			if errors.Is(err, sql.ErrNoRows) {
-				// Upgrades may have no stored setup baseline because the first
-				// tracked sync archived the original raid immediately. Use the
-				// latest archived website roster as evidence instead of making
-				// up a baseline or copying an unchanged old setup.
-				var priorID int64
-				var priorStart time.Time
-				for _, rd := range raids {
-					if rd.ArchivedAt == nil || rd.Status != validation.RaidStatusCompleted ||
-						rd.ScheduledStart == nil || !rd.ScheduledStart.Before(*targetRaid.ScheduledStart) {
-						continue
-					}
-					if priorID == 0 || rd.ScheduledStart.After(priorStart) {
-						priorID = rd.ID
-						priorStart = *rd.ScheduledStart
-					}
-				}
-				if priorID == 0 {
-					report.Warnings = append(report.Warnings, "ICC25 Raidsetup: keine archivierte vorherige Aufstellung vorhanden; neue Raid-Zuordnung nicht belegbar")
-					return nil
-				}
-				oldRoster, rosterErr := bound.att.ListByRaid(ctx, priorID)
-				if rosterErr != nil {
-					return rosterErr
-				}
-				if len(oldRoster) == 0 {
-					report.Warnings = append(report.Warnings, "ICC25 Raidsetup: vorheriger Raid enthält keine vergleichbare historische Aufstellung")
-					return nil
-				}
-				sameAsArchived = len(oldRoster) == len(entries)
-				if sameAsArchived {
-					for _, oldRow := range oldRoster {
-						person, personErr := bound.players.Get(ctx, oldRow.PlayerID)
-						if personErr != nil {
-							return personErr
-						}
-						matched := false
-						for _, entry := range entries {
-							if entry.Player == person.Name && entry.Character == oldRow.CharacterName &&
-								entry.Class == oldRow.Class && entry.Spec == oldRow.Spec && entry.Role == oldRow.Role {
-								matched = true
-								break
-							}
-						}
-						if !matched {
-							sameAsArchived = false
-							break
-						}
-					}
-				}
-				report.Warnings = append(report.Warnings, "ICC25 Raidsetup: keine ältere Setup-Baseline vorhanden; aktuellen Block gegen die letzte archivierte Website-Aufstellung geprüft")
-			} else {
-				if err != nil {
-					return err
-				}
-				previousPlan := Plan{}
-				lastEntries, _, err := parseSetup([]byte(last), &previousPlan)
-				if err != nil {
-					return err
-				}
-				if len(previousPlan.Errors) > 0 {
-					report.Conflicts = append(report.Conflicts, "ICC25 Raidsetup: gespeicherte frühere Aufstellung ist ungültig")
-					return nil
-				}
-				sameAsArchived = reflect.DeepEqual(lastEntries, entries)
-			}
-			if sameAsArchived {
-				report.Warnings = append(report.Warnings, "ICC25 Raidsetup: Aufstellung identisch zum letzten archivierten Raid; keine automatische Übernahme in "+targetRaid.Name+" ohne belegten Wechsel")
+				report.Conflicts = append(report.Conflicts, "ICC25 Raidsetup: erster Import-Raid nicht archiviert oder kein späterer Folgetermin nachweisbar")
 				return nil
 			}
 		}

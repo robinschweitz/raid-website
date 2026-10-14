@@ -17,6 +17,8 @@ interface SheetSyncStatus {
 interface SheetSetupResult {
   raid_id: number
   raid_name?: string
+  scheduled_start?: string
+  created_raid?: boolean
   added: number
   warnings: string[]
   conflicts: string[]
@@ -265,7 +267,7 @@ export function ImportsPage() {
             {!!syncStatus.current_setup?.warnings?.length && <ul className="plain-list">{syncStatus.current_setup.warnings.map((message, i) => <li key={i}>{message}</li>)}</ul>}
             {syncPreview && <p role="status">{syncPreview.ready ? 'Vorabprüfung bestanden. Der Abgleich prüft den Stand vor jedem Schreiben erneut.' : 'Aktivierung blockiert: Altbestand oder Quellenkonflikt zuerst prüfen.'}</p>}
             {!!syncPreview?.blockers.length && <ul className="plain-list">{syncPreview.blockers.map((message, i) => <li key={i}>{message}</li>)}</ul>}
-            {syncPreview?.setup && syncPreview.setup.raid_id > 0 && <p className="muted">Anstehender Raid für „ICC25 Raidsetup“: {syncPreview.setup.raid_name || 'Raid'} #{syncPreview.setup.raid_id} · {syncPreview.setup.added} geplante neue Teilnahmen.</p>}
+            {syncPreview?.setup && syncPreview.setup.raid_id > 0 && <p className="muted">{syncPreview.setup.created_raid ? 'Neuer geplanter Raid' : 'Anstehender Raid'} aus „ICC25 Raidsetup“: {syncPreview.setup.raid_name || 'Raid'} #{syncPreview.setup.raid_id} · {syncPreview.setup.added} geplante neue Teilnahmen{syncPreview.setup.scheduled_start ? ` · ${formatTime(syncPreview.setup.scheduled_start)}` : ''}.</p>}
             {!!syncPreview?.setup?.warnings?.length && <ul className="plain-list">{syncPreview.setup.warnings.map((message, i) => <li key={i}>{message}</li>)}</ul>}
             <p className="muted">Die Vorabprüfung zeigt Archivübernahmen und EP-Ausgleiche, ohne Daten zu verändern. Alte Import-Zuordnungen werden geprüft; widersprüchliche Aufstellungen, unbekannter Website-Loot oder parallele EP-Änderungen blockieren den Abgleich.</p>
             {!!syncPreview?.import?.archive_transfers?.length && <>

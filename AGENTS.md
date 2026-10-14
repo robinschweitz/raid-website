@@ -207,12 +207,14 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   (ADR 009).
 
 ### Legacy Google Sheet import and ongoing sync (ADR 057)
-- ADR 061 treats the first numbered `ICC25 Raidsetup` block as the current
-  roster for the single active imported-series raid. Moving to a successor
-  requires the previous import raid archived and a changed roster against
-  a proven archived setup baseline or the last archived website roster on
-  upgrades lacking a baseline. Never copy stale rosters, invent raids,
-  edit old raids or silently remove participants.
+- ADR 062 supersedes the no-successor rule for sheet archives: when the
+  imported ICC25 recurring series is proven and has no active occurrence,
+  reconcile creates exactly the next numbered PLANNED raid (e.g. ICC25-36
+  after ICC25-35) and populates its roster from the live numbered A:F
+  ICC25 Raidsetup block, even if the players match the archived roster.
+  Validate explicit recurrence, sheet provenance, numeric name, linkage and
+  duplicate identities. Preflight rolls back every mutation; no EP replay
+  or edits to archived raids. Unclear setup mappings never bootstrap a series.
 - ADR 060 permits Admin-only GUI configuration of the authorized-copy sync, with
   persistently encrypted service-account JSON and immediate runtime changes. The
   separate automatic opt-in, read-only preflight, provenance checks, and hard-coded

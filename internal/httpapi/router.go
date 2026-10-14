@@ -93,11 +93,11 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		return nil, fmt.Errorf("bootstrap admin: %w", err)
 	}
 
-	admin, err := players.FindByUsername(context.Background(), strings.ToLower(strings.TrimSpace(opts.AdminUsername)))
-	if err != nil {
-		return nil, fmt.Errorf("find sheet-sync administrator: %w", err)
-	}
 	syncFactory := func(settings sheetsync.Settings, credentials string) (*sheetsync.Service, error) {
+		admin, err := players.FindByUsername(context.Background(), strings.ToLower(strings.TrimSpace(opts.AdminUsername)))
+		if err != nil {
+			return nil, fmt.Errorf("find sheet-sync administrator: %w", err)
+		}
 		writer, err := sheetsync.NewGoogleWriter(credentials)
 		if err != nil {
 			return nil, err

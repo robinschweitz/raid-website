@@ -25,7 +25,7 @@ Authoritative sources, in order of precedence:
 ## What this project is
 
 A WoW WotLK guild raid-management website: raids, attendance, loot, Enhance Points, Armor Tokens,
-polls, roster configuration, and a one-off import of a legacy Google Sheet.
+polls, roster configuration, the legacy Google Sheet import, and opt-in continuous sheet reconciliation (ADR 057).
 
 Architecture is a **modular monolith** (ADR 001): Go backend + SQLite via Bun (ADR 002), React +
 TypeScript frontend built with Vite. One binary serves both the JSON API and the compiled SPA.
@@ -206,7 +206,17 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Guild ranks and raid groups are configurable rows in the database, not hard-coded constants
   (ADR 009).
 
-### Legacy Google Sheet import
+### Legacy Google Sheet import and ongoing sync (ADR 057)
+- The owner requested continuous synchronization instead of a one-off import,
+  including the current raid setup. The first delivery is conservative:
+  historical tabs are continuously previewed/merged with existing provenance,
+  the first numbered setup block can add known characters to the single active
+  raid, and the application publishes read-only Website-prefixed mirror tabs.
+  Source corrections/removals and Website-mirror edits are conflicts rather
+  than automatic last-writer-wins changes. A fully editable two-way master
+  remains explicitly unsupported until correction/ownership rules are decided.
+- Sync is opt-in via server-side Google service-account credentials. It must
+  never export authentication secrets or overwrite existing source tabs.
 - Source tabs: `Raid Archive`, `Loot Archive`, `Charaktere`, `Punkte`.
   Current setup additionally reads `ICC25 Raidsetup` A–F (ADR 029): the first numbered
   roster block, with explicit administrator-supplied schedule and leader. One source/sheet

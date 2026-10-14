@@ -9,9 +9,9 @@ import (
 
 func TestEnsureWebsiteOnlyArchival(t *testing.T) {
 	cases := []struct {
-		name string
+		name    string
 		preview legacyimport.Report
-		want string
+		want    string
 	}{
 		{name: "existing raids can sync", preview: legacyimport.Report{}},
 		{

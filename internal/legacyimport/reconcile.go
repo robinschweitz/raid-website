@@ -75,6 +75,11 @@ func (s *Service) Reconcile(ctx context.Context, actorID int64, source, sheetID,
 		if len(setup.Conflicts) > 0 {
 			return fmt.Errorf("current raid setup conflicts: %s", strings.Join(setup.Conflicts, "; "))
 		}
+		if setup.CreatedRaid {
+			report.Created.Raids++
+			report.Created.Attendance += setup.Added
+			report.Skipped = false
+		}
 		return bound.recordSheetArchiveReport(ctx, actorID, sheetID, reason, report)
 	})
 	return report, setup, err

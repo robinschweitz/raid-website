@@ -94,6 +94,17 @@ Teilnehmer aus `ICC25 Raidsetup`; die Website exportiert Daten in eigene
 Für die erste Einrichtung von Raidserie und geplantem Raid gilt weiterhin der
 vorhandene manuelle Initialimport.
 
+**Raidabschluss und Archivierung ausschließlich in der Website:** Der laufende
+Sheet-Abgleich darf weder neue, sofort archivierte Historien-Raids anlegen noch
+einen bestehenden Raid als archiviert markieren. Erkennt die Vorschau solche
+Änderungen (`created.raids` oder `archived_raids`), stoppt der automatische
+Abgleich mit einem Admin-Fehler, **bevor** Daten importiert/exportiert werden.
+Vergangene historische Daten können nur über den expliziten manuellen
+Initialimport in der Website übernommen werden. Für zukünftige Raids
+`Archivieren` in der Website verwenden: Dort werden Abschluss, EP-Belohnungen,
+Item-Locks und nächste Serie koordiniert; anschließend spiegelt der Sync den
+endgültigen Stand nur in die Arbeitskopie.
+
 Im Tab `Loot Archive` wurde nur in der Arbeitskopie die Kopfzelle G1
 (`Import ID`) ergänzt, damit neue Einträge eindeutige IDs erhalten können.
 Bestehende Einträge wurden nicht umgeschrieben.

@@ -31,7 +31,6 @@ const Source = "google_sheets"
 type Status struct {
 	Enabled       bool                          `json:"enabled"`
 	SheetID       string                        `json:"sheet_id"`
-	BackupSheetID string                        `json:"backup_sheet_id"`
 	LastRun       *time.Time                    `json:"last_run,omitempty"`
 	LastSuccess   *time.Time                    `json:"last_success,omitempty"`
 	LastError     string                        `json:"last_error,omitempty"`
@@ -46,24 +45,23 @@ type Service struct {
 	importer *legacyimport.Service
 	writer   MirrorWriter
 	sheetID  string
-	backupID string
 	actorID  int64
 	reason   string
 	interval time.Duration
 }
 
-func New(db *bun.DB, importer *legacyimport.Service, writer MirrorWriter, sheetID, backupID string, actorID int64, reason string, interval time.Duration) (*Service, error) {
-	if db == nil || importer == nil || writer == nil || strings.TrimSpace(sheetID) == "" || strings.TrimSpace(backupID) == "" || sheetID == backupID || actorID <= 0 || strings.TrimSpace(reason) == "" || interval < time.Minute {
-		return nil, errors.New("sheet sync needs a database, importer, writer, sheet ID, distinct backup ID, actor, reason and interval >= 1m")
+func New(db *bun.DB, importer *legacyimport.Service, writer MirrorWriter, sheetID string, actorID int64, reason string, interval time.Duration) (*Service, error) {
+	if db == nil || importer == nil || writer == nil || strings.TrimSpace(sheetID) == "" || actorID <= 0 || strings.TrimSpace(reason) == "" || interval < time.Minute {
+		return nil, errors.New("sheet sync needs a database, importer, writer, sheet ID, actor, reason and interval >= 1m")
 	}
-	return &Service{db: db, importer: importer, writer: writer, sheetID: sheetID, backupID: backupID, actorID: actorID, reason: reason, interval: interval}, nil
+	return &Service{db: db, importer: importer, writer: writer, sheetID: sheetID, actorID: actorID, reason: reason, interval: interval}, nil
 }
 
 func (s *Service) load(ctx context.Context) (Status, error) {
 	var raw string
 	err := s.db.NewSelect().TableExpr("sheet_sync_state").ColumnExpr("state_json").Where("id = 1").Scan(ctx, &raw)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Status{Enabled: true, SheetID: s.sheetID, BackupSheetID: s.backupID, ExportHashes: map[string]string{}}, nil
+		return Status{Enabled: true, SheetID: s.sheetID, ExportHashes: map[string]string{}}, nil
 	}
 	if err != nil {
 		return Status{}, err
@@ -80,7 +78,6 @@ func (s *Service) load(ctx context.Context) (Status, error) {
 	status = stored.Status
 	status.Enabled = true
 	status.SheetID = s.sheetID
-	status.BackupSheetID = s.backupID
 	status.ExportHashes = stored.ExportHashes
 	if status.ExportHashes == nil {
 		status.ExportHashes = map[string]string{}
@@ -121,17 +118,17 @@ func (s *Service) RunOnce(ctx context.Context) (Status, error) {
 	status.LastError = ""
 	// No import or export writes until the separately stored workbook copy is accessible.
 	var backupVerifier, ok = s.writer.(interface {
-		VerifyBackup(context.Context, string, string) error
+		VerifyWorkingCopy(context.Context, string) error
 	})
 	var backupErr error
 	if !ok {
 		backupErr = errors.New("sheet writer must verify the backup before any sync")
 	} else {
-		backupErr = backupVerifier.VerifyBackup(ctx, s.sheetID, s.backupID)
+		backupErr = backupVerifier.VerifyWorkingCopy(ctx, s.sheetID)
 	}
 	var preview legacyimport.Report
 	if backupErr != nil {
-		err = fmt.Errorf("backup prerequisite: %w", backupErr)
+		err = fmt.Errorf("working copy prerequisite: %w", backupErr)
 	} else {
 		preview, err = s.importer.DryRun(ctx, Source, s.sheetID)
 	}

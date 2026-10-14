@@ -52,7 +52,7 @@ func TestHistoricalOnlySheetBootstrapThenSyncICC25Raid36(t *testing.T) {
 		!strings.Contains(strings.Join(status.CurrentSetup.Warnings, " "), "raidsetup_initialization_required") {
 		t.Fatalf("missing series must be explained in status: %+v %v", status, err)
 	}
-	before := archiveSnapshot(t, db)
+	before := historySnapshot(t, db)
 	cfg := &legacyimport.SetupConfig{
 		Name: "ICC25", Leader: "Hero", FirstDate: "2026-10-19",
 		StartTime: "19:00", Timezone: "Europe/Berlin",
@@ -64,7 +64,7 @@ func TestHistoricalOnlySheetBootstrapThenSyncICC25Raid36(t *testing.T) {
 		t.Fatalf("first setup preview: %+v %v", preview, err)
 	}
 	// The GUI preview must not have created the series or next raid.
-	if !historyUnchanged(before, archiveSnapshot(t, db)) {
+	if !historyUnchanged(before, historySnapshot(t, db)) {
 		t.Fatal("one-time setup preview mutated existing history")
 	}
 	if _, err := imports.MergeWithSetup(ctx, actor, Source, validationCopy, preview.RawHash, "ICC25 Serienplan", cfg); err != nil {

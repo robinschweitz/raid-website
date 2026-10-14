@@ -2731,3 +2731,39 @@ test('Sheet preflight conflict blocks synchronization and displays the cause', a
   assert.equal(button(view, 'Jetzt synchronisieren').props.disabled, true)
   assert.equal(writes(s).filter((r) => r.url.endsWith('/run')).length, 0)
 })
+
+test('Sheet sync Admin settings can be saved without exposing credentials', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
+  s.requests.find((r) => r.url === '/api/v1/sheet-sync/config').resolve({
+    enabled: false, automatic: false,
+    sheet_id: '10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8',
+    interval: '10m', reason: '', credentials_configured: false,
+  })
+  await flush(view)
+  assert.ok(button(view, 'Einstellungen speichern'))
+  const credential = '{"client_email":"private@example.com","private_key":"FAKE"}'
+  const upload = nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'file')[0]
+  assert.ok(upload)
+  upload.props.onChange({ currentTarget: {
+    files: [{ name: 'service-account.json', size: credential.length, text: async () => credential }],
+    value: 'service-account.json',
+  } })
+  await flush(view)
+  assert.doesNotMatch(text(view.tree), /private@example.com/)
+  assert.match(text(view.tree), /service-account.json/)
+  const promise = form(view).props.onSubmit(event)
+  const request = writes(s).at(-1)
+  assert.equal(request.method, 'put')
+  assert.equal(request.url, '/api/v1/sheet-sync/config')
+  assert.equal(request.body.service_account_json, credential)
+  request.resolve({
+    enabled: false, automatic: false,
+    sheet_id: '10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8',
+    interval: '10m', reason: '', credentials_configured: true,
+  })
+  await promise
+  await flush(view)
+  assert.match(text(view.tree), /Servicekonto vorhanden/)
+  assert.doesNotMatch(text(view.tree), /private@example.com/)
+})

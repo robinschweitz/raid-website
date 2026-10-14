@@ -711,8 +711,18 @@ test('import setup sends explicit owner settings and schedule edits invalidate p
   const s = setup()
   const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
   form(view).props.onSubmit(event)
-  assert.deepEqual(JSON.parse(JSON.stringify(writes(s)[0].body.setup)), {
-    name: 'ICC25', leader: 'Oxora', first_date: '2026-10-05', start_time: '19:00',
+  const submitted = JSON.parse(JSON.stringify(writes(s)[0].body.setup))
+  assert.match(submitted.first_date, /^\\d{4}-\\d{2}-\\d{2}$/)
+  const nextDate = new Date(submitted.first_date + 'T00:00:00Z')
+  assert.equal(nextDate.getUTCDay(), 1, 'suggested ICC25 date must be a Monday')
+  const todayParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date())
+  const berlinDate = (field) => Number(todayParts.find((p) => p.type === field)?.value)
+  const today = new Date(Date.UTC(berlinDate('year'), berlinDate('month') - 1, berlinDate('day')))
+  assert.ok(nextDate > today, 'suggested ICC25 date must be in the future')
+  assert.deepEqual({ ...submitted, first_date: 'future Monday' }, {
+    name: 'ICC25', leader: 'Oxora', first_date: 'future Monday', start_time: '19:00',
     timezone: 'Europe/Berlin', weekdays: [1], interval_weeks: 1,
   })
   writes(s)[0].resolve(report())

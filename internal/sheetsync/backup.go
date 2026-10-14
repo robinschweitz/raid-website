@@ -49,43 +49,22 @@ func matchingBackupTabs(original, backup []sheetTab) error {
 	return nil
 }
 
-// VerifyBackup ensures that a separate, accessible workbook copy exists before
-// any automatic database merge or Sheet export. It never writes to the backup.
-// The contents of the backup are not expected to track later source edits.
-func (g *GoogleWriter) VerifyBackup(ctx context.Context, originalID, backupID string) error {
-	if strings.TrimSpace(originalID) == "" || strings.TrimSpace(backupID) == "" || originalID == backupID {
-		return errors.New("a separate backup spreadsheet ID is required")
+// VerifyWorkingCopy allows only the designated copy as the sync target.
+func (g *GoogleWriter) VerifyWorkingCopy(ctx context.Context, sheetID string) error {
+	const copyID = "10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8"
+	if strings.TrimSpace(sheetID) != copyID {
+		return errors.New("sync must target the authorized working copy, never the original")
 	}
 	token, err := g.token(ctx)
-	if err != nil {
-		return err
+	if err != nil { return err }
+	var metadata struct {
+		Sheets []struct {
+			Properties sheetTab `json:"properties"`
+		} `json:"sheets"`
 	}
-	read := func(id string) ([]sheetTab, error) {
-		var response struct {
-			Sheets []struct {
-				Properties sheetTab `json:"properties"`
-			} `json:"sheets"`
-		}
-		path := url.PathEscape(id) + "?fields=sheets(properties(title,sheetId))"
-		if err := g.request(ctx, token, http.MethodGet, path, nil, &response); err != nil {
-			return nil, err
-		}
-		tabs := make([]sheetTab, len(response.Sheets))
-		for i, s := range response.Sheets {
-			tabs[i] = s.Properties
-		}
-		return tabs, nil
-	}
-	original, err := read(originalID)
-	if err != nil {
-		return fmt.Errorf("read original sheet metadata: %w", err)
-	}
-	backup, err := read(backupID)
-	if err != nil {
-		return fmt.Errorf("read backup sheet metadata: %w", err)
-	}
-	if err := matchingBackupTabs(original, backup); err != nil {
-		return fmt.Errorf("verify sheet backup: %w", err)
-	}
-	return nil
+	path := url.PathEscape(sheetID) + "?fields=sheets(properties(title,sheetId))"
+	if err := g.request(ctx, token, http.MethodGet, path, nil, &metadata); err != nil { return err }
+	var found []sheetTab
+	for _, tab := range metadata.Sheets { found = append(found, tab.Properties) }
+	return matchingBackupTabs(found, found)
 }

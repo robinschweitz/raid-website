@@ -94,7 +94,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/characters/claim-requests", RequireAuth(a.createCharacterClaimRequest))
 	mux.HandleFunc("POST /api/v1/characters/claim-with-code", RequireAuth(a.claimCharacterWithCode))
 
-	mux.HandleFunc("GET /api/v1/players", RequireAuth(a.listPlayers))
+	mux.HandleFunc("GET /api/v1/players", a.listPlayers)
 	mux.HandleFunc("POST /api/v1/players", RequireRole(validation.RoleAdmin, a.createPlayer))
 	mux.HandleFunc("GET /api/v1/players/{id}", RequireAuth(a.getPlayer))
 	mux.HandleFunc("PUT /api/v1/players/{id}/account", RequireRole(validation.RoleAdmin, a.setAccount))
@@ -112,7 +112,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/characters/{id}/reload-profile", RequireRole(validation.RoleAdmin, a.reloadCharacterProfile))
 	mux.HandleFunc("GET /api/v1/characters/{id}/name-history", RequireAuth(a.listCharacterNameHistory))
 
-	mux.HandleFunc("GET /api/v1/raids", RequireAuth(a.listRaids))
+	mux.HandleFunc("GET /api/v1/raids", a.listRaids)
 	mux.HandleFunc("POST /api/v1/raids", RequireRole(validation.RoleRaidassistent, a.createRaid))
 	mux.HandleFunc("GET /api/v1/raids/{id}", RequireAuth(a.getRaid))
 	mux.HandleFunc("PATCH /api/v1/raids/{id}", RequireRole(validation.RoleRaidassistent, a.configureRaidSchedule))
@@ -122,7 +122,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/raid-series", RequireRole(validation.RoleAdmin, a.createRaidSeries))
 	mux.HandleFunc("PATCH /api/v1/raid-series/{id}", RequireRole(validation.RoleAdmin, a.updateRaidSeries))
 
-	mux.HandleFunc("GET /api/v1/raids/{id}/attendance", RequireAuth(a.listAttendance))
+	mux.HandleFunc("GET /api/v1/raids/{id}/attendance", a.listAttendance)
 	mux.HandleFunc("GET /api/v1/raids/{id}/signups", RequireAuth(a.getSignups))
 	mux.HandleFunc("PUT /api/v1/raids/{id}/signups/availability", RequireRole(validation.RoleRaidassistent, a.setSignupAvailability))
 	mux.HandleFunc("PUT /api/v1/raids/{id}/signups", RequireRole(validation.RoleMember, a.saveSignups))
@@ -150,7 +150,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/raid-groups", RequireRole(validation.RoleAdmin, a.createRaidGroup))
 	mux.HandleFunc("PATCH /api/v1/raid-groups/{id}", RequireRole(validation.RoleAdmin, a.updateRaidGroup))
 
-	mux.HandleFunc("GET /api/v1/polls", RequireAuth(a.listPolls))
+	mux.HandleFunc("GET /api/v1/polls", a.listPolls)
 	mux.HandleFunc("POST /api/v1/polls", RequireRole(validation.RoleRaidassistent, a.createPoll))
 	mux.HandleFunc("GET /api/v1/polls/{id}", RequireAuth(a.getPoll))
 	mux.HandleFunc("POST /api/v1/polls/{id}/vote", RequireRole(validation.RoleMember, a.votePoll))

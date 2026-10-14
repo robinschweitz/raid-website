@@ -9,39 +9,39 @@ import (
 )
 
 type Config struct {
-	Port                 string
-	DatabaseURL          string
-	Env                  string
-	CookieSecure         bool
-	TrustProxyHeaders    bool
-	PublicOrigin         string
-	AdminUsername        string
-	AdminPassword        string
-	RisingGodsProxyURL   string
-	RisingGodsProxyToken string
-	SheetSyncEnabled bool
-	SheetSyncSheetID string
-	SheetSyncReason string
-	SheetSyncInterval time.Duration
+	Port                    string
+	DatabaseURL             string
+	Env                     string
+	CookieSecure            bool
+	TrustProxyHeaders       bool
+	PublicOrigin            string
+	AdminUsername           string
+	AdminPassword           string
+	RisingGodsProxyURL      string
+	RisingGodsProxyToken    string
+	SheetSyncEnabled        bool
+	SheetSyncSheetID        string
+	SheetSyncReason         string
+	SheetSyncInterval       time.Duration
 	SheetSyncServiceAccount string
 }
 
 func Load() (*Config, error) {
 	env := getEnv("ENV", "development")
 	c := &Config{
-		Port:                 getEnv("PORT", "8080"),
-		DatabaseURL:          getEnv("DATABASE_URL", "file:raid.db?_pragma=journal_mode(WAL)"),
-		Env:                  env,
-		CookieSecure:         getEnv("COOKIE_SECURE", "") == "true" || env == "production",
-		TrustProxyHeaders:    getEnv("TRUST_PROXY_HEADERS", "") == "true",
-		PublicOrigin:         strings.TrimSpace(getEnv("PUBLIC_ORIGIN", "")),
-		AdminUsername:        getEnv("ADMIN_USERNAME", "Robin"),
-		AdminPassword:        getEnv("ADMIN_PASSWORD", "development-password"),
-		RisingGodsProxyURL:   strings.TrimRight(strings.TrimSpace(getEnv("RISING_GODS_PROXY_URL", "")), "/"),
-		RisingGodsProxyToken: strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
-		SheetSyncEnabled: getEnv("SHEET_SYNC_ENABLED", "") == "true",
-		SheetSyncSheetID: strings.TrimSpace(getEnv("SHEET_SYNC_SHEET_ID", "")),
-		SheetSyncReason: strings.TrimSpace(getEnv("SHEET_SYNC_REASON", "")),
+		Port:                    getEnv("PORT", "8080"),
+		DatabaseURL:             getEnv("DATABASE_URL", "file:raid.db?_pragma=journal_mode(WAL)"),
+		Env:                     env,
+		CookieSecure:            getEnv("COOKIE_SECURE", "") == "true" || env == "production",
+		TrustProxyHeaders:       getEnv("TRUST_PROXY_HEADERS", "") == "true",
+		PublicOrigin:            strings.TrimSpace(getEnv("PUBLIC_ORIGIN", "")),
+		AdminUsername:           getEnv("ADMIN_USERNAME", "Robin"),
+		AdminPassword:           getEnv("ADMIN_PASSWORD", "development-password"),
+		RisingGodsProxyURL:      strings.TrimRight(strings.TrimSpace(getEnv("RISING_GODS_PROXY_URL", "")), "/"),
+		RisingGodsProxyToken:    strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
+		SheetSyncEnabled:        getEnv("SHEET_SYNC_ENABLED", "") == "true",
+		SheetSyncSheetID:        strings.TrimSpace(getEnv("SHEET_SYNC_SHEET_ID", "")),
+		SheetSyncReason:         strings.TrimSpace(getEnv("SHEET_SYNC_REASON", "")),
 		SheetSyncServiceAccount: strings.TrimSpace(getEnv("SHEET_SYNC_SERVICE_ACCOUNT_JSON", "")),
 	}
 	if (c.RisingGodsProxyURL == "") != (c.RisingGodsProxyToken == "") {

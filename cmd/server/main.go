@@ -48,16 +48,16 @@ func run() (err error) {
 	}
 	risingGods := registration.RisingGodsClient{ProxyURL: cfg.RisingGodsProxyURL, ProxyToken: cfg.RisingGodsProxyToken}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
-		CookieSecure:      cfg.CookieSecure,
-		TrustProxyHeaders: cfg.TrustProxyHeaders,
-		PublicOrigin:      cfg.PublicOrigin,
-		AdminUsername:     cfg.AdminUsername,
-		AdminPassword:     cfg.AdminPassword,
-		RegistrationFeed:  risingGods,
-		SheetSyncEnabled: cfg.SheetSyncEnabled,
-		SheetSyncSheetID: cfg.SheetSyncSheetID,
-		SheetSyncReason: cfg.SheetSyncReason,
-		SheetSyncInterval: cfg.SheetSyncInterval,
+		CookieSecure:            cfg.CookieSecure,
+		TrustProxyHeaders:       cfg.TrustProxyHeaders,
+		PublicOrigin:            cfg.PublicOrigin,
+		AdminUsername:           cfg.AdminUsername,
+		AdminPassword:           cfg.AdminPassword,
+		RegistrationFeed:        risingGods,
+		SheetSyncEnabled:        cfg.SheetSyncEnabled,
+		SheetSyncSheetID:        cfg.SheetSyncSheetID,
+		SheetSyncReason:         cfg.SheetSyncReason,
+		SheetSyncInterval:       cfg.SheetSyncInterval,
 		SheetSyncServiceAccount: cfg.SheetSyncServiceAccount,
 	})
 	if err != nil {

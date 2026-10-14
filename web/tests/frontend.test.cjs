@@ -2692,3 +2692,21 @@ test('quick-add starts with the name handed over from the roster import', () => 
   assert.equal(button(view, 'Suchen').props.disabled, false)
   assert.equal(s.requests.length, 0)
 })
+
+
+test('anonymous dashboard shows public widgets without profile or personal requests', async () => {
+  const s = setup(null)
+  const { DashboardPage } = s.load('pages/Dashboard.tsx')
+  const view = s.mount(DashboardPage)
+  assert.equal(nodes(view.tree, (node) => node.props?.className === 'card widget-profile').length, 0)
+  assert.deepEqual(s.requests.map((request) => request.url), [
+    '/api/v1/raids?include_archived=true',
+    '/api/v1/players',
+    '/api/v1/polls',
+  ])
+  for (const request of s.requests) request.resolve([])
+  await flush(view)
+  assert.match(text(view.tree), /Gildenübersicht|Bratwurst des Schicksals/)
+  assert.equal(s.requests.some((request) => /\/points|\/characters|\/votes/.test(request.url)), false)
+  view.unmount()
+})

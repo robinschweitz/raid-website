@@ -51,3 +51,5 @@ Thumbs.db
 logs/
 *.log
 .cache
+# Persisted local key protecting GUI-configured Google credentials
+*.sheet-sync.key

@@ -29,14 +29,14 @@ const Source = "google_sheets"
 // Status is persisted so restarts retain the last good export fingerprint.
 // A failure is visible to admins and never silently treated as a successful sync.
 type Status struct {
-	Enabled       bool                          `json:"enabled"`
-	SheetID       string                        `json:"sheet_id"`
-	LastRun       *time.Time                    `json:"last_run,omitempty"`
-	LastSuccess   *time.Time                    `json:"last_success,omitempty"`
-	LastError     string                        `json:"last_error,omitempty"`
-	LastImport    *legacyimport.Report          `json:"last_import,omitempty"`
-	CurrentSetup  *legacyimport.SetupSyncReport `json:"current_setup,omitempty"`
-	ExportHashes  map[string]string             `json:"-"`
+	Enabled      bool                          `json:"enabled"`
+	SheetID      string                        `json:"sheet_id"`
+	LastRun      *time.Time                    `json:"last_run,omitempty"`
+	LastSuccess  *time.Time                    `json:"last_success,omitempty"`
+	LastError    string                        `json:"last_error,omitempty"`
+	LastImport   *legacyimport.Report          `json:"last_import,omitempty"`
+	CurrentSetup *legacyimport.SetupSyncReport `json:"current_setup,omitempty"`
+	ExportHashes map[string]string             `json:"-"`
 }
 
 type Service struct {

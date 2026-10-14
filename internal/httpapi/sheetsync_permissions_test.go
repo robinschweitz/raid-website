@@ -59,7 +59,7 @@ func TestSyncConfigMutationAdminOnly(t *testing.T) {
 		user := "settings-" + string(role)
 		seedAccount(t, b, user, "test-password", role)
 		token := login(t, srv.Client(), srv, user, "test-password")
-		status, body := do(t, srv.Client(), http.MethodPut, srv.URL + "/api/v1/sheet-sync/config", token, payload)
+		status, body := do(t, srv.Client(), http.MethodPut, srv.URL+"/api/v1/sheet-sync/config", token, payload)
 		want := http.StatusForbidden
 		if role == validation.RoleAdmin {
 			want = http.StatusOK
@@ -68,7 +68,7 @@ func TestSyncConfigMutationAdminOnly(t *testing.T) {
 			t.Fatalf("settings %s got %d want %d: %s", role, status, want, body)
 		}
 	}
-	if status, body := do(t, srv.Client(), http.MethodPut, srv.URL + "/api/v1/sheet-sync/config", "", payload); status != http.StatusUnauthorized {
+	if status, body := do(t, srv.Client(), http.MethodPut, srv.URL+"/api/v1/sheet-sync/config", "", payload); status != http.StatusUnauthorized {
 		t.Fatalf("anonymous update got %d: %s", status, body)
 	}
 }

@@ -168,7 +168,7 @@ func TestSafetyRemovedSetupParticipantIsConflict(t *testing.T) {
 	}
 }
 
-func TestSafetyOldSetupDoesNotPopulateSuccessor(t *testing.T) {
+func TestSafetyCurrentSetupPopulatesExistingSuccessorWithoutEPReplay(t *testing.T) {
 	b, imp, _, a := historySafetyFixture(t)
 	ctx := context.Background()
 	rd, err := raid.NewRepo(b).FindByName(ctx, "Safety fixture")
@@ -185,11 +185,22 @@ func TestSafetyOldSetupDoesNotPopulateSuccessor(t *testing.T) {
 		t.Fatal(err)
 	}
 	status, err := s.RunOnce(ctx)
-	if err != nil || status.CurrentSetup.Added != 0 || len(status.CurrentSetup.Warnings) == 0 {
-		t.Fatal(status, err)
+	if err != nil || status.CurrentSetup == nil ||
+		status.CurrentSetup.RaidID != next.ID || status.CurrentSetup.Added != 1 {
+		t.Fatalf("current Sheet setup was not applied to successor: %+v %v", status, err)
 	}
-	if !historyUnchanged(before, historySnapshot(t, b)) {
-		t.Fatal("stale setup changed successor or EP")
+	after := historySnapshot(t, b)
+	if after.Balances["Hero"] != before.Balances["Hero"] ||
+		after.Counts["raids"] != before.Counts["raids"] ||
+		after.Counts["raid_attendance"] != before.Counts["raid_attendance"]+1 {
+		t.Fatal("setup sync changed EP or created a duplicate raid", after)
+	}
+	previous, err := raid.NewRepo(b).Get(ctx, rd.ID)
+	if err != nil || previous.ArchivedAt == nil {
+		t.Fatal("archived predecessor altered", previous, err)
+	}
+	if _, err := s.RunOnce(ctx); err != nil || !historyUnchanged(after, historySnapshot(t, b)) {
+		t.Fatal("repeating current setup must be idempotent", err)
 	}
 }
 

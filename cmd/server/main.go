@@ -60,6 +60,7 @@ func run() (err error) {
 		SheetSyncReason:         cfg.SheetSyncReason,
 		SheetSyncInterval:       cfg.SheetSyncInterval,
 		SheetSyncServiceAccount: cfg.SheetSyncServiceAccount,
+		SheetSyncKeyPath:        strings.Split(strings.TrimPrefix(cfg.DatabaseURL, "file:"), "?")[0] + ".sheet-sync.key",
 	})
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)

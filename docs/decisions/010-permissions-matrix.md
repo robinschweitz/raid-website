@@ -17,7 +17,8 @@ Accounts are provisioned by an Admin via `PUT /api/v1/players/{id}/account` (use
 role). The first admin can be bootstrapped from `ADMIN_USERNAME`/`ADMIN_PASSWORD` at startup.
 
 ## Matrix
-- Read (any authenticated role, i.e. `GUEST`+): all `GET` endpoints.
+- Read (any authenticated role, i.e. `GUEST`+): all `GET` endpoints except the public dashboard reads below.
+- Public dashboard (no session required): `GET /api/v1/raids`, `GET /api/v1/players` (names and IDs only), `GET /api/v1/polls`, and `GET /api/v1/raids/{id}/attendance`. All other reads and every mutation retain their existing authentication/authorization checks. The dashboard hides the player profile and does not fetch player-specific points, characters, or individual poll votes for visitors.
 - Config (`ADMIN`): create player; set account/credentials; create/update characters; guild
   ranks; raid groups; list/import legacy data.
 - Raid operations (`RAIDASSISTENT`+): create raid; complete/cancel/archive raid; attendance;

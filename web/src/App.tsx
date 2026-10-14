@@ -123,12 +123,8 @@ function Layout() {
   )
 }
 
-function useGuestLoginRoute() {
-  const path = useRoute()
-  return path !== '/'
-}
-
 function Gate() {
+  const path = useRoute()
   const { player, loading, error, refresh } = useAuth()
   if (loading) {
     return (
@@ -147,7 +143,7 @@ function Gate() {
       </div>
     )
   }
-  if (!player && useGuestLoginRoute()) {
+  if (!player && path !== '/') {
     return <LoginPage />
   }
   return <Layout />

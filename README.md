@@ -121,8 +121,10 @@ vorhandene manuelle Initialimport.
 laufende Sync den ersten nummerierten `ICC25 Raidsetup`-Block in den einzigen
 anstehenden, aktiven PLANNED/OPEN-Raid der importierten Serie (kein zusätzlicher
 Raid). Beim Wechsel zum nächsten Raid wird zuerst geprüft, dass der
-ursprünglich importierte Raid archiviert ist und eine archivierte vorherige
-Aufstellung als Baseline vorliegt. Die Aufstellung muss sich tatsächlich
+ursprünglich importierte Raid archiviert ist. Bevorzugt wird der
+Vergleich mit der zuletzt gespeicherten Setup-Baseline; bei älteren Imports
+ohne Baseline wird die letzte belegte archivierte Website-Aufstellung derselben
+Serie verglichen. Die aktuelle Aufstellung muss sich tatsächlich
 gegenüber der zuletzt archivierten unterscheiden; sonst wird die veraltete
 Aufstellung nicht in den Nachfolger kopiert. Die Vorabprüfung zeigt den
 Zielraid, seine ID, die Zahl neuer Teilnehmer und eventuelle Hinweise.

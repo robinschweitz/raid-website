@@ -132,6 +132,24 @@ stillschweigend gelöscht oder überschrieben. Die Vorabprüfung zeigt
 Kein Initial-Setup-Mapping, unklare Namensnummerierung oder mehrdeutige
 Teilnahme bedeutet keine automatische Raid-Erzeugung.
 
+**Bestehende Installation nur mit archivierten Raids (z. B. ICC25-01–35):**
+Wenn im Tab `Website Raidserien` nur die Kopfzeile erscheint, ist noch keine
+Raidserie eingerichtet. Der automatische Sync kann dann historische Raids/EP
+abgleichen, aber **keinen geplanten ICC25-36 erzeugen**. In Administration →
+Importe den Button **„ICC25-36 und Raidserie einmalig einrichten“** verwenden.
+Im unteren Abschnitt „Google-Sheet importieren“ die Option
+**„ICC25 Raidsetup (A–F) einmalig als Raid und Serie übernehmen“** aktiv
+lassen; `Name=ICC25`, die tatsächlich gewünschte Raidleitung, das Datum des
+nächsten geplanten Raids, lokale Uhrzeit, Zeitzone und Wiederholung **prüfen**
+(das Datum wird als nächster Montag in Europe/Berlin vorgeschlagen).
+Zuerst **Vorschau (Dry-Run)** prüfen: sie soll `ICC25-36` mit dem geplanten
+Startdatum und der Aufstellung aus dem Live-Sheet zeigen; nur bei
+fehlerfreier Vorschau auf **Zusammenführen** klicken.
+Danach laufen zukünftige Syncs automatisch in dieser Serie. Der
+Synchronisierungsstatus weist mit `raidsetup_initialization_required` auf
+die fehlende einmalige Konfiguration hin, statt die fehlende Aufstellung
+stillschweigend zu verbergen.
+
 **Sheet-Archivierung wird übernommen (ADR 059):** Ein Raid im `Raid Archive`
 zählt auch auf der Website als abgeschlossen und archiviert. Der Sync übernimmt
 Loot und die bereits verbuchten Teilnehmer-EP gemeinsam, mit append-only
@@ -140,8 +158,9 @@ Archivübernahmen und EP-Differenzen. Fehlende alte Baselines/Original-Provenien
 können nach Prüfung des belegten Altbestands übernommen werden. Widersprüchliche
 Website-Aufstellungen, unzugeordneter Loot oder parallele EP-Änderungen stoppen
 alles. Wiederholungen erzeugen keine weiteren EP, Loot-Einträge oder Raidkopien.
-Übernommene Sheet-Historie erzeugt keinen neuen Folge-Raid; ein schon geplanter
-Nachfolger bleibt erhalten. Normales `Archivieren` eines aktiven Website-Raids
+Übernommene Sheet-Historie vergibt keine weiteren Abschluss-EP. Eine bereits
+explizit konfigurierte ICC25-Serie kann unabhängig davon im selben Sync den
+nächsten geplanten Raid anlegen; ein schon geplanter Nachfolger bleibt erhalten. Normales `Archivieren` eines aktiven Website-Raids
 behält seine bestehende EP-/Lock-/Nachfolgerverarbeitung.
 
 Im Tab `Loot Archive` wurde nur in der Arbeitskopie die Kopfzelle G1

@@ -3,6 +3,16 @@ import { useSubmission } from '../useSubmission'
 import { api, ApiError } from '../api'
 import type { ImportRecord, ImportReport } from '../types'
 
+interface SheetSyncStatus {
+  enabled: boolean
+  sheet_id?: string
+  last_run?: string
+  last_success?: string
+  last_error?: string
+  current_setup?: { raid_id: number; added: number; warnings: string[]; conflicts: string[] }
+  last_import?: { skipped: boolean; created: { attendance: number; loot: number; raids: number } }
+}
+
 const DEFAULT_SHEET_ID = '1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU'
 
 function formatTime(value: string | null): string {
@@ -11,6 +21,8 @@ function formatTime(value: string | null): string {
 
 export function ImportsPage() {
   const [records, setRecords] = useState<ImportRecord[]>([])
+  const [syncStatus, setSyncStatus] = useState<SheetSyncStatus | null>(null)
+  const [syncBusy, setSyncBusy] = useState(false)
   const [report, setReport] = useState<ImportReport | null>(null)
   const [sheetID, setSheetID] = useState(DEFAULT_SHEET_ID)
   const [reason, setReason] = useState('')
@@ -53,6 +65,31 @@ export function ImportsPage() {
   }, [isActive])
 
   useEffect(load, [load])
+
+  const loadSync = useCallback(() => {
+    api.get<SheetSyncStatus>('/api/v1/sheet-sync')
+      .then((status) => { if (isActive()) setSyncStatus(status) })
+      .catch(() => { if (isActive()) setSyncStatus(null) })
+  }, [isActive])
+
+  useEffect(loadSync, [loadSync])
+
+  const syncNow = async () => {
+    if (syncBusy || busy) return
+    setSyncBusy(true)
+    try {
+      await api.post<SheetSyncStatus>('/api/v1/sheet-sync/run', {})
+    } catch {
+      // The persisted status contains the actionable conflict, even when the
+      // reconciliation endpoint returned a conflict HTTP status.
+    } finally {
+      if (isActive()) {
+        setSyncBusy(false)
+        loadSync()
+        load()
+      }
+    }
+  }
 
   useEffect(() => {
     if (!operation) return
@@ -104,6 +141,24 @@ export function ImportsPage() {
     <div>
       <div className="page-heading"><div><p className="eyebrow">Administration · Datenübernahme</p><h1>Importe</h1></div></div>
       {error && <p className="error">{error}</p>}
+
+      <section className="card">
+        <h2>Fortlaufende Google-Sheets-Synchronisierung</h2>
+        <p className="muted">Historische Sheet-Zeilen werden regelmäßig auf neue Einträge geprüft. Das aktuelle ICC25 Raidsetup ergänzt nur eindeutig bekannte Teilnehmer des aktiven Raids. Die Website veröffentlicht ihre Daten in separaten „Website …“-Tabs. Widersprüche werden gemeldet, niemals automatisch überschrieben oder gelöscht.</p>
+        {syncStatus?.enabled ? (
+          <>
+            <p role="status">{syncStatus.last_error ? 'Synchronisierung benötigt Prüfung' : syncStatus.last_success ? 'Letzter Abgleich erfolgreich' : 'Synchronisierung aktiviert'}</p>
+            <p className="muted">Letzter Versuch: {formatTime(syncStatus.last_run ?? null)} · Letzter Erfolg: {formatTime(syncStatus.last_success ?? null)}</p>
+            {!!syncStatus.last_error && <p className="error">{syncStatus.last_error}</p>}
+            {syncStatus.current_setup && <p className="muted">Raidsetup: Raid #{syncStatus.current_setup.raid_id || '—'}, {syncStatus.current_setup.added} neue Teilnahmen.</p>}
+            {!!syncStatus.current_setup?.warnings?.length && <ul className="plain-list">{syncStatus.current_setup.warnings.map((message, i) => <li key={i}>{message}</li>)}</ul>}
+            <div className="actions">
+              <button type="button" disabled={busy || syncBusy} onClick={syncNow}>{syncBusy ? 'Abgleich läuft…' : 'Jetzt synchronisieren'}</button>
+              <button type="button" disabled={syncBusy} onClick={loadSync}>Status aktualisieren</button>
+            </div>
+          </>
+        ) : <p className="muted">Automatischer Abgleich ist deaktiviert. Zum Aktivieren benötigt der Server SHEET_SYNC_ENABLED, SHEET_SYNC_SHEET_ID, SHEET_SYNC_REASON und ein freigegebenes Google-Servicekonto. Weitere Hinweise stehen in der README.</p>}
+      </section>
 
       <form className="card import-workflow" onSubmit={submit}>
         <h2>Google-Sheet importieren</h2>

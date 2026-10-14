@@ -273,6 +273,8 @@ export function ImportsPage() {
             <li>Loot: {report.loot}</li>
             <li>Tokens: {report.tokens}</li>
             <li>Punkteeinträge: {report.points_entries}</li>
+            {!!report.finalized_raids && <li>Finalisierte Raids: {report.finalized_raids}</li>}
+            {report.setup && <li>Nächste Aufstellung: {report.setup.name} ({report.setup.attendance} Teilnehmer)</li>}
           </ul>
           <h3>{report.skipped ? 'Einträge der früheren Synchronisierung' : report.mode === 'dry_run' ? 'Geplante Änderungen' : 'Übernommene Änderungen'}</h3>
           {report.mode === 'dry_run' && <p className="muted">Die Vorschau legt keine Einträge an.</p>}

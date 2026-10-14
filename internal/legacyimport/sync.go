@@ -30,6 +30,9 @@ func (s *Service) DryRunSync(ctx context.Context, source, sheetID string) (Repor
 		if err := bound.validateSync(ctx, source, sheetID, p, &rep); err != nil {
 			return err
 		}
+		if _, err := bound.syncFinalizations(ctx, source, sheetID, p, data.Setup, &rep); err != nil {
+			return err
+		}
 		if len(rep.Errors) == 0 {
 			return bound.imports.recordPreview(ctx, source, sheetID, data.Hash)
 		}
@@ -45,6 +48,7 @@ func (s *Service) MergeSync(ctx context.Context, actorID int64, source, sheetID,
 		return Report{}, ErrPreviewRequired
 	}
 	var rep Report
+	var finalizations []syncFinalization
 	err := s.transaction(ctx, true, func(bound *Service) error {
 		data, err := bound.fetcher.Fetch(ctx, sheetID)
 		if err != nil {
@@ -63,6 +67,10 @@ func (s *Service) MergeSync(ctx context.Context, actorID int64, source, sheetID,
 			return err
 		}
 		if err := bound.validateSync(ctx, source, sheetID, p, &rep); err != nil {
+			return err
+		}
+		finalizations, err = bound.syncFinalizations(ctx, source, sheetID, p, data.Setup, &rep)
+		if err != nil {
 			return err
 		}
 		if p.RequiresReason && strings.TrimSpace(reason) == "" {
@@ -115,12 +123,24 @@ func (s *Service) MergeSync(ctx context.Context, actorID int64, source, sheetID,
 		if err := bound.mergeLoot(ctx, source, sheetID, data.Hash, reason, raidIDs, playerIDs, characterIDs, actorID, p, now, &rep, true); err != nil {
 			return err
 		}
+		return nil
+	})
+	if err != nil || len(rep.Errors) > 0 {
+		return rep, err
+	}
+	// Completion starts its own transaction, so it must run only after the sync
+	// transaction has committed. The completion service and successor mapping
+	// make repeated requests idempotent.
+	if err := s.applySyncFinalizations(ctx, actorID, source, sheetID, reason, finalizations, &rep); err != nil {
+		return rep, err
+	}
+	err = s.transaction(ctx, true, func(bound *Service) error {
 		saved, err := json.Marshal(rep)
 		if err != nil {
 			return err
 		}
-		started, completed := now, now
-		return bound.imports.Insert(ctx, &Import{ActorID: actorID, Source: source, SourceURL: sheetID, RawHash: data.Hash, DryRunReport: string(saved), Status: "MERGED", WarningsCount: len(rep.Warnings), ErrorsCount: len(rep.Errors), CreatedCount: rep.Created.Attendance + rep.Created.Loot + rep.Created.Tokens + rep.Created.Points, UpdatedCount: rep.Updated + rep.Withdrawn + rep.Restored, StartedAt: &started, CompletedAt: &completed, Notes: strings.TrimSpace(reason)})
+		now := time.Now().UTC()
+		return bound.imports.Insert(ctx, &Import{ActorID: actorID, Source: source, SourceURL: sheetID, RawHash: rep.RawHash, DryRunReport: string(saved), Status: "MERGED", WarningsCount: len(rep.Warnings), ErrorsCount: len(rep.Errors), CreatedCount: rep.Created.Attendance + rep.Created.Loot + rep.Created.Tokens + rep.Created.Points, UpdatedCount: rep.Updated + rep.Withdrawn + rep.Restored + rep.FinalizedRaids, StartedAt: &now, CompletedAt: &now, Notes: strings.TrimSpace(reason)})
 	})
 	return rep, err
 }

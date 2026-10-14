@@ -1,8 +1,15 @@
-export const appVersion = '1.0.6'
+export const appVersion = '1.0.7'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Wöchentliche Raid-Finalisierung',
+    changes: [
+      'Synchronisierte Raid-Archive finalisieren den aktuellen Raid mit EP-Verarbeitung und übernehmen die neue ICC25-Aufstellung in den Nachfolger.',
+    ],
+  },
+  {
+    version: '1.0.6',
     title: 'Zusammengeführte Sheet-Identitäten',
     changes: [
       'Die historische Sheet-Zuordnung erkennt Charaktere weiter über die Alias-Historie nach einer Zusammenführung.',

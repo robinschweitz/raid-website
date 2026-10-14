@@ -86,6 +86,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		importFetcher,
 	)
 	importsSvc.WithExternalClient(registrationFeed)
+	importsSvc.WithCompletionService(raidcompletion.NewService(raidcompletion.NewRepo(db)))
 
 	if err := authSvc.BootstrapAdmin(context.Background(), opts.AdminUsername, opts.AdminPassword); err != nil {
 		return nil, fmt.Errorf("bootstrap admin: %w", err)

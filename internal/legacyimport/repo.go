@@ -2,6 +2,9 @@ package legacyimport
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -104,6 +107,20 @@ func (r *Repo) syncRaidMappingByRaidID(ctx context.Context, source, sheetID stri
 func (r *Repo) insertSyncRaidMapping(ctx context.Context, source, sheetID, key string, raidID, actorID int64, now time.Time) error {
 	_, err := r.db.ExecContext(ctx, "INSERT INTO legacy_sync_raid_mappings (source, sheet_id, raid_key, raid_id, adopted_by_player_id, adopted_at) VALUES (?, ?, ?, ?, ?, ?)", source, sheetID, key, raidID, actorID, now)
 	return err
+}
+
+func (r *Repo) ensureSyncRaidMapping(ctx context.Context, source, sheetID, key string, raidID, actorID int64, now time.Time) error {
+	mapping, err := r.syncRaidMapping(ctx, source, sheetID, key)
+	if err == nil {
+		if mapping.RaidID != raidID {
+			return fmt.Errorf("sync raid key %q is already mapped to raid %d", key, mapping.RaidID)
+		}
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	return r.insertSyncRaidMapping(ctx, source, sheetID, key, raidID, actorID, now)
 }
 
 func (r *Repo) syncPlayerID(ctx context.Context, source, sheetID, name string) (int64, error) {

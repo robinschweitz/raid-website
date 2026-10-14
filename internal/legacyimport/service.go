@@ -18,6 +18,7 @@ import (
 	"raid-website/internal/loot"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
+	"raid-website/internal/raidcompletion"
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/registration"
@@ -40,26 +41,27 @@ type Counts struct {
 }
 
 type Report struct {
-	ArchivedRaids int          `json:"archived_raids"`
-	Setup         *SetupReport `json:"setup,omitempty"`
-	Mode          string       `json:"mode"`
-	Source        string       `json:"source"`
-	RawHash       string       `json:"raw_hash"`
-	RowsRead      int          `json:"rows_read"`
-	Players       int          `json:"players"`
-	Characters    int          `json:"characters"`
-	Raids         int          `json:"raids"`
-	Attendance    int          `json:"attendance"`
-	Loot          int          `json:"loot"`
-	Tokens        int          `json:"tokens"`
-	PointsEntries int          `json:"points_entries"`
-	Created       Counts       `json:"created"`
-	Updated       int          `json:"updated"`
-	Withdrawn     int          `json:"withdrawn"`
-	Restored      int          `json:"restored"`
-	Skipped       bool         `json:"skipped"`
-	Warnings      []string     `json:"warnings"`
-	Errors        []string     `json:"errors"`
+	ArchivedRaids  int          `json:"archived_raids"`
+	FinalizedRaids int          `json:"finalized_raids"`
+	Setup          *SetupReport `json:"setup,omitempty"`
+	Mode           string       `json:"mode"`
+	Source         string       `json:"source"`
+	RawHash        string       `json:"raw_hash"`
+	RowsRead       int          `json:"rows_read"`
+	Players        int          `json:"players"`
+	Characters     int          `json:"characters"`
+	Raids          int          `json:"raids"`
+	Attendance     int          `json:"attendance"`
+	Loot           int          `json:"loot"`
+	Tokens         int          `json:"tokens"`
+	PointsEntries  int          `json:"points_entries"`
+	Created        Counts       `json:"created"`
+	Updated        int          `json:"updated"`
+	Withdrawn      int          `json:"withdrawn"`
+	Restored       int          `json:"restored"`
+	Skipped        bool         `json:"skipped"`
+	Warnings       []string     `json:"warnings"`
+	Errors         []string     `json:"errors"`
 }
 
 // Service orchestrates legacy sheet import (dry-run and merge).
@@ -75,6 +77,9 @@ type Service struct {
 	fetcher     Fetcher
 	corrections *raidcorrection.Service
 	external    registration.ExternalClient
+	completion  interface {
+		ArchiveRaid(context.Context, int64, int64) (*raid.Raid, *raid.Raid, error)
+	}
 }
 
 type characterLink struct {
@@ -89,6 +94,13 @@ func NewService(imports *Repo, players *player.Repo, chars *character.Repo, raid
 
 func (s *Service) WithExternalClient(external registration.ExternalClient) *Service {
 	s.external = external
+	return s
+}
+
+// WithCompletionService enables active linked raids to be finalized after their
+// sheet loot has been committed. Completion owns its own transaction.
+func (s *Service) WithCompletionService(completion *raidcompletion.Service) *Service {
+	s.completion = completion
 	return s
 }
 

@@ -6,6 +6,14 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
+
+	"raid-website/internal/character"
+	"raid-website/internal/player"
+	"raid-website/internal/raid"
+	"raid-website/internal/raidcompletion"
+	"raid-website/internal/raidseries"
+	"raid-website/internal/validation"
 )
 
 func TestSyncRejectsUnmappedRaidsWithoutBootstrapWrites(t *testing.T) {
@@ -112,5 +120,81 @@ func TestAdoptSyncKeepsDifferentLegacyRaidProvenance(t *testing.T) {
 	preview, err := s.DryRunSync(ctx, "source", "sheet")
 	if err != nil || len(preview.Errors) != 0 {
 		t.Fatalf("sync preview: %+v %v", preview, err)
+	}
+}
+
+func TestSyncFinalizesActiveMappedRaidAndReconcilesSuccessorSetup(t *testing.T) {
+	s, actor := importFixture(t)
+	ctx := context.Background()
+	data := sampleSheet()
+	data.Raid = []byte(strings.ReplaceAll(string(data.Raid), "ICC25-01", "ICC25-35"))
+	// An archived Raid Archive row is sufficient to finalize a no-loot raid.
+	data.Loot = []byte(strings.SplitN(string(data.Loot), "\n", 2)[0] + "\n")
+	data.Setup = []byte(",Charakter,Spieler,Klasse,Spec,Rolle\n1,Nylama,Nylama,Todesritter,Blut (Tank),Tank\n2,Amisu,Amisu,Priester,Disziplin,Heiler\n")
+	data.Hash = "active-completion"
+	s.fetcher = fakeFetcher{data: data}
+
+	series := &raidseries.Series{Name: "ICC25", RaidLeaderID: actor, Weekdays: []int{1}, IntervalWeeks: 1, StartTime: "19:00", Timezone: "UTC", NameTemplate: "ICC25-{number}", NextRaidNumber: 36}
+	if err := s.series.Save(ctx, series); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, time.October, 12, 19, 0, 0, 0, time.UTC)
+	active := &raid.Raid{Name: "ICC25-35", RaidLeaderID: actor, SeriesID: &series.ID, Status: validation.RaidStatusOpen, ScheduledStart: &start, CreatedAt: start, UpdatedAt: start}
+	if err := s.raids.Create(ctx, active); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if err := s.imports.insertSyncRaidMapping(ctx, "source", "sheet", "ICC25-35", active.ID, actor, now); err != nil {
+		t.Fatal(err)
+	}
+	for _, identity := range []struct{ name, class string }{{"Nylama", "Todesritter"}, {"Amisu", "Priester"}} {
+		playerRow := &player.Player{Name: identity.name, Role: validation.RoleGuest, Active: true, CreatedAt: now, UpdatedAt: now}
+		if err := s.players.Create(ctx, playerRow); err != nil {
+			t.Fatal(err)
+		}
+		characterRow := &character.Character{PlayerID: playerRow.ID, Name: identity.name, Class: identity.class, Active: true, CreatedAt: now, UpdatedAt: now}
+		if err := s.chars.Create(ctx, characterRow); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.imports.insertSyncPlayerMapping(ctx, "source", "sheet", identity.name, playerRow.ID, actor, now); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.imports.insertSyncCharacterMapping(ctx, "source", "sheet", identity.name, identity.name, characterRow.ID, playerRow.ID, actor, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.WithCompletionService(raidcompletion.NewService(raidcompletion.NewRepo(s.imports.db)))
+
+	preview, err := s.DryRunSync(ctx, "source", "sheet")
+	if err != nil || len(preview.Errors) > 0 || preview.FinalizedRaids != 1 || preview.Setup == nil || preview.Setup.Name != "ICC25-36" {
+		t.Fatalf("preview: %+v %v", preview, err)
+	}
+	merged, err := s.MergeSync(ctx, actor, "source", "sheet", preview.RawHash, "")
+	if err != nil || len(merged.Errors) > 0 || merged.FinalizedRaids != 1 {
+		t.Fatalf("merge: %+v %v", merged, err)
+	}
+	completed, err := s.raids.Get(ctx, active.ID)
+	if err != nil || completed.Status != validation.RaidStatusCompleted || completed.ArchivedAt == nil {
+		t.Fatalf("completed raid: %+v %v", completed, err)
+	}
+	successorKey, err := s.imports.syncRaidMapping(ctx, "source", "sheet", "ICC25-36")
+	if err != nil {
+		t.Fatal(err)
+	}
+	successor, err := s.raids.Get(ctx, successorKey.RaidID)
+	if err != nil || successor.Status != validation.RaidStatusPlanned {
+		t.Fatalf("successor: %+v %v", successor, err)
+	}
+	roster, err := s.att.ListByRaid(ctx, successor.ID)
+	if err != nil || len(roster) != 2 {
+		t.Fatalf("successor roster: %+v %v", roster, err)
+	}
+	count, err := s.imports.pointTransactionCount(ctx)
+	if err != nil || count != 2 {
+		t.Fatalf("EP award count=%d err=%v", count, err)
+	}
+	replay, err := s.MergeSync(ctx, actor, "source", "sheet", preview.RawHash, "")
+	if err != nil || !replay.Skipped {
+		t.Fatalf("replay: %+v %v", replay, err)
 	}
 }

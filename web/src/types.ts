@@ -421,6 +421,8 @@ export interface ImportCounts {
 }
 
 export interface SyncReport {
+  finalized_raids?: number
+  setup?: { name: string; scheduled_start: string; attendance: number; already_imported: boolean }
   mode: string
   source: string
   raw_hash: string

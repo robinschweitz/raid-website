@@ -18,11 +18,15 @@ war, blockierte ein fester Vergleich mit dessen ID jeden späteren Nachfolger.
 - Wird ein Nachfolger erstmals an das Sheet gebunden, muss der ursprünglich
   importierte Raid abgeschlossen und archiviert sein. Der Nachfolger benötigt
   einen späteren, explizit geplanten Starttermin. Ein zuvor nachweislich
-  synchronisierter, archivierter Raid derselben Serie muss eine gespeicherte
-  Setup-Baseline haben. Der aktuelle erste nummerierte Sheet-Block muss
-  in seinen Aufstellungsdaten von dieser alten Baseline abweichen.
-  Ohne diesen Beleg bleibt der Nachfolger unberührt; die GUI erklärt die
-  fehlende Baseline oder eine unveränderte alte Aufstellung.
+  synchronisierter, archivierter Raid derselben Serie mit gespeicherter
+  Setup-Baseline ist der bevorzugte Vergleich. Bei älteren Imports ohne
+  Setup-Baseline darf alternativ die letzte tatsächlich archivierte
+  Website-Aufstellung derselben Serie verglichen werden. Der aktuelle erste
+  nummerierte Sheet-Block muss sich nachweislich von der vorherigen
+  Aufstellung unterscheiden; eine unveränderte oder nicht belegbare
+  Aufstellung wird nicht übernommen. Diese Ausnahme ist ausdrücklich für
+  die Migration alter Erstimporte gedacht und erzeugt keine künstliche
+  Provenienz über vergangene Sheetstände.
 - Sobald die neue Zuordnung erstmals geprüft und angewendet wurde, wird
   ihre Quelle als eigene Baseline je Zielraid gespeichert. Folgeläufe
   gleichen neue bekannte Teilnehmer additiv ab; entfernte, geänderte,

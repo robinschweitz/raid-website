@@ -2,6 +2,7 @@ package v1
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"raid-website/internal/sheetsync"
 )
@@ -71,7 +72,10 @@ func (a *API) updateSheetSyncConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "sync_config_failed", "Konfiguration konnte nicht gespeichert werden")
+		// The browser receives no filesystem paths or credential details.
+		// Keep the underlying error in the server log for actionable support.
+		log.Printf("sheet sync config save failed: %v", err)
+		WriteError(w, http.StatusInternalServerError, "sync_config_failed", "Konfiguration konnte nicht gespeichert werden (Details im Serverlog)")
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": saved})

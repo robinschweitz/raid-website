@@ -70,19 +70,32 @@ erhalten. Danach kann der Server die vier historischen Google-Sheet-Tabs und
 das aktive `ICC25 Raidsetup` regelmäßig prüfen. Die bestehenden
 Import-Provenienzen, Vorschau-Hashes und Konfliktregeln gelten weiter.
 
-1. In der Google Cloud Console **Google Sheets API** aktivieren, ein **Servicekonto**
+1. **Vor der ersten Aktivierung eine vollständige separate Google-Sheets-Kopie erstellen.**
+   Für dieses Guild-Sheet ist die bestätigte Sicherung:
+   https://docs.google.com/spreadsheets/d/10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8/edit
+   Sie enthält alle 17 ursprünglichen Tabs, einschließlich Formeln; der Sync schreibt nie in diese Datei.
+   Das Servicekonto muss beide Dateien lesen können; Schreibzugriff braucht es nur auf dem Original.
+2. In der Google Cloud Console **Google Sheets API** aktivieren, ein **Servicekonto**
    erstellen und seine E-Mail-Adresse im Guild-Sheet als **Bearbeiter** freigeben.
    Die JSON-Zugangsdaten nur als Secret auf dem Server hinterlegen, **niemals**
    einchecken oder im Browser verwenden.
-2. Diese Umgebungsvariablen setzen und den Server neu starten:
+3. Diese Umgebungsvariablen setzen und den Server neu starten:
 
 ```sh
 SHEET_SYNC_ENABLED=true
 SHEET_SYNC_SHEET_ID=1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU
+SHEET_SYNC_BACKUP_SHEET_ID=10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8
 SHEET_SYNC_INTERVAL=10m
 SHEET_SYNC_REASON="Automatischer Abgleich der Sheet-Archiv-Ergänzungen"
 SHEET_SYNC_SERVICE_ACCOUNT_JSON='{"type":"service_account","client_email":"...","private_key":"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"}'
 ```
+
+Die Sicherung ist eine **Pflichtvoraussetzung**. Beim Start jedes Sync-Laufs
+prüft der Server beide Dateikennungen und alle 17 ursprünglichen Tab-IDs. Bei
+fehlender, umbenannter oder nicht lesbarer Sicherung unterbleiben sämtliche
+Import- und Export-Schreibvorgänge und der Fehler erscheint im Admin-Status.
+Diese Prüfung ersetzt **keine** regelmäßige Datenbank-Sicherung; die
+Sicherung ist bewusst ein unveränderlicher Stand *vor* dem ersten Sync.
 
 Der Intervall muss mindestens 1 Minute betragen. Ohne `SHEET_SYNC_ENABLED=true`
 bleiben automatische Jobs und Schreibzugriffe deaktiviert. Mit aktiviertem

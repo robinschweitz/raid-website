@@ -76,7 +76,18 @@ Der Sync wird ausschließlich für die Arbeitskopie zugelassen. Die ursprünglic
 17 Tabellenblätter müssen in der Kopie bestehen bleiben. Der ursprüngliche
 Stand sollte bei Bedarf zusätzlich gesichert werden, bevor der Sync dort läuft.
 
-Konfiguration (Servicekonto nur auf der **Kopie** freigeben):
+**Konfiguration in der GUI (empfohlen):** Unter *Administration → Importe →
+Fortlaufende Google-Sheets-Synchronisierung* die Synchronisierung aktivieren,
+das Intervall und eine Begründung eingeben und einmalig die JSON-Datei des
+Google-Servicekontos auswählen. Das Servicekonto erhält ausschließlich Zugriff
+auf die freigegebene Kopie. Die Einstellungen werden dauerhaft in der DB
+gespeichert und ohne Neustart angewendet. Zunächst **Automatisch abgleichen**
+deaktiviert lassen, „Vorabprüfung ohne Änderungen“ und dann einen manuellen Lauf
+auf einer Test-Datenbank ausführen; erst danach den automatischen Zeitplan
+separat aktivieren.
+
+**Alternativ (Bootstrap/Altinstallation):** Diese Umgebungsvariablen werden
+weiterhin unterstützt, solange noch keine GUI-Konfiguration gespeichert wurde:
 
 ```sh
 SHEET_SYNC_ENABLED=true
@@ -87,11 +98,16 @@ SHEET_SYNC_REASON="Automatischer Abgleich auf der Arbeitskopie"
 SHEET_SYNC_SERVICE_ACCOUNT_JSON='{"type":"service_account","client_email":"...","private_key":"..."}'
 ```
 
-`SHEET_SYNC_ENABLED=true` stellt zunächst nur die Admin-Sync-API bereit. Ohne
-`SHEET_SYNC_AUTORUN=true` gibt es keinen Startup- oder Timer-Abgleich. Zuerst
-„Vorabprüfung ohne Änderungen“ verwenden; der Server prüft bei jedem tatsächlichen
-Lauf erneut. Der [Aktivierungsleitfaden](docs/sheet-sync-activation.md) beschreibt
-die erforderliche Altbestandsprüfung für ICC25-35 und erklärt Baseline-Blocker.
+**Servicekonto-Schutz:** Die GUI zeigt die Zugangsdaten nach dem Hochladen
+nicht mehr an. Sie werden verschlüsselt in SQLite abgelegt, der lokale
+Schlüssel `<DATENBANKPFAD>.sheet-sync.key` ist separat (Dateimodus 0600)
+gespeichert. **Für ein vollständiges Backup/Restore beide Dateien aufbewahren**
+und vor unbefugtem Zugriff schützen. Der Schlüssel darf nicht ins Repository.
+Eine gespeicherte GUI-Konfiguration hat Vorrang vor den alten Env-Werten.
+`SHEET_SYNC_AUTORUN` ist auch beim Bootstrap ein separates Opt-in; die
+Anmeldung und der normale Serverstart erfordern keine Sheet-Sync-Env-Werte.
+Der [Aktivierungsleitfaden](docs/sheet-sync-activation.md) beschreibt die
+Altbestandsprüfung für ICC25-35.
 
 `SHEET_SYNC_SHEET_ID` darf nicht auf das Original gesetzt werden; der Server
 prüft die freigegebene Arbeitskopie ausdrücklich und lehnt andere IDs ab.

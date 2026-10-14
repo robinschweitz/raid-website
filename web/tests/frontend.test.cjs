@@ -712,7 +712,7 @@ test('import setup sends explicit owner settings and schedule edits invalidate p
   const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
   form(view).props.onSubmit(event)
   const submitted = JSON.parse(JSON.stringify(writes(s)[0].body.setup))
-  assert.match(submitted.first_date, /^\\d{4}-\\d{2}-\\d{2}$/)
+  assert.match(submitted.first_date, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)
   const nextDate = new Date(submitted.first_date + 'T00:00:00Z')
   assert.equal(nextDate.getUTCDay(), 1, 'suggested ICC25 date must be a Monday')
   const todayParts = new Intl.DateTimeFormat('en-GB', {

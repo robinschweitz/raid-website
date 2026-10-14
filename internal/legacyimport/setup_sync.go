@@ -17,20 +17,20 @@ import (
 // SetupSyncReport describes an additive synchronization of the current raid roster.
 // A missing or changed source row never deletes or silently rewrites website data.
 type SetupSyncReport struct {
-	RaidID    int64    `json:"raid_id"`
+	RaidID         int64      `json:"raid_id"`
 	RaidName       string     `json:"raid_name,omitempty"`
 	ScheduledStart *time.Time `json:"scheduled_start,omitempty"`
 	CreatedRaid    bool       `json:"created_raid,omitempty"`
 	Added          int        `json:"added"`
-	Warnings  []string `json:"warnings"`
-	Conflicts []string `json:"conflicts"`
+	Warnings       []string   `json:"warnings"`
+	Conflicts      []string   `json:"conflicts"`
 }
 
 // SyncCurrentSetup reads the live ICC25 Raidsetup tab and adds known characters
-// to the single active raid of the imported series. On a new successor it first
-// requires a previously synchronized archived roster and a changed source block,
-// so an old setup cannot be silently copied into the next raid. Conflicting edits
-// are reported before changes are committed; archived raids are never modified.
+// to the single active raid of the imported series. If none is active it may
+// create the next planned occurrence using proven ICC25 history and the
+// explicitly configured recurrence. Conflicting edits stop the transaction;
+// archived raids are never modified.
 func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, sheetID, expectedHash string) (SetupSyncReport, error) {
 	report := SetupSyncReport{Warnings: []string{}, Conflicts: []string{}}
 	data, err := s.fetcher.Fetch(ctx, sheetID)

@@ -116,7 +116,7 @@ func (s *Service) RunOnce(ctx context.Context) (Status, error) {
 	now := time.Now().UTC()
 	status.LastRun = &now
 	status.LastError = ""
-	// No import or export writes until the separately stored workbook copy is accessible.
+	// No import or export writes until the authorized working copy is verified.
 	var backupVerifier, ok = s.writer.(interface {
 		VerifyWorkingCopy(context.Context, string) error
 	})

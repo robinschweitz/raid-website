@@ -27,6 +27,23 @@ written to the original. It is not silently reverted without owner approval.
 The same header is present in the working copy; all subsequent writes must
 exclusively target the copy.
 
+## Decision: website-only raid finalization and archival
+
+Starting now, only the website's explicit raid archival workflow may finalize
+current or future raids. The scheduled Google Sheet reconciliation is never
+allowed to create a new already-archived raid or classify an existing
+completed-but-unarchived raid as archived. Its dry-run preview is rejected
+when `Created.Raids > 0` or `ArchivedRaids > 0` before merge, active-roster
+updates, or export. Imported legacy history requires a deliberate one-off
+admin import performed in the website; this does not permit scheduled
+Sheet-driven archival of future raids.
+
+The website owns finalization, EP eligibility/rewards, lock expiration,
+and generation of the next raid. The working copy only receives
+website-authoritative completed-raid snapshots; conflicting source changes
+must not silently reopen, archive, or replay rewards. All original-file writes
+remain prohibited.
+
 ## Implemented direction and conflict policy
 
 - The server polls periodically after opt-in. The existing historical importer

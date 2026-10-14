@@ -94,7 +94,7 @@ func TestCurrentICC25SetupMovesToUpcomingRaidAfterSheetArchive(t *testing.T) {
 	}
 }
 
-func TestCurrentICC25SetupDoesNotAdvanceWithoutPriorSnapshot(t *testing.T) {
+func TestCurrentICC25SetupCanUseArchivedRosterWithoutPriorSnapshot(t *testing.T) {
 	b, svc, source, actor, initialID := archiveFixture(t, 0, 10, "Second")
 	ctx := context.Background()
 	if _, err := svc.RunOnce(ctx); err != nil {
@@ -113,11 +113,25 @@ func TestCurrentICC25SetupDoesNotAdvanceWithoutPriorSnapshot(t *testing.T) {
 	if err := raid.NewRepo(b).Create(ctx, next); err != nil {
 		t.Fatal(err)
 	}
-	source.data.Setup = []byte(strings.Replace(string(source.data.Setup), "Vergeltung", "Schutz", 1))
-	source.data = historyHash(source.data)
+	// Without a persisted setup baseline, the last archived raid itself is
+	// sufficient to prove that an unchanged old roster must not be copied.
 	report, err := svc.Preflight(ctx)
 	if err != nil || !report.Ready || report.Setup.Added != 0 ||
-		!strings.Contains(strings.Join(report.Setup.Warnings, " "), "keine belegte frühere Aufstellung") {
-		t.Fatalf("missing baseline must skip reassignment: %+v %v", report, err)
+		!strings.Contains(strings.Join(report.Setup.Warnings, " "), "identisch") {
+		t.Fatalf("unchanged archived roster must be skipped: %+v %v", report, err)
+	}
+	source.data.Setup = []byte(strings.Replace(string(source.data.Setup), "Vergeltung", "Schutz", 1))
+	source.data = historyHash(source.data)
+	report, err = svc.Preflight(ctx)
+	if err != nil || !report.Ready || report.Setup.Added != 1 ||
+		!strings.Contains(strings.Join(report.Setup.Warnings, " "), "keine ältere Setup-Baseline") {
+		t.Fatalf("changed roster should use archived predecessor as proof: %+v %v", report, err)
+	}
+	if _, err := svc.RunOnce(ctx); err != nil {
+		t.Fatal("first successor sync after an upgrade", err)
+	}
+	rows, err := attendance.NewRepo(b).ListByRaid(ctx, next.ID)
+	if err != nil || len(rows) != 1 || rows[0].Spec != "Schutz" {
+		t.Fatal("next roster not imported after proven historical comparison", rows, err)
 	}
 }

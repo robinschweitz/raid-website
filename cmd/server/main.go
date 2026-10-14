@@ -54,6 +54,11 @@ func run() (err error) {
 		AdminUsername:     cfg.AdminUsername,
 		AdminPassword:     cfg.AdminPassword,
 		RegistrationFeed:  risingGods,
+		SheetSyncEnabled: cfg.SheetSyncEnabled,
+		SheetSyncSheetID: cfg.SheetSyncSheetID,
+		SheetSyncReason: cfg.SheetSyncReason,
+		SheetSyncInterval: cfg.SheetSyncInterval,
+		SheetSyncServiceAccount: cfg.SheetSyncServiceAccount,
 	})
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)

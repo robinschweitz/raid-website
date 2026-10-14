@@ -1,8 +1,36 @@
-export const appVersion = '1.0.7'
+export const appVersion = '1.0.11'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Manuelle Sheet-Auswahl',
+    changes: [
+      'Die manuelle Synchronisierung startet ohne vorausgefüllte Sheet-ID; automatische Synchronisierungen bleiben über ihre gespeicherten Zuordnungen aktiv.',
+    ],
+  },
+  {
+    version: '1.0.10',
+    title: 'Aktives Synchronisierungs-Sheet',
+    changes: [
+      'Die Synchronisierung zeigt standardmäßig das aktuell verknüpfte Google Sheet statt der historischen Importquelle.',
+    ],
+  },
+  {
+    version: '1.0.9',
+    title: 'Automatische Google-Sheets-Synchronisierung',
+    changes: [
+      'Verknüpfte Google Sheets werden jede Minute in beide Richtungen synchronisiert; fehlerhafte Vorschauen werden nur protokolliert.',
+    ],
+  },
+  {
+    version: '1.0.8',
+    title: 'Sheet-Verknüpfungen im Raid',
+    changes: [
+      'Raid-Details zeigen nun auch Verknüpfungen, die durch die historische Synchronisierungsübernahme angelegt wurden.',
+    ],
+  },
+  {
+    version: '1.0.7',
     title: 'Wöchentliche Raid-Finalisierung',
     changes: [
       'Synchronisierte Raid-Archive finalisieren den aktuellen Raid mit EP-Verarbeitung und übernehmen die neue ICC25-Aufstellung in den Nachfolger.',

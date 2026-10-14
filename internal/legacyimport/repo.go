@@ -104,6 +104,17 @@ func (r *Repo) syncRaidMappingByRaidID(ctx context.Context, source, sheetID stri
 	return key, err
 }
 
+func (r *Repo) listSyncSheetIDs(ctx context.Context, source string) ([]string, error) {
+	var sheetIDs []string
+	err := r.db.NewSelect().
+		TableExpr("legacy_sync_raid_mappings").
+		ColumnExpr("DISTINCT sheet_id").
+		Where("source = ?", source).
+		OrderExpr("sheet_id ASC").
+		Scan(ctx, &sheetIDs)
+	return sheetIDs, err
+}
+
 func (r *Repo) insertSyncRaidMapping(ctx context.Context, source, sheetID, key string, raidID, actorID int64, now time.Time) error {
 	_, err := r.db.ExecContext(ctx, "INSERT INTO legacy_sync_raid_mappings (source, sheet_id, raid_key, raid_id, adopted_by_player_id, adopted_at) VALUES (?, ?, ?, ?, ?, ?)", source, sheetID, key, raidID, actorID, now)
 	return err

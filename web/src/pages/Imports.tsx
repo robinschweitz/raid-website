@@ -3,8 +3,6 @@ import { useSubmission } from '../useSubmission'
 import { api, ApiError } from '../api'
 import type { Character, ImportRecord, Player, SyncAdoption, SyncReport } from '../types'
 
-const DEFAULT_SHEET_ID = '1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU'
-
 function formatTime(value: string | null): string {
   return value ? new Date(value).toLocaleString() : '—'
 }
@@ -12,7 +10,7 @@ function formatTime(value: string | null): string {
 export function ImportsPage() {
   const [records, setRecords] = useState<ImportRecord[]>([])
   const [report, setReport] = useState<SyncReport | null>(null)
-  const [sheetID, setSheetID] = useState(DEFAULT_SHEET_ID)
+  const [sheetID, setSheetID] = useState('')
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const [syncStatus, setSyncStatus] = useState('')

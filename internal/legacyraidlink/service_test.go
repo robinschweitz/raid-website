@@ -92,3 +92,20 @@ func TestCreateRejectsInvalidOrConflictingLinksWithoutPartialWrite(t *testing.T)
 		t.Fatalf("duplicate raid error = %v, want ErrAlreadyLinked", err)
 	}
 }
+
+func TestGetReturnsSyncAdoptionLink(t *testing.T) {
+	ctx := context.Background()
+	service, actor, rd := setupService(t)
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	if _, err := service.db.ExecContext(ctx, "INSERT INTO legacy_sync_raid_mappings (source, sheet_id, raid_key, raid_id, adopted_by_player_id, adopted_at) VALUES (?, ?, ?, ?, ?, ?)", GoogleSheetsSource, "sync-sheet", "ICC25-34", rd.ID, actor.ID, now); err != nil {
+		t.Fatal(err)
+	}
+
+	link, err := service.Get(ctx, rd.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link.SheetID != "sync-sheet" || link.RaidKey != "ICC25-34" || link.LinkedByPlayerID != actor.ID || !link.LinkedAt.Equal(now) {
+		t.Fatalf("sync link = %+v", link)
+	}
+}

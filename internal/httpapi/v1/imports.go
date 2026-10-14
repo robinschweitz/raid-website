@@ -10,6 +10,9 @@ import (
 // DefaultSheetID is the guild spreadsheet imported by default.
 const DefaultSheetID = "1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU"
 
+// DefaultSyncSheetID is the active adopted sheet shown by the sync workflow.
+const DefaultSyncSheetID = "16KpzNp8iNoKYyc2kw4a563IX5plRJLLsc60K96u2fPA"
+
 type importRequest struct {
 	Setup   *legacyimport.SetupConfig `json:"setup"`
 	SheetID string                    `json:"sheet_id"`
@@ -38,7 +41,7 @@ func (a *API) dryRunSyncAdoption(w http.ResponseWriter, r *http.Request) {
 	}
 	sheetID := req.SheetID
 	if sheetID == "" {
-		sheetID = DefaultSheetID
+		sheetID = DefaultSyncSheetID
 	}
 	result, err := a.Imports.DryRunSyncAdoption(r.Context(), "google_sheets", sheetID)
 	if err != nil {
@@ -61,7 +64,7 @@ func (a *API) adoptSync(w http.ResponseWriter, r *http.Request) {
 	}
 	sheetID := req.SheetID
 	if sheetID == "" {
-		sheetID = DefaultSheetID
+		sheetID = DefaultSyncSheetID
 	}
 	result, err := a.Imports.AdoptSync(r.Context(), actor, "google_sheets", sheetID, legacyimport.SyncAdoptionInput{Reason: req.Reason, Players: req.Players, Characters: req.Characters})
 	if err != nil {
@@ -154,7 +157,7 @@ func (a *API) dryRunSync(w http.ResponseWriter, r *http.Request) {
 	}
 	sheetID := req.SheetID
 	if sheetID == "" {
-		sheetID = DefaultSheetID
+		sheetID = DefaultSyncSheetID
 	}
 	rep, err := a.Imports.DryRunSync(r.Context(), "google_sheets", sheetID)
 	if err != nil {
@@ -177,7 +180,7 @@ func (a *API) mergeSync(w http.ResponseWriter, r *http.Request) {
 	}
 	sheetID := req.SheetID
 	if sheetID == "" {
-		sheetID = DefaultSheetID
+		sheetID = DefaultSyncSheetID
 	}
 	rep, err := a.Imports.MergeSync(r.Context(), actor, "google_sheets", sheetID, req.RawHash, req.Reason)
 	if err != nil {

@@ -62,7 +62,14 @@ func (s *Service) Get(ctx context.Context, raidID int64) (*Link, error) {
 		Where("mapping.raid_id = ?", raidID).
 		Scan(ctx, link)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		err = s.db.NewSelect().
+			TableExpr("legacy_sync_raid_mappings").
+			ColumnExpr("source, sheet_id, raid_key, raid_id, adopted_by_player_id AS linked_by_player_id, adopted_at AS linked_at").
+			Where("raid_id = ?", raidID).
+			Scan(ctx, link)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
 	}
 	if err != nil {
 		return nil, err

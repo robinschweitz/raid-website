@@ -41,6 +41,11 @@ func (s *Service) DryRunSync(ctx context.Context, source, sheetID string) (Repor
 	return rep, err
 }
 
+// ListSyncSheetIDs returns the sheets that have at least one adopted raid mapping.
+func (s *Service) ListSyncSheetIDs(ctx context.Context, source string) ([]string, error) {
+	return s.imports.listSyncSheetIDs(ctx, source)
+}
+
 // MergeSync applies only changes to explicitly linked raids. Fetching, review, and
 // mutation share one transaction so a changed snapshot cannot bypass the review.
 func (s *Service) MergeSync(ctx context.Context, actorID int64, source, sheetID, expectedHash, reason string) (Report, error) {

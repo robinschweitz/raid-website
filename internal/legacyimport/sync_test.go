@@ -109,6 +109,10 @@ func TestAdoptSyncKeepsDifferentLegacyRaidProvenance(t *testing.T) {
 	if err != nil || adoption.Raids[0].Mapped == 0 {
 		t.Fatalf("adoption: %+v %v", adoption, err)
 	}
+	sheetIDs, err := s.ListSyncSheetIDs(ctx, "source")
+	if err != nil || len(sheetIDs) != 1 || sheetIDs[0] != "sheet" {
+		t.Fatalf("adopted sheets: %+v %v", sheetIDs, err)
+	}
 	audits, err := s.imports.db.NewSelect().TableExpr("audit_log").Where("entity_type = ?", "legacy_sync_mapping").Count(ctx)
 	if err != nil || audits != 5 { // raid, two players, and two characters.
 		t.Fatalf("adoption audit rows=%d err=%v", audits, err)

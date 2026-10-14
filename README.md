@@ -65,73 +65,43 @@ same award instead of charging again. Loot DTOs use `award_method`, not a caller
 
 ## Fortlaufender Google-Sheets-Abgleich (opt-in)
 
-Der einmalige Import bleibt für die initiale Übernahme samt explizitem Serienplan
-erhalten. Danach kann der Server die vier historischen Google-Sheet-Tabs und
-das aktive `ICC25 Raidsetup` regelmäßig prüfen. Die bestehenden
-Import-Provenienzen, Vorschau-Hashes und Konfliktregeln gelten weiter.
+**Nur die vom Benutzer freigegebene Arbeitskopie darf bearbeitet werden.**
+Original (strictly read-only / never target for sync):
+https://docs.google.com/spreadsheets/d/1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU/edit
 
-1. **Vor der ersten Aktivierung eine vollständige separate Google-Sheets-Kopie erstellen.**
-   Für dieses Guild-Sheet ist die bestätigte Sicherung:
-   https://docs.google.com/spreadsheets/d/10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8/edit
-   Sie enthält alle 17 ursprünglichen Tabs, einschließlich Formeln; der Sync schreibt nie in diese Datei.
-   Das Servicekonto muss beide Dateien lesen können; Schreibzugriff braucht es nur auf dem Original.
-2. In der Google Cloud Console **Google Sheets API** aktivieren, ein **Servicekonto**
-   erstellen und seine E-Mail-Adresse im Guild-Sheet als **Bearbeiter** freigeben.
-   Die JSON-Zugangsdaten nur als Secret auf dem Server hinterlegen, **niemals**
-   einchecken oder im Browser verwenden.
-3. Diese Umgebungsvariablen setzen und den Server neu starten:
+**Exklusives Arbeits-Sheet:**
+https://docs.google.com/spreadsheets/d/10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8/edit
+
+Der Sync wird ausschließlich für die Arbeitskopie zugelassen. Die ursprünglichen
+17 Tabellenblätter müssen in der Kopie bestehen bleiben. Der ursprüngliche
+Stand sollte bei Bedarf zusätzlich gesichert werden, bevor der Sync dort läuft.
+
+Konfiguration (Servicekonto nur auf der **Kopie** freigeben):
 
 ```sh
 SHEET_SYNC_ENABLED=true
-SHEET_SYNC_SHEET_ID=1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU
-SHEET_SYNC_BACKUP_SHEET_ID=10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8
+SHEET_SYNC_SHEET_ID=10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8
 SHEET_SYNC_INTERVAL=10m
-SHEET_SYNC_REASON="Automatischer Abgleich der Sheet-Archiv-Ergänzungen"
-SHEET_SYNC_SERVICE_ACCOUNT_JSON='{"type":"service_account","client_email":"...","private_key":"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"}'
+SHEET_SYNC_REASON="Automatischer Abgleich auf der Arbeitskopie"
+SHEET_SYNC_SERVICE_ACCOUNT_JSON='{"type":"service_account","client_email":"...","private_key":"..."}'
 ```
 
-Die Sicherung ist eine **Pflichtvoraussetzung**. Beim Start jedes Sync-Laufs
-prüft der Server beide Dateikennungen und alle 17 ursprünglichen Tab-IDs. Bei
-fehlender, umbenannter oder nicht lesbarer Sicherung unterbleiben sämtliche
-Import- und Export-Schreibvorgänge und der Fehler erscheint im Admin-Status.
-Diese Prüfung ersetzt **keine** regelmäßige Datenbank-Sicherung; die
-Sicherung ist bewusst ein unveränderlicher Stand *vor* dem ersten Sync.
+`SHEET_SYNC_SHEET_ID` darf nicht auf das Original gesetzt werden; der Server
+prüft die freigegebene Arbeitskopie ausdrücklich und lehnt andere IDs ab.
+Der periodische Sync importiert additive Historie und neue bekannte
+Teilnehmer aus `ICC25 Raidsetup`; die Website exportiert Daten in eigene
+`Website …`-Tabs **nur in der Kopie**. Konflikte verursachen einen Fehler.
+Für die erste Einrichtung von Raidserie und geplantem Raid gilt weiterhin der
+vorhandene manuelle Initialimport.
 
-Der Intervall muss mindestens 1 Minute betragen. Ohne `SHEET_SYNC_ENABLED=true`
-bleiben automatische Jobs und Schreibzugriffe deaktiviert. Mit aktiviertem
-Servicekonto werden auch private Sheets über die authentifizierte Google
-Sheets API gelesen; die öffentliche gviz-Freigabe ist nicht mehr nötig.
+Im Tab `Loot Archive` wurde nur in der Arbeitskopie die Kopfzelle G1
+(`Import ID`) ergänzt, damit neue Einträge eindeutige IDs erhalten können.
+Bestehende Einträge wurden nicht umgeschrieben.
 
-Im Adminbereich **Importe** werden letzter Versuch, letzter erfolgreicher
-Lauf und Konflikte angezeigt. **Jetzt synchronisieren** startet einen
-manuellen Lauf. Der Server führt beim Start und anschließend regelmäßig
-einen Abgleich aus; der letzte Status überlebt Neustarts. Die Endpunkte
-`GET /api/v1/sheet-sync` und `POST /api/v1/sheet-sync/run` sind Admin-only.
-
-**Konfliktsichere Richtungen:**
-
-- **Google Sheet → Anwendung:** Neue historische Zeilen im `Raid Archive`,
-  `Loot Archive`, `Charaktere`, `Punkte` laufen über Dry-Run und
-  Merge mit Hashprüfung. Der aktuelle Raid wird aus dem ersten nummerierten
-  A:F-Block in `ICC25 Raidsetup` ergänzt – **nur** bekannte, eindeutig
-  zugeordnete Charaktere und nur bei exakt einem aktiven Raid in der
-  importierten Serie. Der erste Raid samt Serie muss zuvor mit der
-  bestehenden manuellen Importmaske eingerichtet sein.
-- **Anwendung → Google Sheet:** Der Server spiegelt seine Daten in
-  `Website Raids`, `Website Raidsetup`, `Website Teilnahmen`,
-  `Website Loot`, `Website Charaktere`, `Website Punkte` und
-  `Website Raidserien`. Diese Tabs sind als **nur lesbare Spiegel**
-  gedacht; geänderte Inhalte erzeugen einen Konflikt statt überschrieben
-  zu werden. Die vier ursprünglichen Archivtabs und das ursprüngliche
-  Raidsetup werden **nicht** durch den Export verändert.
-
-**Wichtige Grenze:** Dies ist noch **kein vollständiger bidirektionaler
-Bearbeitungs-Sync**. Nachträgliche historische Änderungen, Ersetzungen/
-Entfernungen von Raidmitgliedern sowie manuelle Bearbeitungen der Website-
-Spiegelblätter müssen weiterhin mit den vorgesehenen auditierten
-Website-Workflows korrigiert werden. Ein Konflikt stoppt den entsprechenden
-Lauf. Daten oder bestehende EP-/Loot-Buchungen werden niemals automatisch
-gelöscht oder überschrieben. Siehe ADR 057.
+**Grenze:** Dies ist noch kein vollständiger bidirektionaler editierbarer
+Abgleich. Löschungen, Umbesetzungen, nachträgliche historische Änderungen
+und Änderungen an Website-Spiegeltabs werden nicht automatisch übertragen.
+Kein stiller Last-Writer-Wins und kein automatisches Löschen von EP-/Loot-Historie.
 
 ## Local Beutekatalog
 

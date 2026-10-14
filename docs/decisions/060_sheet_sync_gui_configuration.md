@@ -18,7 +18,7 @@ Das Servicekonto wird einmalig als JSON-Datei über eine Admin-Sitzung (HTTPS in
 Produktion) geladen. Der Server validiert es vor der Übernahme und speichert
 es in `sheet_sync_config.credentials_ciphertext` mit AES-256-GCM und zufälligem
 Nonce. Ein separat erzeugter, nicht in der Datenbank abgelegter Schlüssel
-liegt mit Modus 0600 in `<DB-Datei>.sheet-sync.key`; die API gibt ausschließlich
+liegt in `<DB-Datei>.sheet-sync.key` (Unix: Modus 0600; Windows: geschützte DACL nur für Dienstbenutzer, SYSTEM und Administratoren); die API gibt ausschließlich
 `credentials_configured` zurück. Schlüsseldatei und Datenbank müssen beim
 Umzug gemeinsam gesichert und wiederhergestellt werden. Die Schlüsseldatei
 gehört nicht in git und soll nur für den Serverprozess lesbar sein. Die

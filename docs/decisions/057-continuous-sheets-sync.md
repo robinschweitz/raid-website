@@ -13,18 +13,19 @@ and no replay of finalization. The source sheet does not contain stable IDs or
 timestamps for every editable website entity. Blind last-writer-wins bidirectional
 updates could overwrite corrections or recreate historical EP and loot awards.
 
-## Verified pre-sync backup
+## Strict copy-only boundary (owner clarification)
 
-A separate Google Sheets workbook was supplied and verified before editing:
-`10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8`. It has the same 17 tab
-IDs, titles and verified representative source/formula cells as the original
-`1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU`.
+The original spreadsheet `1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU`
+is **never** a write or synchronization target. The owner explicitly permits
+changes **only** to the working copy
+`10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8`.
+The copy has all 17 tabs and is the sole permitted source/export destination.
+An explicit ID gate rejects the original or any unrelated Sheet.
 
-Runtime enablement now requires `SHEET_SYNC_BACKUP_SHEET_ID` distinct from
-the source ID. Each sync checks the availability and exact original tab IDs
-in the backup *before* performing writes, including a manual sync. The
-backup is never written by the application. The database must still be
-backed up separately before deployment.
+Prior to this clarification a single `Loot Archive!G1` header was mistakenly
+written to the original. It is not silently reverted without owner approval.
+The same header is present in the working copy; all subsequent writes must
+exclusively target the copy.
 
 ## Implemented direction and conflict policy
 

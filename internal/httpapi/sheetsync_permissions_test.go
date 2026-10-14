@@ -49,11 +49,11 @@ func TestSyncPermissions(t *testing.T) {
 func TestSyncConfigMutationAdminOnly(t *testing.T) {
 	srv, b := setupServer(t)
 	payload := map[string]any{
-		"enabled": false,
+		"enabled":   false,
 		"automatic": false,
-		"sheet_id": "10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8",
-		"interval": "10m",
-		"reason": "",
+		"sheet_id":  "10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8",
+		"interval":  "10m",
+		"reason":    "",
 	}
 	for _, role := range []validation.Role{validation.RoleMember, validation.RoleRaidassistent, validation.RoleAdmin} {
 		user := "settings-" + string(role)

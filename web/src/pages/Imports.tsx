@@ -14,6 +14,15 @@ interface SheetSyncStatus {
   last_import?: ImportReport
 }
 
+interface SheetSyncConfig {
+  enabled: boolean
+  automatic: boolean
+  sheet_id: string
+  reason: string
+  interval: string
+  credentials_configured: boolean
+}
+
 const DEFAULT_SHEET_ID = '10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8'
 
 function formatTime(value: string | null): string {
@@ -23,6 +32,11 @@ function formatTime(value: string | null): string {
 export function ImportsPage() {
   const [records, setRecords] = useState<ImportRecord[]>([])
   const [syncStatus, setSyncStatus] = useState<SheetSyncStatus | null>(null)
+  const [syncConfig, setSyncConfig] = useState<SheetSyncConfig | null>(null)
+  const [credentialJSON, setCredentialJSON] = useState('')
+  const [credentialFilename, setCredentialFilename] = useState('')
+  const [configBusy, setConfigBusy] = useState(false)
+  const [configMessage, setConfigMessage] = useState('')
   const [syncBusy, setSyncBusy] = useState(false)
   const [syncPreview, setSyncPreview] = useState<{ ready: boolean; blockers: string[]; import?: ImportReport } | null>(null)
   const [report, setReport] = useState<ImportReport | null>(null)
@@ -75,6 +89,38 @@ export function ImportsPage() {
   }, [isActive])
 
   useEffect(loadSync, [loadSync])
+
+  const loadConfig = useCallback(() => {
+    api.get<SheetSyncConfig>('/api/v1/sheet-sync/config')
+      .then((config) => { if (isActive()) setSyncConfig(config) })
+      .catch((err) => { if (isActive()) setConfigMessage(err instanceof ApiError ? err.message : 'Sync-Einstellungen konnten nicht geladen werden') })
+  }, [isActive])
+
+  useEffect(loadConfig, [loadConfig])
+
+  const saveSyncConfig = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!syncConfig || configBusy || syncBusy || busy) return
+    setConfigBusy(true)
+    setConfigMessage('')
+    try {
+      const updated = await api.put<SheetSyncConfig>('/api/v1/sheet-sync/config', {
+        ...syncConfig,
+        service_account_json: credentialJSON,
+      })
+      if (!isActive()) return
+      setSyncConfig(updated)
+      setCredentialJSON('')
+      setCredentialFilename('')
+      setSyncPreview(null)
+      setConfigMessage('Einstellungen gespeichert. Änderungen sind sofort wirksam.')
+      loadSync()
+    } catch (err) {
+      if (isActive()) setConfigMessage(err instanceof ApiError ? err.message : 'Einstellungen konnten nicht gespeichert werden')
+    } finally {
+      if (isActive()) setConfigBusy(false)
+    }
+  }
 
   const checkSync = async () => {
     if (syncBusy || busy) return
@@ -160,6 +206,40 @@ export function ImportsPage() {
       <section className="card">
         <h2>Fortlaufende Google-Sheets-Synchronisierung</h2>
         <p className="muted">Im Sheet archivierte Raids werden einschließlich Loot und bereits verbuchter EP als abgeschlossen übernommen. Abschluss-EP werden dabei nicht nochmals vergeben. Das aktuelle ICC25 Raidsetup ergänzt nur eindeutig bekannte Teilnehmer des aktiven Raids. Die Website veröffentlicht ihre Daten in separaten „Website …“-Tabs. Widersprüche werden gemeldet, niemals automatisch überschrieben oder gelöscht.</p>
+        {syncConfig && <form className="subcard" onSubmit={saveSyncConfig}>
+          <h3>Synchronisierung einrichten</h3>
+          <p className="muted">Diese Einstellungen werden serverseitig gespeichert. Die Google-Zugangsdaten werden nicht zurück an den Browser gesendet. Nur die freigegebene Arbeitskopie ist erlaubt.</p>
+          <label className="check"><input type="checkbox" checked={syncConfig.enabled} disabled={configBusy || syncBusy} onChange={(e) => setSyncConfig({ ...syncConfig, enabled: e.target.checked, automatic: e.target.checked && syncConfig.automatic })} /> Synchronisierung aktivieren</label>
+          <label className="check"><input type="checkbox" checked={syncConfig.automatic} disabled={configBusy || syncBusy || !syncConfig.enabled} onChange={(e) => setSyncConfig({ ...syncConfig, automatic: e.target.checked })} /> Automatisch regelmäßig abgleichen (erst nach erfolgreicher Vorabprüfung aktivieren)</label>
+          <label>Freigegebene Sheet-ID
+            <input value={syncConfig.sheet_id} readOnly aria-readonly="true" />
+          </label>
+          <label>Intervall (mindestens 1 Minute, z. B. 10m oder 1h)
+            <input required value={syncConfig.interval} disabled={configBusy || syncBusy} onChange={(e) => setSyncConfig({ ...syncConfig, interval: e.target.value })} />
+          </label>
+          <label>Begründung für den Abgleich
+            <input required={syncConfig.enabled} value={syncConfig.reason} disabled={configBusy || syncBusy} onChange={(e) => setSyncConfig({ ...syncConfig, reason: e.target.value })} placeholder="Geprüfter Abgleich mit der freigegebenen Kopie" />
+          </label>
+          <label>Google-Servicekonto als JSON-Datei (optional ersetzen)
+            <input type="file" accept=".json,application/json" disabled={configBusy || syncBusy} onChange={(e) => {
+              const file = e.currentTarget.files?.[0]
+              e.currentTarget.value = ''
+              if (!file) return
+              if (file.size > 32 * 1024) {
+                setConfigMessage('Die Servicekonto-Datei ist zu groß (maximal 32 KiB).')
+                return
+              }
+              void file.text().then((content) => {
+                setCredentialJSON(content)
+                setCredentialFilename(file.name)
+                setConfigMessage('')
+              }).catch(() => setConfigMessage('Servicekonto-Datei konnte nicht gelesen werden'))
+            }} />
+          </label>
+          <p className="muted">{credentialFilename ? 'Neue Servicekonto-Datei ausgewählt: ' + credentialFilename : syncConfig.credentials_configured ? 'Servicekonto vorhanden. Leer lassen, um es beizubehalten.' : 'Noch kein Servicekonto eingerichtet. Für die Aktivierung eine JSON-Datei auswählen.'}</p>
+          <div className="actions"><button type="submit" disabled={configBusy || syncBusy || busy}>{configBusy ? 'Speichert…' : 'Einstellungen speichern'}</button></div>
+          {configMessage && <p role="status" className="muted">{configMessage}</p>}
+        </form>}
         {syncStatus?.enabled ? (
           <>
             <p className="muted">{syncStatus.automatic ? 'Automatischer Zeitplan läuft.' : 'Nur Prüf- und manueller Modus: kein automatischer Zeitplan.'}</p>
@@ -187,7 +267,7 @@ export function ImportsPage() {
               <button type="button" disabled={syncBusy} onClick={loadSync}>Status aktualisieren</button>
             </div>
           </>
-        ) : <p className="muted">Automatischer Abgleich ist deaktiviert. Zum Aktivieren benötigt der Server SHEET_SYNC_ENABLED, SHEET_SYNC_SHEET_ID, SHEET_SYNC_REASON und ein freigegebenes Google-Servicekonto. Weitere Hinweise stehen in der README.</p>}
+        ) : <p className="muted">Die Synchronisierung ist noch nicht aktiv. Richte sie oben ein, speichere die Einstellungen und führe zuerst eine Vorabprüfung durch.</p>}
       </section>
 
       <form className="card import-workflow" onSubmit={submit}>

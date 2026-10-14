@@ -120,7 +120,7 @@ func (s *Service) RunOnce(ctx context.Context) (Status, error) {
     }
     if err == nil {
         var setup legacyimport.SetupSyncReport
-        setup, err = s.importer.SyncCurrentSetup(ctx, s.actorID, Source, s.sheetID)
+        setup, err = s.importer.SyncCurrentSetup(ctx, s.actorID, Source, s.sheetID, preview.RawHash)
         if err == nil {
             status.CurrentSetup = &setup
             if len(setup.Conflicts) > 0 { err = fmt.Errorf("current raid setup conflicts: %s", strings.Join(setup.Conflicts, "; ")) }

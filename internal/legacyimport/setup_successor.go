@@ -115,10 +115,16 @@ func (s *Service) createUpcomingSetupRaid(ctx context.Context, actorID int64, so
 		return nil, "", fmt.Errorf("raidsetup: Termin bereits als %s vorhanden; automatische Erstellung blockiert", occurrence.Name)
 	}
 	rd := &raid.Raid{
-		Name: nextName, SeriesID: &series.ID, PreviousRaidID: &lastRaid.ID,
-		RaidLeaderID: series.RaidLeaderID, Status: validation.RaidStatusPlanned,
-		CatalogInstanceID: series.CatalogInstanceID, RaidSize: series.RaidSize,
-		ScheduledStart: &scheduled, CreatedAt: now, UpdatedAt: now,
+		Name:              nextName,
+		SeriesID:          &series.ID,
+		PreviousRaidID:    &lastRaid.ID,
+		RaidLeaderID:      series.RaidLeaderID,
+		Status:            validation.RaidStatusPlanned,
+		CatalogInstanceID: series.CatalogInstanceID,
+		RaidSize:          series.RaidSize,
+		ScheduledStart:    &scheduled,
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}
 	if err := s.raids.Create(ctx, rd); err != nil {
 		return nil, "", fmt.Errorf("raidsetup: %s erstellen: %w", nextName, err)
@@ -133,10 +139,14 @@ func (s *Service) createUpcomingSetupRaid(ctx context.Context, actorID int64, so
 		return nil, "", err
 	}
 	if err := s.imports.writeAudit(ctx, &audit.Log{
-		ActorID: &actorID, EntityType: "raid", EntityID: strconv.FormatInt(rd.ID, 10),
-		Action: "create", BeforeJSON: "null", AfterJSON: string(after),
-		Reason: "Google Sheet ICC25 Raidsetup: nächster geplanter Raid nach "+lastName,
-		CreatedAt: now,
+		ActorID:    &actorID,
+		EntityType: "raid",
+		EntityID:   strconv.FormatInt(rd.ID, 10),
+		Action:     "create",
+		BeforeJSON: "null",
+		AfterJSON:  string(after),
+		Reason:     "Google Sheet ICC25 Raidsetup: nächster geplanter Raid nach " + lastName,
+		CreatedAt:  now,
 	}); err != nil {
 		return nil, "", err
 	}

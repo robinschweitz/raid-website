@@ -46,6 +46,20 @@ function formatTime(value: string | null): string {
   return value ? new Date(value).toLocaleString() : '—'
 }
 
+// Suggest the next Monday in the explicitly configured Berlin raid timezone.
+// It is a form default, not a silently inferred raid schedule: the admin must
+// review/confirm date, time, weekday and raid leader before importing.
+function nextBerlinMonday(): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date())
+  const datePart = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? '0')
+  const candidate = new Date(Date.UTC(datePart('year'), datePart('month') - 1, datePart('day')))
+  const nextDays = ((8 - candidate.getUTCDay()) % 7) || 7
+  candidate.setUTCDate(candidate.getUTCDate() + nextDays)
+  return candidate.toISOString().slice(0, 10)
+}
+
 export function ImportsPage() {
   const [records, setRecords] = useState<ImportRecord[]>([])
   const [syncStatus, setSyncStatus] = useState<SheetSyncStatus | null>(null)
@@ -59,8 +73,9 @@ export function ImportsPage() {
   const [report, setReport] = useState<ImportReport | null>(null)
   const [sheetID, setSheetID] = useState(DEFAULT_SHEET_ID)
   const [reason, setReason] = useState('')
+  const initialSetupForm = useRef<HTMLFormElement>(null)
   const [includeSetup, setIncludeSetup] = useState(true)
-  const [setup, setSetup] = useState({ name: 'ICC25', leader: 'Oxora', first_date: '2026-10-05', start_time: '19:00', timezone: 'Europe/Berlin', weekdays: [1], interval_weeks: 1 })
+  const [setup, setSetup] = useState(() => ({ name: 'ICC25', leader: 'Oxora', first_date: nextBerlinMonday(), start_time: '19:00', timezone: 'Europe/Berlin', weekdays: [1], interval_weeks: 1 }))
   const [error, setError] = useState('')
   const [operation, setOperation] = useState<{ mode: 'dry-run' | 'merge'; startedAt: number } | null>(null)
   const [now, setNow] = useState(Date.now())
@@ -223,6 +238,9 @@ export function ImportsPage() {
       <section className="card">
         <h2>Fortlaufende Google-Sheets-Synchronisierung</h2>
         <p className="muted">Im Sheet archivierte Raids werden einschließlich Loot und bereits verbuchter EP als abgeschlossen übernommen. Abschluss-EP werden dabei nicht nochmals vergeben. „ICC25 Raidsetup“ ist die Aufstellung für den nächsten geplanten Raid. Ist nach ICC25-35 noch kein Serien-Raid aktiv, plant der Sync ICC25-36 anhand der konfigurierten Raidserie und übernimmt die eindeutig zugeordneten Teilnehmer. Die Website veröffentlicht ihre Daten in separaten „Website …“-Tabs. Widersprüche werden gemeldet, niemals automatisch überschrieben oder gelöscht.</p>
+        <p className="muted">Wichtig: Die Synchronisierung kann erst dann einen geplanten Folge-Raid anlegen, wenn die ICC25-Serie einmalig mit Raidleitung, Termin und Wiederholung eingerichtet wurde. Sind bisher nur ICC25-01 bis ICC25-35 archiviert, ist der nächste nummerierte Raid ICC25-36. Die Einstellung erfolgt direkt unten über den vorhandenen einmaligen Raidsetup-Import.</p>
+        <div className="actions"><button type="button" onClick={() => { setIncludeSetup(true); initialSetupForm.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>ICC25-36 und Raidserie einmalig einrichten</button></div>
+        {syncPreview?.blockers.some((message) => message.includes('raidsetup_initialization_required')) && <p role="alert">Die ICC25-Raidserie fehlt. Bitte zuerst über „ICC25-36 und Raidserie einmalig einrichten“ eine überprüfte Ersteinrichtung durchführen.</p>}
         {syncConfig && <form className="subcard" onSubmit={saveSyncConfig}>
           <h3>Synchronisierung einrichten</h3>
           <p className="muted">Diese Einstellungen werden serverseitig gespeichert. Die Google-Zugangsdaten werden nicht zurück an den Browser gesendet. Nur die freigegebene Arbeitskopie ist erlaubt.</p>
@@ -289,7 +307,7 @@ export function ImportsPage() {
         ) : <p className="muted">Die Synchronisierung ist noch nicht aktiv. Richte sie oben ein, speichere die Einstellungen und führe zuerst eine Vorabprüfung durch.</p>}
       </section>
 
-      <form className="card import-workflow" onSubmit={submit}>
+      <form ref={initialSetupForm} className="card import-workflow" onSubmit={submit}>
         <h2>Google-Sheet importieren</h2>
         <label>
           Sheet-ID
@@ -304,10 +322,10 @@ export function ImportsPage() {
         <label className="check"><input type="checkbox" disabled={busy} checked={includeSetup} onChange={(e) => { invalidatePreview(); setIncludeSetup(e.target.checked) }} />ICC25 Raidsetup (A–F) einmalig als Raid und Serie übernehmen</label>
         {includeSetup && <fieldset disabled={busy}>
           <legend>Erster Raid und wöchentliche Serie</legend>
-          <p className="muted">Die Aufstellung stammt aus dem ersten nummerierten Block in A–F. Datum und Serienregeln werden hier ausdrücklich festgelegt. Eine bereits importierte Aufstellung wird nicht überschrieben.</p>
+          <p className="muted">Dieser Schritt legt bei bisher nur archivierten ICC25-Raids einmalig die Serie und den nächsten geplanten Raid (nach ICC25-35: ICC25-36) mit der aktuellen Aufstellung an. Datum und Uhrzeit sind Vorschläge – bitte die tatsächlich gewünschte Raidleitung, den nächsten Termin und die wöchentliche Wiederholung vor der Vorschau bestätigen. Alte Raids werden nicht neu erstellt.</p>
           <label>Name<input required value={setup.name} onChange={(e) => { invalidatePreview(); setSetup({ ...setup, name: e.target.value }) }} /></label>
           <label>Raidleitung (Spielername)<input required value={setup.leader} onChange={(e) => { invalidatePreview(); setSetup({ ...setup, leader: e.target.value }) }} /></label>
-          <label>Erster Raid (Datum in der Serien-Zeitzone)<input required type="date" value={setup.first_date} onChange={(e) => { invalidatePreview(); setSetup({ ...setup, first_date: e.target.value }) }} /></label>
+          <label>Nächster geplanter Raid (Datum in der Serien-Zeitzone)<input required type="date" value={setup.first_date} onChange={(e) => { invalidatePreview(); setSetup({ ...setup, first_date: e.target.value }) }} /></label>
           <label>Startzeit<input required type="time" value={setup.start_time} onChange={(e) => { invalidatePreview(); setSetup({ ...setup, start_time: e.target.value }) }} /></label>
           <label>Zeitzone<input required value={setup.timezone} onChange={(e) => { invalidatePreview(); setSetup({ ...setup, timezone: e.target.value }) }} /></label>
           <label>Wochentag<select value={setup.weekdays[0]} onChange={(e) => { invalidatePreview(); setSetup({ ...setup, weekdays: [Number(e.target.value)] }) }}>{['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'].map((day, i) => <option key={day} value={i}>{day}</option>)}</select></label>

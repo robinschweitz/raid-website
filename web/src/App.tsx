@@ -71,9 +71,6 @@ function Layout() {
       if (isActive()) setError('Abmelden fehlgeschlagen. Bitte erneut versuchen.')
     }
   })
-  if (!player) {
-    return null
-  }
   return (
     <div className="app">
       <a className="skip-link" href="#main-content" onClick={(event) => {
@@ -91,7 +88,7 @@ function Layout() {
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
           <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
           <p className="sidebar-caption">Administration</p>
-          {atLeast(player.role, 'ADMIN') && <>
+          {player && atLeast(player.role, 'ADMIN') && <>
             <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
             <Link className={path === '/raid-series' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/raid-series"><NavIcon name="series" />Raidserien</Link>
             <Link className={path === '/imports' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/imports"><NavIcon name="import" />Importe</Link>
@@ -106,9 +103,8 @@ function Layout() {
       <div className="main-shell">
       <header className="topbar">
         <span className="topbar-brand">Bratwurst des Schicksals <span className="muted">/ Raidverwaltung</span></span>
-        <div className="user"><Link to={`/players/${player.id}`}><NavIcon name="profile" />{player.name}</Link><span className="badge">{player.role}</span>
-          <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button>
-        </div>
+        <div className="user">{player ? <><Link to={`/players/${player.id}`}><NavIcon name="profile" />{player.name}</Link><span className="badge">{player.role}</span>
+          <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button></> : <Link to="/login">Anmelden</Link>}</div>
       </header>
       <main id="main-content" className={path === '/' ? undefined : 'secondary-page'} tabIndex={-1}>
         {error && <p className="error" role="alert">{error}</p>}
@@ -125,6 +121,11 @@ function Layout() {
       </nav>
     </div>
   )
+}
+
+function useGuestLoginRoute() {
+  const path = useRoute()
+  return path !== '/'
 }
 
 function Gate() {
@@ -146,7 +147,7 @@ function Gate() {
       </div>
     )
   }
-  if (!player) {
+  if (!player && useGuestLoginRoute()) {
     return <LoginPage />
   }
   return <Layout />

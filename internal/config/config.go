@@ -56,8 +56,8 @@ func Load() (*Config, error) {
 		}
 	}
 	if c.SheetSyncEnabled {
-		if c.SheetSyncSheetID == "" || c.SheetSyncBackupSheetID == "" || c.SheetSyncSheetID == c.SheetSyncBackupSheetID || c.SheetSyncReason == "" || c.SheetSyncServiceAccount == "" {
-			return nil, errors.New("distinct SHEET_SYNC_SHEET_ID and SHEET_SYNC_BACKUP_SHEET_ID, SHEET_SYNC_REASON and SHEET_SYNC_SERVICE_ACCOUNT_JSON required when SHEET_SYNC_ENABLED=true")
+		if c.SheetSyncSheetID != "10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8" || c.SheetSyncReason == "" || c.SheetSyncServiceAccount == "" {
+			return nil, errors.New("SHEET_SYNC_SHEET_ID set to the explicitly authorized copy, SHEET_SYNC_REASON and SHEET_SYNC_SERVICE_ACCOUNT_JSON required when SHEET_SYNC_ENABLED=true")
 		}
 		interval, err := time.ParseDuration(getEnv("SHEET_SYNC_INTERVAL", "10m"))
 		if err != nil || interval < time.Minute {

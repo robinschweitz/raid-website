@@ -29,7 +29,7 @@ func TestMatchingBackupTabs(t *testing.T) {
 
 func TestBackupIDCannotBeOriginal(t *testing.T) {
 	g := &GoogleWriter{}
-	if err := g.VerifyBackup(t.Context(), "same-id", "same-id"); err == nil {
+	if err := g.VerifyWorkingCopy(t.Context(), "1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU"); err == nil {
 		t.Fatal("backup must use a distinct spreadsheet")
 	}
 }

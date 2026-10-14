@@ -103,23 +103,74 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 				return nil
 			}
 			last, err := bound.imports.latestArchivedSetupBaseline(ctx, source, sheetID, mapping.SeriesID, *targetRaid.ScheduledStart)
+			sameAsArchived := false
 			if errors.Is(err, sql.ErrNoRows) {
-				report.Warnings = append(report.Warnings, "ICC25 Raidsetup: keine belegte frühere Aufstellung gespeichert; neue Raid-Zuordnung ohne Vergleich nicht automatisch möglich")
-				return nil
+				// Upgrades may have no stored setup baseline because the first
+				// tracked sync archived the original raid immediately. Use the
+				// latest archived website roster as evidence instead of making
+				// up a baseline or copying an unchanged old setup.
+				var priorID int64
+				var priorStart time.Time
+				for _, rd := range raids {
+					if rd.ArchivedAt == nil || rd.Status != validation.RaidStatusCompleted ||
+						rd.ScheduledStart == nil || !rd.ScheduledStart.Before(*targetRaid.ScheduledStart) {
+						continue
+					}
+					if priorID == 0 || rd.ScheduledStart.After(priorStart) {
+						priorID = rd.ID
+						priorStart = *rd.ScheduledStart
+					}
+				}
+				if priorID == 0 {
+					report.Warnings = append(report.Warnings, "ICC25 Raidsetup: keine archivierte vorherige Aufstellung vorhanden; neue Raid-Zuordnung nicht belegbar")
+					return nil
+				}
+				oldRoster, rosterErr := bound.att.ListByRaid(ctx, priorID)
+				if rosterErr != nil {
+					return rosterErr
+				}
+				if len(oldRoster) == 0 {
+					report.Warnings = append(report.Warnings, "ICC25 Raidsetup: vorheriger Raid enthält keine vergleichbare historische Aufstellung")
+					return nil
+				}
+				sameAsArchived = len(oldRoster) == len(entries)
+				if sameAsArchived {
+					for _, oldRow := range oldRoster {
+						person, personErr := bound.players.Get(ctx, oldRow.PlayerID)
+						if personErr != nil {
+							return personErr
+						}
+						matched := false
+						for _, entry := range entries {
+							if entry.Player == person.Name && entry.Character == oldRow.CharacterName &&
+								entry.Class == oldRow.Class && entry.Spec == oldRow.Spec && entry.Role == oldRow.Role {
+								matched = true
+								break
+							}
+						}
+						if !matched {
+							sameAsArchived = false
+							break
+						}
+					}
+				}
+				report.Warnings = append(report.Warnings, "ICC25 Raidsetup: keine ältere Setup-Baseline vorhanden; aktuellen Block gegen die letzte archivierte Website-Aufstellung geprüft")
+			} else {
+				if err != nil {
+					return err
+				}
+				previousPlan := Plan{}
+				lastEntries, _, err := parseSetup([]byte(last), &previousPlan)
+				if err != nil {
+					return err
+				}
+				if len(previousPlan.Errors) > 0 {
+					report.Conflicts = append(report.Conflicts, "ICC25 Raidsetup: gespeicherte frühere Aufstellung ist ungültig")
+					return nil
+				}
+				sameAsArchived = reflect.DeepEqual(lastEntries, entries)
 			}
-			if err != nil {
-				return err
-			}
-			previousPlan := Plan{}
-			lastEntries, _, err := parseSetup([]byte(last), &previousPlan)
-			if err != nil {
-				return err
-			}
-			if len(previousPlan.Errors) > 0 {
-				report.Conflicts = append(report.Conflicts, "ICC25 Raidsetup: gespeicherte frühere Aufstellung ist ungültig")
-				return nil
-			}
-			if reflect.DeepEqual(lastEntries, entries) {
+			if sameAsArchived {
 				report.Warnings = append(report.Warnings, "ICC25 Raidsetup: Aufstellung identisch zum letzten archivierten Raid; keine automatische Übernahme in "+targetRaid.Name+" ohne belegten Wechsel")
 				return nil
 			}

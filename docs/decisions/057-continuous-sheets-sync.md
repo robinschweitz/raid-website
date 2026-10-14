@@ -13,6 +13,19 @@ and no replay of finalization. The source sheet does not contain stable IDs or
 timestamps for every editable website entity. Blind last-writer-wins bidirectional
 updates could overwrite corrections or recreate historical EP and loot awards.
 
+## Verified pre-sync backup
+
+A separate Google Sheets workbook was supplied and verified before editing:
+`10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8`. It has the same 17 tab
+IDs, titles and verified representative source/formula cells as the original
+`1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU`.
+
+Runtime enablement now requires `SHEET_SYNC_BACKUP_SHEET_ID` distinct from
+the source ID. Each sync checks the availability and exact original tab IDs
+in the backup *before* performing writes, including a manual sync. The
+backup is never written by the application. The database must still be
+backed up separately before deployment.
+
 ## Implemented direction and conflict policy
 
 - The server polls periodically after opt-in. The existing historical importer

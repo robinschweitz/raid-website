@@ -44,6 +44,7 @@ type Options struct {
 	RegistrationFeed        registration.ExternalClient
 	SheetSyncEnabled        bool
 	SheetSyncSheetID        string
+	SheetSyncBackupSheetID  string
 	SheetSyncReason         string
 	SheetSyncInterval       time.Duration
 	SheetSyncServiceAccount string
@@ -102,7 +103,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 			return nil, fmt.Errorf("configure sheet sync: %w", err)
 		}
 		importsSvc.UseFetcher(sheetsync.AuthenticatedFetcher{Writer: writer})
-		syncService, err = sheetsync.New(db, importsSvc, writer, opts.SheetSyncSheetID, admin.ID, opts.SheetSyncReason, opts.SheetSyncInterval)
+		syncService, err = sheetsync.New(db, importsSvc, writer, opts.SheetSyncSheetID, opts.SheetSyncBackupSheetID, admin.ID, opts.SheetSyncReason, opts.SheetSyncInterval)
 		if err != nil {
 			return nil, fmt.Errorf("create sheet sync: %w", err)
 		}

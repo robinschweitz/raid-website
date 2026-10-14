@@ -87,8 +87,8 @@ function Layout() {
           <Link className={path === '/statistics' ? 'nav-link active' : 'nav-link'} to="/statistics"><NavIcon name="chart" />Statistiken</Link>
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
           <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
-          <p className="sidebar-caption">Administration</p>
           {player && atLeast(player.role, 'ADMIN') && <>
+            <p className="sidebar-caption">Administration</p>
             <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
             <Link className={path === '/raid-series' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/raid-series"><NavIcon name="series" />Raidserien</Link>
             <Link className={path === '/imports' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/imports"><NavIcon name="import" />Importe</Link>

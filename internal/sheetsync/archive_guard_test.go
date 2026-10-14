@@ -15,16 +15,16 @@ func TestEnsureWebsiteOnlyArchival(t *testing.T) {
 	}{
 		{name: "existing raids can sync", preview: legacyimport.Report{}},
 		{
-			name: "new characters and loot can sync",
+			name:    "new characters and loot can sync",
 			preview: legacyimport.Report{Created: legacyimport.Counts{Characters: 2, Loot: 3, Points: 1}},
 		},
 		{
-			name: "new archived raid from sheet is forbidden",
+			name:    "new archived raid from sheet is forbidden",
 			preview: legacyimport.Report{Created: legacyimport.Counts{Raids: 1}},
-			want: "website",
+			want:    "website",
 		},
 		{
-			name: "reclassifying existing completed raid is forbidden",
+			name:    "reclassifying existing completed raid is forbidden",
 			preview: legacyimport.Report{ArchivedRaids: 1},
 			want: "website",
 		},

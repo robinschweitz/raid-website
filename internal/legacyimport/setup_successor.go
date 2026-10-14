@@ -69,7 +69,7 @@ func (s *Service) createUpcomingSetupRaid(ctx context.Context, actorID int64, so
 	lastName := fmt.Sprintf("%s%d", prefix, lastNumber)
 	provenance, err := s.imports.raidMapping(ctx, source, sheetID, lastName)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, "Raidsetup: letzter Sheet-Raid "+lastName+" ohne überprüfte Importzuordnung", nil
+		return nil, "Raidsetup: letzter Sheet-Raid " + lastName + " ohne überprüfte Importzuordnung", nil
 	}
 	if err != nil {
 		return nil, "", err
@@ -79,7 +79,7 @@ func (s *Service) createUpcomingSetupRaid(ctx context.Context, actorID int64, so
 		return nil, "", err
 	}
 	if lastRaid.Name != lastName || lastRaid.ArchivedAt == nil || lastRaid.Status != validation.RaidStatusCompleted || lastRaid.ScheduledStart == nil {
-		return nil, "Raidsetup: "+lastName+" ist auf der Website noch nicht eindeutig archiviert", nil
+		return nil, "Raidsetup: " + lastName + " ist auf der Website noch nicht eindeutig archiviert", nil
 	}
 	if lastRaid.SeriesID != nil && *lastRaid.SeriesID != series.ID {
 		return nil, "", fmt.Errorf("raidsetup: archivierter Raid %s gehört zu einer anderen Serie", lastName)

@@ -15,6 +15,11 @@ import (
 // This never calls raid finalization, awards rewards, or schedules a successor.
 func (s *Service) archiveImportedHistory(ctx context.Context, actorID int64, reason string, p Plan, now time.Time, rep *Report) error {
 	for _, planned := range p.Raids {
+		if s.sheetArchives != nil {
+			if _, pending := s.sheetArchives.raids[planned.Key]; pending {
+				continue
+			}
+		}
 		if planned.ExistingID == 0 {
 			continue
 		}

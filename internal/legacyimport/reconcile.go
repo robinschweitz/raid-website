@@ -20,7 +20,7 @@ func (f snapshotFetcher) Fetch(_ context.Context, sheetID string) (SheetData, er
 
 // Reconcile evaluates one fetched source version and applies domain changes in
 // one transaction. Preview rolls back the same path, including import receipts.
-func (s *Service) Reconcile(ctx context.Context, actorID int64, source, sheetID, reason string, previewOnly bool, guard func(Report) error) (Report, SetupSyncReport, error) {
+func (s *Service) Reconcile(ctx context.Context, actorID int64, source, sheetID, reason string, previewOnly bool) (Report, SetupSyncReport, error) {
 	data, err := s.fetcher.Fetch(ctx, sheetID)
 	if err != nil {
 		return Report{}, SetupSyncReport{}, err
@@ -31,6 +31,9 @@ func (s *Service) Reconcile(ctx context.Context, actorID int64, source, sheetID,
 		bound.fetcher = snapshotFetcher{sheetID, data}
 		bound.strictSource = true
 		bound.external = nil
+		if err := bound.prepareSheetArchives(ctx, actorID, source, sheetID, reason, data); err != nil {
+			return err
+		}
 		preview, err := bound.DryRun(ctx, source, sheetID)
 		report = preview
 		if err != nil {
@@ -39,15 +42,31 @@ func (s *Service) Reconcile(ctx context.Context, actorID int64, source, sheetID,
 		if len(preview.Errors) > 0 {
 			return fmt.Errorf("historical sheet conflicts: %s", strings.Join(preview.Errors, "; "))
 		}
-		if err = guard(preview); err != nil {
-			return err
-		}
 		report, err = bound.Merge(ctx, actorID, source, sheetID, preview.RawHash, reason)
 		if err != nil {
 			return err
 		}
 		if len(report.Errors) > 0 {
 			return fmt.Errorf("historical sheet merge conflicts: %s", strings.Join(report.Errors, "; "))
+		}
+		if report.Skipped {
+			report.Created = Counts{}
+			report.ArchivedRaids = 0
+		}
+		if err = bound.describeSheetArchives(ctx, &report); err != nil {
+			return err
+		}
+		if err = bound.applySheetArchives(ctx, actorID, source, sheetID, reason, &report); err != nil {
+			return err
+		}
+		if len(bound.sheetArchives.raids) > 0 {
+			report.Skipped = false
+		}
+		if err = bound.imports.saveSourceBaseline(ctx, source, sheetID, data); err != nil {
+			return err
+		}
+		if err = bound.savePointBaselines(ctx, source, sheetID, data); err != nil {
+			return err
 		}
 		setup, err = bound.SyncCurrentSetup(ctx, actorID, source, sheetID, data.Hash)
 		if err != nil {
@@ -56,11 +75,7 @@ func (s *Service) Reconcile(ctx context.Context, actorID int64, source, sheetID,
 		if len(setup.Conflicts) > 0 {
 			return fmt.Errorf("current raid setup conflicts: %s", strings.Join(setup.Conflicts, "; "))
 		}
-		if report.Skipped {
-			report.Created = Counts{}
-			report.ArchivedRaids = 0
-		}
-		return nil
+		return bound.recordSheetArchiveReport(ctx, actorID, sheetID, reason, report)
 	})
 	return report, setup, err
 }

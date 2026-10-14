@@ -90,7 +90,7 @@ func validationDB(t *testing.T) (*bun.DB, *legacyimport.Service, *validationFetc
 	return b.DB, s, f, a.ID
 }
 
-func TestSafetyRunOnceRepeatAndBlockNewHistory(t *testing.T) {
+func TestSafetyRunOnceRepeatAndAdoptNewSheetHistory(t *testing.T) {
 	b, imp, f, a := validationDB(t)
 	w := &validationWriter{}
 	s, e := New(b, imp, w, validationCopy, a, "PR13 isolation", time.Minute)
@@ -117,20 +117,20 @@ func TestSafetyRunOnceRepeatAndBlockNewHistory(t *testing.T) {
 	f.data.Character = append(f.data.Character, []byte("MustNotImport,MustNotImport,Paladin,Vergeltung,\n")...)
 	f.data.Hash = "new-history"
 	r, e = s.RunOnce(ctx)
-	if e == nil || w.calls != 2 {
-		t.Fatal("history guard did not stop", e, r)
+	if e != nil || w.calls != 3 {
+		t.Fatal("new Sheet archive was not adopted", e, r)
 	}
-	for table, want := range map[string]int{"raids": 0, "characters": 1, "enhance_point_transactions": 1} {
+	for table, want := range map[string]int{"raids": 1, "characters": 2, "enhance_point_transactions": 1} {
 		var n int
 		if err := b.NewSelect().TableExpr(table).ColumnExpr("COUNT(*)").Scan(ctx, &n); err != nil {
 			t.Fatal(err)
 		}
 		if n != want {
-			t.Fatalf("blocked run mutated %s: %d", table, n)
+			t.Fatalf("adoption had unexpected %s count: %d", table, n)
 		}
 	}
 }
-func TestSafetyRunOnceBlocksArchiveTransition(t *testing.T) {
+func TestSafetyRunOnceAdoptsHistoricalArchiveTransition(t *testing.T) {
 	b, imp, f, a := validationDB(t)
 	ctx := context.Background()
 	f.data.Raid = append(f.data.Raid, []byte("ICC25-99,14.10.2026,1,Hero,Mdd,Paladin,Vergeltung\n")...)
@@ -151,15 +151,15 @@ func TestSafetyRunOnceBlocksArchiveTransition(t *testing.T) {
 		t.Fatal(e)
 	}
 	_, e = s.RunOnce(ctx)
-	if e == nil || w.calls != 0 {
-		t.Fatal("archive transition permitted", e)
+	if e != nil || w.calls != 1 {
+		t.Fatal("archive transition failed", e)
 	}
 	var n int
 	if err := b.NewSelect().TableExpr("raids").ColumnExpr("COUNT(*)").Where("archived_at IS NOT NULL").Scan(ctx, &n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 0 {
-		t.Fatal("real archive transition occurred")
+	if n != 1 {
+		t.Fatal("historical archive transition missing")
 	}
 }
 

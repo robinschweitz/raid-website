@@ -11,7 +11,7 @@ interface SheetSyncStatus {
   last_success?: string
   last_error?: string
   current_setup?: { raid_id: number; added: number; warnings: string[]; conflicts: string[] }
-  last_import?: { skipped: boolean; created: { attendance: number; loot: number; raids: number } }
+  last_import?: ImportReport
 }
 
 const DEFAULT_SHEET_ID = '10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8'
@@ -24,7 +24,7 @@ export function ImportsPage() {
   const [records, setRecords] = useState<ImportRecord[]>([])
   const [syncStatus, setSyncStatus] = useState<SheetSyncStatus | null>(null)
   const [syncBusy, setSyncBusy] = useState(false)
- const [syncPreview, setSyncPreview] = useState<{ ready: boolean; blockers: string[] } | null>(null)
+  const [syncPreview, setSyncPreview] = useState<{ ready: boolean; blockers: string[]; import?: ImportReport } | null>(null)
   const [report, setReport] = useState<ImportReport | null>(null)
   const [sheetID, setSheetID] = useState(DEFAULT_SHEET_ID)
   const [reason, setReason] = useState('')
@@ -81,7 +81,7 @@ export function ImportsPage() {
     setSyncBusy(true)
     setSyncPreview(null)
     try {
-      const result = await api.post<{ ready: boolean; blockers: string[] }>('/api/v1/sheet-sync/preflight', {})
+      const result = await api.post<{ ready: boolean; blockers: string[]; import?: ImportReport }>('/api/v1/sheet-sync/preflight', {})
       if (isActive()) setSyncPreview(result)
     } catch (err) {
       if (isActive()) setSyncPreview({ ready: false, blockers: [err instanceof ApiError ? err.message : 'Vorabprüfung fehlgeschlagen'] })
@@ -159,7 +159,7 @@ export function ImportsPage() {
 
       <section className="card">
         <h2>Fortlaufende Google-Sheets-Synchronisierung</h2>
-        <p className="muted">Historische Sheet-Zeilen werden regelmäßig auf neue Einträge geprüft. Das aktuelle ICC25 Raidsetup ergänzt nur eindeutig bekannte Teilnehmer des aktiven Raids. Die Website veröffentlicht ihre Daten in separaten „Website …“-Tabs. Widersprüche werden gemeldet, niemals automatisch überschrieben oder gelöscht.</p>
+        <p className="muted">Im Sheet archivierte Raids werden einschließlich Loot und bereits verbuchter EP als abgeschlossen übernommen. Abschluss-EP werden dabei nicht nochmals vergeben. Das aktuelle ICC25 Raidsetup ergänzt nur eindeutig bekannte Teilnehmer des aktiven Raids. Die Website veröffentlicht ihre Daten in separaten „Website …“-Tabs. Widersprüche werden gemeldet, niemals automatisch überschrieben oder gelöscht.</p>
         {syncStatus?.enabled ? (
           <>
             <p className="muted">{syncStatus.automatic ? 'Automatischer Zeitplan läuft.' : 'Nur Prüf- und manueller Modus: kein automatischer Zeitplan.'}</p>
@@ -170,7 +170,17 @@ export function ImportsPage() {
             {!!syncStatus.current_setup?.warnings?.length && <ul className="plain-list">{syncStatus.current_setup.warnings.map((message, i) => <li key={i}>{message}</li>)}</ul>}
             {syncPreview && <p role="status">{syncPreview.ready ? 'Vorabprüfung bestanden. Der Abgleich prüft den Stand vor jedem Schreiben erneut.' : 'Aktivierung blockiert: Altbestand oder Quellenkonflikt zuerst prüfen.'}</p>}
             {!!syncPreview?.blockers.length && <ul className="plain-list">{syncPreview.blockers.map((message, i) => <li key={i}>{message}</li>)}</ul>}
-            <p className="muted">Vorabprüfung verändert keine Daten. Der automatische Zeitplan wird erst mit SHEET_SYNC_AUTORUN=true gestartet. Ein alter Import ohne Quellenbaseline oder ICC25-35 ohne eindeutige Loot-Zuordnung muss vor der Aktivierung abgeglichen werden.</p>
+            <p className="muted">Die Vorabprüfung zeigt Archivübernahmen und EP-Ausgleiche, ohne Daten zu verändern. Alte Import-Zuordnungen werden geprüft; widersprüchliche Aufstellungen, unbekannter Website-Loot oder parallele EP-Änderungen blockieren den Abgleich.</p>
+            {!!syncPreview?.import?.archive_transfers?.length && <>
+              <h3>Geplante Archivübernahme</h3>
+              <ul className="plain-list">{syncPreview.import.archive_transfers.map((raid) => <li key={raid.raid_name}>{raid.raid_name} · Sheet-Archivdatum: {formatTime(raid.archived_at)}</li>)}</ul>
+            </>}
+            {!!syncPreview?.import?.point_transfers?.length && <div className="table-wrap">
+              <table><caption>EP-Abgleich mit dem Sheet</caption><thead><tr><th>Spieler</th><th>Website bisher</th><th>Sheet-Zielstand</th><th>Ausgleich</th></tr></thead>
+                <tbody>{syncPreview.import.point_transfers.map((entry) => <tr key={entry.player}><td>{entry.player}</td><td>{entry.before}</td><td>{entry.target}</td><td>{entry.adjustment > 0 ? '+' : ''}{entry.adjustment}</td></tr>)}</tbody>
+              </table>
+            </div>}
+            {!!syncPreview?.import?.warnings?.length && <ul className="plain-list">{syncPreview.import.warnings.map((message, i) => <li key={i}>{message}</li>)}</ul>}
             <div className="actions">
               <button type="button" disabled={busy || syncBusy} onClick={checkSync}>Vorabprüfung ohne Änderungen</button>
               <button type="button" disabled={busy || syncBusy || !syncPreview?.ready} onClick={syncNow}>{syncBusy ? 'Abgleich läuft…' : 'Jetzt synchronisieren'}</button>

@@ -40,39 +40,42 @@ type Counts struct {
 }
 
 type Report struct {
-	ArchivedRaids int          `json:"archived_raids"`
-	Setup         *SetupReport `json:"setup,omitempty"`
-	Mode          string       `json:"mode"`
-	Source        string       `json:"source"`
-	RawHash       string       `json:"raw_hash"`
-	RowsRead      int          `json:"rows_read"`
-	Players       int          `json:"players"`
-	Characters    int          `json:"characters"`
-	Raids         int          `json:"raids"`
-	Attendance    int          `json:"attendance"`
-	Loot          int          `json:"loot"`
-	Tokens        int          `json:"tokens"`
-	PointsEntries int          `json:"points_entries"`
-	Created       Counts       `json:"created"`
-	Skipped       bool         `json:"skipped"`
-	Warnings      []string     `json:"warnings"`
-	Errors        []string     `json:"errors"`
+	ArchivedRaids    int               `json:"archived_raids"`
+	ArchiveTransfers []ArchiveTransfer `json:"archive_transfers,omitempty"`
+	PointTransfers   []PointTransfer   `json:"point_transfers,omitempty"`
+	Setup            *SetupReport      `json:"setup,omitempty"`
+	Mode             string            `json:"mode"`
+	Source           string            `json:"source"`
+	RawHash          string            `json:"raw_hash"`
+	RowsRead         int               `json:"rows_read"`
+	Players          int               `json:"players"`
+	Characters       int               `json:"characters"`
+	Raids            int               `json:"raids"`
+	Attendance       int               `json:"attendance"`
+	Loot             int               `json:"loot"`
+	Tokens           int               `json:"tokens"`
+	PointsEntries    int               `json:"points_entries"`
+	Created          Counts            `json:"created"`
+	Skipped          bool              `json:"skipped"`
+	Warnings         []string          `json:"warnings"`
+	Errors           []string          `json:"errors"`
 }
 
 // Service orchestrates legacy sheet import (dry-run and merge).
 type Service struct {
-	imports      *Repo
-	players      *player.Repo
-	chars        *character.Repo
-	raids        *raid.Repo
-	att          *attendance.Repo
-	loot         *loot.Repo
-	points       *enhancepoints.Repo
-	series       *raidseries.Repo
-	fetcher      Fetcher
-	corrections  *raidcorrection.Service
-	external     registration.ExternalClient
-	strictSource bool
+	imports       *Repo
+	players       *player.Repo
+	chars         *character.Repo
+	raids         *raid.Repo
+	att           *attendance.Repo
+	loot          *loot.Repo
+	points        *enhancepoints.Repo
+	series        *raidseries.Repo
+	fetcher       Fetcher
+	corrections   *raidcorrection.Service
+	external      registration.ExternalClient
+	strictSource  bool
+	sheetArchives *sheetArchivePlan
 }
 
 type characterLink struct {
@@ -283,6 +286,9 @@ func (s *Service) DryRunWithSetup(ctx context.Context, source, sheetID string, c
 			rep.Errors = append(rep.Errors, conflicts...)
 		}
 		_, err = bound.review(ctx, source, sheetID, p, &rep)
+		if err == nil {
+			err = bound.describeSheetArchives(ctx, &rep)
+		}
 		if err != nil {
 			return err
 		}
@@ -396,7 +402,16 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 			return err
 		}
 		now := time.Now().UTC()
-		playerIDs, err := mergePlayers(ctx, s.players, s.points, actorID, p, now, &rep)
+		playerPlan := p
+		playerPlan.Players = append([]PlayerPlan(nil), p.Players...)
+		if s.sheetArchives != nil {
+			for i := range playerPlan.Players {
+				if _, pending := s.sheetArchives.points[playerPlan.Players[i].Name]; pending {
+					playerPlan.Players[i].HasPoints = false
+				}
+			}
+		}
+		playerIDs, err := mergePlayers(ctx, s.players, s.points, actorID, playerPlan, now, &rep)
 		if err != nil {
 			return err
 		}
@@ -452,6 +467,9 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 			Notes:          strings.TrimSpace(reason),
 		}
 		if err := s.imports.saveSourceBaseline(ctx, source, sheetID, data); err != nil {
+			return err
+		}
+		if err := s.savePointBaselines(ctx, source, sheetID, data); err != nil {
 			return err
 		}
 		if err := s.imports.Insert(ctx, imp); err != nil {

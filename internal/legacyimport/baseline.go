@@ -64,7 +64,17 @@ func (s *Service) sourceConflicts(ctx context.Context, source, sheetID string, d
 		points[row.Name] = row
 	}
 	for _, row := range oldPlan.Players {
+		_, archivePoints := PlayerPlan{}, false
+		if s.sheetArchives != nil {
+			_, archivePoints = s.sheetArchives.points[row.Name]
+		}
 		if !row.HasPoints {
+			continue
+		}
+		if archivePoints {
+			if current, ok := points[row.Name]; !ok || current.Active != row.Active {
+				conflicts = append(conflicts, fmt.Sprintf("points source conflict: %q Aktivstatus geändert", row.Name))
+			}
 			continue
 		}
 		current, ok := points[row.Name]
@@ -77,6 +87,11 @@ func (s *Service) sourceConflicts(ctx context.Context, source, sheetID string, d
 		oldPlayers[row.Name] = row
 	}
 	for _, row := range newPlan.Players {
+		if s.sheetArchives != nil {
+			if _, pending := s.sheetArchives.points[row.Name]; pending {
+				continue
+			}
+		}
 		if previous, exists := oldPlayers[row.Name]; exists && !previous.HasPoints && row.HasPoints && row.Points != 0 {
 			conflicts = append(conflicts, fmt.Sprintf("points source conflict: %q hatte keinen belegten Eröffnungsstand; kein nachträglicher Saldenimport", row.Name))
 		}
@@ -120,7 +135,18 @@ func (s *Service) sourceConflicts(ctx context.Context, source, sheetID string, d
 			conflicts = append(conflicts, fmt.Sprintf("loot source conflict: Import ID %q entfernt", row.ImportID))
 		}
 	}
-	if len(old.Setup) > 0 {
+	archiveSetup := false
+	if s.sheetArchives != nil {
+		for _, rp := range s.sheetArchives.raids {
+			mapping, err := s.imports.setupMapping(ctx, source, sheetID)
+			if err == nil && rp.ExistingID == mapping.RaidID {
+				archiveSetup = true
+			} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return nil, err
+			}
+		}
+	}
+	if len(old.Setup) > 0 && !archiveSetup {
 		oldSetupPlan, newSetupPlan := Plan{}, Plan{}
 		before, _, err := parseSetup(old.Setup, &oldSetupPlan)
 		if err != nil {

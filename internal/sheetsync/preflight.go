@@ -32,7 +32,7 @@ func (s *Service) Preflight(ctx context.Context) (PreflightReport, error) {
 		return report, nil
 	}
 	var err error
-	report.Import, report.Setup, err = s.importer.Reconcile(ctx, s.actorID, Source, s.sheetID, s.reason, true, ensureWebsiteOnlyArchival)
+	report.Import, report.Setup, err = s.importer.Reconcile(ctx, s.actorID, Source, s.sheetID, s.reason, true)
 	if err != nil {
 		report.Blockers = append(report.Blockers, err.Error())
 		return report, nil

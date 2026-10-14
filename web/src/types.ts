@@ -411,6 +411,8 @@ export interface ImportCounts {
 }
 
 export interface ImportReport {
+  archive_transfers?: { raid_id: number; raid_name: string; archived_at: string }[]
+  point_transfers?: { player: string; before: number; target: number; adjustment: number }[]
 	archived_raids?: number
 	setup?: { name: string; leader: string; scheduled_start: string; timezone: string; weekdays: number[]; interval_weeks: number; attendance: number; already_imported: boolean }
   mode: string

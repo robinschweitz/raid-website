@@ -1,8 +1,13 @@
-export const appVersion = '1.0.3'
+export const appVersion = '1.0.4'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Sheet-Archivierungen übernehmen',
+    changes: ['Archivstatus, Loot und bereits verbuchte Sheet-EP werden gemeinsam übernommen; die Vorabprüfung zeigt EP-Ausgleiche und Konflikte.'],
+  },
+  {
+    version: '1.0.3',
     title: 'Sicherer Sheet-Abgleich',
     changes: ['Vorabprüfung ohne Änderungen, atomarer Datenabgleich und geschützte Website-Spiegeltabs.'],
   },

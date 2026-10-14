@@ -56,7 +56,11 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 			}
 			continue
 		}
-		if hasPrevious && row.ExternalID == "" {
+		_, newArchive := RaidPlan{}, false
+		if s.sheetArchives != nil {
+			_, newArchive = s.sheetArchives.raids[row.RaidKey]
+		}
+		if hasPrevious && row.ExternalID == "" && !newArchive {
 			rep.Errors = append(rep.Errors, "ambiguous no-ID loot: unseen content or changed multiplicity")
 			continue
 		}
@@ -79,7 +83,11 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 		} else {
 			playerIDs[pl.Name] = existing.ID
 		}
-		if pl.HasPoints && pl.Points != 0 {
+		_, archivePoints := PlayerPlan{}, false
+		if s.sheetArchives != nil {
+			_, archivePoints = s.sheetArchives.points[pl.Name]
+		}
+		if pl.HasPoints && pl.Points != 0 && !archivePoints {
 			has := false
 			if playerIDs[pl.Name] != 0 {
 				has, err = s.points.HasTransactionType(ctx, playerIDs[pl.Name], "legacy_open")

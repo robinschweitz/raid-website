@@ -210,7 +210,15 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - ADR 058 adds safe activation: API-only unless `SHEET_SYNC_AUTORUN=true`, an
   Admin-only read-only preflight, persisted source baselines, atomic domain
   reconciliation and a single atomic Sheets snapshot batch. Missing old baselines
-  and ambiguous ICC25-35 cutover data block activation; never infer production EP.
+  and ambiguous cutover data block activation unless the proven archive adoption
+  in ADR 059 can reconcile them. Never infer an absent source EP balance.
+- ADR 059 supersedes website-only Sheet archival: Raid Archive outcomes adopt
+  archive state, loot and participant Sheet EP atomically with compensating ledger
+  entries and audit. No second completion reward or new recurrence chain. Proven
+  setup/series identity can bind active raids; first archive adoption may accept
+  no-ID loot. Original import mappings can be referenced by the authorized copy
+  through an immutable scope relation; the Original Sheet is never fetched or
+  written by continuous sync. Concurrent website EP and ambiguous loot conflict.
 - The owner requested continuous synchronization instead of a one-off import,
   including the current raid setup. The first delivery is conservative:
   historical tabs are continuously previewed/merged with existing provenance,

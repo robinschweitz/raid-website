@@ -57,22 +57,8 @@ func (s *Service) GetStatus(ctx context.Context) (Status, error) {
 	return s.load(ctx)
 }
 
-// ensureWebsiteOnlyArchival prevents the periodic Sheet importer from either
-// creating already-archived raids or classifying an existing raid as archived.
-// Historical one-off imports remain an explicit action in the website's admin UI.
-// New raids must be created/finalized through the website workflow.
-func ensureWebsiteOnlyArchival(preview legacyimport.Report) error {
-	if preview.Created.Raids > 0 {
-		return fmt.Errorf("%d new historical raids found in Sheet: create/finalize raids through the website; automatic import disabled", preview.Created.Raids)
-	}
-	if preview.ArchivedRaids > 0 {
-		return fmt.Errorf("%d raid archive transitions found in Sheet: archive exclusively through the website", preview.ArchivedRaids)
-	}
-	return nil
-}
-
-// RunOnce first reconciles append-only historical sheet rows, then imports only
-// new, known participants from ICC25 Raidsetup, then exports website snapshots.
+// RunOnce adopts Sheet archive outcomes and additive history atomically, then
+// imports known current-raid participants and publishes website snapshots.
 // Import conflicts prevent the export, preserving evidence for an administrator.
 func (s *Service) RunOnce(ctx context.Context) (Status, error) {
 	s.mu.Lock()
@@ -110,7 +96,7 @@ func (s *Service) RunOnce(ctx context.Context) (Status, error) {
 	if backupErr != nil {
 		err = fmt.Errorf("working copy prerequisite: %w", backupErr)
 	} else {
-		merged, setup, reconcileErr := s.importer.Reconcile(ctx, s.actorID, Source, s.sheetID, s.reason, false, ensureWebsiteOnlyArchival)
+		merged, setup, reconcileErr := s.importer.Reconcile(ctx, s.actorID, Source, s.sheetID, s.reason, false)
 		err = reconcileErr
 		if err == nil {
 			status.LastImport = &merged

@@ -2,7 +2,9 @@ package legacyimport
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 
 	"github.com/uptrace/bun"
 
@@ -74,8 +76,12 @@ type raidMapping struct {
 }
 
 func (r *Repo) raidMapping(ctx context.Context, source, sheetID, key string) (*raidMapping, error) {
+	fromSheet, err := r.provenanceScope(ctx, source, sheetID)
+	if err != nil {
+		return nil, err
+	}
 	row := new(raidMapping)
-	err := r.db.NewSelect().Model(row).Where("source = ?", source).Where("sheet_id = ?", sheetID).Where("raid_key = ?", key).Scan(ctx)
+	err = r.db.NewSelect().Model(row).Where("source = ?", source).Where("(sheet_id = ? OR sheet_id = ?)", sheetID, fromSheet).Where("raid_key = ?", key).Scan(ctx)
 	return row, err
 }
 
@@ -85,8 +91,12 @@ func (r *Repo) insertRaidMapping(ctx context.Context, row *raidMapping) error {
 }
 
 func (r *Repo) mappings(ctx context.Context, source, sheetID string) ([]lootMapping, error) {
+	fromSheet, err := r.provenanceScope(ctx, source, sheetID)
+	if err != nil {
+		return nil, err
+	}
 	var rows []lootMapping
-	err := r.db.NewSelect().Model(&rows).Where("source = ?", source).Where("sheet_id = ?", sheetID).Where("tab = ?", "Loot Archive").Scan(ctx)
+	err = r.db.NewSelect().Model(&rows).Where("source = ?", source).Where("(sheet_id = ? OR sheet_id = ?)", sheetID, fromSheet).Where("tab = ?", "Loot Archive").Scan(ctx)
 	return rows, err
 }
 
@@ -117,8 +127,12 @@ type setupMapping struct {
 }
 
 func (r *Repo) setupMapping(ctx context.Context, source, sheetID string) (*setupMapping, error) {
+	fromSheet, err := r.provenanceScope(ctx, source, sheetID)
+	if err != nil {
+		return nil, err
+	}
 	row := new(setupMapping)
-	err := r.db.NewSelect().Model(row).Where("source = ?", source).Where("sheet_id = ?", sheetID).Scan(ctx)
+	err = r.db.NewSelect().Model(row).Where("source = ?", source).Where("(sheet_id = ? OR sheet_id = ?)", sheetID, fromSheet).Scan(ctx)
 	return row, err
 }
 
@@ -137,7 +151,11 @@ func (r *Repo) playerHasPointHistory(ctx context.Context, playerID int64) (bool,
 }
 
 func (r *Repo) hasLegacyProvenanceGap(ctx context.Context, source, sheetID string) (bool, error) {
-	return r.db.NewSelect().Model((*Import)(nil)).Where("source = ?", source).Where("source_url = ?", sheetID).Where("status = ?", "MERGED").Where("dry_run_report = ?", "").Exists(ctx)
+	from, err := r.provenanceScope(ctx, source, sheetID)
+	if err != nil {
+		return false, err
+	}
+	return r.db.NewSelect().Model((*Import)(nil)).Where("source=? AND (source_url=? OR source_url=?) AND status='MERGED' AND dry_run_report=''", source, sheetID, from).Exists(ctx)
 }
 
 func (r *Repo) charactersByName(ctx context.Context, name string) ([]character.Character, error) {
@@ -222,4 +240,67 @@ func (r *Repo) setupBaseline(ctx context.Context, source, sheetID string, raidID
 func (r *Repo) saveSetupBaseline(ctx context.Context, source, sheetID string, raidID int64, raw []byte) error {
 	_, err := r.db.ExecContext(ctx, "INSERT INTO sheet_setup_baselines(source,sheet_id,raid_id,setup_csv) VALUES(?,?,?,?) ON CONFLICT(source,sheet_id,raid_id) DO UPDATE SET setup_csv=excluded.setup_csv", source, sheetID, raidID, string(raw))
 	return err
+}
+
+func (r *Repo) pointVersion(ctx context.Context, playerID int64) (int64, error) {
+	var id int64
+	err := r.db.NewSelect().TableExpr("enhance_point_transactions").ColumnExpr("COALESCE(MAX(id),0)").Where("player_id=?", playerID).Scan(ctx, &id)
+	return id, err
+}
+
+func (r *Repo) pointBaseline(ctx context.Context, source, sheetID string, playerID int64) (int64, error) {
+	from, err := r.provenanceScope(ctx, source, sheetID)
+	if err != nil {
+		return 0, err
+	}
+	var id int64
+	err = r.db.NewSelect().TableExpr("sheet_point_baselines").ColumnExpr("transaction_id").Where("source=? AND (sheet_id=? OR sheet_id=?) AND player_id=?", source, sheetID, from, playerID).OrderExpr("CASE WHEN sheet_id=? THEN 0 ELSE 1 END", sheetID).Limit(1).Scan(ctx, &id)
+	return id, err
+}
+
+func (r *Repo) savePointBaseline(ctx context.Context, source, sheetID string, playerID int64) error {
+	id, err := r.pointVersion(ctx, playerID)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, "INSERT INTO sheet_point_baselines(source,sheet_id,player_id,transaction_id) VALUES(?,?,?,?) ON CONFLICT(source,sheet_id,player_id) DO UPDATE SET transaction_id=excluded.transaction_id", source, sheetID, playerID, id)
+	return err
+}
+
+func (r *Repo) hasWebsitePoints(ctx context.Context, playerID int64) (bool, error) {
+	return r.db.NewSelect().TableExpr("enhance_point_transactions").Where("player_id=? AND type <> 'legacy_open'", playerID).Exists(ctx)
+}
+
+func (r *Repo) unmappedLootExists(ctx context.Context, source, sheetID string, raidID int64) (bool, error) {
+	from, err := r.provenanceScope(ctx, source, sheetID)
+	if err != nil {
+		return false, err
+	}
+	return r.db.NewSelect().TableExpr("loot_awards AS award").Where("award.raid_id=? AND NOT EXISTS (SELECT 1 FROM legacy_loot_mappings AS mapping WHERE mapping.source=? AND (mapping.sheet_id=? OR mapping.sheet_id=?) AND mapping.loot_award_id=award.id)", raidID, source, sheetID, from).Exists(ctx)
+}
+
+// copyImportProvenance retains the original immutable mappings. It only adds a
+// scope for the authorized copy; no remote source is accessed here.
+func (r *Repo) copyImportProvenance(ctx context.Context, source, fromSheet, toSheet string) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO sheet_provenance_scopes(source,sheet_id,from_sheet_id) VALUES(?,?,?)", source, toSheet, fromSheet)
+	return err
+}
+
+func (r *Repo) provenanceScope(ctx context.Context, source, sheetID string) (string, error) {
+	var from string
+	err := r.db.NewSelect().TableExpr("sheet_provenance_scopes").ColumnExpr("from_sheet_id").Where("source=? AND sheet_id=?", source, sheetID).Scan(ctx, &from)
+	if errors.Is(err, sql.ErrNoRows) {
+		return sheetID, nil
+	}
+	return from, err
+}
+
+func (r *Repo) raidMappings(ctx context.Context, source, sheetID string) ([]raidMapping, error) {
+	from, err := r.provenanceScope(ctx, source, sheetID)
+	if err != nil {
+		return nil, err
+	}
+	var rows []raidMapping
+	err = r.db.NewSelect().Model(&rows).Where("source=? AND (sheet_id=? OR sheet_id=?)", source, sheetID, from).Scan(ctx, &rows)
+	return rows, err
 }

@@ -19,6 +19,10 @@ duplicate onboarding, and the frontend selects existing characters directly (ADR
 It imports the first roster block in `ICC25 Raidsetup` A–F and uses explicit administrator
 schedule input to bootstrap one PLANNED raid and series. Source/sheet setup mappings and
 configuration-bound previews prevent duplicate bootstrap or silent replacement (ADR 029).
+Continuous reconciliation also adopts Sheet archive outcomes: source-proven raid
+identity, loot, compensating EP entries, archive state, expired locks, audit and
+baselines share one transaction (ADR 059). This adopts history without replaying
+website completion rewards or starting another recurrence chain.
 
 `loot` records outside MAIN/SECOND/ENHANCED/BOE outcomes and coordinates linked enhanced
 EP costs; `raidcorrection` appends coupled compensation and audit snapshots. EP is a

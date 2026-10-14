@@ -2692,3 +2692,42 @@ test('quick-add starts with the name handed over from the roster import', () => 
   assert.equal(button(view, 'Suchen').props.disabled, false)
   assert.equal(s.requests.length, 0)
 })
+
+test('Sheet preflight exposes archive and EP targets before enabling synchronization', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
+  s.requests.find((r) => r.url === '/api/v1/imports').resolve([])
+  s.requests.find((r) => r.url === '/api/v1/sheet-sync').resolve({ enabled: true, automatic: false })
+  await flush(view)
+  assert.equal(button(view, 'Jetzt synchronisieren').props.disabled, true)
+  button(view, 'Vorabprüfung ohne Änderungen').props.onClick()
+  const request = writes(s)[0]
+  assert.equal(request.url, '/api/v1/sheet-sync/preflight')
+  assert.equal(writes(s).filter((r) => r.url.endsWith('/run')).length, 0)
+  request.resolve({ ready: true, blockers: [], import: {
+    archive_transfers: [{ raid_id: 35, raid_name: 'ICC25-35', archived_at: '2026-10-11T22:00:00Z' }],
+    point_transfers: [{ player: 'Hero', before: 0, target: 10, adjustment: 10 }, { player: 'Other', before: 170, target: 120, adjustment: -50 }],
+    warnings: ['Skopin: vorhandene Website-EP bleiben unverändert.'],
+  } })
+  await flush(view)
+  assert.match(text(view.tree), /Geplante Archivübernahme/)
+  assert.match(text(view.tree), /ICC25-35/)
+  assert.match(text(view.tree), /Hero\s+0\s+10\s+\+\s*10/)
+  assert.match(text(view.tree), /Other\s+170\s+120\s+-50/)
+  assert.match(text(view.tree), /Skopin: vorhandene Website-EP bleiben unverändert/)
+  assert.equal(button(view, 'Jetzt synchronisieren').props.disabled, false)
+})
+
+test('Sheet preflight conflict blocks synchronization and displays the cause', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
+  s.requests.find((r) => r.url === '/api/v1/imports').resolve([])
+  s.requests.find((r) => r.url === '/api/v1/sheet-sync').resolve({ enabled: true })
+  await flush(view)
+  button(view, 'Vorabprüfung ohne Änderungen').props.onClick()
+  writes(s)[0].resolve({ ready: false, blockers: ['Hero: EP-Konflikt; Website und Sheet geändert'] })
+  await flush(view)
+  assert.match(text(view.tree), /Hero: EP-Konflikt/)
+  assert.equal(button(view, 'Jetzt synchronisieren').props.disabled, true)
+  assert.equal(writes(s).filter((r) => r.url.endsWith('/run')).length, 0)
+})

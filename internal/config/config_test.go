@@ -2,6 +2,27 @@ package config
 
 import "testing"
 
+func TestSheetSyncRequiresSeparateAutomaticOptIn(t *testing.T) {
+	t.Setenv("ENV", "development")
+	t.Setenv("SHEET_SYNC_ENABLED", "true")
+	t.Setenv("SHEET_SYNC_AUTORUN", "")
+	t.Setenv("SHEET_SYNC_SHEET_ID", "10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8")
+	t.Setenv("SHEET_SYNC_REASON", "test")
+	t.Setenv("SHEET_SYNC_SERVICE_ACCOUNT_JSON", "{}")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.SheetSyncEnabled || cfg.SheetSyncAutoRun {
+		t.Fatal("configuration must default to API-only mode")
+	}
+	t.Setenv("SHEET_SYNC_AUTORUN", "true")
+	cfg, err = Load()
+	if err != nil || !cfg.SheetSyncAutoRun {
+		t.Fatal("explicit autorun missing", err)
+	}
+}
+
 func TestProductionCredentials(t *testing.T) {
 	for _, tc := range []struct {
 		name, username, password string

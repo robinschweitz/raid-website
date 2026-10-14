@@ -28,7 +28,7 @@ type SetupSyncReport struct {
 // before any change is committed. Archived raids and unknown players are never
 // modified automatically.
 func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, sheetID, expectedHash string) (SetupSyncReport, error) {
-	var report SetupSyncReport
+	report := SetupSyncReport{Warnings: []string{}, Conflicts: []string{}}
 	data, err := s.fetcher.Fetch(ctx, sheetID)
 	if err != nil {
 		return report, err
@@ -76,6 +76,30 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 			return nil
 		}
 		report.RaidID = active[0]
+		if report.RaidID != mapping.RaidID {
+			report.Warnings = append(report.Warnings, "Raidsetup gehört zum vorherigen Raid; Folge-Raid wird nicht aus einer veralteten Sheet-Aufstellung ergänzt")
+			return nil
+		}
+		previous, previousErr := bound.imports.setupBaseline(ctx, source, sheetID, report.RaidID)
+		if previousErr != nil && !errors.Is(previousErr, sql.ErrNoRows) {
+			return previousErr
+		}
+		if previousErr == nil {
+			oldPlan := Plan{}
+			oldEntries, _, parseErr := parseSetup([]byte(previous), &oldPlan)
+			if parseErr != nil {
+				return parseErr
+			}
+			currentSource := map[string]bool{}
+			for _, entry := range entries {
+				currentSource[entry.Character] = true
+			}
+			for _, entry := range oldEntries {
+				if !currentSource[entry.Character] {
+					report.Conflicts = append(report.Conflicts, fmt.Sprintf("%s: synchronisierter Sheet-Teilnehmer entfernt; keine automatische Löschung", entry.Character))
+				}
+			}
+		}
 		current, err := bound.att.ListByRaid(ctx, report.RaidID)
 		if err != nil {
 			return err
@@ -175,7 +199,7 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 		if len(pending) == 0 && len(entries) > 0 {
 			report.Warnings = append(report.Warnings, "Raidsetup unverändert; Website-exklusive Teilnehmer bleiben erhalten")
 		}
-		return nil
+		return bound.imports.saveSetupBaseline(ctx, source, sheetID, report.RaidID, data.Setup)
 	})
 	if err != nil {
 		return SetupSyncReport{}, fmt.Errorf("sync current setup: %w", err)

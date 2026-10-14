@@ -1,8 +1,13 @@
-export const appVersion = '1.0.2'
+export const appVersion = '1.0.3'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Sicherer Sheet-Abgleich',
+    changes: ['Vorabprüfung ohne Änderungen, atomarer Datenabgleich und geschützte Website-Spiegeltabs.'],
+  },
+  {
+    version: '1.0.2',
     title: 'Zusammenführungen',
     changes: [
       'Doppelte Charaktere und zusammengeführte Spielerkonten werden nach der Übertragung gelöscht.',

@@ -5,6 +5,19 @@ import (
 	"raid-website/internal/sheetsync"
 )
 
+func (a *API) sheetSyncPreflight(w http.ResponseWriter, r *http.Request) {
+	if a.SheetSync == nil {
+		WriteError(w, http.StatusConflict, "sync_disabled", "Google-Sheets-Synchronisierung ist nicht aktiviert")
+		return
+	}
+	report, err := a.SheetSync.Preflight(r.Context())
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "sync_preflight_failed", "Vorabprüfung konnte nicht abgeschlossen werden")
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": report})
+}
+
 func (a *API) sheetSyncStatus(w http.ResponseWriter, r *http.Request) {
 	if a.SheetSync == nil {
 		WriteJSON(w, http.StatusOK, map[string]any{"data": sheetsync.Status{Enabled: false}})

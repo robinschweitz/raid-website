@@ -23,6 +23,9 @@ type AuthenticatedFetcher struct {
 }
 
 func (f AuthenticatedFetcher) Fetch(ctx context.Context, sheetID string) (legacyimport.SheetData, error) {
+	if sheetID != "10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8" {
+		return legacyimport.SheetData{}, fmt.Errorf("sync source must be the authorized working copy")
+	}
 	if f.Writer == nil {
 		return legacyimport.SheetData{}, fmt.Errorf("google writer required")
 	}

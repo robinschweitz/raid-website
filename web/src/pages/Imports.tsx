@@ -5,6 +5,7 @@ import type { ImportRecord, ImportReport } from '../types'
 
 interface SheetSyncStatus {
   enabled: boolean
+  automatic?: boolean
   sheet_id?: string
   last_run?: string
   last_success?: string
@@ -13,7 +14,7 @@ interface SheetSyncStatus {
   last_import?: { skipped: boolean; created: { attendance: number; loot: number; raids: number } }
 }
 
-const DEFAULT_SHEET_ID = '1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU'
+const DEFAULT_SHEET_ID = '10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8'
 
 function formatTime(value: string | null): string {
   return value ? new Date(value).toLocaleString() : '—'
@@ -23,6 +24,7 @@ export function ImportsPage() {
   const [records, setRecords] = useState<ImportRecord[]>([])
   const [syncStatus, setSyncStatus] = useState<SheetSyncStatus | null>(null)
   const [syncBusy, setSyncBusy] = useState(false)
+ const [syncPreview, setSyncPreview] = useState<{ ready: boolean; blockers: string[] } | null>(null)
   const [report, setReport] = useState<ImportReport | null>(null)
   const [sheetID, setSheetID] = useState(DEFAULT_SHEET_ID)
   const [reason, setReason] = useState('')
@@ -74,9 +76,22 @@ export function ImportsPage() {
 
   useEffect(loadSync, [loadSync])
 
+  const checkSync = async () => {
+    if (syncBusy || busy) return
+    setSyncBusy(true)
+    setSyncPreview(null)
+    try {
+      const result = await api.post<{ ready: boolean; blockers: string[] }>('/api/v1/sheet-sync/preflight', {})
+      if (isActive()) setSyncPreview(result)
+    } catch (err) {
+      if (isActive()) setSyncPreview({ ready: false, blockers: [err instanceof ApiError ? err.message : 'Vorabprüfung fehlgeschlagen'] })
+    } finally { if (isActive()) setSyncBusy(false) }
+  }
+
   const syncNow = async () => {
     if (syncBusy || busy) return
     setSyncBusy(true)
+    setSyncPreview(null)
     try {
       await api.post<SheetSyncStatus>('/api/v1/sheet-sync/run', {})
     } catch {
@@ -147,13 +162,18 @@ export function ImportsPage() {
         <p className="muted">Historische Sheet-Zeilen werden regelmäßig auf neue Einträge geprüft. Das aktuelle ICC25 Raidsetup ergänzt nur eindeutig bekannte Teilnehmer des aktiven Raids. Die Website veröffentlicht ihre Daten in separaten „Website …“-Tabs. Widersprüche werden gemeldet, niemals automatisch überschrieben oder gelöscht.</p>
         {syncStatus?.enabled ? (
           <>
+            <p className="muted">{syncStatus.automatic ? 'Automatischer Zeitplan läuft.' : 'Nur Prüf- und manueller Modus: kein automatischer Zeitplan.'}</p>
             <p role="status">{syncStatus.last_error ? 'Synchronisierung benötigt Prüfung' : syncStatus.last_success ? 'Letzter Abgleich erfolgreich' : 'Synchronisierung aktiviert'}</p>
             <p className="muted">Letzter Versuch: {formatTime(syncStatus.last_run ?? null)} · Letzter Erfolg: {formatTime(syncStatus.last_success ?? null)}</p>
             {!!syncStatus.last_error && <p className="error">{syncStatus.last_error}</p>}
             {syncStatus.current_setup && <p className="muted">Raidsetup: Raid #{syncStatus.current_setup.raid_id || '—'}, {syncStatus.current_setup.added} neue Teilnahmen.</p>}
             {!!syncStatus.current_setup?.warnings?.length && <ul className="plain-list">{syncStatus.current_setup.warnings.map((message, i) => <li key={i}>{message}</li>)}</ul>}
+            {syncPreview && <p role="status">{syncPreview.ready ? 'Vorabprüfung bestanden. Der Abgleich prüft den Stand vor jedem Schreiben erneut.' : 'Aktivierung blockiert: Altbestand oder Quellenkonflikt zuerst prüfen.'}</p>}
+            {!!syncPreview?.blockers.length && <ul className="plain-list">{syncPreview.blockers.map((message, i) => <li key={i}>{message}</li>)}</ul>}
+            <p className="muted">Vorabprüfung verändert keine Daten. Der automatische Zeitplan wird erst mit SHEET_SYNC_AUTORUN=true gestartet. Ein alter Import ohne Quellenbaseline oder ICC25-35 ohne eindeutige Loot-Zuordnung muss vor der Aktivierung abgeglichen werden.</p>
             <div className="actions">
-              <button type="button" disabled={busy || syncBusy} onClick={syncNow}>{syncBusy ? 'Abgleich läuft…' : 'Jetzt synchronisieren'}</button>
+              <button type="button" disabled={busy || syncBusy} onClick={checkSync}>Vorabprüfung ohne Änderungen</button>
+              <button type="button" disabled={busy || syncBusy || !syncPreview?.ready} onClick={syncNow}>{syncBusy ? 'Abgleich läuft…' : 'Jetzt synchronisieren'}</button>
               <button type="button" disabled={syncBusy} onClick={loadSync}>Status aktualisieren</button>
             </div>
           </>

@@ -162,6 +162,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	WishlistHandlers{Wishlist: wishlist.NewService(a.DB)}.Register(mux)
 
 	mux.HandleFunc("GET /api/v1/sheet-sync", RequireRole(validation.RoleAdmin, a.sheetSyncStatus))
+	mux.HandleFunc("POST /api/v1/sheet-sync/preflight", RequireRole(validation.RoleAdmin, a.sheetSyncPreflight))
 	mux.HandleFunc("POST /api/v1/sheet-sync/run", RequireRole(validation.RoleAdmin, a.runSheetSync))
 	mux.HandleFunc("GET /api/v1/imports", RequireRole(validation.RoleAdmin, a.listImports))
 	mux.HandleFunc("POST /api/v1/imports/dry-run", RequireRole(validation.RoleAdmin, a.dryRunImport))

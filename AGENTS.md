@@ -207,6 +207,10 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   (ADR 009).
 
 ### Legacy Google Sheet import and ongoing sync (ADR 057)
+- ADR 058 adds safe activation: API-only unless `SHEET_SYNC_AUTORUN=true`, an
+  Admin-only read-only preflight, persisted source baselines, atomic domain
+  reconciliation and a single atomic Sheets snapshot batch. Missing old baselines
+  and ambiguous ICC25-35 cutover data block activation; never infer production EP.
 - The owner requested continuous synchronization instead of a one-off import,
   including the current raid setup. The first delivery is conservative:
   historical tabs are continuously previewed/merged with existing provenance,

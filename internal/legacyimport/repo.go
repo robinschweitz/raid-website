@@ -2,6 +2,7 @@ package legacyimport
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/uptrace/bun"
 
@@ -131,6 +132,10 @@ func (r *Repo) pointTransactionCount(ctx context.Context) (int, error) {
 	return int(count), err
 }
 
+func (r *Repo) playerHasPointHistory(ctx context.Context, playerID int64) (bool, error) {
+	return r.db.NewSelect().TableExpr("enhance_point_transactions").Where("player_id=?", playerID).Exists(ctx)
+}
+
 func (r *Repo) hasLegacyProvenanceGap(ctx context.Context, source, sheetID string) (bool, error) {
 	return r.db.NewSelect().Model((*Import)(nil)).Where("source = ?", source).Where("source_url = ?", sheetID).Where("status = ?", "MERGED").Where("dry_run_report = ?", "").Exists(ctx)
 }
@@ -143,12 +148,19 @@ func (r *Repo) charactersByName(ctx context.Context, name string) ([]character.C
 	return rows, err
 }
 
+func (r *Repo) inactiveCharacterNameExists(ctx context.Context, name string) (bool, error) {
+	return r.db.NewSelect().Model((*character.Character)(nil)).Where("character.active = ? AND (character.name = ? OR EXISTS (SELECT 1 FROM character_name_history AS history WHERE history.character_id = character.id AND (history.old_name = ? OR history.new_name = ?)) OR EXISTS (SELECT 1 FROM character_merge_aliases AS alias WHERE alias.target_character_id = character.id AND alias.source_name = ?))", false, name, name, name, name).Exists(ctx)
+}
+
 func (r *Repo) isCharacterMergeAlias(ctx context.Context, name string, targetID int64) (bool, error) {
 	return r.db.NewSelect().TableExpr("character_merge_aliases").Where("source_name = ? AND target_character_id = ?", name, targetID).Exists(ctx)
 }
 
 // transaction holds the application's single SQLite connection through planning and merge.
 func (s *Service) transaction(ctx context.Context, commit bool, fn func(*Service) error) error {
+	if _, nested := s.imports.db.(bun.Tx); nested {
+		return fn(s)
+	}
 	tx, err := s.imports.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -180,4 +192,34 @@ func (r *Repo) List(ctx context.Context) ([]Import, error) {
 		return nil, err
 	}
 	return imports, nil
+}
+
+func (r *Repo) sourceBaseline(ctx context.Context, source, sheetID string) (SheetData, error) {
+	var raw string
+	err := r.db.NewSelect().TableExpr("sheet_source_baselines").ColumnExpr("data_json").Where("source = ? AND sheet_id = ?", source, sheetID).Scan(ctx, &raw)
+	if err != nil {
+		return SheetData{}, err
+	}
+	var data SheetData
+	err = json.Unmarshal([]byte(raw), &data)
+	return data, err
+}
+
+func (r *Repo) saveSourceBaseline(ctx context.Context, source, sheetID string, data SheetData) error {
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, "INSERT INTO sheet_source_baselines(source,sheet_id,data_json) VALUES(?,?,?) ON CONFLICT(source,sheet_id) DO UPDATE SET data_json=excluded.data_json", source, sheetID, string(raw))
+	return err
+}
+
+func (r *Repo) setupBaseline(ctx context.Context, source, sheetID string, raidID int64) (string, error) {
+	var raw string
+	err := r.db.NewSelect().TableExpr("sheet_setup_baselines").ColumnExpr("setup_csv").Where("source=? AND sheet_id=? AND raid_id=?", source, sheetID, raidID).Scan(ctx, &raw)
+	return raw, err
+}
+func (r *Repo) saveSetupBaseline(ctx context.Context, source, sheetID string, raidID int64, raw []byte) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO sheet_setup_baselines(source,sheet_id,raid_id,setup_csv) VALUES(?,?,?,?) ON CONFLICT(source,sheet_id,raid_id) DO UPDATE SET setup_csv=excluded.setup_csv", source, sheetID, raidID, string(raw))
+	return err
 }

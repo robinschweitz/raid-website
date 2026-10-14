@@ -43,6 +43,7 @@ type Options struct {
 	AdminPassword           string
 	RegistrationFeed        registration.ExternalClient
 	SheetSyncEnabled        bool
+	SheetSyncAutoRun        bool
 	SheetSyncSheetID        string
 	SheetSyncReason         string
 	SheetSyncInterval       time.Duration
@@ -144,7 +145,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		mux.Handle("/", spa)
 	}
 
-	if syncService != nil {
+	if syncService != nil && opts.SheetSyncAutoRun {
 		syncService.Start(context.Background())
 	}
 	return requestID(securityHeaders(opts.CookieSecure)(logging(csrfProtection(authenticate(authSvc)(mux))))), nil

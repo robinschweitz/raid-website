@@ -88,6 +88,15 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 				}
 			}
 			if !has {
+				if s.strictSource && playerIDs[pl.Name] != 0 {
+					anyHistory, err := s.imports.playerHasPointHistory(ctx, playerIDs[pl.Name])
+					if err != nil {
+						return p, err
+					}
+					if anyHistory {
+						rep.Errors = append(rep.Errors, fmt.Sprintf("points source conflict: %q hat bereits EP-Historie; kein zusätzlicher Eröffnungsstand", pl.Name))
+					}
+				}
 				rep.Created.Points++
 			}
 		}
@@ -109,6 +118,15 @@ func (s *Service) review(ctx context.Context, source, sheetID string, p Plan, re
 			rep.Errors = append(rep.Errors, fmt.Sprintf("character %q: ambiguous identity or ownership mismatch for %q", c.Name, c.PlayerName))
 		}
 		if len(matches) == 0 {
+			if s.strictSource {
+				inactive, err := s.imports.inactiveCharacterNameExists(ctx, c.Name)
+				if err != nil {
+					return p, err
+				}
+				if inactive {
+					rep.Errors = append(rep.Errors, fmt.Sprintf("character %q: inaktiver Website-Charakter darf nicht automatisch neu angelegt werden", c.Name))
+				}
+			}
 			rep.Created.Characters++
 		}
 	}

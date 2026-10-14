@@ -20,6 +20,7 @@ type Config struct {
 	RisingGodsProxyURL      string
 	RisingGodsProxyToken    string
 	SheetSyncEnabled        bool
+	SheetSyncAutoRun        bool
 	SheetSyncSheetID        string
 	SheetSyncReason         string
 	SheetSyncInterval       time.Duration
@@ -40,6 +41,7 @@ func Load() (*Config, error) {
 		RisingGodsProxyURL:      strings.TrimRight(strings.TrimSpace(getEnv("RISING_GODS_PROXY_URL", "")), "/"),
 		RisingGodsProxyToken:    strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
 		SheetSyncEnabled:        getEnv("SHEET_SYNC_ENABLED", "") == "true",
+		SheetSyncAutoRun:        getEnv("SHEET_SYNC_AUTORUN", "") == "true",
 		SheetSyncSheetID:        strings.TrimSpace(getEnv("SHEET_SYNC_SHEET_ID", "")),
 		SheetSyncReason:         strings.TrimSpace(getEnv("SHEET_SYNC_REASON", "")),
 		SheetSyncServiceAccount: strings.TrimSpace(getEnv("SHEET_SYNC_SERVICE_ACCOUNT_JSON", "")),

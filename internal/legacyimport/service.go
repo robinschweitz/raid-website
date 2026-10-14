@@ -61,17 +61,18 @@ type Report struct {
 
 // Service orchestrates legacy sheet import (dry-run and merge).
 type Service struct {
-	imports     *Repo
-	players     *player.Repo
-	chars       *character.Repo
-	raids       *raid.Repo
-	att         *attendance.Repo
-	loot        *loot.Repo
-	points      *enhancepoints.Repo
-	series      *raidseries.Repo
-	fetcher     Fetcher
-	corrections *raidcorrection.Service
-	external    registration.ExternalClient
+	imports      *Repo
+	players      *player.Repo
+	chars        *character.Repo
+	raids        *raid.Repo
+	att          *attendance.Repo
+	loot         *loot.Repo
+	points       *enhancepoints.Repo
+	series       *raidseries.Repo
+	fetcher      Fetcher
+	corrections  *raidcorrection.Service
+	external     registration.ExternalClient
+	strictSource bool
 }
 
 type characterLink struct {
@@ -274,6 +275,13 @@ func (s *Service) DryRunWithSetup(ctx context.Context, source, sheetID string, c
 		rep = reportFromPlan("dry_run", source, data, p, rows)
 		rep.Setup = setupReport
 		logger.Info("legacy import dry-run reviewing source=%s sheet=%s rows=%d players=%d characters=%d raids=%d loot=%d", source, sheetID, rows, rep.Players, rep.Characters, rep.Raids, rep.Loot)
+		if bound.strictSource {
+			conflicts, conflictErr := bound.sourceConflicts(ctx, source, sheetID, data)
+			if conflictErr != nil {
+				return conflictErr
+			}
+			rep.Errors = append(rep.Errors, conflicts...)
+		}
 		_, err = bound.review(ctx, source, sheetID, p, &rep)
 		if err != nil {
 			return err
@@ -442,6 +450,9 @@ func (s *Service) MergeWithSetup(ctx context.Context, actorID int64, source, she
 			StartedAt:      &started,
 			CompletedAt:    &completed,
 			Notes:          strings.TrimSpace(reason),
+		}
+		if err := s.imports.saveSourceBaseline(ctx, source, sheetID, data); err != nil {
+			return err
 		}
 		if err := s.imports.Insert(ctx, imp); err != nil {
 			return fmt.Errorf("record import: %w", err)

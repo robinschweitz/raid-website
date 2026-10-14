@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 )
@@ -170,79 +171,130 @@ func rowsHash(rows [][]string) string {
 }
 
 func (g *GoogleWriter) Publish(ctx context.Context, sheetID string, tabs map[string][][]string, previous map[string]string) (map[string]string, error) {
+	return g.publish(ctx, sheetID, tabs, previous, false)
+}
+
+// Validate checks mirror ownership without creating or changing any tabs.
+func (g *GoogleWriter) Validate(ctx context.Context, sheetID string, tabs map[string][][]string, previous map[string]string) error {
+	_, err := g.publish(ctx, sheetID, tabs, previous, true)
+	return err
+}
+
+func (g *GoogleWriter) publish(ctx context.Context, sheetID string, tabs map[string][][]string, previous map[string]string, previewOnly bool) (map[string]string, error) {
+	if sheetID != "10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8" {
+		return nil, errors.New("export must target the authorized working copy")
+	}
+	allowed := map[string]bool{"Website Raids": true, "Website Raidsetup": true, "Website Teilnahmen": true, "Website Loot": true, "Website Charaktere": true, "Website Punkte": true, "Website Raidserien": true}
+	for title := range tabs {
+		if !allowed[title] {
+			return nil, fmt.Errorf("export tab %q is not website-owned", title)
+		}
+	}
 	token, err := g.token(ctx)
 	if err != nil {
 		return nil, err
 	}
 	path := url.PathEscape(sheetID)
+	type properties struct {
+		Title string `json:"title"`
+		ID    int64  `json:"sheetId"`
+		Grid  struct {
+			Rows    int `json:"rowCount"`
+			Columns int `json:"columnCount"`
+		} `json:"gridProperties"`
+	}
 	var metadata struct {
 		Sheets []struct {
-			Properties struct {
-				Title string `json:"title"`
-			} `json:"properties"`
+			Properties properties `json:"properties"`
 		} `json:"sheets"`
 	}
-	if err := g.request(ctx, token, http.MethodGet, path+"?fields=sheets(properties(title))", nil, &metadata); err != nil {
+	if err = g.request(ctx, token, http.MethodGet, path+"?fields=sheets(properties(title,sheetId,gridProperties))", nil, &metadata); err != nil {
 		return nil, err
 	}
-	existing := map[string]bool{}
-	for _, tab := range metadata.Sheets {
-		existing[tab.Properties.Title] = true
+	existing := map[string]properties{}
+	var nextID int64 = 1
+	for _, sheet := range metadata.Sheets {
+		existing[sheet.Properties.Title] = sheet.Properties
+		if sheet.Properties.ID >= nextID {
+			nextID = sheet.Properties.ID + 1
+		}
 	}
-	// Always validate all tabs before modifying anything, so a manual change
-	// to an exported tab cannot cause a partial multi-tab export.
-	type tabWrite struct {
-		title       string
-		rows        [][]string
-		hash        string
-		needsCreate bool
+	titles := make([]string, 0, len(tabs))
+	for title := range tabs {
+		titles = append(titles, title)
 	}
-	updates := make([]tabWrite, 0, len(tabs))
-	result := make(map[string]string, len(previous))
-	for key, value := range previous {
-		result[key] = value
-	}
-	for title, rows := range tabs {
+	sort.Strings(titles)
+	result := map[string]string{}
+	requests := []any{}
+	for _, title := range titles {
+		rows := tabs[title]
+		prop, exists := existing[title]
+		if !exists && previous[title] != "" {
+			return nil, fmt.Errorf("snapshot tab %q removed outside website; refusing recreation", title)
+		}
 		current := [][]string{}
-		if existing[title] {
-			escapedRange := url.PathEscape("'" + strings.ReplaceAll(title, "'", "''") + "'!A1:Z")
-			var valueRange struct {
+		if exists {
+			var values struct {
 				Values [][]string `json:"values"`
 			}
-			if err := g.request(ctx, token, http.MethodGet, path+"/values/"+escapedRange, nil, &valueRange); err != nil {
+			rangeName := url.PathEscape("'" + strings.ReplaceAll(title, "'", "''") + "'!A1:Z")
+			if err = g.request(ctx, token, http.MethodGet, path+"/values/"+rangeName, nil, &values); err != nil {
 				return nil, err
 			}
-			current = valueRange.Values
+			current = values.Values
 		}
-		desired := rowsHash(rows)
-		old := previous[title]
-		actual := rowsHash(current)
-		if existing[title] && actual != desired && (old == "" || actual != old) {
+		actual, desired := rowsHash(current), rowsHash(rows)
+		if exists && actual != desired && (previous[title] == "" || actual != previous[title]) {
 			return nil, fmt.Errorf("snapshot tab %q changed outside website; refusing overwrite", title)
 		}
-		updates = append(updates, tabWrite{title, rows, desired, !existing[title]})
-	}
-	for _, update := range updates {
-		if update.needsCreate {
-			request := map[string]any{"requests": []any{map[string]any{"addSheet": map[string]any{"properties": map[string]any{"title": update.title}}}}}
-			if err := g.request(ctx, token, http.MethodPost, path+":batchUpdate", request, nil); err != nil {
-				return nil, err
-			}
-		}
-		if !update.needsCreate && previous[update.title] == update.hash {
-			// The snapshot may be identical, but we already verified the remote tab.
-			result[update.title] = update.hash
+		result[title] = desired
+		// A successful remote batch with a lost response is also an idempotent retry.
+		if exists && actual == desired {
 			continue
 		}
-		rangeName := url.PathEscape("'" + strings.ReplaceAll(update.title, "'", "''") + "'!A1:Z")
-		if err := g.request(ctx, token, http.MethodPost, path+"/values/"+rangeName+":clear", map[string]any{}, nil); err != nil {
+		endRows := len(rows)
+		if len(current) > endRows {
+			endRows = len(current)
+		}
+		if endRows == 0 {
+			endRows = 1
+		}
+		if !exists {
+			if nextID > 2147483647 {
+				return nil, errors.New("no available sheet ID for atomic export")
+			}
+			prop.ID = nextID
+			nextID++
+			requests = append(requests, map[string]any{"addSheet": map[string]any{"properties": map[string]any{"title": title, "sheetId": prop.ID, "gridProperties": map[string]int{"rowCount": endRows, "columnCount": 26}}}})
+		} else if prop.Grid.Rows < endRows || prop.Grid.Columns < 26 {
+			gridRows := prop.Grid.Rows
+			if gridRows < endRows {
+				gridRows = endRows
+			}
+			gridColumns := prop.Grid.Columns
+			if gridColumns < 26 {
+				gridColumns = 26
+			}
+			requests = append(requests, map[string]any{"updateSheetProperties": map[string]any{"properties": map[string]any{"sheetId": prop.ID, "gridProperties": map[string]int{"rowCount": gridRows, "columnCount": gridColumns}}, "fields": "gridProperties.rowCount,gridProperties.columnCount"}})
+		}
+		rowData := make([]any, 0, len(rows))
+		for _, row := range rows {
+			if len(row) > 26 {
+				return nil, fmt.Errorf("snapshot tab %q exceeds export width", title)
+			}
+			cells := make([]any, 0, len(row))
+			for _, value := range row {
+				cells = append(cells, map[string]any{"userEnteredValue": map[string]string{"stringValue": value}})
+			}
+			rowData = append(rowData, map[string]any{"values": cells})
+		}
+		// Missing cells inside this explicit range are cleared in the same atomic batch.
+		requests = append(requests, map[string]any{"updateCells": map[string]any{"range": map[string]any{"sheetId": prop.ID, "startRowIndex": 0, "startColumnIndex": 0, "endRowIndex": endRows, "endColumnIndex": 26}, "fields": "userEnteredValue", "rows": rowData}})
+	}
+	if len(requests) > 0 && !previewOnly {
+		if err = g.request(ctx, token, http.MethodPost, path+":batchUpdate", map[string]any{"requests": requests}, nil); err != nil {
 			return nil, err
 		}
-		payload := map[string]any{"range": "'" + update.title + "'!A1", "majorDimension": "ROWS", "values": update.rows}
-		if err := g.request(ctx, token, http.MethodPut, path+"/values/"+url.PathEscape("'"+update.title+"'!A1")+"?valueInputOption=RAW", payload, nil); err != nil {
-			return nil, err
-		}
-		result[update.title] = update.hash
 	}
 	return result, nil
 }

@@ -80,11 +80,18 @@ Konfiguration (Servicekonto nur auf der **Kopie** freigeben):
 
 ```sh
 SHEET_SYNC_ENABLED=true
+SHEET_SYNC_AUTORUN=false
 SHEET_SYNC_SHEET_ID=10aqVmmODH9Q8F6_RiGoVM2CXK3qtwtjz9hcsQN8_NO8
 SHEET_SYNC_INTERVAL=10m
 SHEET_SYNC_REASON="Automatischer Abgleich auf der Arbeitskopie"
 SHEET_SYNC_SERVICE_ACCOUNT_JSON='{"type":"service_account","client_email":"...","private_key":"..."}'
 ```
+
+`SHEET_SYNC_ENABLED=true` stellt zunächst nur die Admin-Sync-API bereit. Ohne
+`SHEET_SYNC_AUTORUN=true` gibt es keinen Startup- oder Timer-Abgleich. Zuerst
+„Vorabprüfung ohne Änderungen“ verwenden; der Server prüft bei jedem tatsächlichen
+Lauf erneut. Der [Aktivierungsleitfaden](docs/sheet-sync-activation.md) beschreibt
+die erforderliche Altbestandsprüfung für ICC25-35 und erklärt Baseline-Blocker.
 
 `SHEET_SYNC_SHEET_ID` darf nicht auf das Original gesetzt werden; der Server
 prüft die freigegebene Arbeitskopie ausdrücklich und lehnt andere IDs ab.

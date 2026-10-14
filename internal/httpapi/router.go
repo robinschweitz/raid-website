@@ -97,6 +97,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		if err != nil { return nil, fmt.Errorf("find sheet-sync administrator: %w", err) }
 		writer, err := sheetsync.NewGoogleWriter(opts.SheetSyncServiceAccount)
 		if err != nil { return nil, fmt.Errorf("configure sheet sync: %w", err) }
+		importsSvc.UseFetcher(sheetsync.AuthenticatedFetcher{Writer: writer})
 		syncService, err = sheetsync.New(db, importsSvc, writer, opts.SheetSyncSheetID, admin.ID, opts.SheetSyncReason, opts.SheetSyncInterval)
 		if err != nil { return nil, fmt.Errorf("create sheet sync: %w", err) }
 	}

@@ -3,6 +3,7 @@ package legacyimport
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -80,11 +81,14 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 			return err
 		}
 		byCharacter := make(map[int64]attendance.Attendance, len(current))
+		byPlayer := make(map[int64]int64, len(current))
 		for _, row := range current {
 			byCharacter[row.CharacterID] = row
+			byPlayer[row.PlayerID] = row.CharacterID
 		}
 		pending := make([]attendance.Attendance, 0)
 		seen := make(map[int64]bool)
+		seenPlayers := make(map[int64]bool)
 		for _, entry := range entries {
 			person, err := bound.players.FindByName(ctx, entry.Player)
 			if errors.Is(err, sql.ErrNoRows) {
@@ -117,6 +121,11 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 				continue
 			}
 			seen[characterID] = true
+			if seenPlayers[person.ID] {
+				report.Conflicts = append(report.Conflicts, fmt.Sprintf("%s: Spieler mehrfach mit unterschiedlichen Charakteren im Sheet", entry.Character))
+				continue
+			}
+			seenPlayers[person.ID] = true
 			if existing, ok := byCharacter[characterID]; ok {
 				if existing.PlayerID != person.ID || existing.CharacterName != entry.Character ||
 					existing.Class != entry.Class || existing.Spec != entry.Spec || existing.Role != entry.Role {
@@ -124,10 +133,17 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 				}
 				continue
 			}
+			if former, ok := byPlayer[person.ID]; ok && former != characterID {
+				report.Conflicts = append(report.Conflicts, fmt.Sprintf("%s: Spieler hat bereits einen anderen Charakter im Raid; kein automatischer Austausch", entry.Character))
+				continue
+			}
 			pending = append(pending, attendance.Attendance{
 				RaidID: report.RaidID, PlayerID: person.ID, CharacterID: characterID,
 				CharacterName: entry.Character, Class: entry.Class, Spec: entry.Spec, Role: entry.Role,
 			})
+		}
+		if len(current)+len(pending) > 25 {
+			report.Conflicts = append(report.Conflicts, "ICC25 Raidsetup: mehr als 25 Website-Teilnahmen nach Ergänzung; kein automatisches Entfernen")
 		}
 		if len(report.Conflicts) > 0 {
 			return nil
@@ -142,10 +158,13 @@ func (s *Service) SyncCurrentSetup(ctx context.Context, actorID int64, source, s
 				return err
 			}
 			actor := actorID
+			after, err := json.Marshal(&pending[i])
+			if err != nil {
+				return err
+			}
 			if err := bound.imports.writeAudit(ctx, &audit.Log{
 				ActorID: &actor, EntityType: "attendance", EntityID: fmt.Sprint(pending[i].ID),
-				Action: "create", BeforeJSON: "null", AfterJSON: fmt.Sprintf(
-					"{\"raid_id\":%d,\"character_id\":%d}", report.RaidID, pending[i].CharacterID),
+				Action: "create", BeforeJSON: "null", AfterJSON: string(after),
 				Reason:    "Automatischer Google-Sheet-Abgleich (nur neue Raidsetup-Einträge)",
 				CreatedAt: now,
 			}); err != nil {

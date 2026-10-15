@@ -87,6 +87,8 @@ function RaidDetail({ raidID }: Props) {
   const characterVersion = useRef(0)
   const lootFormVersion = useRef(0)
   const lootEditorVersion = useRef(0)
+  const lootItemInput = useRef<HTMLInputElement>(null)
+  const focusLootItem = useRef(false)
   const lootRequest = useRef<{ payload: string; id: string } | null>(null)
   const catalogVersion = useRef(0)
   const associationVersion = useRef(0)
@@ -98,6 +100,7 @@ function RaidDetail({ raidID }: Props) {
   const [loot, setLoot] = useState<RecordedLoot[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [series, setSeries] = useState<RaidSeries[]>([])
   const [raidName, setRaidName] = useState('')
   const [seriesID, setSeriesID] = useState('')
@@ -116,6 +119,11 @@ function RaidDetail({ raidID }: Props) {
   const [attDetails, setAttDetails] = useState({ is_bench: false, late_join: false, early_leave: false })
   const [attReason, setAttReason] = useState('')
   const [attSnapshot, setAttSnapshot] = useState<{ character_name?: string; class?: string; spec?: string }>({})
+  const [rosterSearch, setRosterSearch] = useState('')
+  const [rosterRole, setRosterRole] = useState<AttendanceRole | ''>('')
+  const [rosterClass, setRosterClass] = useState('')
+  const [rosterBench, setRosterBench] = useState<'ALL' | 'RAID' | 'BENCH'>('ALL')
+  const [rosterIncomplete, setRosterIncomplete] = useState(false)
 
   const [lootItem, setLootItem] = useState('')
   const [lootItemID, setLootItemID] = useState('')
@@ -238,6 +246,7 @@ function RaidDetail({ raidID }: Props) {
     setLootNotes('')
     setLootReason('')
     lootRequest.current = null
+    focusLootItem.current = false
     if (!canWrite || !raid?.catalog_instance_id || raid.raid_size == null) return
     setCatalogStatus('Bosse der gespeicherten Raidinstanz werden geladen.')
     api.get<CatalogBoss[]>(`/api/v1/loot-catalog/bosses?instance_id=${encodeURIComponent(raid.catalog_instance_id)}`).then((rows) => {
@@ -253,6 +262,24 @@ function RaidDetail({ raidID }: Props) {
   const playerName = (id: number) => players.find((p) => p.id === id)?.name ?? `#${id}`
   const characterLabel = (character: Character) => `${character.name} · ${character.class} · ${playerName(character.player_id)} · #${character.id}${!character.active ? ' (inaktiv)' : ''}`
   const visibleCharacters = characters.filter((character) => String(character.id) === attCharacter || characterLabel(character).toLocaleLowerCase('de').includes(characterSearch.toLocaleLowerCase('de')))
+  const selectedAttendanceCharacter = characters.find((character) => character.id === Number(attCharacter) && character.player_id === Number(attPlayer))
+  const rosterClasses = [...new Set(attendance.map((row) => row.class?.trim()).filter((value): value is string => !!value))].sort((a, b) => a.localeCompare(b, 'de'))
+  const visibleAttendance = attendance.filter((row) => {
+    if (row.id === attEditing?.id) return true
+    const haystack = `${row.character_name ?? ''} ${row.class ?? ''} ${row.spec ?? ''} ${playerName(row.player_id)}`.toLocaleLowerCase('de')
+    if (rosterSearch.trim() && !haystack.includes(rosterSearch.trim().toLocaleLowerCase('de'))) return false
+    if (rosterRole && row.role !== rosterRole) return false
+    if (rosterClass && row.class?.trim() !== rosterClass) return false
+    if (rosterBench === 'RAID' && row.is_bench) return false
+    if (rosterBench === 'BENCH' && !row.is_bench) return false
+    return !rosterIncomplete || !row.character_name?.trim() || !row.class?.trim() || !row.spec?.trim()
+  })
+
+  useEffect(() => {
+    if (!focusLootItem.current || catalogItems.length === 0) return
+    focusLootItem.current = false
+    lootItemInput.current?.focus()
+  }, [catalogItems])
 
   const editAttendance = (row: Attendance | null) => {
     if (isPending() || !isActive() || !canWrite || (row && row.raid_id !== raidID)) return
@@ -270,6 +297,15 @@ function RaidDetail({ raidID }: Props) {
     })
     setAttReason('')
     setAttSnapshot(row ? { character_name: row.character_name || undefined, class: row.class || undefined, spec: row.spec || undefined } : {})
+  }
+
+  const clearAttendanceCharacter = () => {
+    if (isPending() || !isActive() || !canWrite || renderedCharacterVersion !== characterVersion.current) return
+    ++characterVersion.current
+    setAttCharacter('')
+    setAttPlayer('')
+    setCharacterSearch('')
+    setAttSnapshot({})
   }
 
   const changeSnapshot = (field: SnapshotField, value: string) => {
@@ -303,6 +339,7 @@ function RaidDetail({ raidID }: Props) {
     setLootMethod(row ? awardMethod(row) : 'MAIN')
     setLootNotes(row?.notes ?? '')
     setLootReason('')
+    focusLootItem.current = false
   }
 
   const chooseCatalogBoss = (id: string) => changeLoot(() => {
@@ -310,6 +347,7 @@ function RaidDetail({ raidID }: Props) {
     if (renderedCatalogVersion !== catalogVersion.current) return
     const version = ++catalogVersion.current
     const selected = catalogBosses.find((boss) => boss.id === id && boss.instance_id === raid?.catalog_instance_id)
+    focusLootItem.current = !!selected
     const editorVersion = lootEditorVersion.current
     setCatalogBoss(selected ? id : lootEditing?.catalog_boss_id ?? '')
     setCatalogItem('')
@@ -354,6 +392,7 @@ function RaidDetail({ raidID }: Props) {
     }
     await submit(async () => {
       setError('')
+      setMessage('')
       try {
         const body = {
           player_id: Number(attPlayer),
@@ -378,6 +417,7 @@ function RaidDetail({ raidID }: Props) {
         setAttDetails({ is_bench: false, late_join: false, early_leave: false })
         setAttReason('')
         setAttSnapshot({})
+        setMessage(attEditing ? 'Teilnahme-Korrektur gespeichert.' : 'Teilnahme hinzugefügt.')
         await load()
       } catch (err) {
         if (isActive()) setError(raidError(err, 'Teilnahme fehlgeschlagen'))
@@ -402,6 +442,7 @@ function RaidDetail({ raidID }: Props) {
     }
     await submit(async () => {
       setError('')
+      setMessage('')
       try {
         const body = {
           ...(!lootEditing || lootItemID !== lootEditing.item_id ? { item_id: lootItemID } : {}),
@@ -443,6 +484,7 @@ function RaidDetail({ raidID }: Props) {
         setLootMethod('MAIN')
         setLootNotes('')
         setLootReason('')
+        setMessage(lootEditing ? 'Loot-Korrektur gespeichert.' : 'Loot vergeben.')
         await load()
       } catch (err) {
         if (isActive()) setError(raidError(err, 'Loot fehlgeschlagen'))
@@ -455,6 +497,7 @@ function RaidDetail({ raidID }: Props) {
     if (name === 'archive' && isActiveRaid && (!raid.series_id || !raid.scheduled_start)) return
     await submit(async () => {
       setError('')
+      setMessage('')
       try {
         if (name === 'archive') {
           const result = await api.postEnvelope<ArchiveResponse>(`/api/v1/raids/${raidID}/archive`)
@@ -465,6 +508,7 @@ function RaidDetail({ raidID }: Props) {
           ++catalogVersion.current
           setArchiveResult(result)
           setRaid(result.data)
+          setMessage('Raid archiviert.')
         } else {
           const result = await api.post<Raid>(`/api/v1/raids/${raidID}/cancel`)
           if (!isActive()) return
@@ -473,6 +517,7 @@ function RaidDetail({ raidID }: Props) {
           ++lootEditorVersion.current
           ++catalogVersion.current
           setRaid(result)
+          setMessage('Raid abgesagt.')
         }
         await load()
       } catch (err) {
@@ -497,6 +542,7 @@ function RaidDetail({ raidID }: Props) {
     if (Object.keys(changes).length === 0) return
     await submit(async () => {
       setError('')
+      setMessage('')
       try {
         const updated = await api.patch<Raid>(`/api/v1/raids/${raidID}`, changes)
         if (isActive()) {
@@ -514,6 +560,7 @@ function RaidDetail({ raidID }: Props) {
           setAssociationSize(updated.raid_size == null ? '' : String(updated.raid_size))
           setSeriesID(updated.series_id ? String(updated.series_id) : '')
           setScheduled(localStart(updated.scheduled_start))
+          setMessage('Raidplanung gespeichert.')
         }
       } catch (err) {
         if (isActive()) setError(raidError(err, 'Planung speichern fehlgeschlagen'))
@@ -530,6 +577,7 @@ function RaidDetail({ raidID }: Props) {
     }
     await submit(async () => {
       setError('')
+      setMessage('')
       try {
         const updated = await api.patch<Raid>(`/api/v1/raids/${raidID}`, changes)
         if (!isActive()) return
@@ -542,6 +590,7 @@ function RaidDetail({ raidID }: Props) {
         setRaid(updated)
         setAssociationInstance(updated.catalog_instance_id ?? '')
         setAssociationSize(updated.raid_size == null ? '' : String(updated.raid_size))
+        setMessage('Raidinstanz und Größe gespeichert.')
       } catch (err) {
         if (isActive()) setError(raidError(err, 'Raidinstanz und Größe speichern fehlgeschlagen.'))
       }
@@ -552,12 +601,14 @@ function RaidDetail({ raidID }: Props) {
 		if (!lootEditing || !canWrite || (lootNeedsReason && !lootReason.trim())) return
 		await submit(async () => {
 			setError('')
+			setMessage('')
 			try {
 				await api.post<LootAward>(`/api/v1/raids/${raidID}/loot/${lootEditing.id}/withdraw`, {
 					...(lootNeedsReason ? { reason: lootReason.trim() } : {}),
 				})
 				if (!isActive()) return
 				editLoot(null)
+				setMessage('Loot zurückgezogen.')
 				await load()
 			} catch (err) {
 				if (isActive()) setError(raidError(err, 'Loot konnte nicht zurückgezogen werden.'))
@@ -595,6 +646,7 @@ function RaidDetail({ raidID }: Props) {
         {raid.archived_at && <p className="muted">Archivierte Historie: Änderungen an Roster und Loot erfordern eine Begründung.</p>}
       </RaidBanner>
       {error && <p className="error">{error}</p>}
+      {message && <p className="success-message" role="status">{message}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
       <nav className="workspace-tabs" aria-label="Raidbereiche">
         <button type="button" aria-pressed={view === 'signups'} aria-controls="raid-signups" onClick={() => setView('signups')}>Anmeldungen</button>
@@ -623,7 +675,7 @@ function RaidDetail({ raidID }: Props) {
         <label>Geplanter Start ({Intl.DateTimeFormat().resolvedOptions().timeZone}, wird als UTC gespeichert)
           <input aria-label="Geplanter Start" disabled={pending} required={!raid.scheduled_start} type="datetime-local" value={scheduled} onChange={(e) => setScheduled(e.target.value)} />
         </label>
-        <button disabled={pending || (!!raid.series_id && !seriesID) || (!raid.series_id && !raidName.trim()) || (Number(seriesID) === (raid.series_id ?? 0) && scheduled === localStart(raid.scheduled_start) && (!!raid.series_id || !!seriesID || raidName.trim() === raid.name))} onClick={saveSchedule}>Planung speichern</button>
+        <button className="primary-action" disabled={pending || (!!raid.series_id && !seriesID) || (!raid.series_id && !raidName.trim()) || (Number(seriesID) === (raid.series_id ?? 0) && scheduled === localStart(raid.scheduled_start) && (!!raid.series_id || !!seriesID || raidName.trim() === raid.name))} onClick={saveSchedule}>Planung speichern</button>
         {!raid.series_id && <p className="muted">Vor dem Archivieren muss eine Serie zugeordnet sein.</p>}
         {!raid.scheduled_start && <p className="muted">Vor dem Archivieren muss ein geplanter Start eingetragen und gespeichert sein.</p>}
         <p className="muted">Nur geänderte Werte werden gespeichert. Vorhandene Werte können nicht geleert werden.</p>
@@ -650,14 +702,14 @@ function RaidDetail({ raidID }: Props) {
           {associationSize && !sizes.includes(Number(associationSize)) && <option value={associationSize}>{associationSize} Spieler (derzeit nicht verfügbar)</option>}
           {sizes.map((size) => <option key={size} value={size}>{size} Spieler</option>)}
         </select></label>
-        <button type="button" disabled={pending || !associationChanged || !associationValid} onClick={saveAssociation}>Raidinstanz und Größe speichern</button>
+        <button className="primary-action" type="button" disabled={pending || !associationChanged || !associationValid} onClick={saveAssociation}>Raidinstanz und Größe speichern</button>
       </section>}
       {canManage && !raid.archived_at && raid.status !== 'CANCELLED' && (
         <section>
         <p className="muted">{isActiveRaid ? 'Archivieren beendet den Raid endgültig: +10 EP pro Teilnehmer ohne Main-Spec-Loot, ungenutzte Locks verfallen und der nächste zukünftige Serientermin wird angelegt. Spätere Korrekturen erfordern eine Begründung.' : 'Dieser historische abgeschlossene Raid wird nur archiviert. Keine erneute EP-Vergabe und kein Nachfolger.'}</p>
         <div className="actions">
           {isActiveRaid && <button disabled={pending} onClick={() => action('cancel')}>Absagen</button>}
-          <button disabled={pending || (isActiveRaid && (!raid.series_id || !raid.scheduled_start))} onClick={() => action('archive')}>Archivieren</button>
+          <button className="archive-action" disabled={pending || (isActiveRaid && (!raid.series_id || !raid.scheduled_start))} onClick={() => action('archive')}>Archivieren</button>
         </div>
         </section>
       )}
@@ -665,7 +717,18 @@ function RaidDetail({ raidID }: Props) {
 
       <section id="raid-roster" hidden={view !== 'roster'} className="card raid-roster" aria-label="Raidroster">
         <div className="section-heading"><h2>Raidaufstellung</h2><span className="muted">{attendance.filter((row) => !row.is_bench).length} im Raid · {attendance.filter((row) => row.is_bench).length} auf der Ersatzbank</span></div>
-        <RaidRosterBoard attendance={attendance} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
+        <div className="roster-filters" aria-label="Aufstellung filtern">
+          <label>Aufstellung filtern<input type="search" value={rosterSearch} onChange={(event) => setRosterSearch(event.target.value)} placeholder="Charakter oder Spieler" /></label>
+          <label>Rolle<select value={rosterRole} onChange={(event) => setRosterRole(event.target.value as AttendanceRole | '')}>
+            <option value="">Alle Rollen</option><option value="TANK">Tank</option><option value="HEAL">Heal</option><option value="DD">DD</option>
+          </select></label>
+          <label>Klasse<select value={rosterClass} onChange={(event) => setRosterClass(event.target.value)}><option value="">Alle Klassen</option>{rosterClasses.map((characterClass) => <option key={characterClass} value={characterClass}>{characterClass}</option>)}</select></label>
+          <label>Platz<select value={rosterBench} onChange={(event) => setRosterBench(event.target.value as 'ALL' | 'RAID' | 'BENCH')}><option value="ALL">Raid und Ersatzbank</option><option value="RAID">Nur im Raid</option><option value="BENCH">Nur Ersatzbank</option></select></label>
+          <label className="check"><input type="checkbox" checked={rosterIncomplete} onChange={(event) => setRosterIncomplete(event.target.checked)} /> Unvollständige</label>
+          {(rosterSearch || rosterRole || rosterClass || rosterBench !== 'ALL' || rosterIncomplete) && <button type="button" onClick={() => { setRosterSearch(''); setRosterRole(''); setRosterClass(''); setRosterBench('ALL'); setRosterIncomplete(false) }}>Filter zurücksetzen</button>}
+        </div>
+        {visibleAttendance.length !== attendance.length && <p className="muted roster-filter-result">{visibleAttendance.length} von {attendance.length} Teilnehmern angezeigt.</p>}
+        <RaidRosterBoard attendance={visibleAttendance} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
         {canWrite && (
           <div>
             {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
@@ -684,6 +747,8 @@ function RaidDetail({ raidID }: Props) {
               <datalist id="attendance-character-options">
                 {visibleCharacters.map((character) => <option key={character.id} value={characterLabel(character)} />)}
               </datalist>
+              {characterSearch.trim() && !selectedAttendanceCharacter && visibleCharacters.length === 0 && <p className="field-hint">Kein passender Charakter gefunden.</p>}
+              {selectedAttendanceCharacter && <span className="selection-chip character-selection"><span>Ausgewählt: {selectedAttendanceCharacter.name} · {playerName(selectedAttendanceCharacter.player_id)}</span><button type="button" aria-label="Ausgewählten Charakter entfernen" disabled={pending} onClick={clearAttendanceCharacter}>Entfernen</button></span>}
               <label>Gespeicherte Klasse<select aria-label="Gespeicherte Klasse" disabled={pending || hasAttCharacter} value={attSnapshot.class ?? ''} onChange={(e) => { changeSnapshot('class', e.target.value); changeSnapshot('spec', '') }}>
                 <option value="">Klasse wählen…</option>
                 {attSnapshot.class && !classSpecs[attSnapshot.class] && <option value={attSnapshot.class}>{attSnapshot.class} (gespeichert)</option>}
@@ -696,15 +761,15 @@ function RaidDetail({ raidID }: Props) {
                 <option value="HEAL">Heal</option>
                 <option value="DD">DD</option>
               </select>
-              {attendanceFlags.map(({ key, label }) => <label className="check" key={key}>
+              <fieldset className="attendance-flags"><legend>Teilnahmestatus</legend>{attendanceFlags.map(({ key, label }) => <label className="check" key={key}>
                 <input type="checkbox" disabled={pending} checked={attDetails[key]} onChange={(e) => {
                   const checked = e.target.checked
                   setAttDetails((previous) => ({ ...previous, [key]: checked }))
                 }} /> {label}
-              </label>)}
+              </label>)}</fieldset>
               {attNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Teilnahme-Begründung" value={attReason} onChange={(e) => setAttReason(e.target.value)} required /></label>}
               {attEditing && error && <p className="error" role="alert">{error}</p>}
-              <button type="submit" disabled={pending || !hasAttCharacter || (attNeedsReason && !attReason.trim())}>{attEditing ? 'Teilnahme-Korrektur speichern' : 'Hinzufügen'}</button>
+              <button className="primary-action" type="submit" disabled={pending || !hasAttCharacter || (attNeedsReason && !attReason.trim())}>{attEditing ? 'Teilnahme-Korrektur speichern' : 'Hinzufügen'}</button>
               {attEditing && <button type="button" disabled={pending} onClick={() => editAttendance(null)}>Bearbeitung abbrechen</button>}
             </form>}
           </div>
@@ -742,7 +807,7 @@ function RaidDetail({ raidID }: Props) {
                   {catalogDifficulties.length === 0 && <option value="">Zuerst Boss wählen</option>}
                   {catalogDifficulties.map((difficulty) => <option key={difficulty} value={difficulty}>{catalogModeLabels[difficulty]}</option>)}
                 </select></label>
-                <label>Item auswählen<input type="search" list="loot-item-options" aria-label="Loot-Item" autoComplete="off" disabled={pending || catalogItems.length === 0} value={catalogSearch} onChange={(e) => changeLoot(() => {
+                <label>Item auswählen<input ref={lootItemInput} type="search" list="loot-item-options" aria-label="Loot-Item" autoComplete="off" disabled={pending || catalogItems.length === 0} value={catalogSearch} onChange={(e) => changeLoot(() => {
                   if (renderedCatalogVersion !== catalogVersion.current) return
                   setCatalogSearch(e.target.value)
                   const item = catalogItems.find((drop) => drop.mode === catalogDifficulty && (catalogItemLabel(drop) === e.target.value || dropKey(drop) === e.target.value))
@@ -753,6 +818,8 @@ function RaidDetail({ raidID }: Props) {
                 <datalist id="loot-item-options">
                   {visibleCatalogItems.map((item) => <option key={dropKey(item)} value={catalogItemLabel(item)} />)}
                 </datalist>
+                {catalogSearch.trim() && !selectedDrop && visibleCatalogItems.length === 0 && <p className="field-hint">Kein passendes Item für diesen Boss und Modus gefunden.</p>}
+                {selectedDrop && <span className="selection-chip"><span>Ausgewählt: {selectedDrop.name} · Item-ID {selectedDrop.item_id}</span><button type="button" aria-label="Ausgewähltes Item entfernen" disabled={pending} onClick={() => changeLoot(() => { setCatalogItem(''); setCatalogSearch(''); setLootItem(''); setLootItemID('') })}>Entfernen</button></span>}
                 {selectedDrop?.conditional && <p className="muted">Bedingte Beute.</p>}
               </> : <>
               {lootEditing && <p>Gespeicherte Identität: {lootBoss || 'Boss historisch nicht gespeichert'} · {lootItem} · Item-ID {lootItemID || 'historisch nicht gespeichert'}</p>}
@@ -774,7 +841,7 @@ function RaidDetail({ raidID }: Props) {
               <label>Notizen<input disabled={pending} placeholder="Loot-Notizen" value={lootNotes} onChange={(e) => changeLoot(() => setLootNotes(e.target.value))} /></label>
               {lootNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Loot-Begründung" value={lootReason} onChange={(e) => changeLoot(() => setLootReason(e.target.value))} required /></label>}
               {lootEditing && error && <p className="error" role="alert">{error}</p>}
-               <button type="submit" disabled={pending || !lootItem.trim() || !hasLootRecipient || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : 'Vergeben'}</button>
+                <button className="primary-action" type="submit" disabled={pending || !lootItem.trim() || !hasLootRecipient || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : 'Vergeben'}</button>
 				{lootEditing && <button type="button" disabled={pending || (lootNeedsReason && !lootReason.trim())} onClick={() => void withdrawLoot()}>Loot zurückziehen</button>}
                {lootEditing && <button type="button" disabled={pending} onClick={() => editLoot(null)}>Bearbeitung abbrechen</button>}
             </form>

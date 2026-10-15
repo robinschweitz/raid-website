@@ -499,6 +499,51 @@ test('character search filters the suggestions and clears an unselected identity
   assert.doesNotMatch(characterSuggestions, /Char 11/)
 })
 
+test('selected attendance character can be cleared without retaining its identity', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1)
+  await flush(view)
+  select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
+  view.render()
+  assert.match(text(view.tree), /Ausgewählt:\s+Char 10/)
+  nodes(view.tree, (node) => node.type === 'button' && node.props['aria-label'] === 'Ausgewählten Charakter entfernen')[0].props.onClick()
+  view.render()
+  assert.equal(button(view, 'Hinzufügen').props.disabled, true)
+  assert.doesNotMatch(text(view.tree), /Ausgewählt:\s+Char 10/)
+})
+
+test('attendance save announces successful completion', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1)
+  await flush(view)
+  select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
+  view.render()
+  const saving = form(view).props.onSubmit(event)
+  writes(s)[0].resolve({ id: 1 })
+  await flush(view)
+  resolveRaid(s, 1)
+  await saving
+  view.render()
+  assert.match(text(view.tree), /Teilnahme hinzugefügt/)
+})
+
+test('roster filters are display-only and can be reset', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { attendance: [recipientRow, { ...recipientRow, id: 10, character_id: 21, character_name: 'Andere Figur', role: 'TANK' }] })
+  await flush(view)
+  input(view, 'Charakter oder Spieler').props.onChange(change('Saved'))
+  view.render()
+  const roster = () => nodes(view.tree, (node) => node.type === 'section' && node.props.id === 'raid-roster')[0]
+  assert.match(text(roster()), /Saved raid character/)
+  assert.doesNotMatch(text(roster()), /Andere Figur/)
+  button(view, 'Filter zurücksetzen').props.onClick()
+  view.render()
+  assert.match(text(roster()), /Andere Figur/)
+})
+
 for (const [label, submits] of [['Lock anlegen', true], ['Stornieren', false], ['Anlegen', true], ['Speichern', true]]) {
   test(`player mutation ${label} blocks same-tick duplicates`, async () => {
     const s = setup()

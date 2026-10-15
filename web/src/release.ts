@@ -1,11 +1,12 @@
-export const appVersion = '1.0.6'
+export const appVersion = '1.0.7'
 
 export const changelog = [
   {
     version: appVersion,
-    title: 'Direkte Auswahl bei Teilnahme und Loot',
+    title: 'Schnellere Raidverwaltung',
     changes: [
-      'Charaktere und Loot können jetzt in einem gemeinsamen Eingabefeld gesucht und ausgewählt werden.',
+      'Auswahlfelder zeigen die getroffene Auswahl, erfolgreiche Änderungen werden bestätigt und die Raidaufstellung kann gefiltert werden.',
+      'Teilnahme- und Loot-Editoren sind auf kleinen Bildschirmen besser bedienbar.',
     ],
   },
   {

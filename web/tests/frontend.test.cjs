@@ -55,7 +55,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
     useContext: () => auth,
   }
   react.useLayoutEffect = react.useEffect
-  const api = Object.fromEntries(['get', 'post', 'postEnvelope', 'put', 'patch'].map((method) => [method, (url, body) => {
+  const api = Object.fromEntries(['get', 'post', 'postEnvelope', 'put', 'patch', 'del'].map((method) => [method, (url, body) => {
     let resolve, reject
     const promise = new Promise((yes, no) => { resolve = yes; reject = no })
     requests.push({ method, url, body, resolve, reject })
@@ -2858,4 +2858,67 @@ test('anonymous dashboard shows public widgets without profile or personal reque
   assert.match(text(view.tree), /Gildenübersicht|Bratwurst des Schicksals/)
   assert.equal(s.requests.some((request) => /\/points|\/characters|\/votes/.test(request.url)), false)
   view.unmount()
+})
+
+test('a member can announce an absence with a reason and take it back before the raid starts', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [{ id: 2, name: 'Ich' }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [], absences: [] })
+  resolveIf(s, '/api/v1/players/2/characters', [])
+  await flush(view)
+  assert.match(text(view.tree), /Kannst du nicht kommen/)
+  const reason = nodes(view.tree, (n) => n.type === 'input' && n.props.placeholder?.startsWith('z. B.'))[0]
+  reason.props.onChange(change('Krank'))
+  view.render()
+  button(view, 'Ich kann nicht kommen').props.onClick()
+  assert.equal(writes(s)[0].method, 'put')
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/absences/2')
+  assert.deepEqual(writes(s)[0].body, { reason: 'Krank' })
+})
+
+test('an announced absence shows the reason and can be revoked with "Doch dabei"', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [{ id: 2, name: 'Ich' }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [], absences: [{ player_id: 2, reason: 'Urlaub', created_at: '2030-01-01T00:00:00Z' }] })
+  resolveIf(s, '/api/v1/players/2/characters', [])
+  await flush(view)
+  assert.match(text(view.tree), /Du hast abgesagt.*Urlaub/s)
+  assert.equal(button(view, 'Ich kann nicht kommen'), undefined)
+  button(view, 'Doch dabei').props.onClick()
+  assert.equal(writes(s)[0].method, 'del')
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/absences/2')
+})
+
+test('no absence form once the raid has started; staff can still manage absences', async () => {
+  const started = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = started.load('components/RaidSignups.tsx')
+  const old = { ...raid(8), scheduled_start: '2000-01-01T20:00:00Z' }
+  const view = started.mount(RaidSignups, { raid: old, attendance: [], players: [], onRosterChange: async () => {} })
+  resolveIf(started, '/api/v1/raids/8/signups', { is_enabled: false, is_open: false, class_specs: {}, entries: [], absences: [] })
+  resolveIf(started, '/api/v1/players/2/characters', [])
+  await flush(view)
+  assert.doesNotMatch(text(view.tree), /Kannst du nicht kommen/)
+
+  const s = setup({ id: 9, role: 'RAIDASSISTENT' })
+  const staffView = s.mount(s.load('components/RaidSignups.tsx').RaidSignups, { raid: old, attendance: [], players: [{ id: 3, name: 'Tom', active: true }, { id: 4, name: 'Eva', active: true }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: false, is_open: false, class_specs: {}, entries: [], absences: [{ player_id: 3, reason: 'Telefonisch', created_at: '2030-01-01T00:00:00Z' }] })
+  resolveIf(s, '/api/v1/players/9/characters', [])
+  await flush(staffView)
+  assert.match(text(staffView.tree), /Tom.*Hat abgesagt.*Telefonisch/s)
+  button(staffView, 'Absage zurücknehmen').props.onClick()
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/absences/3')
+  const options = nodes(staffView.tree, (n) => n.type === 'option').map((n) => text(n))
+  assert.ok(options.includes('Eva') && !options.includes('Tom'), 'only players without absence are offered')
+})
+
+test('roster rows of players who declined carry a badge and reason', () => {
+  const board = setup().load('components/RaidRosterBoard.tsx').RaidRosterBoard({
+    attendance: [{ id: 1, player_id: 3, character_name: 'A', class: 'Magier', spec: 'Feuer', role: 'DD' }, { id: 2, player_id: 4, character_name: 'B', class: 'Magier', spec: 'Feuer', role: 'DD' }],
+    playerName: () => '', canWrite: false, pending: false, onEdit: () => {}, absences: new Map([[3, 'Krank']]),
+  })
+  const flat = text(board)
+  assert.equal((flat.match(/Hat abgesagt/g) ?? []).length, 1)
+  assert.match(flat, /Grund:\s+Krank/)
 })

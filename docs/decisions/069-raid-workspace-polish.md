@@ -65,3 +65,16 @@ hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetz
   Absenden fehlt. Bestätigungen nutzen dieselbe schließbare Meldung wie der Rest der Raidseite.
 - Wunschliste lesen: Nicht-Staff darf die Wunschliste eigener Charaktere lesen, auch wenn sie leer ist. Die
   Berechtigung folgt dem Besitzer des Charakters, nicht dem Listeninhalt. Unbekannte Charaktere liefern 404.
+
+## Nachtrag: Absage durch Spieler
+
+- Neue Tabelle `raid_absences` (Migration 067), eindeutig je Raid und Spieler, mit optionalem Grund (höchstens
+  200 Zeichen). Endpunkte `PUT`/`DELETE /api/v1/raids/{id}/absences/{playerID}`, Rolle MEMBER; die Übersicht der
+  Anmeldungen liefert `absences`.
+- Spieler ändern nur die eigene Absage und nur bis zum geplanten Start (sonst 409 `raid_started`). Die
+  Raidleitung (RAIDASSISTENT+) darf für jeden Spieler eintragen und zurücknehmen, solange der Raid aktiv ist.
+  Jede Änderung wird als `absence_declare`/`absence_revoke` protokolliert.
+- Eine Absage markiert nur: Aufstellung, Anmeldungen und Bank bleiben unverändert, die Raidleitung entscheidet.
+- **Offen (fachliche Regel):** Beim Archivieren erhält jeder Eintrag der Aufstellung +10 EP. Wer abgesagt hat und
+  nicht entfernt wird, bekäme sie ebenfalls. Es gibt bewusst keine automatische Ausnahme; die Archiv-Rückfrage
+  nennt betroffene Spieler. Ob Abgesagte keine EP erhalten sollen, muss fachlich entschieden werden.

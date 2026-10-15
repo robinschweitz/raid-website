@@ -14,10 +14,11 @@ interface Props {
   editingID?: number
   isAddOpen?: boolean
   filtered?: boolean
+  absences?: Map<number, string>
   children?: ReactNode
 }
 
-export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, isAddOpen, filtered, children }: Props) {
+export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, isAddOpen, filtered, absences, children }: Props) {
   const member = (row: Attendance) => (
     <li key={row.id} className={`setup-member ${characterClassName(row.class?.trim() ?? '')}${editingID === row.id ? ' is-editing' : ''}`}>
       {editingID === row.id ? <div className="in-place-editor"><h3>{row.character_name || 'Teilnahme'} bearbeiten</h3>{children}</div> : <>
@@ -28,9 +29,11 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
         <small>{playerName(row.player_id)}</small>
         <div className="setup-flags">
           {row.is_bench && <span className="badge">{rosterGroups.find((group) => group.role === rosterGroup(row))?.label}</span>}
+          {absences?.has(row.player_id) && <span className="badge bad" title={absences.get(row.player_id) || undefined}>Hat abgesagt</span>}
           {row.late_join && <span className="badge">Später dabei</span>}
           {row.early_leave && <span className="badge">Früher gegangen</span>}
         </div>
+        {absences?.get(row.player_id) && <p className="setup-note">Grund: {absences.get(row.player_id)}</p>}
         {row.notes && <p className="setup-note">{row.notes}</p>}
         {canWrite && (!row.character_name?.trim() || !row.class?.trim() || !row.spec?.trim()) && <small className="error">Teilnahme #{row.id}: {[
           !row.character_name?.trim() && 'Charaktername', !row.class?.trim() && 'Klasse', !row.spec?.trim() && 'tatsächlicher Spec',

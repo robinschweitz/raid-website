@@ -1,8 +1,17 @@
-export const appVersion = '1.0.19'
+export const appVersion = '1.0.20'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Absage für Raids',
+    changes: [
+      'Spieler können bis zum Raidstart mit „Ich kann nicht kommen“ absagen und optional einen Grund nennen; „Doch dabei“ nimmt die Absage zurück.',
+      'Die Raidleitung sieht Absagen in der Anmeldung und als Hinweis „Hat abgesagt“ in der Aufstellung und kann sie für Spieler eintragen oder zurücknehmen.',
+      'Die Aufstellung ändert sich durch eine Absage nicht. Vor dem Archivieren warnt eine Rückfrage, wenn abgesagte Spieler noch in der Aufstellung stehen.',
+    ],
+  },
+  {
+    version: '1.0.19',
     title: 'Hinweis beim Anmeldeschluss',
     changes: [
       'Schließt die Anmeldung, während jemand noch Charaktere ankreuzt, erscheint ein Hinweis, dass nichts mehr angemeldet wurde.',

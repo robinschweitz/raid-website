@@ -125,6 +125,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/raids/{id}/signups/availability", RequireRole(validation.RoleRaidassistent, a.setSignupAvailability))
 	mux.HandleFunc("PUT /api/v1/raids/{id}/signups", RequireRole(validation.RoleMember, a.saveSignups))
 	mux.HandleFunc("POST /api/v1/raids/{id}/signups/{signupID}/withdraw", RequireRole(validation.RoleMember, a.withdrawSignup))
+	mux.HandleFunc("PUT /api/v1/raids/{id}/absences/{playerID}", RequireRole(validation.RoleMember, a.declineAbsence))
+	mux.HandleFunc("DELETE /api/v1/raids/{id}/absences/{playerID}", RequireRole(validation.RoleMember, a.revokeAbsence))
 	mux.HandleFunc("POST /api/v1/raids/{id}/signups/{signupID}/accept", RequireRole(validation.RoleRaidassistent, a.acceptSignup))
 	mux.HandleFunc("POST /api/v1/raids/{id}/attendance", RequireRole(validation.RoleRaidassistent, a.createAttendance))
 	mux.HandleFunc("PATCH /api/v1/raids/{id}/attendance/{recordID}", RequireRole(validation.RoleRaidassistent, a.correctAttendance))

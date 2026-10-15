@@ -82,3 +82,38 @@ func (r *Repo) save(ctx context.Context, row *signupRow) error {
 	_, err := r.db.NewUpdate().Model(row).WherePK().Exec(ctx)
 	return err
 }
+
+type absenceRow struct {
+	bun.BaseModel `bun:"table:raid_absences"`
+	ID            int64 `bun:"id,pk,autoincrement"`
+	RaidID        int64
+	PlayerID      int64
+	Reason        string
+	CreatedAt     time.Time
+}
+
+func (r *Repo) absences(ctx context.Context, raidID int64) ([]absenceRow, error) {
+	rows := []absenceRow{}
+	err := r.db.NewSelect().Model(&rows).Where("raid_id = ?", raidID).Order("id ASC").Scan(ctx)
+	return rows, err
+}
+
+func (r *Repo) absence(ctx context.Context, raidID, playerID int64) (*absenceRow, error) {
+	row := new(absenceRow)
+	err := r.db.NewSelect().Model(row).Where("raid_id = ? AND player_id = ?", raidID, playerID).Scan(ctx)
+	return row, err
+}
+
+func (r *Repo) saveAbsence(ctx context.Context, row *absenceRow) error {
+	if row.ID == 0 {
+		_, err := r.db.NewInsert().Model(row).Exec(ctx)
+		return err
+	}
+	_, err := r.db.NewUpdate().Model(row).WherePK().Exec(ctx)
+	return err
+}
+
+func (r *Repo) deleteAbsence(ctx context.Context, id int64) error {
+	_, err := r.db.NewDelete().TableExpr("raid_absences").Where("id = ?", id).Exec(ctx)
+	return err
+}

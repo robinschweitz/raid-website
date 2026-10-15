@@ -7,7 +7,7 @@ import { RaidLootList } from '../components/RaidLootList'
 import { RaidBanner } from '../components/RaidBanner'
 import { RaidRosterBoard } from '../components/RaidRosterBoard'
 import { RaidSignups } from '../components/RaidSignups'
-import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Attendance, type AttendanceRole, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
+import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Absence, type Attendance, type AttendanceRole, type SignupOverview, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
 import { matchesCatalogItem } from '../catalog'
 import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
@@ -119,6 +119,7 @@ function RaidDetail({ raidID }: Props) {
   const [attCharacter, setAttCharacter] = useState('')
   const [attRole, setAttRole] = useState<AttendanceRole>('DD')
   const [characters, setCharacters] = useState<Character[]>([])
+  const [absences, setAbsences] = useState<Absence[]>([])
   const [characterSearch, setCharacterSearch] = useState('')
   const [quickAdd, setQuickAdd] = useState(false)
   const [quickAddName, setQuickAddName] = useState('')
@@ -189,18 +190,22 @@ function RaidDetail({ raidID }: Props) {
   }
   const visibleCatalogItems = modeCatalogItems.filter((item) => dropKey(item) === catalogItem || matchesCatalogItem(item, catalogSearch))
 
+  const absenceReasons = new Map(absences.map((row) => [row.player_id, row.reason]))
+  const declinedInRoster = attendance.filter((row) => absenceReasons.has(row.player_id))
+
   const load = useCallback(async () => {
     if (!isActive()) return
     const version = ++loadVersion.current
     setError('')
     try {
-      const [r, a, l, p, s, cs] = await Promise.all([
+      const [r, a, l, p, s, cs, ab] = await Promise.all([
         api.get<Raid>(`/api/v1/raids/${raidID}`),
         api.get<Attendance[]>(`/api/v1/raids/${raidID}/attendance`),
         api.get<RecordedLoot[]>(`/api/v1/raids/${raidID}/loot`),
         api.get<Player[]>('/api/v1/players'),
         api.get<RaidSeries[]>('/api/v1/raid-series'),
         api.get<Character[]>('/api/v1/characters'),
+        api.get<SignupOverview>(`/api/v1/raids/${raidID}/signups`).then((o) => o.absences ?? []).catch((): Absence[] => []),
       ])
       if (isActive() && version === loadVersion.current) {
         const context = JSON.stringify([r.catalog_instance_id ?? '', r.raid_size ?? null])
@@ -218,6 +223,7 @@ function RaidDetail({ raidID }: Props) {
         setLoot(l)
         setPlayers(p)
         setCharacters(cs)
+        setAbsences(ab)
         setSeries(s)
         setRaidName(r.name)
         setSeriesID(r.series_id ? String(r.series_id) : '')
@@ -552,7 +558,7 @@ function RaidDetail({ raidID }: Props) {
     if (!canManage || !raid || raid.archived_at || raid.status === 'CANCELLED' || (name !== 'archive' && !isActiveRaid)) return
     if (name === 'archive' && isActiveRaid && (!raid.series_id || !raid.scheduled_start)) return
     if (name === 'cancel' && !window.confirm('Raid wirklich absagen? Es werden keine EP vergeben.')) return
-    if (name === 'archive' && isActiveRaid && !window.confirm('Raid jetzt archivieren? Das beendet den Raid endgültig, vergibt EP und legt den nächsten Termin an.')) return
+    if (name === 'archive' && isActiveRaid && !window.confirm(`Raid jetzt archivieren? Das beendet den Raid endgültig, vergibt EP und legt den nächsten Termin an.${declinedInRoster.length ? `\n\nAchtung: ${[...new Set(declinedInRoster.map((row) => playerName(row.player_id)))].join(', ')} ${declinedInRoster.length === 1 ? 'hat' : 'haben'} abgesagt, ${declinedInRoster.length === 1 ? 'steht' : 'stehen'} aber noch in der Aufstellung und ${declinedInRoster.length === 1 ? 'erhält' : 'erhalten'} EP.` : ''}`)) return
     await submit(async () => {
       setError('')
       setMessage('')
@@ -787,7 +793,7 @@ function RaidDetail({ raidID }: Props) {
 
         </div>
         {rosterFiltered && <div className="roster-filter-result"><span className="muted" role="status">{visibleAttendance.length} von {attendance.length} Teilnehmern angezeigt.</span><button type="button" onClick={() => { setRosterSearch(''); setRosterRole(''); setRosterClass(''); setRosterBench('ALL'); setRosterIncomplete(false) }}>Filter zurücksetzen</button></div>}
-        <RaidRosterBoard attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
+        <RaidRosterBoard absences={absenceReasons} attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
         {canWrite && (
           <div>
             {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}

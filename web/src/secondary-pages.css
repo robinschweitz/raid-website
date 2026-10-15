@@ -193,10 +193,9 @@
 .roster-filter-result { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 8px 0; font-size: 12px; }
 .roster-filter-result button { min-height: 30px; padding: 2px 10px; font-size: 12px; }
 .secondary-page .inline-form > label.picker-field { flex: 1 1 100%; }
-.selection-chip { display: flex; flex: 1 1 100%; align-items: center; justify-content: space-between; gap: 10px; max-width: 100%; padding: 5px 6px 5px 12px; border: 1px solid #4e7890; border-left: 3px solid #7ad7ff; border-radius: 4px; background: #0c2739; color: #c7efff; font-size: 13px; overflow-wrap: anywhere; }
-.selection-chip > span { min-width: 0; }
-.selection-chip button { flex: 0 0 auto; min-height: 30px; padding: 2px 10px; color: #c7efff; background: transparent; border-color: transparent; font-size: 12px; white-space: nowrap; }
-.selection-chip button:hover:not(:disabled) { color: #fff; border-color: #7ad7ff; }
+.picker-row { display: flex; gap: 8px; align-items: stretch; }
+.picker-row > input { flex: 1 1 auto; min-width: 0; }
+.picker-row > button { flex: 0 0 auto; white-space: nowrap; }
 .field-hint { color: #aac4d3; font-size: 12px; }
 .attendance-flags { display: flex; flex: 0 1 auto; flex-wrap: wrap; gap: 4px 12px; min-width: 0; margin: 0; padding: 6px 10px 8px; border-color: #31536a; }
 .attendance-flags legend { padding-inline: 4px; color: #8fb6c9; font-size: 11px; }
@@ -335,7 +334,10 @@
   .raid-detail .raid-banner-content { padding: 20px; }
   .secondary-page .page-heading { padding: 16px; }
   .secondary-page .inline-form > label { flex-basis: 100%; }
-  .roster-filters > label, .attendance-flags, .selection-chip { flex-basis: 100%; }
+  .roster-filters > label, .attendance-flags { flex-basis: 100%; }
+  .picker-row { flex-wrap: wrap; }
+  .picker-row > input { flex: 1 1 100%; }
+  .picker-row > button { margin-left: auto; min-height: 36px; }
   .roster-filters > .check { min-height: 42px; }
   .secondary-page .inline-form > .primary-action { width: 100%; }
   .secondary-page .loot-boss-heading { align-items: flex-start; flex-direction: column; }

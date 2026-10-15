@@ -25,7 +25,12 @@ type RecordedLoot = LootAward & { award_method?: AwardMethod; enhanced_cost?: nu
 const dropKey = (item: CatalogItemDrop) => JSON.stringify([item.boss_id, item.item_id, item.raid_size, item.mode])
 const awardLabels: Record<AwardMethod, string> = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
 const awardMethod = (row: RecordedLoot): AwardMethod => row.award_method ?? (row.is_main_spec ? 'MAIN' : 'SECOND')
-const catalogItemLabel = (item: CatalogItemDrop) => `${item.name} · Item-ID ${item.item_id} · ${item.raid_size} Spieler · ${catalogModeLabels[item.mode]}${item.conditional ? ' · Bedingte Beute' : ''}`
+// The list is already limited to one boss, difficulty and raid size, so the name is enough.
+// The item ID is only added when two drops in that list share a name.
+const catalogItemLabel = (item: CatalogItemDrop, siblings: CatalogItemDrop[]) => {
+  const sameName = siblings.some((other) => other !== item && other.name === item.name)
+  return `${item.name}${item.conditional ? ' · Bedingte Beute' : ''}${sameName ? ` · Item-ID ${item.item_id}` : ''}`
+}
 
 const attendanceFlags = [
   { key: 'is_bench', label: 'Ersatzbank' },
@@ -172,7 +177,9 @@ function RaidDetail({ raidID }: Props) {
   const hasCatalogIdentity = (!!lootEditing && unchangedLootIdentity && unchangedLootRecipient)
     || (associated && catalogSourcesAvailable && !!selectedDrop && catalogBosses.some((boss) => boss.id === catalogBoss && boss.instance_id === raid?.catalog_instance_id))
   const catalogDifficulties = (Object.keys(catalogModeLabels) as (keyof typeof catalogModeLabels)[]).filter((mode) => catalogItems.some((item) => item.mode === mode))
-  const visibleCatalogItems = catalogItems.filter((item) => item.mode === catalogDifficulty && (dropKey(item) === catalogItem || matchesCatalogItem(item, catalogSearch)))
+  const modeCatalogItems = catalogItems.filter((item) => item.mode === catalogDifficulty)
+  const itemLabel = (item: CatalogItemDrop) => catalogItemLabel(item, modeCatalogItems)
+  const visibleCatalogItems = modeCatalogItems.filter((item) => dropKey(item) === catalogItem || matchesCatalogItem(item, catalogSearch))
 
   const load = useCallback(async () => {
     if (!isActive()) return
@@ -260,7 +267,15 @@ function RaidDetail({ raidID }: Props) {
   }, [raid?.catalog_instance_id, raid?.raid_size, catalogContext, canWrite, isActive])
 
   const playerName = (id: number) => players.find((p) => p.id === id)?.name ?? `#${id}`
-  const characterLabel = (character: Character) => `${character.name} · ${character.class} · ${playerName(character.player_id)} · #${character.id}${!character.active ? ' (inaktiv)' : ''}`
+  // The character ID is only shown when two characters would otherwise look identical.
+  const characterCore = (character: Character) => `${character.name} · ${character.class} · ${playerName(character.player_id)}`
+  const characterKey = (character: Character) => `${characterCore(character)}${character.active ? '' : ' (inaktiv)'}`
+  const characterKeyCounts = new Map<string, number>()
+  for (const character of characters) characterKeyCounts.set(characterKey(character), (characterKeyCounts.get(characterKey(character)) ?? 0) + 1)
+  const characterLabel = (character: Character) => {
+    const duplicate = (characterKeyCounts.get(characterKey(character)) ?? 0) > 1
+    return `${characterCore(character)}${duplicate ? ` · #${character.id}` : ''}${character.active ? '' : ' (inaktiv)'}`
+  }
   const visibleCharacters = characters.filter((character) => String(character.id) === attCharacter || characterLabel(character).toLocaleLowerCase('de').includes(characterSearch.toLocaleLowerCase('de')))
   const selectedAttendanceCharacter = characters.find((character) => character.id === Number(attCharacter) && character.player_id === Number(attPlayer))
   const rosterClasses = [...new Set(attendance.map((row) => row.class?.trim()).filter((value): value is string => !!value))].sort((a, b) => a.localeCompare(b, 'de'))
@@ -741,7 +756,7 @@ function RaidDetail({ raidID }: Props) {
             {!attEditing && !quickAdd && <button type="button" disabled={pending} onClick={() => { setQuickAddName(''); setQuickAdd(true) }}>Neuen Charakter anlegen</button>}
             {quickAdd ? <RaidQuickAdd key={quickAddName} initialQuery={quickAddName} raidID={raidID} players={players} options={classSpecs} needsReason={attNeedsReason} pending={pending} submit={submit} isActive={isActive} onCancel={() => setQuickAdd(false)} onAdded={async () => { setQuickAdd(false); await load() }} /> :
             <form className="inline-form" onSubmit={addAttendance}>
-              <label className="picker-field">Charakter auswählen<input type="search" list="attendance-character-options" aria-label="Teilnahme-Charakter" autoComplete="off" autoFocus={attEditing != null} disabled={pending || characters.length === 0} value={characterSearch} onChange={(e) => {
+              <label className="picker-field">Charakter auswählen<span className="picker-row"><input type="search" list="attendance-character-options" aria-label="Teilnahme-Charakter" autoComplete="off" autoFocus={attEditing != null} disabled={pending || characters.length === 0} value={characterSearch} onChange={(e) => {
                 if (!isActive() || isPending() || renderedCharacterVersion !== characterVersion.current) return
                 ++characterVersion.current
                 setCharacterSearch(e.target.value)
@@ -749,12 +764,11 @@ function RaidDetail({ raidID }: Props) {
                 setAttCharacter(selected ? String(selected.id) : '')
                 setAttPlayer(selected ? String(selected.player_id) : '')
                 setAttSnapshot(selected ? { character_name: selected.name, class: selected.class, spec: selected.main_spec } : {})
-              }} placeholder="Charaktername oder Spieler" required /></label>
+              }} placeholder="Charaktername oder Spieler" required />{selectedAttendanceCharacter && <button type="button" aria-label="Ausgewählten Charakter entfernen" disabled={pending} onClick={clearAttendanceCharacter}>Entfernen</button>}</span></label>
               <datalist id="attendance-character-options">
                 {visibleCharacters.map((character) => <option key={character.id} value={characterLabel(character)} />)}
               </datalist>
               {characterSearch.trim() && !selectedAttendanceCharacter && visibleCharacters.length === 0 && <p className="field-hint">Kein passender Charakter gefunden.</p>}
-              {selectedAttendanceCharacter && <span className="selection-chip character-selection"><span>Ausgewählt: {selectedAttendanceCharacter.name} · {playerName(selectedAttendanceCharacter.player_id)}</span><button type="button" aria-label="Ausgewählten Charakter entfernen" disabled={pending} onClick={clearAttendanceCharacter}>Entfernen</button></span>}
               <label>Gespeicherte Klasse<select aria-label="Gespeicherte Klasse" disabled={pending || hasAttCharacter} value={attSnapshot.class ?? ''} onChange={(e) => { changeSnapshot('class', e.target.value); changeSnapshot('spec', '') }}>
                 <option value="">Klasse wählen…</option>
                 {attSnapshot.class && !classSpecs[attSnapshot.class] && <option value={attSnapshot.class}>{attSnapshot.class} (gespeichert)</option>}
@@ -798,7 +812,7 @@ function RaidDetail({ raidID }: Props) {
             {attendance.length === 0 && <p className="muted">Keine Empfänger verfügbar: zuerst Charaktere in den Raidroster aufnehmen.</p>}
             <form className="inline-form" onSubmit={addLoot}>
               {associated ? <>
-                <p>Gespeicherter Eintrag: {lootBoss || 'Kein Boss gewählt'} · {lootItem || 'Kein Drop gewählt'}{lootItemID ? ` (Item-ID ${lootItemID})` : ''}</p>
+                {lootEditing && <p>Gespeicherter Eintrag: {lootBoss || 'Kein Boss gewählt'} · {lootItem || 'Kein Drop gewählt'}{lootItemID ? ` (Item-ID ${lootItemID})` : ''}</p>}
                 <label>Boss / Begegnung<select aria-label="Loot-Boss" disabled={pending || !catalogSourcesAvailable || catalogBosses.length === 0} value={catalogBoss} onChange={(e) => chooseCatalogBoss(e.target.value)}>
                   <option value="">{lootEditing ? 'Gespeicherte Loot-Identität beibehalten' : 'Boss wählen'}</option>
                   {catalogBoss && !catalogBosses.some((boss) => boss.id === catalogBoss) && <option value={catalogBoss}>Gespeicherter Boss (derzeit nicht verfügbar)</option>}
@@ -813,19 +827,21 @@ function RaidDetail({ raidID }: Props) {
                   {catalogDifficulties.length === 0 && <option value="">Zuerst Boss wählen</option>}
                   {catalogDifficulties.map((difficulty) => <option key={difficulty} value={difficulty}>{catalogModeLabels[difficulty]}</option>)}
                 </select></label>
-                <label className="picker-field">Item auswählen<input ref={lootItemInput} type="search" list="loot-item-options" aria-label="Loot-Item" autoComplete="off" disabled={pending || catalogItems.length === 0} value={catalogSearch} onChange={(e) => changeLoot(() => {
+                <label className="picker-field">Item auswählen<span className="picker-row"><input ref={lootItemInput} type="search" list="loot-item-options" aria-label="Loot-Item" autoComplete="off" disabled={pending || catalogItems.length === 0} value={catalogSearch} onChange={(e) => changeLoot(() => {
                   if (renderedCatalogVersion !== catalogVersion.current) return
-                  setCatalogSearch(e.target.value)
-                  const item = catalogItems.find((drop) => drop.mode === catalogDifficulty && (catalogItemLabel(drop) === e.target.value || dropKey(drop) === e.target.value))
+                  const typed = e.target.value
+                  const typedID = typed.trim()
+                  const item = modeCatalogItems.find((drop) => itemLabel(drop) === typed || dropKey(drop) === typed)
+                    ?? (/^\d+$/.test(typedID) ? modeCatalogItems.find((drop) => drop.item_id === typedID) : undefined)
+                  setCatalogSearch(item ? itemLabel(item) : typed)
                   setCatalogItem(item ? dropKey(item) : '')
                   setLootItem(item?.name ?? '')
                   setLootItemID(item?.item_id ?? '')
-                })} placeholder="Name oder Item-ID" required /></label>
+                })} placeholder="Name oder Item-ID" required />{selectedDrop && <button type="button" aria-label="Ausgewähltes Item entfernen" disabled={pending} onClick={() => changeLoot(() => { setCatalogItem(''); setCatalogSearch(''); setLootItem(''); setLootItemID('') })}>Entfernen</button>}</span></label>
                 <datalist id="loot-item-options">
-                  {visibleCatalogItems.map((item) => <option key={dropKey(item)} value={catalogItemLabel(item)} />)}
+                  {visibleCatalogItems.map((item) => <option key={dropKey(item)} value={itemLabel(item)} />)}
                 </datalist>
                 {catalogSearch.trim() && !selectedDrop && visibleCatalogItems.length === 0 && <p className="field-hint">Kein passendes Item für diesen Boss und Modus gefunden.</p>}
-                {selectedDrop && <span className="selection-chip"><span>Ausgewählt: {selectedDrop.name} · Item-ID {selectedDrop.item_id}</span><button type="button" aria-label="Ausgewähltes Item entfernen" disabled={pending} onClick={() => changeLoot(() => { setCatalogItem(''); setCatalogSearch(''); setLootItem(''); setLootItemID('') })}>Entfernen</button></span>}
                 {selectedDrop?.conditional && <p className="muted">Bedingte Beute.</p>}
               </> : <>
               {lootEditing && <p>Gespeicherte Identität: {lootBoss || 'Boss historisch nicht gespeichert'} · {lootItem} · Item-ID {lootItemID || 'historisch nicht gespeichert'}</p>}

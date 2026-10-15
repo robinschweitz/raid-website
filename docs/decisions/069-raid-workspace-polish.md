@@ -5,7 +5,10 @@ Status: Accepted. Amends ADR 068.
 ## Decision
 
 Picker inputs for attendance characters and catalog items use the full form width, and the
-selected value is shown in a full-width selection row with a clear action. Success messages stay
+clear action sits directly next to the field. Suggestions show names only: the item list is
+already limited to one boss, difficulty and raid size, and a character ID or item ID is added
+only when two entries would otherwise look identical. Typing an exact item ID still selects
+that item. Saved-record identities in the correction editor keep showing the item ID. Success messages stay
 visible while the user scrolls, can be closed, and are cleared when the user switches the raid
 tab; they do not use timers. While a roster filter is active, empty roles and the bench say
 "Keine Treffer" instead of "Noch nicht besetzt", and "Filter zurücksetzen" sits with the match

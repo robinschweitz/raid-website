@@ -1,8 +1,17 @@
-export const appVersion = '1.0.8'
+export const appVersion = '1.0.9'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Auswahl ohne interne IDs',
+    changes: [
+      'Charakter- und Item-Vorschläge zeigen nur noch Namen. Eine ID erscheint nur, wenn zwei Einträge sonst nicht zu unterscheiden wären.',
+      'Eine genau eingegebene Item-ID wählt weiterhin das passende Item aus.',
+      '„Entfernen“ steht direkt neben dem Auswahlfeld statt in einer zusätzlichen Zeile.',
+    ],
+  },
+  {
+    version: '1.0.8',
     title: 'Übersichtlichere Raidverwaltung',
     changes: [
       'Charakter- und Item-Auswahl nutzen die volle Breite, die Auswahl bleibt vollständig lesbar.',

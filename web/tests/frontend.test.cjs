@@ -506,11 +506,13 @@ test('selected attendance character can be cleared without retaining its identit
   await flush(view)
   select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
   view.render()
-  assert.match(text(view.tree), /Ausgewählt:\s+Char 10/)
-  nodes(view.tree, (node) => node.type === 'button' && node.props['aria-label'] === 'Ausgewählten Charakter entfernen')[0].props.onClick()
+  const clearButton = () => nodes(view.tree, (node) => node.type === 'button' && node.props['aria-label'] === 'Ausgewählten Charakter entfernen')[0]
+  assert.ok(clearButton())
+  clearButton().props.onClick()
   view.render()
   assert.equal(button(view, 'Hinzufügen').props.disabled, true)
-  assert.doesNotMatch(text(view.tree), /Ausgewählt:\s+Char 10/)
+  assert.equal(clearButton(), undefined)
+  assert.equal(select(view, 'Teilnahme-Charakter').props.value, '')
 })
 
 test('attendance save announces successful completion', async () => {
@@ -587,6 +589,39 @@ test('success message can be closed and does not follow the user to another tab'
   view.render()
   view.render() // the harness does not re-render after an effect sets state
   assert.doesNotMatch(text(view.tree), /Teilnahme hinzugefügt/)
+})
+
+test('character suggestions hide internal IDs unless two characters look identical', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { characters: [character(10, 1), { ...character(11, 1), name: 'Char 10' }, character(20, 2)].map((row) => ({ ...row, active: true })) })
+  await flush(view)
+  const values = nodes(suggestions(view, 'Teilnahme-Charakter'), (node) => node.type === 'option').map((node) => node.props.value)
+  assert.deepEqual(values, ['Char 10 · Priest · Spieler 1 · #10', 'Char 10 · Priest · Spieler 1 · #11', 'Char 20 · Priest · Spieler 2'])
+  select(view, 'Teilnahme-Charakter').props.onChange(change(values[1]))
+  view.render()
+  assert.equal(button(view, 'Hinzufügen').props.disabled, false)
+})
+
+test('an exact item ID selects the item while only the name is shown', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+  await flush(view)
+  const catalog = catalogFixture()
+  resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
+  await flush(view)
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
+  view.render()
+  const drops = itemDrops(catalog, 'boss:1', 25)
+  resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', drops)
+  await flush(view)
+  const wanted = drops.find((drop) => drop.mode === 'NORMAL')
+  select(view, 'Loot-Item').props.onChange(change(` ${wanted.item_id} `))
+  view.render()
+  assert.match(select(view, 'Loot-Item').props.value, /Katalogitem/)
+  assert.doesNotMatch(select(view, 'Loot-Item').props.value, new RegExp(String(wanted.item_id)))
+  assert.ok(nodes(view.tree, (node) => node.type === 'button' && node.props['aria-label'] === 'Ausgewähltes Item entfernen')[0])
 })
 
 for (const [label, submits] of [['Lock anlegen', true], ['Stornieren', false], ['Anlegen', true], ['Speichern', true]]) {
@@ -903,7 +938,8 @@ test('archived attendance edits in place, prefills saved values and PATCHes with
   assert.equal(checkbox(view, 'Ersatzbank').props.checked, false)
   assert.equal(input(view, 'Teilnahme-Begründung').props.value, '')
   await flush(view)
-  assert.match(select(view, 'Teilnahme-Charakter').props.value, /#11/)
+  assert.match(select(view, 'Teilnahme-Charakter').props.value, /Char 11/)
+  assert.doesNotMatch(select(view, 'Teilnahme-Charakter').props.value, /#11/)
   await form(view).props.onSubmit(event)
   assert.equal(writes(s).length, 0)
   select(view, 'Teilnahme-Rolle').props.onChange(change('TANK'))
@@ -1912,7 +1948,9 @@ test('associated loot filters by persisted instance and size, preserves mixed so
   view.render()
   assert.equal(resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25)), true)
   await flush(view)
-  assert.match(nodes(suggestions(view, 'Loot-Item'), (node) => node.type === 'option').map((node) => node.props.value).join(' '), /Katalogitem.*25\s+Spieler.*Normal/)
+  const itemSuggestions = nodes(suggestions(view, 'Loot-Item'), (node) => node.type === 'option').map((node) => node.props.value).join(' ')
+  assert.match(itemSuggestions, /Katalogitem/)
+  assert.doesNotMatch(itemSuggestions, /Item-ID|Spieler|Normal/)
   const variants = nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)
   assert.equal(variants.length, 1)
   assert.equal(select(view, 'Loot-Modus').props.value, 'NORMAL')
@@ -2184,8 +2222,7 @@ for (const code of ['catalog_item_invalid', 'request_id_required']) {
     view.render()
     assert.doesNotMatch(text(view.tree), /English server fallback/)
     assert.match(text(view.tree), code === 'catalog_item_invalid' ? /Zuordnung prüfen.*Beute erneut wählen/ : /Speicherschlüssel.*erneut speichern/)
-    assert.match(text(form(view, 1)), /Katalogitem/)
-    assert.notEqual(select(view, 'Loot-Item').props.value, '')
+    assert.match(select(view, 'Loot-Item').props.value, /Katalogitem/)
   })
 }
 

@@ -137,7 +137,8 @@ function text(tree) {
 const button = (view, label) => nodes(view.tree, (n) => n.type === 'button' && text(n) === label)[0]
 const form = (view, index = 0) => nodes(view.tree, (n) => n.type === 'form')[index]
 const input = (view, placeholder) => nodes(view.tree, (n) => n.type === 'input' && n.props.placeholder === placeholder)[0]
-const select = (view, label) => nodes(view.tree, (n) => n.type === 'select' && n.props['aria-label'] === label)[0]
+const select = (view, label) => nodes(view.tree, (n) => (n.type === 'select' || n.type === 'input') && n.props['aria-label'] === label)[0]
+const suggestions = (view, label) => nodes(view.tree, (n) => n.type === 'datalist' && n.props.id === select(view, label)?.props.list)[0]
 const checkbox = (view, label) => nodes(view.tree, (n) => n.type === 'label' && n.props.className === 'check' && text(n).trim() === label)[0].props.children[0]
 const event = { preventDefault() {} }
 const change = (value) => ({ target: { value } })
@@ -287,7 +288,7 @@ async function chooseSourceDrop(s, view) {
   view.render()
   resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
   await flush(view)
-  const option = nodes(select(view, 'Loot-Item'), (node) => node.type === 'option' && node.props.value)[0]
+  const option = nodes(suggestions(view, 'Loot-Item'), (node) => node.type === 'option' && node.props.value)[0]
   select(view, 'Loot-Item').props.onChange(change(option.props.value))
   view.render()
 }
@@ -482,7 +483,7 @@ test('player EP is read-only while switching players', async () => {
   assert.equal(button(view, 'Enhance würfeln'), undefined)
 })
 
-test('character search preserves selected identity and displays the matching owner', async () => {
+test('character search filters the suggestions and clears an unselected identity', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1)
@@ -491,9 +492,11 @@ test('character search preserves selected identity and displays the matching own
   view.render()
   input(view, 'Charaktername oder Spieler').props.onChange(change('Spieler 2'))
   view.render()
-  assert.equal(select(view, 'Teilnahme-Charakter').props.value, '10')
-  assert.match(text(select(view, 'Teilnahme-Charakter')), /Char 20.*Spieler 2/)
-  assert.doesNotMatch(text(select(view, 'Teilnahme-Charakter')), /Char 11/)
+  assert.equal(select(view, 'Teilnahme-Charakter').props.value, 'Spieler 2')
+  assert.equal(button(view, 'Hinzufügen').props.disabled, true)
+  const characterSuggestions = nodes(suggestions(view, 'Teilnahme-Charakter'), (node) => node.type === 'option').map((node) => node.props.value).join(' ')
+  assert.match(characterSuggestions, /Char 20.*Spieler 2/)
+  assert.doesNotMatch(characterSuggestions, /Char 11/)
 })
 
 for (const [label, submits] of [['Lock anlegen', true], ['Stornieren', false], ['Anlegen', true], ['Speichern', true]]) {
@@ -810,7 +813,7 @@ test('archived attendance edits in place, prefills saved values and PATCHes with
   assert.equal(checkbox(view, 'Ersatzbank').props.checked, false)
   assert.equal(input(view, 'Teilnahme-Begründung').props.value, '')
   await flush(view)
-  assert.equal(select(view, 'Teilnahme-Charakter').props.value, '11')
+  assert.match(select(view, 'Teilnahme-Charakter').props.value, /#11/)
   await form(view).props.onSubmit(event)
   assert.equal(writes(s).length, 0)
   select(view, 'Teilnahme-Rolle').props.onChange(change('TANK'))
@@ -1819,16 +1822,16 @@ test('associated loot filters by persisted instance and size, preserves mixed so
   view.render()
   assert.equal(resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25)), true)
   await flush(view)
-  assert.match(text(select(view, 'Loot-Item')), /Katalogitem.*25\s+Spieler.*Normal/)
-  const variants = nodes(select(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)
+  assert.match(nodes(suggestions(view, 'Loot-Item'), (node) => node.type === 'option').map((node) => node.props.value).join(' '), /Katalogitem.*25\s+Spieler.*Normal/)
+  const variants = nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)
   assert.equal(variants.length, 1)
   assert.equal(select(view, 'Loot-Modus').props.value, 'NORMAL')
   assert.deepEqual(nodes(select(view, 'Loot-Modus'), (node) => node.type === 'option').map((node) => node.props.value), ['NORMAL', 'HEROIC'])
   assert.doesNotMatch(text(select(view, 'Loot-Modus')), /source:|Alle|Lootmodus|Difficulty/)
   select(view, 'Loot-Modus').props.onChange(change('HEROIC'))
   view.render()
-  assert.equal(nodes(select(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value).length, 1)
-  select(view, 'Loot-Item').props.onChange(change(nodes(select(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0].props.value))
+  assert.equal(nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value).length, 1)
+  select(view, 'Loot-Item').props.onChange(change(nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0].props.value))
   select(view, 'Loot-Empfänger').props.onChange(change('20'))
   select(view, 'Loot-Vergabemethode').props.onChange(change('ENHANCED'))
   view.render()
@@ -1962,7 +1965,7 @@ test('associated correction sends changed catalog ID and item ID only; recipient
   view.render()
   resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
   await flush(view)
-  const drop = nodes(select(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0]
+  const drop = nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0]
   select(view, 'Loot-Item').props.onChange(change(drop.props.value))
   view.render()
   const save = form(view, 1).props.onSubmit(event)
@@ -1990,7 +1993,7 @@ test('same catalog item recipient correction omits unchanged catalog IDs and met
   view.render()
   resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
   await flush(view)
-  select(view, 'Loot-Item').props.onChange(change(nodes(select(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0].props.value))
+  select(view, 'Loot-Item').props.onChange(change(nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0].props.value))
   select(view, 'Loot-Empfänger').props.onChange(change('20'))
   assert.equal(input(view, 'Loot-Begründung'), undefined)
   view.render()
@@ -2072,7 +2075,7 @@ test('boss switch discards obsolete item variants and prevents stale variant han
   await flush(view)
   assert.equal(select(view, 'Loot-Item').props.disabled, true)
   assert.equal(select(view, 'Loot-Item').props.value, '')
-  assert.doesNotMatch(text(select(view, 'Loot-Item')), /Katalogitem/)
+  assert.doesNotMatch(text(suggestions(view, 'Loot-Item')), /Katalogitem/)
 })
 
 for (const code of ['catalog_item_invalid', 'request_id_required']) {

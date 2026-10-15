@@ -1,8 +1,17 @@
-export const appVersion = '1.0.11'
+export const appVersion = '1.0.12'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Alle Hinzufügen-Formulare oben',
+    changes: [
+      '„Neue Raidserie“, „Neue Umfrage“, „Gildenrang hinzufügen“, „Raidgruppe hinzufügen“ sowie „Charakter hinzufügen/beanspruchen“ stehen jetzt oberhalb der Listen.',
+      'Nach „Hinzufügen“ bleibt die Teilnahme-Eingabe offen und der Cursor steht wieder im Charakterfeld, damit sich mehrere Charaktere hintereinander eintragen lassen.',
+      'Leere Listen erklären, womit man beginnt (Loot, Raids, Umfragen, Raidserien).',
+    ],
+  },
+  {
+    version: '1.0.11',
     title: 'Formulare zuerst, schnellere Lootvergabe',
     changes: [
       '„Loot erfassen“, „Teilnahme hinzufügen“, „Neuer Raid“ und „Neuer Spieler“ stehen jetzt oberhalb der Listen statt ganz unten.',

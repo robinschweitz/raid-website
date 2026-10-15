@@ -164,7 +164,7 @@ export function RaidsPage() {
           {visibleRaids.length === 0 && (
             <tr>
               <td colSpan={4} className="muted">
-                Noch keine Raids.
+                {canManage ? 'Noch keine Raids. Mit „Neuer Raid“ den ersten Termin anlegen.' : 'Noch keine Raids.'}
               </td>
             </tr>
           )}

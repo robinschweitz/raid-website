@@ -93,6 +93,8 @@ function RaidDetail({ raidID }: Props) {
   const lootFormVersion = useRef(0)
   const lootEditorVersion = useRef(0)
   const lootItemInput = useRef<HTMLInputElement>(null)
+  const attCharacterInput = useRef<HTMLInputElement>(null)
+  const focusAttendanceInput = useRef(false)
   const lootRecipientInput = useRef<HTMLInputElement>(null)
   const focusLootItem = useRef(false)
   const lootRequest = useRef<{ payload: string; id: string } | null>(null)
@@ -311,6 +313,12 @@ function RaidDetail({ raidID }: Props) {
   }, [view])
 
   useEffect(() => {
+    if (!focusAttendanceInput.current) return
+    focusAttendanceInput.current = false
+    attCharacterInput.current?.focus()
+  }, [attendance])
+
+  useEffect(() => {
     if (!message) return undefined
     const timer = setTimeout(() => setMessage(''), 8000)
     return () => clearTimeout(timer)
@@ -459,6 +467,7 @@ function RaidDetail({ raidID }: Props) {
         setAttDetails({ is_bench: false, late_join: false, early_leave: false })
         setAttReason('')
         setAttSnapshot({})
+        focusAttendanceInput.current = !attEditing
         setMessage(attEditing ? 'Teilnahme-Korrektur gespeichert.' : 'Teilnahme hinzugefügt.')
         await load()
       } catch (err) {
@@ -782,7 +791,7 @@ function RaidDetail({ raidID }: Props) {
             {!attEditing && !quickAdd && <button type="button" disabled={pending} onClick={() => { setQuickAddName(''); setQuickAdd(true) }}>Neuen Charakter anlegen</button>}
             {quickAdd ? <RaidQuickAdd key={quickAddName} initialQuery={quickAddName} raidID={raidID} players={players} options={classSpecs} needsReason={attNeedsReason} pending={pending} submit={submit} isActive={isActive} onCancel={() => setQuickAdd(false)} onAdded={async () => { setQuickAdd(false); await load() }} /> :
             <form className="inline-form" onSubmit={addAttendance}>
-              <label className="picker-field">Charakter auswählen<span className="picker-row"><input type="search" list="attendance-character-options" aria-label="Teilnahme-Charakter" autoComplete="off" autoFocus={attEditing != null} disabled={pending || characters.length === 0} value={characterSearch} onChange={(e) => {
+              <label className="picker-field">Charakter auswählen<span className="picker-row"><input ref={attCharacterInput} type="search" list="attendance-character-options" aria-label="Teilnahme-Charakter" autoComplete="off" autoFocus={attEditing != null} disabled={pending || characters.length === 0} value={characterSearch} onChange={(e) => {
                 if (!isActive() || isPending() || renderedCharacterVersion !== characterVersion.current) return
                 ++characterVersion.current
                 setCharacterSearch(e.target.value)

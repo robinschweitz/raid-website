@@ -38,3 +38,10 @@ hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetz
 - Neben „Vergeben“ erklärt ein Hinweis, was fehlt. Items, die in diesem Raid schon vergeben wurden,
   tragen „bereits n× vergeben“; mehrfaches Vergeben bleibt erlaubt (mehrere Exemplare, BoE).
 - Enter im Item-Feld fokussiert den Empfänger; Erfolgsmeldungen schließen sich nach 8 Sekunden.
+
+## Nachtrag: Restliche Hinzufügen-Formulare, Mehrfach-Erfassung, leere Zustände
+
+- Auch „Neue Raidserie“, „Neue Umfrage“, „Gildenrang/Raidgruppe hinzufügen“ und die Charakter-Formulare
+  im Spielerprofil stehen oberhalb ihrer Listen.
+- Nach dem Hinzufügen einer Teilnahme bleibt der Abschnitt offen und der Fokus kehrt ins Charakterfeld zurück.
+- Leere Listen nennen für berechtigte Rollen die passende Aktion; andere Rollen sehen den bisherigen Kurztext.

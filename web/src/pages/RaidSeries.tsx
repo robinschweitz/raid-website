@@ -101,6 +101,7 @@ export function RaidSeriesPage() {
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Raidserien</h1></div></div>
     <p className="muted">Beim Archivieren entsteht der nächste zukünftige Termin nach dieser Konfiguration. Die Wiederholung verwendet die konfigurierte IANA-Zeitzone, nicht die Browser-Zeitzone.</p>
     {error && <p className="error" role="alert">{error}</p>}
+    {isAdmin && editingID === null && <details className="card editor-disclosure"><summary>Neue Raidserie</summary>{editorForm}</details>}
     <ul className="series-directory">{series.map((s) => <li className={`card${editingID === s.id ? ' is-editing' : ''}`} key={s.id}>
       <h2>{s.name}</h2>
       {isAdmin && editingID === s.id ? editorForm : <>
@@ -111,7 +112,6 @@ export function RaidSeriesPage() {
         {isAdmin && <button disabled={pending} onClick={() => edit(s)}>Serie bearbeiten</button>}
       </>}
     </li>)}</ul>
-    {series.length === 0 && <p className="muted">Keine Raidserien konfiguriert.</p>}
-    {isAdmin && editingID === null && <details className="card editor-disclosure"><summary>Neue Raidserie</summary>{editorForm}</details>}
+    {series.length === 0 && <p className="muted">{isAdmin ? 'Keine Raidserien konfiguriert. Mit „Neue Raidserie“ die erste anlegen.' : 'Keine Raidserien konfiguriert.'}</p>}
   </div>
 }

@@ -108,6 +108,41 @@ export function PollsPage() {
       {error && <p className="error">{error}</p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
+      {canManage && (
+        <details className="card editor-disclosure"><summary>Neue Umfrage</summary>
+        <form className="card" onSubmit={createPoll}>
+          <label>
+            Titel
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+          </label>
+          <label>
+            Beschreibung
+            <input value={description} onChange={(e) => setDescription(e.target.value)} />
+          </label>
+          <label>
+            Art
+            <select value={pollType} onChange={(e) => { setPollType(e.target.value as PollType); if (e.target.value === 'TEXT') setAllowMultiple(false) }}>
+              <option value="TEXT">Freitext</option>
+              <option value="CHOICE">Vordefinierte Antworten</option>
+            </select>
+          </label>
+          {pollType === 'CHOICE' && (
+            <>
+              <label>
+                Antworten, eine pro Zeile
+                <textarea value={optionsText} onChange={(e) => setOptionsText(e.target.value)} required />
+              </label>
+              <label className="inline-choice">
+                <input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} />
+                Mehrere Antworten erlauben
+              </label>
+            </>
+          )}
+          <button type="submit" disabled={pending}>Anlegen</button>
+        </form>
+        </details>
+      )}
+
       <div className="poll-directory">{polls.map((p) => (
         <section className="card" key={p.id}>
           <h2>
@@ -159,42 +194,8 @@ export function PollsPage() {
           )}
         </section>
       ))}</div>
-      {polls.length === 0 && <p className="muted">Keine Umfragen.</p>}
+      {polls.length === 0 && <p className="muted">{canManage ? 'Noch keine Umfragen. Mit „Neue Umfrage“ die erste starten.' : 'Keine Umfragen.'}</p>}
 
-      {canManage && (
-        <details className="card editor-disclosure"><summary>Neue Umfrage</summary>
-        <form className="card" onSubmit={createPoll}>
-          <label>
-            Titel
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-          </label>
-          <label>
-            Beschreibung
-            <input value={description} onChange={(e) => setDescription(e.target.value)} />
-          </label>
-          <label>
-            Art
-            <select value={pollType} onChange={(e) => { setPollType(e.target.value as PollType); if (e.target.value === 'TEXT') setAllowMultiple(false) }}>
-              <option value="TEXT">Freitext</option>
-              <option value="CHOICE">Vordefinierte Antworten</option>
-            </select>
-          </label>
-          {pollType === 'CHOICE' && (
-            <>
-              <label>
-                Antworten, eine pro Zeile
-                <textarea value={optionsText} onChange={(e) => setOptionsText(e.target.value)} required />
-              </label>
-              <label className="inline-choice">
-                <input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} />
-                Mehrere Antworten erlauben
-              </label>
-            </>
-          )}
-          <button type="submit" disabled={pending}>Anlegen</button>
-        </form>
-        </details>
-      )}
     </div>
   )
 }

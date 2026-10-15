@@ -2040,6 +2040,70 @@ test('loot form: recipient type-ahead, submit hint, awarded marker and Enter mov
   assert.doesNotMatch(text(view.tree), /Empfänger-Charakter wählen\./)
 })
 
+test('Enter in the item field moves focus to the recipient and other keys do not', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  const catalog = catalogFixture()
+  resolveRaid(s, 1, { raid: { catalog_instance_id: 'map:631', raid_size: 25 }, attendance: [recipientRow], catalog })
+  await flush(view)
+  resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
+  await flush(view)
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
+  view.render()
+  resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
+  await flush(view)
+  let focused = 0
+  select(view, 'Loot-Empfänger').props.ref.current = { focus: () => { focused += 1 } }
+  const enter = () => select(view, 'Loot-Item').props.onKeyDown({ key: 'Enter', preventDefault() {} })
+  enter()
+  assert.equal(focused, 0, 'no item chosen yet: Enter does not jump')
+  select(view, 'Loot-Item').props.onChange(change(nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option')[0].props.value))
+  view.render()
+  select(view, 'Loot-Item').props.onKeyDown({ key: 'a', preventDefault() {} })
+  assert.equal(focused, 0)
+  enter()
+  assert.equal(focused, 1)
+})
+
+test('success messages close themselves after a few seconds', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  const timers = []
+  const realSetTimeout = global.setTimeout
+  global.setTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length }
+  try {
+    resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+    await flush(view)
+    await chooseSourceDrop(s, view)
+    select(view, 'Loot-Empfänger').props.onChange(change('20'))
+    view.render()
+    const submit = form(view, 1).props.onSubmit(event)
+    writes(s)[0].resolve({ id: 9 })
+    await flush(view)
+    resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+    await submit
+    await flush(view)
+    const toast = () => nodes(view.tree, (n) => n.props?.className === 'success-message')
+    assert.equal(toast().length, 1)
+    assert.match(text(toast()), /Loot vergeben\./)
+    const dismiss = timers.filter((t) => t.ms === 8000).pop()
+    assert.ok(dismiss, 'an 8 second dismiss timer is armed')
+    dismiss.fn()
+    view.render()
+    assert.equal(toast().length, 0)
+  } finally {
+    global.setTimeout = realSetTimeout
+  }
+})
+
+test('empty loot list tells staff how to start', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+  await flush(view)
+  assert.match(text(view.tree), /Noch kein Loot vergeben\. Mit „Loot erfassen“/)
+})
+
 test('unsaved association is preview only; saved context invalidates old loot requests and handlers', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })

@@ -57,6 +57,8 @@ export function matchRaidSetup(setup: RaidSetup, attendance: Attendance[]) {
       if (visited.has(playerIndex)) continue
       visited.add(playerIndex)
       const previous = matchedPlayerToSlot.get(playerIndex)
+      // A flexible requirement must never displace an already fulfilled specific spec.
+      if (previous !== undefined && slots[slotIndex].label.startsWith('Irgendein ') && !slots[previous].label.startsWith('Irgendein ')) continue
       if (previous === undefined || assign(previous, visited)) {
         matchedPlayerToSlot.set(playerIndex, slotIndex)
         return true
@@ -64,9 +66,9 @@ export function matchRaidSetup(setup: RaidSetup, attendance: Attendance[]) {
     }
     return false
   }
-  // Assign flexible slots first so specific slots can displace them during augmentation.
+  // Fill specific slots first and protect them from flexible-slot reassignment.
   const ordered = slots.map((_, index) => index).sort((left, right) =>
-    candidates[right].length - candidates[left].length || slots[left].index - slots[right].index)
+    candidates[left].length - candidates[right].length || slots[left].index - slots[right].index)
   for (const slotIndex of ordered) assign(slotIndex, new Set())
   const matched = new Set(matchedPlayerToSlot.values())
   const missingSlots = slots.filter((_, index) => !matched.has(index))

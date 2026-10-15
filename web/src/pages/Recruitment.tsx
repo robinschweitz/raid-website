@@ -1,22 +1,23 @@
 import { useEffect, useState } from 'react'
 import type { Attendance } from '../types'
-import { defaultRecruitmentTemplate, recruitmentRoles, renderRecruitmentText } from '../recruitmentText'
+import { defaultRecruitmentTemplate, recruitmentRoles, recruitmentStorageKey, renderRecruitmentText } from '../recruitmentText'
 import { iccIdealSetup, matchRaidSetup, setupOptions, type RaidSetup } from '../raidSetup'
 
 interface Props {
   raidID: number
+  seriesID?: number | null
   attendance: Attendance[]
   onRefresh: () => Promise<void>
 }
 
 interface StoredTemplate { text: string; setup: RaidSetup }
 const defaultSetup = () => iccIdealSetup.map((group) => [...group])
-const storageKey = (raidID: number) => `raid-recruitment-template-v1:${raidID}`
 
-function loadTemplate(raidID: number): StoredTemplate {
+function loadTemplate(raidID: number, seriesID?: number | null): StoredTemplate {
   const fallback = { text: defaultRecruitmentTemplate, setup: defaultSetup() }
   try {
-    const saved = window.localStorage.getItem(storageKey(raidID))
+    // Templates saved for a single raid before series-wide storage are still picked up once.
+    const saved = window.localStorage.getItem(recruitmentStorageKey(raidID, seriesID)) ?? window.localStorage.getItem(recruitmentStorageKey(raidID))
     if (!saved) return fallback
     const parsed: unknown = JSON.parse(saved)
     if (typeof parsed !== 'object' || parsed === null) return fallback
@@ -29,15 +30,15 @@ function loadTemplate(raidID: number): StoredTemplate {
   }
 }
 
-export function RaidRecruitment({ raidID, attendance, onRefresh }: Props) {
+export function RaidRecruitment({ raidID, seriesID, attendance, onRefresh }: Props) {
   const [template, setTemplate] = useState<StoredTemplate>({ text: defaultRecruitmentTemplate, setup: defaultSetup() })
   const [error, setError] = useState('')
   const [copyStatus, setCopyStatus] = useState('')
 
   useEffect(() => {
-    setTemplate(loadTemplate(raidID))
+    setTemplate(loadTemplate(raidID, seriesID))
     setCopyStatus('')
-  }, [raidID])
+  }, [raidID, seriesID])
 
   useEffect(() => {
     const timer = window.setInterval(() => { void onRefresh() }, 15000)
@@ -48,7 +49,7 @@ export function RaidRecruitment({ raidID, attendance, onRefresh }: Props) {
     setTemplate(next)
     setCopyStatus('')
     try {
-      window.localStorage.setItem(storageKey(raidID), JSON.stringify(next))
+      window.localStorage.setItem(recruitmentStorageKey(raidID, seriesID), JSON.stringify(next))
     } catch {
       setError('Vorlage konnte in diesem Browser nicht gespeichert werden.')
     }
@@ -67,7 +68,7 @@ export function RaidRecruitment({ raidID, attendance, onRefresh }: Props) {
 
   return <div>
     <p className="muted">Die Zahlen werden aus der gespeicherten Raidaufstellung berechnet und alle 15 Sekunden aktualisiert. Ersatzbank-Spieler zählen nicht als besetzte Plätze.</p>
-    <p className="muted">Vorlage und Soll-Besetzung werden pro Raid in diesem Browser gespeichert, nicht auf dem Server.</p>
+    <p className="muted">Vorlage und Soll-Besetzung werden {seriesID ? 'für die ganze Raidserie' : 'für diesen Raid'} in diesem Browser gespeichert, nicht auf dem Server.</p>
     {error && <p className="error" role="alert">{error}</p>}
     <section className="card">
       <h2>Raid und Soll-Besetzung</h2>

@@ -40,3 +40,11 @@ test('updates all occurrences of placeholders and leaves custom wording intact',
     'Noch 1 Tank, 3 RDD, 5 MDD! 1 Tank.')
   assert.equal(renderRecruitmentText('{{OTHER}}', missing), '{{OTHER}}')
 })
+
+test('recruitment template is stored per series so next week\'s raid keeps it', () => {
+  const { recruitmentStorageKey } = load('recruitmentText.ts', { './raidRoster': grouping })
+  assert.equal(recruitmentStorageKey(5, 3), recruitmentStorageKey(9, 3))
+  assert.notEqual(recruitmentStorageKey(5, 3), recruitmentStorageKey(5, 4))
+  assert.notEqual(recruitmentStorageKey(5), recruitmentStorageKey(9))
+  assert.equal(recruitmentStorageKey(5, null), recruitmentStorageKey(5))
+})

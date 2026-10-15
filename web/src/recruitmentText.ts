@@ -35,3 +35,8 @@ export function renderRecruitmentText(template: string, missing: RecruitmentTarg
 }
 
 export const defaultRecruitmentTemplate = 'Wir suchen noch {{TANK}} Tanks, {{HEAL}} Heiler, {{RDD}} RDDs und {{MDD}} MDDs.'
+
+// Recurring raids create a new raid every week, so a template belongs to the
+// series; raids without a series keep their own template.
+export const recruitmentStorageKey = (raidID: number, seriesID?: number | null) =>
+  seriesID ? `raid-recruitment-template-v2:series:${seriesID}` : `raid-recruitment-template-v1:${raidID}`

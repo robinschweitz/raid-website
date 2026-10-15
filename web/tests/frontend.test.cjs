@@ -544,6 +544,51 @@ test('roster filters are display-only and can be reset', async () => {
   assert.match(text(roster()), /Andere Figur/)
 })
 
+test('roster filters say there are no matches instead of an unfilled slot', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { attendance: [recipientRow] })
+  await flush(view)
+  const roster = () => nodes(view.tree, (node) => node.type === 'section' && node.props.id === 'raid-roster')[0]
+  assert.match(text(roster()), /Noch nicht besetzt/)
+  assert.doesNotMatch(text(roster()), /Keine Treffer/)
+  input(view, 'Charakter oder Spieler').props.onChange(change('gibt es nicht'))
+  view.render()
+  assert.match(text(roster()), /Keine Treffer auf der Ersatzbank/)
+  assert.match(text(roster()), /0\s+von\s+1\s+Teilnehmern angezeigt/)
+  assert.doesNotMatch(text(roster()), /Noch nicht besetzt/)
+})
+
+test('success message can be closed and does not follow the user to another tab', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1)
+  await flush(view)
+  const closeButton = () => nodes(view.tree, (node) => node.type === 'button' && node.props['aria-label'] === 'Meldung schließen')[0]
+  const addCharacter = async () => {
+    select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
+    view.render()
+    const saving = form(view).props.onSubmit(event)
+    writes(s).at(-1).resolve({ id: 1 })
+    await flush(view)
+    resolveRaid(s, 1)
+    await saving
+    view.render()
+  }
+  await addCharacter()
+  assert.match(text(view.tree), /Teilnahme hinzugefügt/)
+  closeButton().props.onClick()
+  view.render()
+  assert.doesNotMatch(text(view.tree), /Teilnahme hinzugefügt/)
+  assert.equal(closeButton(), undefined)
+  await addCharacter()
+  assert.match(text(view.tree), /Teilnahme hinzugefügt/)
+  nodes(view.tree, (node) => node.type === 'button' && node.props['aria-controls'] === 'raid-loot')[0].props.onClick()
+  view.render()
+  view.render() // the harness does not re-render after an effect sets state
+  assert.doesNotMatch(text(view.tree), /Teilnahme hinzugefügt/)
+})
+
 for (const [label, submits] of [['Lock anlegen', true], ['Stornieren', false], ['Anlegen', true], ['Speichern', true]]) {
   test(`player mutation ${label} blocks same-tick duplicates`, async () => {
     const s = setup()

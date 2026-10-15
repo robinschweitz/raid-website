@@ -57,7 +57,9 @@
 .secondary-page input:not([type='checkbox']):not([type='color']),
 .secondary-page select { min-height: 40px; background-color: #091827; }
 .secondary-page .inline-form > p { margin-block: 0; font-size: 12px; }
-.secondary-page .success-message { padding: 9px 12px; border-left: 2px solid #7ad7ff; background: #0c2a3c; color: #c7efff; }
+.secondary-page .success-message { position: sticky; top: 12px; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; padding: 8px 8px 8px 14px; border: 1px solid #3f7f9c; border-left: 3px solid #7ad7ff; border-radius: 4px; background: #0c2a3c; color: #c7efff; box-shadow: 0 8px 24px #02080f99; }
+.secondary-page .success-message button { flex: 0 0 auto; min-height: 30px; padding: 2px 10px; color: #c7efff; background: transparent; border-color: transparent; font-size: 12px; }
+.secondary-page .success-message button:hover:not(:disabled) { color: #fff; border-color: #7ad7ff; }
 .secondary-page .primary-action { color: #06111c; background: linear-gradient(135deg, #7ad7ff, #d7f4ff); border-color: #d7f4ff; font-weight: 700; }
 .secondary-page .primary-action:hover:not(:disabled) { border-color: #fff; box-shadow: 0 0 14px #7ad7ff55; }
 .secondary-page .archive-action { color: #ffe1a8; border-color: #a87d3c; background: #302313; }
@@ -128,7 +130,7 @@
 .setup-meta .badge { background: #091827b8; padding: 4px 9px; }
 .setup-note { white-space: pre-wrap; overflow-wrap: anywhere; }
 .setup-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.setup-column { --role-color: #82ceef; background: linear-gradient(160deg, #10273a, #071521); border: 1px solid #31536a; border-top: 2px solid var(--role-color); border-radius: 8px; min-width: 0; }
+.setup-column { --role-color: #82ceef; background: linear-gradient(160deg, #10273a, #071521); border: 1px solid #31536a; border-top: 2px solid var(--role-color); border-radius: 8px; min-width: 0; overflow: hidden; }
 .setup-column > header, .setup-bench > header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; gap: 12px; border-bottom: 1px solid #28485e; }
 .setup-column h3, .setup-bench h3 { margin: 0; font-size: 13px; }
 .setup-column h3 > span { color: var(--role-color); margin-right: 6px; }
@@ -185,19 +187,20 @@
 .secondary-page .raid-loot .inline-form { padding: 14px; border: 1px solid #284356; border-radius: 4px; background: #07152380; }
 .secondary-page .raid-loot .inline-form > p { flex-basis: 100%; margin: 0; }
 .roster-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 14px 0 6px; padding: 12px; border: 1px solid #284356; border-radius: 4px; background: #07152380; }
-.roster-filters > label { flex: 1 1 140px; min-width: 0; }
+.roster-filters > label { flex: 1 1 150px; min-width: 0; }
+.roster-filters > .filter-search { flex: 2 1 220px; }
 .roster-filters > .check { flex: 0 1 auto; min-height: 40px; }
-.roster-filters button { align-self: end; }
-.roster-filter-result { margin: 8px 0; font-size: 12px; }
-.selection-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 4px 6px 4px 10px; border: 1px solid #4e7890; border-radius: 999px; background: #0c2739; color: #c7efff; font-size: 12px; overflow-wrap: anywhere; }
+.roster-filter-result { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 8px 0; font-size: 12px; }
+.roster-filter-result button { min-height: 30px; padding: 2px 10px; font-size: 12px; }
+.secondary-page .inline-form > label.picker-field { flex: 1 1 100%; }
+.selection-chip { display: flex; flex: 1 1 100%; align-items: center; justify-content: space-between; gap: 10px; max-width: 100%; padding: 5px 6px 5px 12px; border: 1px solid #4e7890; border-left: 3px solid #7ad7ff; border-radius: 4px; background: #0c2739; color: #c7efff; font-size: 13px; overflow-wrap: anywhere; }
 .selection-chip > span { min-width: 0; }
-.selection-chip button { min-height: 28px; padding: 2px 7px; color: #c7efff; background: transparent; border-color: transparent; font-size: 11px; }
+.selection-chip button { flex: 0 0 auto; min-height: 30px; padding: 2px 10px; color: #c7efff; background: transparent; border-color: transparent; font-size: 12px; white-space: nowrap; }
 .selection-chip button:hover:not(:disabled) { color: #fff; border-color: #7ad7ff; }
 .field-hint { color: #aac4d3; font-size: 12px; }
 .attendance-flags { display: flex; flex: 0 1 auto; flex-wrap: wrap; gap: 4px 12px; min-width: 0; margin: 0; padding: 6px 10px 8px; border-color: #31536a; }
 .attendance-flags legend { padding-inline: 4px; color: #8fb6c9; font-size: 11px; }
 .attendance-flags .check { flex: 0 1 auto; }
-.setup-column > header, .setup-bench > header { position: sticky; top: 0; z-index: 2; background: #0c2233; }
 .loot-boss-heading { position: sticky; top: 0; z-index: 2; }
 .secondary-page .profile-header { background: linear-gradient(100deg, #0b1c2a, #102d4380), url('/banners/icecrown.jpg') center / cover; padding: 28px; }
 .character-profile-page .character-hero { display: flex; align-items: center; gap: 18px; position: relative; overflow: visible; background: radial-gradient(circle at 14% 0%, #244a68b3, transparent 34%), linear-gradient(100deg, #091724, #102c42); }
@@ -326,14 +329,14 @@
   .setup-board, .setup-bench ul, .poll-directory, .series-directory { grid-template-columns: minmax(0, 1fr); }
   .statistics-summary, .statistics-grid { grid-template-columns: minmax(0, 1fr); }
   .secondary-page .card { padding: 16px; }
-  .secondary-page .workspace-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
-  .secondary-page .workspace-tabs button { flex: 0 0 auto; padding: 12px; white-space: nowrap; }
+  .secondary-page .workspace-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .secondary-page .workspace-tabs button { padding: 12px 8px; }
+  .secondary-page .workspace-tabs button:nth-child(n + 3) { border-top: 1px solid #29485e; }
   .raid-detail .raid-banner-content { padding: 20px; }
   .secondary-page .page-heading { padding: 16px; }
   .secondary-page .inline-form > label { flex-basis: 100%; }
-  .roster-filters > label, .roster-filters > button, .attendance-flags, .selection-chip { flex-basis: 100%; }
+  .roster-filters > label, .attendance-flags, .selection-chip { flex-basis: 100%; }
   .roster-filters > .check { min-height: 42px; }
-  .selection-chip { border-radius: 5px; justify-content: space-between; }
   .secondary-page .inline-form > .primary-action { width: 100%; }
   .secondary-page .loot-boss-heading { align-items: flex-start; flex-direction: column; }
   .character-profile-page .character-hero { align-items: flex-start; flex-direction: column; }

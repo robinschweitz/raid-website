@@ -275,6 +275,12 @@ function RaidDetail({ raidID }: Props) {
     return !rosterIncomplete || !row.character_name?.trim() || !row.class?.trim() || !row.spec?.trim()
   })
 
+  const rosterFiltered = !!rosterSearch.trim() || !!rosterRole || !!rosterClass || rosterBench !== 'ALL' || rosterIncomplete
+
+  useEffect(() => {
+    setMessage('')
+  }, [view])
+
   useEffect(() => {
     if (!focusLootItem.current || catalogItems.length === 0) return
     focusLootItem.current = false
@@ -646,7 +652,7 @@ function RaidDetail({ raidID }: Props) {
         {raid.archived_at && <p className="muted">Archivierte Historie: Änderungen an Roster und Loot erfordern eine Begründung.</p>}
       </RaidBanner>
       {error && <p className="error">{error}</p>}
-      {message && <p className="success-message" role="status">{message}</p>}
+      {message && <p className="success-message" role="status"><span>{message}</span><button type="button" aria-label="Meldung schließen" onClick={() => setMessage('')}>Schließen</button></p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
       <nav className="workspace-tabs" aria-label="Raidbereiche">
         <button type="button" aria-pressed={view === 'signups'} aria-controls="raid-signups" onClick={() => setView('signups')}>Anmeldungen</button>
@@ -718,24 +724,24 @@ function RaidDetail({ raidID }: Props) {
       <section id="raid-roster" hidden={view !== 'roster'} className="card raid-roster" aria-label="Raidroster">
         <div className="section-heading"><h2>Raidaufstellung</h2><span className="muted">{attendance.filter((row) => !row.is_bench).length} im Raid · {attendance.filter((row) => row.is_bench).length} auf der Ersatzbank</span></div>
         <div className="roster-filters" aria-label="Aufstellung filtern">
-          <label>Aufstellung filtern<input type="search" value={rosterSearch} onChange={(event) => setRosterSearch(event.target.value)} placeholder="Charakter oder Spieler" /></label>
+          <label className="filter-search">Aufstellung filtern<input type="search" value={rosterSearch} onChange={(event) => setRosterSearch(event.target.value)} placeholder="Charakter oder Spieler" /></label>
           <label>Rolle<select value={rosterRole} onChange={(event) => setRosterRole(event.target.value as AttendanceRole | '')}>
             <option value="">Alle Rollen</option><option value="TANK">Tank</option><option value="HEAL">Heal</option><option value="DD">DD</option>
           </select></label>
           <label>Klasse<select value={rosterClass} onChange={(event) => setRosterClass(event.target.value)}><option value="">Alle Klassen</option>{rosterClasses.map((characterClass) => <option key={characterClass} value={characterClass}>{characterClass}</option>)}</select></label>
           <label>Platz<select value={rosterBench} onChange={(event) => setRosterBench(event.target.value as 'ALL' | 'RAID' | 'BENCH')}><option value="ALL">Raid und Ersatzbank</option><option value="RAID">Nur im Raid</option><option value="BENCH">Nur Ersatzbank</option></select></label>
-          <label className="check"><input type="checkbox" checked={rosterIncomplete} onChange={(event) => setRosterIncomplete(event.target.checked)} /> Unvollständige</label>
-          {(rosterSearch || rosterRole || rosterClass || rosterBench !== 'ALL' || rosterIncomplete) && <button type="button" onClick={() => { setRosterSearch(''); setRosterRole(''); setRosterClass(''); setRosterBench('ALL'); setRosterIncomplete(false) }}>Filter zurücksetzen</button>}
+          <label className="check"><input type="checkbox" checked={rosterIncomplete} onChange={(event) => setRosterIncomplete(event.target.checked)} /> Nur unvollständige</label>
+
         </div>
-        {visibleAttendance.length !== attendance.length && <p className="muted roster-filter-result">{visibleAttendance.length} von {attendance.length} Teilnehmern angezeigt.</p>}
-        <RaidRosterBoard attendance={visibleAttendance} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
+        {rosterFiltered && <div className="roster-filter-result"><span className="muted" role="status">{visibleAttendance.length} von {attendance.length} Teilnehmern angezeigt.</span><button type="button" onClick={() => { setRosterSearch(''); setRosterRole(''); setRosterClass(''); setRosterBench('ALL'); setRosterIncomplete(false) }}>Filter zurücksetzen</button></div>}
+        <RaidRosterBoard attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
         {canWrite && (
           <div>
             {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
             {!attEditing && !quickAdd && <button type="button" disabled={pending} onClick={() => { setQuickAddName(''); setQuickAdd(true) }}>Neuen Charakter anlegen</button>}
             {quickAdd ? <RaidQuickAdd key={quickAddName} initialQuery={quickAddName} raidID={raidID} players={players} options={classSpecs} needsReason={attNeedsReason} pending={pending} submit={submit} isActive={isActive} onCancel={() => setQuickAdd(false)} onAdded={async () => { setQuickAdd(false); await load() }} /> :
             <form className="inline-form" onSubmit={addAttendance}>
-              <label>Charakter auswählen<input type="search" list="attendance-character-options" aria-label="Teilnahme-Charakter" autoComplete="off" autoFocus={attEditing != null} disabled={pending || characters.length === 0} value={characterSearch} onChange={(e) => {
+              <label className="picker-field">Charakter auswählen<input type="search" list="attendance-character-options" aria-label="Teilnahme-Charakter" autoComplete="off" autoFocus={attEditing != null} disabled={pending || characters.length === 0} value={characterSearch} onChange={(e) => {
                 if (!isActive() || isPending() || renderedCharacterVersion !== characterVersion.current) return
                 ++characterVersion.current
                 setCharacterSearch(e.target.value)
@@ -756,11 +762,11 @@ function RaidDetail({ raidID }: Props) {
               </select></label>
               <SpecSelect label="Tatsächlicher Spec" disabled={pending} value={attSnapshot.spec ?? ''} specs={classSpecs[canonicalClass(attSnapshot.class ?? '')] ?? []} onChange={(value) => changeSnapshot('spec', value)} />
               {characters.find((c) => c.id === Number(attCharacter))?.second_spec && <button disabled={pending} type="button" onClick={() => changeSnapshot('spec', characters.find((c) => c.id === Number(attCharacter))!.second_spec)}>Second-Spec übernehmen</button>}
-              <select aria-label="Teilnahme-Rolle" disabled={pending} value={attRole} onChange={(e) => setAttRole(e.target.value as AttendanceRole)}>
+              <label>Rolle<select aria-label="Teilnahme-Rolle" disabled={pending} value={attRole} onChange={(e) => setAttRole(e.target.value as AttendanceRole)}>
                 <option value="TANK">Tank</option>
                 <option value="HEAL">Heal</option>
                 <option value="DD">DD</option>
-              </select>
+              </select></label>
               <fieldset className="attendance-flags"><legend>Teilnahmestatus</legend>{attendanceFlags.map(({ key, label }) => <label className="check" key={key}>
                 <input type="checkbox" disabled={pending} checked={attDetails[key]} onChange={(e) => {
                   const checked = e.target.checked
@@ -807,7 +813,7 @@ function RaidDetail({ raidID }: Props) {
                   {catalogDifficulties.length === 0 && <option value="">Zuerst Boss wählen</option>}
                   {catalogDifficulties.map((difficulty) => <option key={difficulty} value={difficulty}>{catalogModeLabels[difficulty]}</option>)}
                 </select></label>
-                <label>Item auswählen<input ref={lootItemInput} type="search" list="loot-item-options" aria-label="Loot-Item" autoComplete="off" disabled={pending || catalogItems.length === 0} value={catalogSearch} onChange={(e) => changeLoot(() => {
+                <label className="picker-field">Item auswählen<input ref={lootItemInput} type="search" list="loot-item-options" aria-label="Loot-Item" autoComplete="off" disabled={pending || catalogItems.length === 0} value={catalogSearch} onChange={(e) => changeLoot(() => {
                   if (renderedCatalogVersion !== catalogVersion.current) return
                   setCatalogSearch(e.target.value)
                   const item = catalogItems.find((drop) => drop.mode === catalogDifficulty && (catalogItemLabel(drop) === e.target.value || dropKey(drop) === e.target.value))

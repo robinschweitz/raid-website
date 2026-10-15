@@ -1,8 +1,18 @@
-export const appVersion = '1.0.7'
+export const appVersion = '1.0.8'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Übersichtlichere Raidverwaltung',
+    changes: [
+      'Charakter- und Item-Auswahl nutzen die volle Breite, die Auswahl bleibt vollständig lesbar.',
+      'Bestätigungen bleiben sichtbar, lassen sich schließen und verschwinden beim Wechsel des Reiters.',
+      'Gefilterte Aufstellungen zeigen „Keine Treffer“ statt „Noch nicht besetzt“; „Filter zurücksetzen“ steht direkt bei der Trefferanzahl.',
+      'Die Raidbereiche sind auf dem Handy ein 2×2-Raster statt einer abgeschnittenen Leiste. Die Rolle der Teilnahme hat jetzt eine Beschriftung.',
+    ],
+  },
+  {
+    version: '1.0.7',
     title: 'Schnellere Raidverwaltung',
     changes: [
       'Auswahlfelder zeigen die getroffene Auswahl, erfolgreiche Änderungen werden bestätigt und die Raidaufstellung kann gefiltert werden.',

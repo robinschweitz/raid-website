@@ -13,10 +13,11 @@ interface Props {
   onEdit: (row: Attendance) => void
   editingID?: number
   isAddOpen?: boolean
+  filtered?: boolean
   children?: ReactNode
 }
 
-export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, isAddOpen, children }: Props) {
+export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, isAddOpen, filtered, children }: Props) {
   const member = (row: Attendance) => (
     <li key={row.id} className={`setup-member ${characterClassName(row.class?.trim() ?? '')}${editingID === row.id ? ' is-editing' : ''}`}>
       {editingID === row.id ? <div className="in-place-editor"><h3>{row.character_name || 'Teilnahme'} bearbeiten</h3>{children}</div> : <>
@@ -51,13 +52,13 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
           <header><h3><span aria-hidden="true">{symbol}</span> {label}</h3><span className="badge">{rows.length}</span></header>
           {role === 'UNKNOWN' && <p className="setup-group-hint">Klasse oder Spec nicht eindeutig zuordenbar.</p>}
           <ul>{rows.map(member)}</ul>
-          {rows.length === 0 && <p className="setup-empty">Noch nicht besetzt</p>}
+          {rows.length === 0 && <p className="setup-empty">{filtered ? 'Keine Treffer' : 'Noch nicht besetzt'}</p>}
         </section>
       })}
     </div>
     <section className="setup-bench" aria-label="Ersatzbank">
       <header><h3>Ersatzbank</h3><span className="badge">{bench.length}</span></header>
-      {bench.length ? <ul>{bench.map(member)}</ul> : <p className="muted">Keine Teilnehmer auf der Ersatzbank.</p>}
+      {bench.length ? <ul>{bench.map(member)}</ul> : <p className="muted">{filtered ? 'Keine Treffer auf der Ersatzbank.' : 'Keine Teilnehmer auf der Ersatzbank.'}</p>}
     </section>
     {canWrite && editingID == null && <details className="editor-disclosure" open={isAddOpen || undefined}><summary>Teilnahme hinzufügen</summary>{children}</details>}
   </>

@@ -80,3 +80,11 @@ hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetz
   aus der Aufstellung mit Absage (sonst 400 `invalid_exclusion`). Ohne Angabe bleibt das Verhalten unverändert.
   Die Entscheidung wird als `archive_without_points` im Audit-Log festgehalten. In der Oberfläche zeigt
   „Archivieren“ dazu vorab eine Liste mit Ankreuzfeldern („Keine EP für …“).
+
+## Nachtrag: EP-Übersicht vor dem Archivieren
+
+- `GET /api/v1/raids/{id}/archive-preview` (RAIDASSISTENT+) liefert je Spieler der Aufstellung den aktuellen
+  EP-Stand, die zu vergebenden EP (`award`) und den Grund (`award`, `main_spec_loot`, `already_awarded`). Es
+  ändert nichts und nutzt dieselben Regeln wie das Archivieren.
+- „Archivieren“ öffnet bei aktiven Raids immer zuerst diese Übersicht (Aktuell / Neu / Danach / Hinweis). Die
+  Ausnahme für Abgesagte (`without_points`) wird dort pro Zeile gesetzt; die Anzeige rechnet live mit.

@@ -244,3 +244,59 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 	}
 	return archived, next, nil
 }
+
+// Participation reasons reported by PreviewArchive.
+const (
+	PreviewAward          = "award"
+	PreviewMainSpecLoot   = "main_spec_loot"
+	PreviewAlreadyAwarded = "already_awarded"
+)
+
+// PreviewRow tells what archiving would do for one roster player.
+type PreviewRow struct {
+	PlayerID int64  `json:"player_id"`
+	Balance  int    `json:"balance"`
+	Award    int    `json:"award"`
+	Reason   string `json:"reason"`
+}
+
+// PreviewArchive reports, without changing anything, who would receive the
+// participation points when the raid is archived and each player's balance.
+func (s *Service) PreviewArchive(ctx context.Context, raidID int64) ([]PreviewRow, error) {
+	rd, err := s.repo.raids.Get(ctx, raidID)
+	if err != nil {
+		return nil, fmt.Errorf("load raid %d: %w", raidID, err)
+	}
+	if rd.Status != validation.RaidStatusPlanned && rd.Status != validation.RaidStatusOpen {
+		return nil, ErrRaidNotArchivable
+	}
+	rows, err := s.repo.attendance.ListByRaid(ctx, raidID)
+	if err != nil {
+		return nil, err
+	}
+	out := []PreviewRow{}
+	seen := map[int64]bool{}
+	for _, a := range rows {
+		if seen[a.PlayerID] {
+			continue
+		}
+		seen[a.PlayerID] = true
+		row := PreviewRow{PlayerID: a.PlayerID, Reason: PreviewAward, Award: noMainSpecAward}
+		if row.Balance, err = s.repo.points.Balance(ctx, a.PlayerID); err != nil {
+			return nil, err
+		}
+		hasMain, err := s.repo.loot.PlayerHasMainSpecAward(ctx, raidID, a.PlayerID)
+		if err != nil {
+			return nil, err
+		}
+		if hasMain {
+			row.Award, row.Reason = 0, PreviewMainSpecLoot
+		} else if done, err := s.repo.points.HasNoMainSpecAward(ctx, raidID, a.PlayerID); err != nil {
+			return nil, err
+		} else if done {
+			row.Award, row.Reason = 0, PreviewAlreadyAwarded
+		}
+		out = append(out, row)
+	}
+	return out, nil
+}

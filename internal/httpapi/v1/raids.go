@@ -259,3 +259,22 @@ func parseOptionalTime(raw *string) (*time.Time, error) {
 	u := t.UTC()
 	return &u, nil
 }
+
+func (a *API) archivePreview(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid raid id")
+		return
+	}
+	rows, err := a.Completion.PreviewArchive(r.Context(), id)
+	switch {
+	case errors.Is(err, raid.ErrNotFound):
+		WriteError(w, http.StatusNotFound, "not_found", "raid not found")
+	case errors.Is(err, raidcompletion.ErrRaidNotArchivable):
+		WriteError(w, http.StatusConflict, "raid_not_archivable", "raid cannot be archived")
+	case err != nil:
+		WriteError(w, http.StatusInternalServerError, "internal", "could not preview archive")
+	default:
+		WriteJSON(w, http.StatusOK, map[string]any{"data": rows})
+	}
+}

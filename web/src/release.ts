@@ -1,8 +1,16 @@
-export const appVersion = '1.0.21'
+export const appVersion = '1.0.22'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'EP-Übersicht vor dem Archivieren',
+    changes: [
+      '„Archivieren“ zeigt zuerst, wer wie viele EP bekommt, den aktuellen Stand und den Stand danach.',
+      'Spieler ohne EP werden mit Grund aufgeführt, z. B. weil sie ein Main-Spec-Item bekommen haben (mit Itemname). Abgesagte Spieler lassen sich dort von den EP ausnehmen.',
+    ],
+  },
+  {
+    version: '1.0.21',
     title: 'EP bei Absagen beim Archivieren',
     changes: [
       'Stehen abgesagte Spieler noch in der Aufstellung, zeigt „Archivieren“ zuerst eine Liste. Dort lässt sich pro Spieler festlegen, ob er keine EP erhält; ohne Auswahl bleibt es bei +10 EP.',

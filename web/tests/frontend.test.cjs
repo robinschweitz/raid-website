@@ -416,6 +416,16 @@ function resolveRaid(s, id, options = {}) {
   }
 }
 
+async function startArchive(s, view, rows = []) {
+  const opening = button(view, 'Archivieren').props.onClick()
+  const request = s.requests.find((r) => r.method === 'get' && r.url.endsWith('/archive-preview') && !r.resolved)
+  request.resolved = true
+  request.resolve(rows)
+  await opening
+  view.render()
+  return { done: button(view, 'Jetzt archivieren').props.onClick() }
+}
+
 function resolvePlayer(s, id) {
   for (const r of s.requests.filter((r) => r.method === 'get' && !r.resolved)) {
     r.resolved = true
@@ -1433,8 +1443,8 @@ test('archive preserves successor, invalidates old submits and requires reasons 
   view.render()
   const oldLootSubmit = form(view, 1).props.onSubmit
   assert.equal(button(view, 'Abschließen'), undefined)
-  const first = button(view, 'Archivieren').props.onClick()
-  await button(view, 'Archivieren').props.onClick()
+  const first = (await startArchive(s, view)).done
+  await button(view, 'Jetzt archivieren').props.onClick()
   assert.equal(writes(s).length, 1)
   assert.equal(writes(s)[0].method, 'postEnvelope')
   assert.equal(writes(s)[0].url, '/api/v1/raids/1/archive')
@@ -1495,13 +1505,13 @@ test('series assignment PATCHes existing active raid and archive errors are loca
   writes(s)[0].resolve({ ...raid(1), series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' })
   await attach
   view.render()
-  const archive = button(view, 'Archivieren').props.onClick()
+  const archive = (await startArchive(s, view)).done
   const { ApiError } = s.load('api.ts')
   writes(s)[1].reject(new ApiError(409, 'local_time_ambiguous', 'English backend message'))
   await archive
   view.render()
   assert.match(text(view.tree), /Zeitumstellung mehrdeutig/)
-  assert.equal(button(view, 'Archivieren').props.disabled, false)
+  assert.equal(button(view, 'Jetzt archivieren').props.disabled, false)
 })
 
 test('archived attendance uses saved name, class and actual spec; missing history stays unavailable', async () => {
@@ -1897,7 +1907,7 @@ test('roster_incomplete archive errors identify missing row details and leave co
   resolveRaid(s, 1, { raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' }, attendance: [{ ...attendanceRow, character_name: 'Saved name', class: '', spec: '' }] })
   await flush(view)
   assert.match(text(view.tree), /Teilnahme #.*7.*Klasse, tatsächlicher Spec.*fehlt/)
-  const first = button(view, 'Archivieren').props.onClick()
+  const first = (await startArchive(s, view)).done
   const { ApiError } = s.load('api.ts')
   writes(s)[0].reject(new ApiError(409, 'roster_incomplete', 'raid roster is incomplete'))
   await first
@@ -2924,20 +2934,31 @@ test('roster rows of players who declined carry a badge and reason', () => {
   assert.match(flat, /Grund:\s+Krank/)
 })
 
-test('archiving with declined players in the roster lets staff decide who gets no EP', async () => {
+test('archive review shows who gets which EP, who gets none because of loot, and lets staff exclude declined players', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
-  resolveRaid(s, 1, { raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' }, attendance: [recipientRow], absences: [{ player_id: 2, reason: 'Krank', created_at: '2026-10-01T00:00:00Z' }] })
+  resolveRaid(s, 1, {
+    raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' },
+    attendance: [recipientRow, { ...recipientRow, id: 10, player_id: 1 }],
+    loot: [{ id: 1, raid_id: 1, item_name: 'Schwert', awarded_to_player_id: 1, is_main_spec: true }],
+    absences: [{ player_id: 2, reason: 'Krank', created_at: '2026-10-01T00:00:00Z' }],
+  })
   await flush(view)
-  await button(view, 'Archivieren').props.onClick()
+  const opening = button(view, 'Archivieren').props.onClick()
   assert.equal(writes(s).length, 0, 'the first click only opens the review')
-  assert.equal(s.confirms.length, 0)
+  const request = s.requests.find((r) => r.url.endsWith('/archive-preview'))
+  request.resolve([{ player_id: 1, balance: 40, award: 0, reason: 'main_spec_loot' }, { player_id: 2, balance: 25, award: 10, reason: 'award' }])
+  await opening
   view.render()
-  assert.match(text(view.tree), /Abgesagte Spieler in der Aufstellung/)
-  assert.match(text(view.tree), /Keine EP für .*Krank/)
-  const check = nodes(view.tree, (n) => n.type === 'label' && /Keine EP für/.test(text(n)))[0]
+  assert.equal(s.confirms.length, 0)
+  let flat = text(view.tree)
+  assert.match(flat, /Keine EP: Main-Spec-Loot \(Schwert\)/)
+  assert.match(flat, /25\s+\+10\s+35/)
+  const check = nodes(view.tree, (n) => n.type === 'label' && /Hat abgesagt/.test(text(n)))[0]
   nodes(check, (n) => n.type === 'input')[0].props.onChange({ target: { checked: true } })
   view.render()
+  flat = text(view.tree)
+  assert.match(flat, /25\s+0\s+25/)
   const done = button(view, 'Jetzt archivieren').props.onClick()
   assert.equal(writes(s).length, 1)
   assert.deepEqual(writes(s)[0].body, { without_points: [2] })
@@ -2945,13 +2966,17 @@ test('archiving with declined players in the roster lets staff decide who gets n
   await done
 })
 
-test('archiving without declined players sends no exclusion body', async () => {
+test('archive review can be left with "Zurück" without sending anything', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, { raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' }, attendance: [recipientRow] })
   await flush(view)
-  const done = button(view, 'Archivieren').props.onClick()
-  assert.equal(writes(s)[0].body, undefined)
-  writes(s)[0].reject(new Error('offline'))
-  await done
+  const opening = button(view, 'Archivieren').props.onClick()
+  s.requests.find((r) => r.url.endsWith('/archive-preview')).resolve([])
+  await opening
+  view.render()
+  button(view, 'Zurück').props.onClick()
+  view.render()
+  assert.ok(button(view, 'Archivieren'))
+  assert.equal(writes(s).length, 0)
 })

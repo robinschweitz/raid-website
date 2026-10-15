@@ -1,8 +1,15 @@
-export const appVersion = '1.0.17'
+export const appVersion = '1.0.18'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Anmeldung in Klassenfarbe',
+    changes: [
+      'In der Raidanmeldung erscheint der Charaktername in seiner Klassenfarbe, wie in der Aufstellung.',
+    ],
+  },
+  {
+    version: '1.0.17',
     title: 'Übersichtlichere Raidanmeldung',
     changes: [
       'Anmeldung: Checkbox und Charaktername stehen in einer Zeile, „Ausgewählte Charaktere anmelden“ und „In Aufstellung übernehmen“ sind als Hauptaktionen hervorgehoben.',

@@ -240,6 +240,58 @@ test('raid signups submit several own characters and guard duplicate submissions
   view.unmount()
 })
 
+test('members can withdraw their own pending signup but not accepted ones or other players', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [{ id: 2, name: 'Ich' }, { id: 3, name: 'Andere' }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: { Magier: ['Feuer'] }, entries: [
+    { id: 4, player_id: 2, character_id: 11, character_name: 'Meiner', class: 'Magier', spec: 'Feuer', is_accepted: false, is_withdrawn: false },
+    { id: 5, player_id: 3, character_id: 12, character_name: 'Fremder', class: 'Magier', spec: 'Feuer', is_accepted: false, is_withdrawn: false },
+    { id: 6, player_id: 2, character_id: 13, character_name: 'Bestaetigt', class: 'Magier', spec: 'Feuer', attendance_id: 44, is_accepted: true, is_withdrawn: false },
+  ] })
+  resolveIf(s, '/api/v1/players/2/characters', [])
+  await flush(view)
+  const withdraws = nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Zurückziehen')
+  assert.equal(withdraws.length, 1, 'only the own, not yet accepted signup can be withdrawn')
+  withdraws[0].props.onClick()
+  assert.equal(writes(s).length, 1)
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/signups/4/withdraw')
+})
+
+test('after the deadline the signup form and withdraw buttons disappear even if the server still says open', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2000-01-01T20:00:00Z' }, attendance: [], players: [{ id: 2, name: 'Ich' }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: { Magier: ['Feuer'] }, entries: [
+    { id: 4, player_id: 2, character_id: 11, character_name: 'Meiner', class: 'Magier', spec: 'Feuer', is_accepted: false, is_withdrawn: false },
+  ] })
+  resolveIf(s, '/api/v1/players/2/characters', [{ id: 11, player_id: 2, name: 'Meiner', class: 'Magier', main_spec: 'Feuer', active: true }])
+  await flush(view)
+  assert.match(text(view.tree), /Anmeldung geschlossen/)
+  assert.equal(form(view), undefined)
+  assert.equal(button(view, 'Zurückziehen'), undefined)
+})
+
+test('staff can switch the roster slot to an alternative and the unchanged character is sent for safety', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, {
+    raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' },
+    attendance: [{ id: 44, player_id: 2, character_id: 11 }], players: [{ id: 2, name: 'Spieler' }], onRosterChange: async () => {},
+  })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [
+    { id: 4, player_id: 2, character_id: 11, character_name: 'Erster', class: 'Magier', spec: 'Feuer', attendance_id: 44, is_accepted: true, is_withdrawn: false },
+    { id: 5, player_id: 2, character_id: 12, character_name: 'Alternative', class: 'Magier', spec: 'Frost', attendance_id: 44, is_accepted: false, is_withdrawn: false },
+  ] })
+  resolveIf(s, '/api/v1/players/1/characters', [])
+  await flush(view)
+  button(view, 'Auf diesen Charakter wechseln').props.onClick()
+  view.render()
+  assert.match(text(view.tree), /ersetzen\?/)
+  button(view, 'Charakterwechsel bestätigen').props.onClick()
+  assert.deepEqual(writes(s)[0].body, { replace_attendance_id: 44, expected_character_id: 11 })
+})
+
 test('signup form hints at the missing choice and hides the button without own characters', async () => {
   const s = setup({ id: 2, role: 'MEMBER' })
   const { RaidSignups } = s.load('components/RaidSignups.tsx')

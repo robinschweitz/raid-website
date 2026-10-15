@@ -132,7 +132,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
                   else delete next[character.id]
                   return next
                 })
-              }} /> {character.name} · {character.class}{accepted ? ' · Bestätigt (Änderungen durch Raidleitung)' : entry && !entry.is_withdrawn ? ' · Angemeldet' : ''}
+              }} /> <span className="character-name">{character.name}</span> · {character.class}{accepted ? ' · Bestätigt (Änderungen durch Raidleitung)' : entry && !entry.is_withdrawn ? ' · Angemeldet' : ''}
             </label>
             <label>Gewünschter Spec für {character.name}
               <select disabled={pending || !selected || accepted} value={choices[character.id] ?? defaultSpec} onChange={(event) => setChoices((previous) => ({ ...previous, [character.id]: event.target.value }))}>

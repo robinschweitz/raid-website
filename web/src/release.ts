@@ -1,142 +1,25 @@
-export const appVersion = '1.0.22'
+export const appVersion = '1.0.7'
 
 export const changelog = [
   {
     version: appVersion,
-    title: 'EP-Übersicht vor dem Archivieren',
+    title: 'Komfortablere Raidverwaltung, Absagen und EP-Übersicht',
     changes: [
-      '„Archivieren“ zeigt zuerst, wer wie viele EP bekommt, den aktuellen Stand und den Stand danach.',
-      'Spieler ohne EP werden mit Grund aufgeführt, z. B. weil sie ein Main-Spec-Item bekommen haben (mit Itemname). Abgesagte Spieler lassen sich dort von den EP ausnehmen.',
+      'Absagen: Spieler können bis zum Raidstart mit „Ich kann nicht kommen“ absagen (optional mit Grund) und mit „Doch dabei“ zurücknehmen. Die Raidleitung sieht Absagen in der Anmeldung und als „Hat abgesagt“ in der Aufstellung und kann sie auch für Spieler eintragen.',
+      'Archivieren zeigt vorab eine EP-Übersicht mit aktuellem Stand, Vergabe und Stand danach. Spieler ohne EP stehen mit Grund da, z. B. wegen eines Main-Spec-Items. Abgesagte Spieler lassen sich dort von den EP ausnehmen.',
+      'Raid und Loot: Auswahlfelder zeigen Namen statt IDs, der Loot-Empfänger lässt sich per Tippen suchen, bereits vergebene Items sind markiert, Boss und Schwierigkeit bleiben nach dem Vergeben stehen, Enter springt zum nächsten Feld.',
+      'Alle „Hinzufügen“-Formulare (Loot, Teilnahme, Raids, Spieler, Serien, Umfragen u. a.) stehen oberhalb der Listen. Neben „Hinzufügen“ steht, was noch fehlt, und leere Listen erklären den Anfang.',
+      'Bestätigungen bleiben sichtbar, lassen sich schließen und verschwinden von selbst. „Absagen“, „Archivieren“ und „Loot zurückziehen“ fragen vorher nach.',
+      'Anmeldung zum Raid: Charaktere in Klassenfarbe, klarere Hauptaktionen und Hinweise, Hinweis wenn die Anmeldung während der Auswahl schließt. Eigene leere Wunschlisten sind wieder lesbar.',
+      'Rechte: Fehlende Berechtigungen werden auf Deutsch gemeldet, Gäste sehen keine Wunschlisten-Schaltflächen, Registrierungsanfragen zeigen Nicht-Admins einen Hinweis.',
+      'Weitere Verbesserungen: Spielersuche mit natürlicher Sortierung, lesbarere Anmelde-Reiter, „Jede Woche“ bei Serien, kompaktere Beute-Filter auf dem Handy, Legende im Status-Diagramm und durchgehend deutsche Beschriftungen („Änderungsprotokoll“, „Verlauf“).',
     ],
   },
   {
-    version: '1.0.21',
-    title: 'EP bei Absagen beim Archivieren',
+    version: '1.0.6',
+    title: 'Direkte Auswahl bei Teilnahme und Loot',
     changes: [
-      'Stehen abgesagte Spieler noch in der Aufstellung, zeigt „Archivieren“ zuerst eine Liste. Dort lässt sich pro Spieler festlegen, ob er keine EP erhält; ohne Auswahl bleibt es bei +10 EP.',
-    ],
-  },
-  {
-    version: '1.0.20',
-    title: 'Absage für Raids',
-    changes: [
-      'Spieler können bis zum Raidstart mit „Ich kann nicht kommen“ absagen und optional einen Grund nennen; „Doch dabei“ nimmt die Absage zurück.',
-      'Die Raidleitung sieht Absagen in der Anmeldung und als Hinweis „Hat abgesagt“ in der Aufstellung und kann sie für Spieler eintragen oder zurücknehmen.',
-      'Die Aufstellung ändert sich durch eine Absage nicht. Vor dem Archivieren warnt eine Rückfrage, wenn abgesagte Spieler noch in der Aufstellung stehen.',
-    ],
-  },
-  {
-    version: '1.0.19',
-    title: 'Hinweis beim Anmeldeschluss',
-    changes: [
-      'Schließt die Anmeldung, während jemand noch Charaktere ankreuzt, erscheint ein Hinweis, dass nichts mehr angemeldet wurde.',
-    ],
-  },
-  {
-    version: '1.0.18',
-    title: 'Anmeldung in Klassenfarbe',
-    changes: [
-      'In der Raidanmeldung erscheint der Charaktername in seiner Klassenfarbe, wie in der Aufstellung.',
-    ],
-  },
-  {
-    version: '1.0.17',
-    title: 'Übersichtlichere Raidanmeldung',
-    changes: [
-      'Anmeldung: Checkbox und Charaktername stehen in einer Zeile, „Ausgewählte Charaktere anmelden“ und „In Aufstellung übernehmen“ sind als Hauptaktionen hervorgehoben.',
-      'Ein Hinweis erklärt, dass mindestens ein Charakter angekreuzt werden muss. Ohne eigene Charaktere gibt es keine nutzlose Schaltfläche mehr.',
-      'Bestätigungen („Anmeldungen geöffnet.“) sind wie im Rest der Seite gestaltet und schließen sich nach einigen Sekunden.',
-      'Wunschliste: Wer einen eigenen Charakter hat, kann dessen leere Wunschliste wieder lesen.',
-    ],
-  },
-  {
-    version: '1.0.16',
-    title: 'Klarere Rechte für Mitglieder und Gäste',
-    changes: [
-      'Registrierungsanfragen: Wer kein Admin ist, sieht einen klaren Hinweis statt einer englischen Fehlermeldung.',
-      'Fehlende Berechtigungen und fehlende Anmeldung werden auf Deutsch gemeldet.',
-      'Gäste sehen in der Beute keine Wunschlisten-Schaltflächen mehr, die sie nicht nutzen dürfen.',
-    ],
-  },
-  {
-    version: '1.0.15',
-    title: 'Besser lesbare Anmeldung',
-    changes: [
-      'Anmeldeseite: Die Reiter „Code anfordern“ und „Registrieren“ sind besser lesbar, „Anmelden“ ist als Hauptaktion hervorgehoben.',
-      'Der Versionsverlauf heißt jetzt „Änderungsprotokoll“.',
-    ],
-  },
-  {
-    version: '1.0.14',
-    title: 'Spielersuche und feinere Details',
-    changes: [
-      'Spielerliste: Suchfeld mit Trefferanzahl und natürliche Sortierung (Spieler2 vor Spieler10).',
-      'Raidserien: „Jede Woche“ statt „Alle 1 Wochen“.',
-      'Beute: Die Filter passen auf dem Handy in zwei Spalten und brauchen weniger Platz.',
-      'Raid: Der Bereich „Planung & Details“ heißt auch in seiner Überschrift so.',
-    ],
-  },
-  {
-    version: '1.0.13',
-    title: 'Sicherheitsabfragen und einheitliche Texte',
-    changes: [
-      '„Absagen“, „Archivieren“ und „Loot zurückziehen“ fragen vor dem Ausführen nach.',
-      'Neben „Hinzufügen“ steht, was noch fehlt (Charakter wählen, Begründung eintragen).',
-      'Statistiken: Legende mit Anzahl beim Status-Diagramm, durchgehend deutsche Beschriftungen („Einträge“, „Vergabemethode“). Übersicht und Profil: „Raidaufstellung“ und „Verlauf“ statt englischer Titel.',
-      'Auf dem Handy steht in der Anwesenheitskarte wieder ein Abstand zwischen Beschriftung und Zahl.',
-    ],
-  },
-  {
-    version: '1.0.12',
-    title: 'Alle Hinzufügen-Formulare oben',
-    changes: [
-      '„Neue Raidserie“, „Neue Umfrage“, „Gildenrang hinzufügen“, „Raidgruppe hinzufügen“ sowie „Charakter hinzufügen/beanspruchen“ stehen jetzt oberhalb der Listen.',
-      'Nach „Hinzufügen“ bleibt die Teilnahme-Eingabe offen und der Cursor steht wieder im Charakterfeld, damit sich mehrere Charaktere hintereinander eintragen lassen.',
-      'Leere Listen erklären, womit man beginnt (Loot, Raids, Umfragen, Raidserien).',
-    ],
-  },
-  {
-    version: '1.0.11',
-    title: 'Formulare zuerst, schnellere Lootvergabe',
-    changes: [
-      '„Loot erfassen“, „Teilnahme hinzufügen“, „Neuer Raid“ und „Neuer Spieler“ stehen jetzt oberhalb der Listen statt ganz unten.',
-      'Der Empfänger lässt sich wie Item und Charakter per Tippen suchen.',
-      'Neben „Vergeben“ steht, was noch fehlt. Bereits vergebene Items sind in der Auswahl mit „bereits n× vergeben“ markiert.',
-      'Mit Enter im Item-Feld springt der Cursor zum Empfänger. Bestätigungen verschwinden nach einigen Sekunden von selbst.',
-    ],
-  },
-  {
-    version: '1.0.10',
-    title: 'Mehrere Items hintereinander vergeben',
-    changes: [
-      'Nach dem Vergeben bleiben Boss und Schwierigkeit ausgewählt, damit das nächste Item vom selben Boss direkt gewählt werden kann.',
-    ],
-  },
-  {
-    version: '1.0.9',
-    title: 'Auswahl ohne interne IDs',
-    changes: [
-      'Charakter- und Item-Vorschläge zeigen nur noch Namen. Eine ID erscheint nur, wenn zwei Einträge sonst nicht zu unterscheiden wären.',
-      'Eine genau eingegebene Item-ID wählt weiterhin das passende Item aus.',
-      '„Entfernen“ steht direkt neben dem Auswahlfeld statt in einer zusätzlichen Zeile.',
-    ],
-  },
-  {
-    version: '1.0.8',
-    title: 'Übersichtlichere Raidverwaltung',
-    changes: [
-      'Charakter- und Item-Auswahl nutzen die volle Breite, die Auswahl bleibt vollständig lesbar.',
-      'Bestätigungen bleiben sichtbar, lassen sich schließen und verschwinden beim Wechsel des Reiters.',
-      'Gefilterte Aufstellungen zeigen „Keine Treffer“ statt „Noch nicht besetzt“; „Filter zurücksetzen“ steht direkt bei der Trefferanzahl.',
-      'Die Raidbereiche sind auf dem Handy ein 2×2-Raster statt einer abgeschnittenen Leiste. Die Rolle der Teilnahme hat jetzt eine Beschriftung.',
-    ],
-  },
-  {
-    version: '1.0.7',
-    title: 'Schnellere Raidverwaltung',
-    changes: [
-      'Auswahlfelder zeigen die getroffene Auswahl, erfolgreiche Änderungen werden bestätigt und die Raidaufstellung kann gefiltert werden.',
-      'Teilnahme- und Loot-Editoren sind auf kleinen Bildschirmen besser bedienbar.',
+      'Charaktere und Loot können jetzt in einem gemeinsamen Eingabefeld gesucht und ausgewählt werden.',
     ],
   },
   {

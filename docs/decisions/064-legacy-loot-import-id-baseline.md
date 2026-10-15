@@ -1,6 +1,6 @@
 # ADR 064: Historical loot Import ID baseline
 
-Status: Accepted by owner, 2026-10-15.
+Status: Superseded by ADR 066, 2026-10-15.
 
 ## Decision
 

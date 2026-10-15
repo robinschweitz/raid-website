@@ -9,10 +9,14 @@ Status: Accepted by owner, 2026-10-15.
   administration UI.
 - Current domain data remains: players, characters, raids, attendance, loot,
   tokens, Enhance Point transactions, and their ordinary audit history.
-- Import/sync provenance, mappings, previews, delivery queues, states, events,
-  and their dedicated audit entries are permanently deleted by migration 066.
+- Migration 066 deletes import/sync provenance, mappings, previews, delivery
+  queues, states, events, and their dedicated audit entries from the active
+  production database.
 - A future legacy import is an offline, one-time Python operation, not a web
   feature or a recurring synchronization service.
+- The pre-migration database backup and prior server binary are retained solely
+  for recovery until 2026-11-14. They are not used by the active service and
+  must then be permanently deleted.
 
 ## Consequences
 

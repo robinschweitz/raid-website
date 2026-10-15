@@ -1,6 +1,6 @@
 # ADR 065: Normalize existing legacy loot Import IDs
 
-Status: Accepted by owner, 2026-10-15.
+Status: Superseded by ADR 066, 2026-10-15.
 
 ## Decision
 

@@ -2,6 +2,7 @@ package wishlist
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"github.com/uptrace/bun"
@@ -33,7 +34,7 @@ func (s *Service) WithTx(tx bun.Tx) *Service {
 func (s *Service) charOwner(ctx context.Context, charID int64) (playerID int64, err error) {
 	ch, err := s.characters.Get(ctx, charID)
 	if err != nil {
-		if errors.Is(err, character.ErrNotFound) {
+		if errors.Is(err, character.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
 			return 0, ErrCharacterNotFound
 		}
 		return 0, err
@@ -42,6 +43,14 @@ func (s *Service) charOwner(ctx context.Context, charID int64) (playerID int64, 
 		return 0, ErrCharacterNotFound
 	}
 	return ch.PlayerID, nil
+}
+
+// Owner returns the player who owns the character.
+func (s *Service) Owner(ctx context.Context, charID int64) (int64, error) {
+	if charID <= 0 {
+		return 0, ErrInvalid
+	}
+	return s.charOwner(ctx, charID)
 }
 
 // ListByCharacter returns the wishlist for a character.

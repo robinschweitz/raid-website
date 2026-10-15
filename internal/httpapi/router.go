@@ -25,6 +25,7 @@ import (
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/raidsignup"
+	"raid-website/internal/recruitment"
 	"raid-website/internal/registration"
 	"raid-website/internal/roster"
 	"raid-website/internal/webui"
@@ -90,6 +91,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Completion:        raidcompletion.NewService(raidcompletion.NewRepo(db)),
 		Corrections:       corrections,
 		Signups:           raidsignup.NewService(raidsignup.NewRepo(db)),
+		Recruitment:       recruitment.NewService(db),
 		Registration:      registrationSvc,
 		AccountMerge:      accountmerge.NewService(accountmerge.NewRepo(db)),
 	})

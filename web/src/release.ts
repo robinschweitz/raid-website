@@ -1,6 +1,15 @@
-export const appVersion = '1.0.7'
+export const appVersion = '1.0.8'
 
 export const changelog = [
+  {
+    version: appVersion,
+    title: 'Raidgesuchtext im Workspace',
+    changes: [
+      'Der Gesuchtext mit Soll-Besetzung ist direkt beim jeweiligen aktiven Raid erreichbar (für Raidassistenten und höher).',
+      'Textvorlage und Soll-Besetzung werden mit „Vorlage speichern“ für die ganze Raidserie gespeichert und sind für alle Raidleiter und Geräte gleich. Im Browser gespeicherte Vorlagen werden einmal übernommen.',
+      'Die Aktualisierung alle 15 Sekunden lädt nur noch die Aufstellung und lässt andere Eingaben auf der Raidseite unberührt.',
+    ],
+  },
   {
     version: appVersion,
     title: 'Komfortablere Raidverwaltung, Absagen und EP-Übersicht',

@@ -44,6 +44,7 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
   )
   const bench = attendance.filter((row) => row.is_bench)
   return <>
+    {canWrite && editingID == null && <details className="editor-disclosure" open={isAddOpen || undefined}><summary>Teilnahme hinzufügen</summary>{children}</details>}
     <div className="setup-board">
       {rosterGroups.map(({ role, label, symbol }) => {
         const rows = attendance.filter((row) => rosterGroup(row) === role && !row.is_bench)
@@ -60,6 +61,5 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
       <header><h3>Ersatzbank</h3><span className="badge">{bench.length}</span></header>
       {bench.length ? <ul>{bench.map(member)}</ul> : <p className="muted">{filtered ? 'Keine Treffer auf der Ersatzbank.' : 'Keine Teilnehmer auf der Ersatzbank.'}</p>}
     </section>
-    {canWrite && editingID == null && <details className="editor-disclosure" open={isAddOpen || undefined}><summary>Teilnahme hinzufügen</summary>{children}</details>}
   </>
 }

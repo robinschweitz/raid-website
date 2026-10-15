@@ -47,26 +47,6 @@ export function PlayersPage() {
     <div>
       <div className="page-heading"><div><p className="eyebrow">Unsere Gemeinschaft</p><h1>Spieler</h1></div>{isAdmin && <Link to="/roster">Gildenkonfiguration →</Link>}</div>
       {error && <p className="error">{error}</p>}
-      <div className="card table-scroll"><table className="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {players.map((p) => (
-            <tr key={p.id}>
-              <td>
-                <Link to={`/players/${p.id}`}>{p.name}</Link>
-              </td>
-              <td>{p.active ? 'aktiv' : 'inaktiv'}</td>
-            </tr>
-          ))}
-          {players.length === 0 && <tr><td colSpan={2} className="muted">Keine Spieler geladen.</td></tr>}
-        </tbody>
-      </table></div>
-
       {isAdmin && (
         <details className="card editor-disclosure"><summary>Neuer Spieler</summary>
         <form className="card inline-form" onSubmit={onCreate}>
@@ -88,6 +68,26 @@ export function PlayersPage() {
         </form>
         </details>
       )}
+      <div className="card table-scroll"><table className="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {players.map((p) => (
+            <tr key={p.id}>
+              <td>
+                <Link to={`/players/${p.id}`}>{p.name}</Link>
+              </td>
+              <td>{p.active ? 'aktiv' : 'inaktiv'}</td>
+            </tr>
+          ))}
+          {players.length === 0 && <tr><td colSpan={2} className="muted">Keine Spieler geladen.</td></tr>}
+        </tbody>
+      </table></div>
+
     </div>
   )
 }

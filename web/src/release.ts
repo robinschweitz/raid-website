@@ -1,8 +1,18 @@
-export const appVersion = '1.0.10'
+export const appVersion = '1.0.11'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Formulare zuerst, schnellere Lootvergabe',
+    changes: [
+      '„Loot erfassen“, „Teilnahme hinzufügen“, „Neuer Raid“ und „Neuer Spieler“ stehen jetzt oberhalb der Listen statt ganz unten.',
+      'Der Empfänger lässt sich wie Item und Charakter per Tippen suchen.',
+      'Neben „Vergeben“ steht, was noch fehlt. Bereits vergebene Items sind in der Auswahl mit „bereits n× vergeben“ markiert.',
+      'Mit Enter im Item-Feld springt der Cursor zum Empfänger. Bestätigungen verschwinden nach einigen Sekunden von selbst.',
+    ],
+  },
+  {
+    version: '1.0.10',
     title: 'Mehrere Items hintereinander vergeben',
     changes: [
       'Nach dem Vergeben bleiben Boss und Schwierigkeit ausgewählt, damit das nächste Item vom selben Boss direkt gewählt werden kann.',

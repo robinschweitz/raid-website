@@ -77,7 +77,7 @@
 .secondary-page .editor-disclosure {
   border: 1px solid #2d4e65;
   border-radius: 4px;
-  margin-top: 18px;
+  margin: 18px 0;
   padding: 12px 18px;
   background: #0c1e2e;
 }
@@ -181,7 +181,8 @@
 .secondary-page .loot-method.enhanced { border-color: #c47dffb3; color: #ddbaff; background: #2a183d; }
 .secondary-page .loot-method.boe { border-color: #ffd58aa3; color: #ffe1a8; background: #332717; }
 .secondary-page .loot-cost { font-variant-numeric: tabular-nums; color: #e7f8ff; white-space: nowrap; }
-.secondary-page .raid-loot .editor-disclosure { margin-top: 18px; }
+.secondary-page .raid-loot .editor-disclosure { margin: 14px 0 18px; }
+.loot-submit-hint { align-self: center; margin: 0; }
 .secondary-page .raid-loot .editor-disclosure > summary { width: fit-content; padding: 9px 14px; color: #06111c; background: linear-gradient(135deg, #7ad7ff, #d7f4ff); border: 1px solid #d7f4ff; border-radius: 3px; cursor: pointer; font-weight: 700; }
 .secondary-page .raid-loot .editor-disclosure[open] > summary { margin-bottom: 12px; }
 .secondary-page .raid-loot .inline-form { padding: 14px; border: 1px solid #284356; border-radius: 4px; background: #07152380; }

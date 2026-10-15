@@ -28,3 +28,13 @@ are local UI state only; API payloads, authorization and raid history are unaffe
 Nach einer neuen Loot-Vergabe bleiben Boss, Schwierigkeit und Dropliste gewählt; Item, Empfänger,
 Methode, Notizen und Grund werden zurückgesetzt. So lassen sich mehrere Items desselben Bosses
 hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetzt.
+
+## Nachtrag: Formulare oben, Empfänger-Suche, Hinweise
+
+- Hinzufügen-Formulare (Loot erfassen, Teilnahme hinzufügen, Neuer Raid, Neuer Spieler) stehen als
+  eingeklappter Abschnitt oberhalb der jeweiligen Liste, damit sie bei langen Listen ohne Scrollen erreichbar sind.
+- Der Loot-Empfänger ist wie Item und Charakter ein Suchfeld mit Vorschlägen; eine genau eingegebene
+  Charakter-ID wählt ebenfalls aus. Nur bei gleichen Namen erscheint `#ID`.
+- Neben „Vergeben“ erklärt ein Hinweis, was fehlt. Items, die in diesem Raid schon vergeben wurden,
+  tragen „bereits n× vergeben“; mehrfaches Vergeben bleibt erlaubt (mehrere Exemplare, BoE).
+- Enter im Item-Feld fokussiert den Empfänger; Erfolgsmeldungen schließen sich nach 8 Sekunden.

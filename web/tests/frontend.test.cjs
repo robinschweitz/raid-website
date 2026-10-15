@@ -16,6 +16,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
   const prompts = []
   const confirms = []
   const confirmAnswers = []
+  const intervals = []
   const auth = { player: me }
   const jsx = (type, props, key) => ({ type, props: props ?? {}, key })
   const slot = (create) => {
@@ -83,7 +84,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
       const exports = load(path.relative(path.resolve(__dirname, '../src'), resolved + extension))
       return name.endsWith('/api') ? { ...exports, api } : exports
     }
-    vm.runInThisContext(`(function(require,module,exports,window,crypto){${source}\n})`, { filename })(localRequire, module, module.exports, { prompt: () => prompts.shift(), confirm: (message) => { confirms.push(message); return confirmAnswers.length ? confirmAnswers.shift() : true }, setInterval: () => 0, clearInterval: () => {} }, crypto)
+    vm.runInThisContext(`(function(require,module,exports,window,crypto){${source}\n})`, { filename })(localRequire, module, module.exports, { prompt: () => prompts.shift(), confirm: (message) => { confirms.push(message); return confirmAnswers.length ? confirmAnswers.shift() : true }, setInterval: (fn) => { intervals.push(fn); return intervals.length }, clearInterval: () => {} }, crypto)
     return module.exports
   }
 
@@ -120,7 +121,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
     return { render, unmount, get tree() { return tree } }
   }
 
-  return { load, mount, requests, api, auth, navigations, prompts, confirms, confirmAnswers }
+  return { load, mount, requests, api, auth, navigations, prompts, confirms, confirmAnswers, intervals }
 }
 
 function nodes(tree, predicate) {
@@ -2579,6 +2580,10 @@ test('raid workspace opens on roster, preserves drafts between views and resets 
   assert.equal(panel('raid-roster').props.hidden, false)
   assert.equal(panel('raid-loot').props.hidden, true)
   assert.equal(panel('raid-planning').props.hidden, true)
+  assert.equal(panel('raid-recruitment').props.hidden, true)
+  button(view, 'Gesuchtext').props.onClick()
+  view.render()
+  assert.equal(panel('raid-recruitment').props.hidden, false)
   input(view, 'Charaktername oder Spieler').props.onChange(change('Keep this draft'))
   nodes(view.tree, (n) => n.type === 'button' && n.props['aria-controls'] === 'raid-loot')[0].props.onClick()
   view.render()
@@ -2997,4 +3002,52 @@ test('staff can bench a declined player straight from the roster', async () => {
   assert.deepEqual(writes(s)[0].body, { is_bench: true })
   writes(s)[0].reject(new Error('offline'))
   await done
+})
+
+test('recruitment template is loaded from the server, saved explicitly and the refresh only reloads the roster', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const { RaidRecruitment } = s.load('pages/Recruitment.tsx')
+  const view = s.mount(RaidRecruitment, { raidID: 8, seriesID: 3, attendance: [] })
+  const setupGrid = Array.from({ length: 5 }, () => ['Maintank', 'Offtank', 'Leer', 'Irgendein MDD', 'Irgendein RDD'])
+  resolveIf(s, '/api/v1/raids/8/recruitment-template', { text: 'Gespeicherter Text {{TANK}}', setup: setupGrid, updated_by: 1, updated_at: '2030-01-01T10:00:00Z' })
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.type === 'textarea' && !n.props.readOnly)[0].props.value, 'Gespeicherter Text {{TANK}}')
+  assert.equal(button(view, 'Vorlage speichern').props.disabled, true, 'nothing to save yet')
+  assert.match(text(view.tree), /Gespeichert\./)
+  nodes(view.tree, (n) => n.type === 'textarea' && !n.props.readOnly)[0].props.onChange(change('Neuer Text {{HEAL}}'))
+  view.render()
+  assert.match(text(view.tree), /Ungespeicherte Änderungen/)
+  const saving = button(view, 'Vorlage speichern').props.onClick()
+  const put = writes(s)[0]
+  assert.equal(put.method, 'put')
+  assert.equal(put.url, '/api/v1/raids/8/recruitment-template')
+  assert.equal(put.body.text, 'Neuer Text {{HEAL}}')
+  put.resolve({ text: 'Neuer Text {{HEAL}}', setup: setupGrid, updated_by: 1, updated_at: '2030-01-02T10:00:00Z' })
+  await saving
+  await flush(view)
+  assert.equal(button(view, 'Vorlage speichern').props.disabled, true)
+  // The 15 second refresh asks for the roster only.
+  const before = s.requests.length
+  s.intervals.at(-1)()
+  const fresh = s.requests.slice(before)
+  assert.deepEqual(fresh.map((r) => r.url), ['/api/v1/raids/8/attendance'])
+  fresh[0].resolve([])
+})
+
+test('a failed template save keeps the draft and shows the error', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const { RaidRecruitment } = s.load('pages/Recruitment.tsx')
+  const { ApiError } = s.load('api.ts')
+  const view = s.mount(RaidRecruitment, { raidID: 8, seriesID: null, attendance: [] })
+  resolveIf(s, '/api/v1/raids/8/recruitment-template', null)
+  await flush(view)
+  nodes(view.tree, (n) => n.type === 'textarea' && !n.props.readOnly)[0].props.onChange(change('Entwurf'))
+  view.render()
+  const saving = button(view, 'Vorlage speichern').props.onClick()
+  writes(s)[0].reject(new ApiError(403, 'forbidden', 'Dafür fehlt dir die Berechtigung.'))
+  await saving
+  await flush(view)
+  assert.match(text(view.tree), /Dafür fehlt dir die Berechtigung/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'textarea' && !n.props.readOnly)[0].props.value, 'Entwurf')
+  assert.equal(button(view, 'Vorlage speichern').props.disabled, false)
 })

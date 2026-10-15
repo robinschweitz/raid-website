@@ -10,7 +10,16 @@ export const changelog = [
     ],
   },
   {
-    version: appVersion,
+    version: '1.0.8',
+    title: 'Raidgesuchtext im Workspace',
+    changes: [
+      'Der Gesuchtext mit Soll-Besetzung ist direkt beim jeweiligen aktiven Raid erreichbar (für Raidassistenten und höher).',
+      'Textvorlage und Soll-Besetzung werden mit „Vorlage speichern“ für die ganze Raidserie gespeichert und sind für alle Raidleiter und Geräte gleich. Im Browser gespeicherte Vorlagen werden einmal übernommen.',
+      'Die Aktualisierung alle 15 Sekunden lädt nur noch die Aufstellung und lässt andere Eingaben auf der Raidseite unberührt.',
+    ],
+  },
+  {
+    version: '1.0.7',
     title: 'Komfortablere Raidverwaltung, Absagen und EP-Übersicht',
     changes: [
       'Absagen: Spieler können bis zum Raidstart mit „Ich kann nicht kommen“ absagen (optional mit Grund) und mit „Doch dabei“ zurücknehmen. Die Raidleitung sieht Absagen in der Anmeldung und als „Hat abgesagt“ in der Aufstellung und kann sie auch für Spieler eintragen.',

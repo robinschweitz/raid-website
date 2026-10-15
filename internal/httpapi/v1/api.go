@@ -22,6 +22,7 @@ import (
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/raidsignup"
+	"raid-website/internal/recruitment"
 	"raid-website/internal/registration"
 	"raid-website/internal/roster"
 	"raid-website/internal/validation"
@@ -49,6 +50,7 @@ type Deps struct {
 	Completion        *raidcompletion.Service
 	Corrections       *raidcorrection.Service
 	Signups           *raidsignup.Service
+	Recruitment       *recruitment.Service
 	Registration      *registration.Service
 	AccountMerge      *accountmerge.Service
 }
@@ -122,6 +124,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/raid-series/{id}", RequireRole(validation.RoleAdmin, a.updateRaidSeries))
 
 	mux.HandleFunc("GET /api/v1/raids/{id}/attendance", a.listAttendance)
+	mux.HandleFunc("GET /api/v1/raids/{id}/recruitment-template", RequireRole(validation.RoleRaidassistent, a.getRecruitmentTemplate))
+	mux.HandleFunc("PUT /api/v1/raids/{id}/recruitment-template", RequireRole(validation.RoleRaidassistent, a.saveRecruitmentTemplate))
 	mux.HandleFunc("GET /api/v1/raids/{id}/signups", RequireAuth(a.getSignups))
 	mux.HandleFunc("PUT /api/v1/raids/{id}/signups/availability", RequireRole(validation.RoleRaidassistent, a.setSignupAvailability))
 	mux.HandleFunc("PUT /api/v1/raids/{id}/signups", RequireRole(validation.RoleMember, a.saveSignups))

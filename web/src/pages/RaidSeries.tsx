@@ -106,7 +106,7 @@ export function RaidSeriesPage() {
       <h2>{s.name}</h2>
       {isAdmin && editingID === s.id ? editorForm : <>
         <p>{s.weekdays.map((day) => weekdays[day]).join(', ')} · {s.start_time}</p>
-        <p className="muted">Alle {s.interval_weeks} Wochen · {s.timezone}</p>
+        <p className="muted">{s.interval_weeks === 1 ? 'Jede Woche' : `Alle ${s.interval_weeks} Wochen`} · {s.timezone}</p>
         {s.name_template && <p className="muted">Namensvorlage: {s.name_template} · Nächste Nummer: {s.next_raid_number}</p>}
         <p className="muted">Raidleitung: {players.find((p) => p.id === s.raid_leader_id)?.name ?? 'Nicht verfügbar'}{s.catalog_instance_id && ` · ${catalog?.instances.find((instance) => instance.id === s.catalog_instance_id)?.name ?? `Instanz #${s.catalog_instance_id}`}${s.raid_size ? ` · ${s.raid_size} Spieler` : ''}`}</p>
         {isAdmin && <button disabled={pending} onClick={() => edit(s)}>Serie bearbeiten</button>}

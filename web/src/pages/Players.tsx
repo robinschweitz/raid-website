@@ -13,6 +13,7 @@ export function PlayersPage() {
   const [players, setPlayers] = useState<PlayerSummary[]>([])
   const [error, setError] = useState('')
   const [name, setName] = useState('')
+  const [search, setSearch] = useState('')
   const [role, setRole] = useState<Role>('GUEST')
 
   const isAdmin = me ? atLeast(me.role, 'ADMIN') : false
@@ -43,6 +44,10 @@ export function PlayersPage() {
     })
   }
 
+  const visiblePlayers = players
+    .filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' }))
+
   return (
     <div>
       <div className="page-heading"><div><p className="eyebrow">Unsere Gemeinschaft</p><h1>Spieler</h1></div>{isAdmin && <Link to="/roster">Gildenkonfiguration →</Link>}</div>
@@ -68,6 +73,10 @@ export function PlayersPage() {
         </form>
         </details>
       )}
+      {players.length > 0 && <div className="roster-filters player-search">
+        <label className="filter-search">Spieler suchen<input type="search" value={search} placeholder="Name" onChange={(e) => setSearch(e.target.value)} /></label>
+        <span className="muted" role="status">{visiblePlayers.length} von {players.length} Spielern</span>
+      </div>}
       <div className="card table-scroll"><table className="table">
         <thead>
           <tr>
@@ -76,7 +85,7 @@ export function PlayersPage() {
           </tr>
         </thead>
         <tbody>
-          {players.map((p) => (
+          {visiblePlayers.map((p) => (
             <tr key={p.id}>
               <td>
                 <Link to={`/players/${p.id}`}>{p.name}</Link>
@@ -85,6 +94,7 @@ export function PlayersPage() {
             </tr>
           ))}
           {players.length === 0 && <tr><td colSpan={2} className="muted">Keine Spieler geladen.</td></tr>}
+          {players.length > 0 && visiblePlayers.length === 0 && <tr><td colSpan={2} className="muted">Kein Spieler mit diesem Namen.</td></tr>}
         </tbody>
       </table></div>
 

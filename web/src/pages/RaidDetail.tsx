@@ -715,7 +715,7 @@ function RaidDetail({ raidID }: Props) {
       </nav>
       {view === 'signups' && <div id="raid-signups"><RaidSignups raid={raid} attendance={attendance} players={players} onRosterChange={load} /></div>}
       <section id="raid-planning" hidden={view !== 'planning'} className="card raid-summary" aria-label="Raidübersicht">
-      <h2>Übersicht</h2>
+      <h2>Planung & Details</h2>
       {raid.archived_at && <p className="muted">Archivierte Historie: Änderungen erfordern eine Begründung und werden protokolliert.</p>}
       {raid.previous_raid_id && <p><Link to={`/raids/${raid.previous_raid_id}`}>Vorheriger Raid</Link></p>}
       {archiveResult && <p role="status">Raid archiviert und weiterhin in der Historie sichtbar. {archiveResult.next_raid

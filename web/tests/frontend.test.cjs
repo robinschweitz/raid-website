@@ -780,6 +780,24 @@ for (const [file, component, label] of [
   })
 }
 
+test('player list sorts names naturally and filters by the search text', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/Players.tsx').PlayersPage)
+  const row = (id, name) => ({ id, name, guild_rank_id: null, active: true })
+  s.requests.forEach((r) => r.resolve([row(1, 'Spieler10'), row(2, 'Spieler2'), row(3, 'admin'), row(4, 'Spieler1')]))
+  await flush(view)
+  const names = () => nodes(view.tree, (n) => n.type === 'td').map((n) => text(n)).filter((t) => t && t !== 'aktiv')
+  assert.deepEqual(names(), ['admin', 'Spieler1', 'Spieler2', 'Spieler10'])
+  assert.match(text(view.tree), /4\s+von\s+4\s+Spielern/)
+  input(view, 'Name').props.onChange(change(' spieler1 '))
+  view.render()
+  assert.deepEqual(names(), ['Spieler1', 'Spieler10'])
+  assert.match(text(view.tree), /2\s+von\s+4\s+Spielern/)
+  input(view, 'Name').props.onChange(change('zzz'))
+  view.render()
+  assert.match(text(view.tree), /Kein Spieler mit diesem Namen/)
+})
+
 test('auth distinguishes network failure from anonymous and supports retry', async () => {
   const s = setup()
   const view = s.mount(s.load('auth.tsx').AuthProvider, { children: null })

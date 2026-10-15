@@ -1,8 +1,18 @@
-export const appVersion = '1.0.13'
+export const appVersion = '1.0.14'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Spielersuche und feinere Details',
+    changes: [
+      'Spielerliste: Suchfeld mit Trefferanzahl und natürliche Sortierung (Spieler2 vor Spieler10).',
+      'Raidserien: „Jede Woche“ statt „Alle 1 Wochen“.',
+      'Beute: Die Filter passen auf dem Handy in zwei Spalten und brauchen weniger Platz.',
+      'Raid: Der Bereich „Planung & Details“ heißt auch in seiner Überschrift so.',
+    ],
+  },
+  {
+    version: '1.0.13',
     title: 'Sicherheitsabfragen und einheitliche Texte',
     changes: [
       '„Absagen“, „Archivieren“ und „Loot zurückziehen“ fragen vor dem Ausführen nach.',

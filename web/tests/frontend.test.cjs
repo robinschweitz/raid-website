@@ -14,6 +14,8 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
   const requests = []
   const navigations = []
   const prompts = []
+  const confirms = []
+  const confirmAnswers = []
   const auth = { player: me }
   const jsx = (type, props, key) => ({ type, props: props ?? {}, key })
   const slot = (create) => {
@@ -81,7 +83,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
       const exports = load(path.relative(path.resolve(__dirname, '../src'), resolved + extension))
       return name.endsWith('/api') ? { ...exports, api } : exports
     }
-    vm.runInThisContext(`(function(require,module,exports,window,crypto){${source}\n})`, { filename })(localRequire, module, module.exports, { prompt: () => prompts.shift(), setInterval: () => 0, clearInterval: () => {} }, crypto)
+    vm.runInThisContext(`(function(require,module,exports,window,crypto){${source}\n})`, { filename })(localRequire, module, module.exports, { prompt: () => prompts.shift(), confirm: (message) => { confirms.push(message); return confirmAnswers.length ? confirmAnswers.shift() : true }, setInterval: () => 0, clearInterval: () => {} }, crypto)
     return module.exports
   }
 
@@ -118,7 +120,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
     return { render, unmount, get tree() { return tree } }
   }
 
-  return { load, mount, requests, api, auth, navigations, prompts }
+  return { load, mount, requests, api, auth, navigations, prompts, confirms, confirmAnswers }
 }
 
 function nodes(tree, predicate) {
@@ -2102,6 +2104,22 @@ test('empty loot list tells staff how to start', async () => {
   resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
   await flush(view)
   assert.match(text(view.tree), /Noch kein Loot vergeben\. Mit „Loot erfassen“/)
+})
+
+test('cancelling a raid asks for confirmation and a declined prompt sends nothing', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { raid: { status: 'OPEN' }, attendance: [recipientRow] })
+  await flush(view)
+  s.confirmAnswers.push(false)
+  await button(view, 'Absagen').props.onClick()
+  assert.equal(writes(s).length, 0)
+  assert.match(s.confirms[0], /absagen/)
+  const accepted = button(view, 'Absagen').props.onClick()
+  assert.equal(writes(s).length, 1)
+  assert.match(writes(s)[0].url, /cancel$/)
+  writes(s)[0].reject(new Error('offline'))
+  await accepted
 })
 
 test('unsaved association is preview only; saved context invalidates old loot requests and handlers', async () => {

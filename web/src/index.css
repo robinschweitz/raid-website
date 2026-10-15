@@ -1299,6 +1299,7 @@ input[type='checkbox'] {
 
 .attendance-details {
   flex: 1;
+  min-width: 150px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1307,6 +1308,7 @@ input[type='checkbox'] {
 .attendance-detail-row {
   display: flex;
   justify-content: space-between;
+  gap: 16px;
   font-size: 12px;
 }
 

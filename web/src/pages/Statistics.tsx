@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, ApiError } from '../api'
 import { Link } from '../router'
 import type { Attendance, Character, LootAward, Player, Raid } from '../types'
@@ -133,7 +133,7 @@ export function StatisticsPage() {
       <StatCard label="Aktive Spieler" value={activePlayers} hint="Spieler mit aktivem Status" />
       <StatCard label="Aktive Charaktere" value={activeCharacters.length} hint="Alle gespeicherten aktiven Charaktere" />
       <StatCard label="Archivierte Raids" value={historicalRaids.length} hint="Abgeschlossene Raid-Historie" />
-      <StatCard label="Loot-Eintraege" value={allLoot.length} hint={`${mainSpecLoot} Main-Spec / ${allLoot.length - mainSpecLoot} andere`} />
+      <StatCard label="Loot-Einträge" value={allLoot.length} hint={`${mainSpecLoot} Main-Spec / ${allLoot.length - mainSpecLoot} andere`} />
     </section>
 
     <div className="statistics-grid">
@@ -145,6 +145,7 @@ export function StatisticsPage() {
               {raidStatusData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
             </Pie>
             <Tooltip contentStyle={{ background: '#101d2e', border: '1px solid #2a4057', borderRadius: 4 }} labelStyle={{ color: '#dce6f0' }} itemStyle={{ color: '#86d9f2' }} />
+            <Legend verticalAlign="bottom" iconType="circle" formatter={(value, entry) => <span style={{ color: '#dce6f0' }}>{value}: {(entry.payload as { value?: number } | undefined)?.value ?? 0}</span>} />
           </PieChart>
         </ResponsiveContainer> : <p className="muted">Noch keine Raids gespeichert.</p>}
       </section>
@@ -164,22 +165,22 @@ export function StatisticsPage() {
       <section className="card statistics-chart-card">
         <div className="section-heading"><h2>Historische Rollen</h2><span className="eyebrow">Archivierte Roster</span></div>
         {roleData.length > 0 ? <div className="stat-bars">{roleData.map((entry) => <div className="stat-bar-row" key={entry.name}><span>{entry.name}</span><strong>{entry.value}</strong><div><i style={{ width: percent(entry.value, allAttendance.length) }} /></div></div>)}</div> : <p className="muted">Noch keine historischen Aufstellungen vorhanden.</p>}
-        {allAttendance.length > 0 && <p className="muted">{benchRows} von {allAttendance.length} Eintraegen waren Ersatzbank.</p>}
+        {allAttendance.length > 0 && <p className="muted">{benchRows} von {allAttendance.length} Einträgen waren Ersatzbank.</p>}
       </section>
 
       <section className="card statistics-chart-card">
-        <div className="section-heading"><h2>Loot-Verteilung</h2><span className="eyebrow">Award-Methode</span></div>
+        <div className="section-heading"><h2>Loot-Verteilung</h2><span className="eyebrow">Vergabemethode</span></div>
         {lootMethodData.length > 0 ? <div className="stat-bars">{lootMethodData.map((entry) => <div className="stat-bar-row" key={entry.name}><span>{entry.name}</span><strong>{entry.value}</strong><div><i style={{ width: percent(entry.value, allLoot.length) }} /></div></div>)}</div> : <p className="muted">Noch keine Loot-Historie vorhanden.</p>}
       </section>
 
       <section className="card statistics-table-card">
         <div className="section-heading"><h2>Meiste Teilnahmen</h2><span className="eyebrow">Archivierte Raids</span></div>
-        <div className="table-scroll"><table className="table small"><thead><tr><th>Spieler</th><th>Eintraege</th></tr></thead><tbody>{attendanceLeaders.map((entry) => <tr key={entry.name}><td>{entry.name}</td><td>{entry.value}</td></tr>)}{attendanceLeaders.length === 0 && <tr><td colSpan={2} className="muted">Noch keine Teilnahmen.</td></tr>}</tbody></table></div>
+        <div className="table-scroll"><table className="table small"><thead><tr><th>Spieler</th><th>Einträge</th></tr></thead><tbody>{attendanceLeaders.map((entry) => <tr key={entry.name}><td>{entry.name}</td><td>{entry.value}</td></tr>)}{attendanceLeaders.length === 0 && <tr><td colSpan={2} className="muted">Noch keine Teilnahmen.</td></tr>}</tbody></table></div>
       </section>
 
       <section className="card statistics-table-card">
-        <div className="section-heading"><h2>Meiste Loot-Eintraege</h2><span className="eyebrow">Archivierte Raids</span></div>
-        <div className="table-scroll"><table className="table small"><thead><tr><th>Spieler</th><th>Loot</th></tr></thead><tbody>{lootLeaders.map((entry) => <tr key={entry.name}><td>{entry.name}</td><td>{entry.value}</td></tr>)}{lootLeaders.length === 0 && <tr><td colSpan={2} className="muted">Noch keine Loot-Eintraege.</td></tr>}</tbody></table></div>
+        <div className="section-heading"><h2>Meiste Loot-Einträge</h2><span className="eyebrow">Archivierte Raids</span></div>
+        <div className="table-scroll"><table className="table small"><thead><tr><th>Spieler</th><th>Loot</th></tr></thead><tbody>{lootLeaders.map((entry) => <tr key={entry.name}><td>{entry.name}</td><td>{entry.value}</td></tr>)}{lootLeaders.length === 0 && <tr><td colSpan={2} className="muted">Noch keine Loot-Einträge.</td></tr>}</tbody></table></div>
       </section>
     </div>
   </div>

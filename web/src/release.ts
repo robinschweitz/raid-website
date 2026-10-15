@@ -1,8 +1,18 @@
-export const appVersion = '1.0.12'
+export const appVersion = '1.0.13'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Sicherheitsabfragen und einheitliche Texte',
+    changes: [
+      '„Absagen“, „Archivieren“ und „Loot zurückziehen“ fragen vor dem Ausführen nach.',
+      'Neben „Hinzufügen“ steht, was noch fehlt (Charakter wählen, Begründung eintragen).',
+      'Statistiken: Legende mit Anzahl beim Status-Diagramm, durchgehend deutsche Beschriftungen („Einträge“, „Vergabemethode“). Übersicht und Profil: „Raidaufstellung“ und „Verlauf“ statt englischer Titel.',
+      'Auf dem Handy steht in der Anwesenheitskarte wieder ein Abstand zwischen Beschriftung und Zahl.',
+    ],
+  },
+  {
+    version: '1.0.12',
     title: 'Alle Hinzufügen-Formulare oben',
     changes: [
       '„Neue Raidserie“, „Neue Umfrage“, „Gildenrang hinzufügen“, „Raidgruppe hinzufügen“ sowie „Charakter hinzufügen/beanspruchen“ stehen jetzt oberhalb der Listen.',

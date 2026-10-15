@@ -551,6 +551,8 @@ function RaidDetail({ raidID }: Props) {
   const action = async (name: 'cancel' | 'archive') => {
     if (!canManage || !raid || raid.archived_at || raid.status === 'CANCELLED' || (name !== 'archive' && !isActiveRaid)) return
     if (name === 'archive' && isActiveRaid && (!raid.series_id || !raid.scheduled_start)) return
+    if (name === 'cancel' && !window.confirm('Raid wirklich absagen? Es werden keine EP vergeben.')) return
+    if (name === 'archive' && isActiveRaid && !window.confirm('Raid jetzt archivieren? Das beendet den Raid endgültig, vergibt EP und legt den nächsten Termin an.')) return
     await submit(async () => {
       setError('')
       setMessage('')
@@ -655,6 +657,7 @@ function RaidDetail({ raidID }: Props) {
 
 	const withdrawLoot = async () => {
 		if (!lootEditing || !canWrite || (lootNeedsReason && !lootReason.trim())) return
+		if (!window.confirm(`Loot „${lootEditing.item_name}“ wirklich zurückziehen?`)) return
 		await submit(async () => {
 			setError('')
 			setMessage('')
@@ -824,6 +827,7 @@ function RaidDetail({ raidID }: Props) {
               </label>)}</fieldset>
               {attNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Teilnahme-Begründung" value={attReason} onChange={(e) => setAttReason(e.target.value)} required /></label>}
               {attEditing && error && <p className="error" role="alert">{error}</p>}
+              {!pending && (!hasAttCharacter ? <p className="field-hint">Zuerst einen Charakter wählen.</p> : attNeedsReason && !attReason.trim() ? <p className="field-hint">Begründung eintragen.</p> : null)}
               <button className="primary-action" type="submit" disabled={pending || !hasAttCharacter || (attNeedsReason && !attReason.trim())}>{attEditing ? 'Teilnahme-Korrektur speichern' : 'Hinzufügen'}</button>
               {attEditing && <button type="button" disabled={pending} onClick={() => editAttendance(null)}>Bearbeitung abbrechen</button>}
             </form>}

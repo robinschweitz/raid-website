@@ -45,3 +45,9 @@ hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetz
   im Spielerprofil stehen oberhalb ihrer Listen.
 - Nach dem Hinzufügen einer Teilnahme bleibt der Abschnitt offen und der Fokus kehrt ins Charakterfeld zurück.
 - Leere Listen nennen für berechtigte Rollen die passende Aktion; andere Rollen sehen den bisherigen Kurztext.
+
+## Nachtrag: Sicherheitsabfragen und einheitliche Texte
+
+- Absagen, Archivieren und Loot zurückziehen verlangen eine Bestätigung (`window.confirm`, wie beim
+  Zusammenführen von Konten); ein abgelehnter Dialog sendet nichts.
+- Sichtbare Beschriftungen sind durchgehend deutsch mit Umlauten; das Status-Diagramm hat eine Legende.

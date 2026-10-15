@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -449,5 +450,56 @@ func TestSuccessorUsesNameTemplate(t *testing.T) {
 	}
 	if updated.NextRaidNumber != 35 {
 		t.Fatalf("want next raid number 35, got %d", updated.NextRaidNumber)
+	}
+}
+
+func TestArchiveWithoutPointsForDeclinedPlayers(t *testing.T) {
+	ctx := context.Background()
+	archive := func(t *testing.T, without []int64) (balances [2]int, err error) {
+		db := setupDB(t)
+		actor := seedPlayer(t, ctx, player.NewRepo(db), "Actor")
+		other := seedPlayer(t, ctx, player.NewRepo(db), "Other")
+		now := time.Now().UTC()
+		rd := &raid.Raid{Name: "Absence", RaidLeaderID: actor, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
+		seedSchedule(t, ctx, db, rd)
+		if err := raid.NewRepo(db).Create(ctx, rd); err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range []int64{actor, other} {
+			c := seedCharacter(t, ctx, character.NewRepo(db), p, "Char"+strconv.FormatInt(p, 10))
+			a := &attendance.Attendance{RaidID: rd.ID, PlayerID: p, CharacterID: c, CharacterName: "Char", Class: "Krieger", Spec: "Waffen", Role: validation.RoleDD, CreatedAt: now, UpdatedAt: now}
+			if err := attendance.NewRepo(db).Create(ctx, a); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Only "other" declined.
+		if _, err := db.ExecContext(ctx, "INSERT INTO raid_absences (raid_id, player_id, reason, created_at) VALUES (?, ?, '', ?)", rd.ID, other, now); err != nil {
+			t.Fatal(err)
+		}
+		translate := func(ids []int64) []int64 {
+			out := []int64{}
+			for _, id := range ids {
+				if id == 1 {
+					out = append(out, actor)
+				} else {
+					out = append(out, other)
+				}
+			}
+			return out
+		}
+		_, _, err = NewService(NewRepo(db)).ArchiveRaidWithout(ctx, rd.ID, actor, translate(without))
+		for i, p := range []int64{actor, other} {
+			balances[i], _ = enhancepoints.NewRepo(db).Balance(ctx, p)
+		}
+		return balances, err
+	}
+	if b, err := archive(t, nil); err != nil || b != [2]int{10, 10} {
+		t.Fatalf("default: %v %v", b, err)
+	}
+	if b, err := archive(t, []int64{2}); err != nil || b != [2]int{10, 0} {
+		t.Fatalf("declined player excluded: %v %v", b, err)
+	}
+	if _, err := archive(t, []int64{1}); !errors.Is(err, ErrInvalidExclusion) {
+		t.Fatalf("player who did not decline must be rejected: %v", err)
 	}
 }

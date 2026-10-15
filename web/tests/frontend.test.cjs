@@ -411,6 +411,7 @@ function resolveRaid(s, id, options = {}) {
       : r.url === '/api/v1/character-options' ? { Priester: ['Disziplin', 'Heilig', 'Schatten'], Magier: ['Feuer', 'Frost'] }
       : r.url.endsWith('/attendance') ? options.attendance ?? []
       : r.url.endsWith('/loot') ? options.loot ?? []
+      : r.url.endsWith('/signups') ? { absences: options.absences ?? [] }
       : r.url === '/api/v1/loot-catalog' ? options.catalog ?? emptyCatalog() : [])
   }
 }
@@ -2921,4 +2922,36 @@ test('roster rows of players who declined carry a badge and reason', () => {
   const flat = text(board)
   assert.equal((flat.match(/Hat abgesagt/g) ?? []).length, 1)
   assert.match(flat, /Grund:\s+Krank/)
+})
+
+test('archiving with declined players in the roster lets staff decide who gets no EP', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' }, attendance: [recipientRow], absences: [{ player_id: 2, reason: 'Krank', created_at: '2026-10-01T00:00:00Z' }] })
+  await flush(view)
+  await button(view, 'Archivieren').props.onClick()
+  assert.equal(writes(s).length, 0, 'the first click only opens the review')
+  assert.equal(s.confirms.length, 0)
+  view.render()
+  assert.match(text(view.tree), /Abgesagte Spieler in der Aufstellung/)
+  assert.match(text(view.tree), /Keine EP für .*Krank/)
+  const check = nodes(view.tree, (n) => n.type === 'label' && /Keine EP für/.test(text(n)))[0]
+  nodes(check, (n) => n.type === 'input')[0].props.onChange({ target: { checked: true } })
+  view.render()
+  const done = button(view, 'Jetzt archivieren').props.onClick()
+  assert.equal(writes(s).length, 1)
+  assert.deepEqual(writes(s)[0].body, { without_points: [2] })
+  writes(s)[0].reject(new Error('offline'))
+  await done
+})
+
+test('archiving without declined players sends no exclusion body', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' }, attendance: [recipientRow] })
+  await flush(view)
+  const done = button(view, 'Archivieren').props.onClick()
+  assert.equal(writes(s)[0].body, undefined)
+  writes(s)[0].reject(new Error('offline'))
+  await done
 })

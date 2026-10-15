@@ -3,6 +3,7 @@ package v1
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -160,7 +161,14 @@ func (a *API) archiveRaid(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "invalid raid id")
 		return
 	}
-	rd, next, err := a.Completion.ArchiveRaid(r.Context(), id, actor)
+	var req struct {
+		WithoutPoints []int64 `json:"without_points"`
+	}
+	if err := DecodeJSON(r, &req); err != nil && !errors.Is(err, io.EOF) {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	rd, next, err := a.Completion.ArchiveRaidWithout(r.Context(), id, actor, req.WithoutPoints)
 	if err != nil {
 		if writeSeriesError(w, err) {
 			return
@@ -174,6 +182,8 @@ func (a *API) archiveRaid(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusConflict, "raid_cancelled", "cancelled raids cannot be archived")
 		case errors.Is(err, raidcompletion.ErrRaidNotArchivable):
 			WriteError(w, http.StatusConflict, "raid_not_archivable", "raid cannot be archived")
+		case errors.Is(err, raidcompletion.ErrInvalidExclusion):
+			WriteError(w, http.StatusBadRequest, "invalid_exclusion", "Nur Spieler aus der Aufstellung, die abgesagt haben, können von den EP ausgenommen werden.")
 		case errors.Is(err, raidcompletion.ErrRosterIncomplete):
 			WriteError(w, http.StatusConflict, "roster_incomplete", err.Error())
 		default:

@@ -120,6 +120,8 @@ function RaidDetail({ raidID }: Props) {
   const [attRole, setAttRole] = useState<AttendanceRole>('DD')
   const [characters, setCharacters] = useState<Character[]>([])
   const [absences, setAbsences] = useState<Absence[]>([])
+  const [archiveReview, setArchiveReview] = useState(false)
+  const [withoutPoints, setWithoutPoints] = useState<number[]>([])
   const [characterSearch, setCharacterSearch] = useState('')
   const [quickAdd, setQuickAdd] = useState(false)
   const [quickAddName, setQuickAddName] = useState('')
@@ -191,7 +193,7 @@ function RaidDetail({ raidID }: Props) {
   const visibleCatalogItems = modeCatalogItems.filter((item) => dropKey(item) === catalogItem || matchesCatalogItem(item, catalogSearch))
 
   const absenceReasons = new Map(absences.map((row) => [row.player_id, row.reason]))
-  const declinedInRoster = attendance.filter((row) => absenceReasons.has(row.player_id))
+  const declinedPlayers = [...new Set(attendance.filter((row) => absenceReasons.has(row.player_id)).map((row) => row.player_id))]
 
   const load = useCallback(async () => {
     if (!isActive()) return
@@ -558,13 +560,14 @@ function RaidDetail({ raidID }: Props) {
     if (!canManage || !raid || raid.archived_at || raid.status === 'CANCELLED' || (name !== 'archive' && !isActiveRaid)) return
     if (name === 'archive' && isActiveRaid && (!raid.series_id || !raid.scheduled_start)) return
     if (name === 'cancel' && !window.confirm('Raid wirklich absagen? Es werden keine EP vergeben.')) return
-    if (name === 'archive' && isActiveRaid && !window.confirm(`Raid jetzt archivieren? Das beendet den Raid endgültig, vergibt EP und legt den nächsten Termin an.${declinedInRoster.length ? `\n\nAchtung: ${[...new Set(declinedInRoster.map((row) => playerName(row.player_id)))].join(', ')} ${declinedInRoster.length === 1 ? 'hat' : 'haben'} abgesagt, ${declinedInRoster.length === 1 ? 'steht' : 'stehen'} aber noch in der Aufstellung und ${declinedInRoster.length === 1 ? 'erhält' : 'erhalten'} EP.` : ''}`)) return
+    if (name === 'archive' && isActiveRaid && declinedPlayers.length && !archiveReview) { setArchiveReview(true); return }
+    if (name === 'archive' && isActiveRaid && !window.confirm('Raid jetzt archivieren? Das beendet den Raid endgültig, vergibt EP und legt den nächsten Termin an.')) return
     await submit(async () => {
       setError('')
       setMessage('')
       try {
         if (name === 'archive') {
-          const result = await api.postEnvelope<ArchiveResponse>(`/api/v1/raids/${raidID}/archive`)
+          const result = await api.postEnvelope<ArchiveResponse>(`/api/v1/raids/${raidID}/archive`, archiveReview ? { without_points: withoutPoints.filter((id) => declinedPlayers.includes(id)) } : undefined)
           if (!isActive()) return
           ++characterVersion.current
           ++lootFormVersion.current
@@ -774,8 +777,16 @@ function RaidDetail({ raidID }: Props) {
         <p className="muted">{isActiveRaid ? 'Archivieren beendet den Raid endgültig: +10 EP pro Teilnehmer ohne Main-Spec-Loot, ungenutzte Locks verfallen und der nächste zukünftige Serientermin wird angelegt. Spätere Korrekturen erfordern eine Begründung.' : 'Dieser historische abgeschlossene Raid wird nur archiviert. Keine erneute EP-Vergabe und kein Nachfolger.'}</p>
         <div className="actions">
           {isActiveRaid && <button disabled={pending} onClick={() => action('cancel')}>Absagen</button>}
-          <button className="archive-action" disabled={pending || (isActiveRaid && (!raid.series_id || !raid.scheduled_start))} onClick={() => action('archive')}>Archivieren</button>
+          <button className="archive-action" disabled={pending || (isActiveRaid && (!raid.series_id || !raid.scheduled_start))} onClick={() => action('archive')}>{archiveReview ? 'Jetzt archivieren' : 'Archivieren'}</button>
+          {archiveReview && <button type="button" disabled={pending} onClick={() => { setArchiveReview(false); setWithoutPoints([]) }}>Zurück</button>}
         </div>
+        {archiveReview && declinedPlayers.length > 0 && <fieldset className="subcard archive-absences">
+          <legend>Abgesagte Spieler in der Aufstellung</legend>
+          <p className="muted">Diese Spieler haben abgesagt, stehen aber noch in der Aufstellung. Standardmäßig erhalten sie wie alle +10 EP. Ankreuzen, wenn sie keine EP bekommen sollen.</p>
+          {declinedPlayers.map((id) => <label key={id} className="check">
+            <input type="checkbox" checked={withoutPoints.includes(id)} disabled={pending} onChange={(e) => setWithoutPoints((prev) => e.target.checked ? [...prev, id] : prev.filter((x) => x !== id))} /> Keine EP für {playerName(id)}{absenceReasons.get(id) ? ` (${absenceReasons.get(id)})` : ''}
+          </label>)}
+        </fieldset>}
         </section>
       )}
       </section>

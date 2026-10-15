@@ -1,8 +1,15 @@
-export const appVersion = '1.0.20'
+export const appVersion = '1.0.21'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'EP bei Absagen beim Archivieren',
+    changes: [
+      'Stehen abgesagte Spieler noch in der Aufstellung, zeigt „Archivieren“ zuerst eine Liste. Dort lässt sich pro Spieler festlegen, ob er keine EP erhält; ohne Auswahl bleibt es bei +10 EP.',
+    ],
+  },
+  {
+    version: '1.0.20',
     title: 'Absage für Raids',
     changes: [
       'Spieler können bis zum Raidstart mit „Ich kann nicht kommen“ absagen und optional einen Grund nennen; „Doch dabei“ nimmt die Absage zurück.',

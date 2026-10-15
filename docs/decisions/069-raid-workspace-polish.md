@@ -75,6 +75,8 @@ hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetz
   Raidleitung (RAIDASSISTENT+) darf für jeden Spieler eintragen und zurücknehmen, solange der Raid aktiv ist.
   Jede Änderung wird als `absence_declare`/`absence_revoke` protokolliert.
 - Eine Absage markiert nur: Aufstellung, Anmeldungen und Bank bleiben unverändert, die Raidleitung entscheidet.
-- **Offen (fachliche Regel):** Beim Archivieren erhält jeder Eintrag der Aufstellung +10 EP. Wer abgesagt hat und
-  nicht entfernt wird, bekäme sie ebenfalls. Es gibt bewusst keine automatische Ausnahme; die Archiv-Rückfrage
-  nennt betroffene Spieler. Ob Abgesagte keine EP erhalten sollen, muss fachlich entschieden werden.
+- **EP beim Archivieren:** Die Raidleitung entscheidet pro Spieler. `POST /api/v1/raids/{id}/archive` nimmt
+  optional `{"without_points": [playerID, …]}`; diese Spieler erhalten keine +10 EP. Zulässig sind nur Spieler
+  aus der Aufstellung mit Absage (sonst 400 `invalid_exclusion`). Ohne Angabe bleibt das Verhalten unverändert.
+  Die Entscheidung wird als `archive_without_points` im Audit-Log festgehalten. In der Oberfläche zeigt
+  „Archivieren“ dazu vorab eine Liste mit Ankreuzfeldern („Keine EP für …“).

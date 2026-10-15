@@ -2,13 +2,16 @@ package raidcompletion
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"raid-website/internal/attendance"
+	"raid-website/internal/audit"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
@@ -21,6 +24,7 @@ var (
 	ErrRaidCancelled     = errors.New("raid is cancelled")
 	ErrRaidNotArchivable = errors.New("raid is not archivable")
 	ErrRosterIncomplete  = errors.New("raid roster is incomplete")
+	ErrInvalidExclusion  = errors.New("only rostered players who declined can be excluded from points")
 )
 
 // Service archives raids with point awards, lock expiry and successor scheduling.
@@ -36,6 +40,13 @@ func NewService(repo *Repo) *Service {
 // ArchiveRaid finalizes rewards, locks and the next occurrence atomically.
 // Stored COMPLETED raids are historical: never recreate their rewards or cadence.
 func (s *Service) ArchiveRaid(ctx context.Context, raidID, actorID int64) (*raid.Raid, *raid.Raid, error) {
+	return s.ArchiveRaidWithout(ctx, raidID, actorID, nil)
+}
+
+// ArchiveRaidWithout archives like ArchiveRaid but awards no participation points
+// to the listed players. Each must be on the roster and have declined the raid;
+// the decision is written to the audit log.
+func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64, withoutPoints []int64) (*raid.Raid, *raid.Raid, error) {
 	var archived, next *raid.Raid
 	err := s.repo.InTransaction(ctx, func(repo *Repo) error {
 		raids := repo.raids
@@ -143,9 +154,39 @@ func (s *Service) ArchiveRaid(ctx context.Context, raidID, actorID int64) (*raid
 			return fmt.Errorf("complete raid %d: %w", raidID, err)
 		}
 
+		skip := make(map[int64]bool, len(withoutPoints))
+		if len(withoutPoints) > 0 {
+			declined, err := repo.declinedPlayers(ctx, raidID)
+			if err != nil {
+				return fmt.Errorf("load absences for raid %d: %w", raidID, err)
+			}
+			rostered := make(map[int64]bool, len(rows))
+			for _, a := range rows {
+				rostered[a.PlayerID] = true
+			}
+			for _, id := range withoutPoints {
+				if !declined[id] || !rostered[id] {
+					return ErrInvalidExclusion
+				}
+				skip[id] = true
+			}
+			ids := make([]int64, 0, len(skip))
+			for id := range skip {
+				ids = append(ids, id)
+			}
+			slices.Sort(ids)
+			after, err := json.Marshal(map[string]any{"without_points": ids})
+			if err != nil {
+				return err
+			}
+			if err := repo.audit.Insert(ctx, &audit.Log{ActorID: &actorID, EntityType: "raid", EntityID: strconv.FormatInt(raidID, 10), Action: "archive_without_points", BeforeJSON: "null", AfterJSON: string(after), CreatedAt: now}); err != nil {
+				return err
+			}
+		}
+
 		awardedPlayers := make(map[int64]struct{}, len(rows))
 		for _, a := range rows {
-			if _, done := awardedPlayers[a.PlayerID]; done {
+			if _, done := awardedPlayers[a.PlayerID]; done || skip[a.PlayerID] {
 				continue
 			}
 			awardedPlayers[a.PlayerID] = struct{}{}

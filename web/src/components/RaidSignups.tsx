@@ -50,6 +50,18 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
     })
   }, [load, raid.scheduled_start, raid.status, isActive])
 
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (isOpen) { wasOpen.current = true; return }
+    if (!wasOpen.current) return
+    wasOpen.current = false
+    const unsent = Object.keys(choices).length > 0
+    // Staff closing the signup themselves already get a confirmation from the action.
+    if (!canManage || unsent) setMessage(unsent ? 'Die Anmeldung wurde gerade geschlossen. Die angekreuzten Charaktere wurden nicht mehr angemeldet.' : 'Die Anmeldung wurde gerade geschlossen.')
+    setChoices({})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
   useEffect(() => {
     if (!message) return undefined
     const timer = setTimeout(() => setMessage(''), 8000)

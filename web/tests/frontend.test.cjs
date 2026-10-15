@@ -258,6 +258,26 @@ test('members can withdraw their own pending signup but not accepted ones or oth
   assert.equal(writes(s)[0].url, '/api/v1/raids/8/signups/4/withdraw')
 })
 
+test('a signup that closes while a member is choosing explains what happened', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: { Magier: ['Feuer'] }, entries: [] })
+  resolveIf(s, '/api/v1/players/2/characters', [{ id: 11, player_id: 2, name: 'Neuling', class: 'Magier', main_spec: 'Feuer', active: true }])
+  await flush(view)
+  nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')[0].props.onChange({ target: { checked: true } })
+  view.render()
+  assert.doesNotMatch(text(view.tree), /gerade geschlossen/)
+  const refresh = button(view, 'Anmeldungen aktualisieren').props.onClick()
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: false, is_open: false, class_specs: { Magier: ['Feuer'] }, entries: [] })
+  resolveIf(s, '/api/v1/players/2/characters', [])
+  await flush(view)
+  await refresh
+  await flush(view)
+  assert.match(text(view.tree), /gerade geschlossen\. Die angekreuzten Charaktere wurden nicht mehr angemeldet/)
+  assert.equal(form(view), undefined)
+})
+
 test('after the deadline the signup form and withdraw buttons disappear even if the server still says open', async () => {
   const s = setup({ id: 2, role: 'MEMBER' })
   const { RaidSignups } = s.load('components/RaidSignups.tsx')

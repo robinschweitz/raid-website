@@ -1,8 +1,15 @@
-export const appVersion = '1.0.18'
+export const appVersion = '1.0.19'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Hinweis beim Anmeldeschluss',
+    changes: [
+      'Schließt die Anmeldung, während jemand noch Charaktere ankreuzt, erscheint ein Hinweis, dass nichts mehr angemeldet wurde.',
+    ],
+  },
+  {
+    version: '1.0.18',
     title: 'Anmeldung in Klassenfarbe',
     changes: [
       'In der Raidanmeldung erscheint der Charaktername in seiner Klassenfarbe, wie in der Aufstellung.',

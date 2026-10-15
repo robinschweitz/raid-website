@@ -111,7 +111,7 @@ func (r *Repo) MoveHistoricalReferences(ctx context.Context, sourceID, targetID 
 		{"raid_attendance", "player_id"}, {"raid_signups", "player_id"}, {"character_wishlist", "player_id"},
 		{"loot_awards", "awarded_to_player_id"}, {"loot_awards", "awarded_by_player_id"}, {"enhance_point_transactions", "player_id"},
 		{"enhance_point_transactions", "actor_id"}, {"item_locks", "actor_id"}, {"polls", "created_by"},
-		{"poll_votes", "player_id"}, {"legacy_imports", "actor_id"}, {"audit_log", "actor_id"},
+		{"poll_votes", "player_id"}, {"audit_log", "actor_id"},
 		{"raid_quick_add_requests", "actor_id"}, {"registration_requests", "requester_player_id"},
 		{"registration_codes", "created_by_player_id"}, {"registration_codes", "used_by_player_id"},
 	}

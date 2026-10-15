@@ -16,8 +16,6 @@ import (
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	v1 "raid-website/internal/httpapi/v1"
-	"raid-website/internal/legacyimport"
-	"raid-website/internal/legacyraidlink"
 	"raid-website/internal/loot"
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
@@ -29,7 +27,6 @@ import (
 	"raid-website/internal/raidsignup"
 	"raid-website/internal/registration"
 	"raid-website/internal/roster"
-	"raid-website/internal/websheetsync"
 	"raid-website/internal/webui"
 )
 
@@ -41,8 +38,6 @@ type Options struct {
 	AdminUsername     string
 	AdminPassword     string
 	RegistrationFeed  registration.ExternalClient
-	ImportFetcher     legacyimport.Fetcher
-	WebsiteSheets     websheetsync.Sheets
 }
 
 // New constructs the HTTP handler tree with all v1 dependencies wired.
@@ -70,30 +65,11 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	}
 	registrationSvc := registration.NewService(db, players, chars, audits, authSvc, registrationFeed)
 
-	importFetcher := opts.ImportFetcher
-	if importFetcher == nil {
-		importFetcher = legacyimport.GoogleFetcher{}
-	}
-	importsSvc := legacyimport.NewService(
-		legacyimport.NewRepo(db),
-		players,
-		chars,
-		raids,
-		att,
-		lootRepo,
-		points,
-		raidseries.NewRepo(db),
-		importFetcher,
-	)
-	importsSvc.WithExternalClient(registrationFeed)
-	importsSvc.WithCompletionService(raidcompletion.NewService(raidcompletion.NewRepo(db)))
-
 	if err := authSvc.BootstrapAdmin(context.Background(), opts.AdminUsername, opts.AdminPassword); err != nil {
 		return nil, fmt.Errorf("bootstrap admin: %w", err)
 	}
 
-	websiteSync := websheetsync.NewService(db, opts.WebsiteSheets)
-	corrections := raidcorrection.NewService(raidcorrection.NewRepo(db)).WithExternalClient(registrationFeed).WithWebsiteSync(websiteSync)
+	corrections := raidcorrection.NewService(raidcorrection.NewRepo(db)).WithExternalClient(registrationFeed)
 	api := v1.NewAPI(v1.Deps{
 		DB:                db,
 		Auth:              authSvc,
@@ -113,12 +89,9 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Audit:             audits,
 		Completion:        raidcompletion.NewService(raidcompletion.NewRepo(db)),
 		Corrections:       corrections,
-		Imports:           importsSvc,
-		LegacyRaidLinks:   legacyraidlink.NewService(db),
 		Signups:           raidsignup.NewService(raidsignup.NewRepo(db)),
 		Registration:      registrationSvc,
 		AccountMerge:      accountmerge.NewService(accountmerge.NewRepo(db)),
-		WebsiteSync:       websiteSync,
 	})
 
 	mux := http.NewServeMux()

@@ -121,22 +121,10 @@ endpoint is removed. Existing completed history never triggers new historical re
 or a recurrence chain. Migrations 004 and 005 preserve existing records without automatic
 awards or invented schedules.
 
-## Import API
+## Historical Imports
 
-Call `POST /api/v1/imports/dry-run` with `{"sheet_id":"..."}` first. Review the report,
-then call `POST /api/v1/imports` with `{"sheet_id":"...","raw_hash":"<preview hash>"}`.
-Include `"reason":"..."` when adding rows to an existing imported raid; these changes
-use the same audited correction and ledger rules as manual corrections.
-Both routes are Admin-only. A changed source requires a new preview; report errors prevent
-all domain writes. Identical replay returns the saved report without reprocessing.
-
-## Google Sheets Sync
-
-Set `GOOGLE_SERVICE_ACCOUNT_FILE` to an untracked service-account JSON credential and share
-the target sheet with its `client_email` as an Editor. An Admin can link an existing raid to a
-sheet ID and raid key in Raidplanung. Manual website loot changes for linked raids are queued
-durably; use **Website zu Google Sheets** in Importe to deliver or retry them. The sheet uses
-the `Import ID`, `Website Award ID`, `Website Sync ID`, `Website Updated At`, and `Website Sync
-Status` columns and retains an append-only `Website Sync Audit` tab.
+Google Sheets import and synchronization are not part of the running application. Existing
+historical data is local and authoritative. If an exceptional historical import is required,
+use a dedicated offline Python script with an explicit dry-run, report, and database backup.
 
 See ARCHITECTURE.md and docs/decisions/ for details.

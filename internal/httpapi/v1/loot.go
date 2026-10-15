@@ -216,16 +216,3 @@ func (a *API) withdrawLoot(w http.ResponseWriter, r *http.Request) {
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": row})
 }
-
-func (a *API) flushWebsiteSync(w http.ResponseWriter, r *http.Request) {
-	if a.WebsiteSync == nil {
-		WriteError(w, http.StatusServiceUnavailable, "website_sync_unconfigured", "Google-Sheets-Synchronisierung ist nicht konfiguriert")
-		return
-	}
-	result, err := a.WebsiteSync.Flush(r.Context())
-	if err != nil {
-		WriteError(w, http.StatusServiceUnavailable, "website_sync_failed", "Google-Sheets-Synchronisierung konnte nicht abgeschlossen werden")
-		return
-	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": result})
-}

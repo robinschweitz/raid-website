@@ -1,0 +1,4 @@
+DROP TRIGGER legacy_loot_baselines_no_delete;
+DROP TRIGGER legacy_loot_baselines_no_update;
+DROP INDEX idx_legacy_loot_baselines_scope;
+DROP TABLE legacy_loot_baselines;

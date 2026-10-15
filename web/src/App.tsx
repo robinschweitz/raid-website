@@ -11,7 +11,6 @@ import { PlayerDetailPage } from './pages/PlayerDetail'
 import { CharacterDetailPage } from './pages/CharacterDetail'
 import { RosterPage } from './pages/Roster'
 import { PollsPage } from './pages/Polls'
-import { ImportsPage } from './pages/Imports'
 import { RaidSeriesPage } from './pages/RaidSeries'
 import { RaidsPage } from './pages/Raids'
 import { StatisticsPage } from './pages/Statistics'
@@ -49,9 +48,6 @@ function Routes() {
   if (parts[0] === 'loot-catalog') return <LootCatalogPage />
   if (parts[0] === 'polls') {
     return <PollsPage />
-  }
-  if (parts[0] === 'imports') {
-    return <ImportsPage />
   }
   if (parts[0] === 'registration-requests') return <RegistrationRequestsPage />
   if (parts[0] === 'changelog') return <ChangelogPage />
@@ -94,7 +90,6 @@ function Layout() {
           {atLeast(player.role, 'ADMIN') && <>
             <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
             <Link className={path === '/raid-series' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/raid-series"><NavIcon name="series" />Raidserien</Link>
-            <Link className={path === '/imports' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/imports"><NavIcon name="import" />Synchronisierung</Link>
             <Link className={path === '/registration-requests' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/registration-requests"><NavIcon name="players" />Registrierung</Link>
           </>}
         </nav>

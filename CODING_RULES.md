@@ -185,8 +185,7 @@ Fachcode liegt beim Fach:
 ```text
 nicht:   internal/utils/calculate_points.go
 sondern:  internal/enhancepoints/completion.go
-          internal/loot/tokens.go
-          internal/legacyimport/parse.go
+           internal/loot/tokens.go
 ```
 
 ---

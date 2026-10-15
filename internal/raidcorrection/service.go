@@ -15,7 +15,6 @@ import (
 	"raid-website/internal/loot"
 	"raid-website/internal/registration"
 	"raid-website/internal/validation"
-	"raid-website/internal/websheetsync"
 )
 
 var (
@@ -31,18 +30,12 @@ var (
 type Service struct {
 	repo     *Repo
 	external registration.ExternalClient
-	sync     *websheetsync.Service
 }
 
 func NewService(repo *Repo) *Service { return &Service{repo: repo} }
 
 func (s *Service) WithExternalClient(external registration.ExternalClient) *Service {
 	s.external = external
-	return s
-}
-
-func (s *Service) WithWebsiteSync(sync *websheetsync.Service) *Service {
-	s.sync = sync
 	return s
 }
 
@@ -53,7 +46,7 @@ func referenceError(err error) error {
 	return err
 }
 
-func (s *Service) check(ctx context.Context, r *Repo, raidID, actor int64, reason string, imported bool) (bool, error) {
+func (s *Service) check(ctx context.Context, r *Repo, raidID, actor int64, reason string) (bool, error) {
 	if actor <= 0 {
 		return false, ErrReason
 	}
@@ -73,15 +66,6 @@ func (s *Service) check(ctx context.Context, r *Repo, raidID, actor int64, reaso
 		}
 		if strings.TrimSpace(reason) == "" {
 			return false, ErrReason
-		}
-		if imported {
-			mapped, err := r.isImportedRaid(ctx, raidID)
-			if err != nil {
-				return false, err
-			}
-			if !mapped {
-				return false, ErrRaidState
-			}
 		}
 	}
 	completed := rd.Status == validation.RaidStatusCompleted
@@ -128,15 +112,7 @@ type SnapshotPatch struct {
 
 // SaveAttendance adds attendance or applies an audited correction.
 func (s *Service) SaveAttendance(ctx context.Context, row *attendance.Attendance, actor int64, reason string, snapshot ...SnapshotPatch) error {
-	return s.saveAttendance(ctx, row, actor, reason, nil, false, snapshot...)
-}
-
-// SaveImportedAttendance audits a new historical attendance entry in an existing raid.
-func (s *Service) SaveImportedAttendance(ctx context.Context, row *attendance.Attendance, actor int64, reason string) error {
-	if row.ID != 0 {
-		return ErrInvalid
-	}
-	return s.saveAttendance(ctx, row, actor, reason, nil, true)
+	return s.saveAttendance(ctx, row, actor, reason, nil, snapshot...)
 }
 
 // CorrectAttendance loads and patches the record within the correction transaction.
@@ -145,11 +121,11 @@ func (s *Service) CorrectAttendance(ctx context.Context, raidID, id, actor int64
 	if patch == nil {
 		patch = func(*attendance.Attendance) {}
 	}
-	err := s.saveAttendance(ctx, row, actor, reason, patch, false, snapshot...)
+	err := s.saveAttendance(ctx, row, actor, reason, patch, snapshot...)
 	return row, err
 }
 
-func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance, actor int64, reason string, patch func(*attendance.Attendance), imported bool, snapshot ...SnapshotPatch) error {
+func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance, actor int64, reason string, patch func(*attendance.Attendance), snapshot ...SnapshotPatch) error {
 	return s.repo.InTransaction(ctx, func(r *Repo) error {
 		var before any
 		if row.ID != 0 {
@@ -169,7 +145,7 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 				row.RaidID = old.RaidID
 			}
 		}
-		completed, err := s.check(ctx, r, row.RaidID, actor, reason, imported)
+		completed, err := s.check(ctx, r, row.RaidID, actor, reason)
 		if err != nil {
 			return err
 		}
@@ -186,13 +162,13 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 			if err != nil {
 				return referenceError(err)
 			}
-			if referenceChanged || (!imported && row.CharacterName == "") {
+			if referenceChanged || row.CharacterName == "" {
 				row.CharacterName = c.Name
 			}
-			if referenceChanged || (!imported && row.Class == "") {
+			if referenceChanged || row.Class == "" {
 				row.Class = c.Class
 			}
-			if referenceChanged || (!imported && row.Spec == "") {
+			if referenceChanged || row.Spec == "" {
 				row.Spec = c.MainSpec
 			}
 		}
@@ -221,15 +197,13 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 		}
 		if row.ID == 0 || referenceChanged || input.Class != nil || (old != nil && old.Class != row.Class) {
 			row.Class = attendance.NormalizeClass(row.Class)
-			// Imported historical additions preserve unavailable source metadata,
-			// matching the initial import; they never use live character defaults.
-			if _, ok := validation.ClassSpecs[row.Class]; !ok && !imported {
+			if _, ok := validation.ClassSpecs[row.Class]; !ok {
 				return ErrInvalid
 			}
 		}
 		if row.ID == 0 || referenceChanged || input.Spec != nil || (old != nil && old.Spec != row.Spec) {
 			row.Spec = strings.TrimSpace(row.Spec)
-			if row.Spec == "" && !imported {
+			if row.Spec == "" {
 				return ErrInvalid
 			}
 		}
@@ -264,7 +238,7 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 				return err
 			}
 		}
-		if completed || before != nil || imported {
+		if completed || before != nil {
 			return s.log(ctx, r, "attendance", row.ID, actor, reason, before, row)
 		}
 		return nil
@@ -273,35 +247,19 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 
 // SaveLoot applies ordinary active-raid additions or explicit audited corrections.
 func (s *Service) SaveLoot(ctx context.Context, row *loot.Award, actor int64, reason string) error {
-	return s.saveLoot(ctx, row, actor, reason, nil, false)
-}
-
-// SaveImportedLoot audits a new historical award, preserving its source timestamp.
-func (s *Service) SaveImportedLoot(ctx context.Context, row *loot.Award, actor int64, reason string) error {
-	if row.ID != 0 || row.Source != "legacy_import" || row.AwardedAt.IsZero() {
-		return ErrInvalid
-	}
-	return s.saveLoot(ctx, row, actor, reason, nil, true)
+	return s.saveLoot(ctx, row, actor, reason, nil)
 }
 
 // CorrectLoot loads and patches the award within the correction transaction.
 func (s *Service) CorrectLoot(ctx context.Context, raidID, id, actor int64, reason string, patch func(*loot.Award)) (*loot.Award, error) {
 	row := &loot.Award{ID: id, RaidID: raidID}
-	err := s.saveLoot(ctx, row, actor, reason, patch, false)
+	err := s.saveLoot(ctx, row, actor, reason, patch)
 	return row, err
 }
 
-// CorrectImportedLoot corrects an imported award without applying current catalog or
-// Enhanced-cost rules to historical sheet data.
-func (s *Service) CorrectImportedLoot(ctx context.Context, raidID, id, actor int64, reason string, patch func(*loot.Award)) (*loot.Award, error) {
-	row := &loot.Award{ID: id, RaidID: raidID}
-	err := s.saveLoot(ctx, row, actor, reason, patch, true)
-	return row, err
-}
-
-func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, reason string, patch func(*loot.Award), imported bool) error {
+func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, reason string, patch func(*loot.Award)) error {
 	return s.repo.InTransaction(ctx, func(r *Repo) error {
-		if row.ID == 0 && !imported {
+		if row.ID == 0 {
 			row.AwardedByPlayerID = actor
 			retried, err := loot.ResolveRequest(ctx, r.loot, row, reason)
 			if err != nil || retried {
@@ -325,9 +283,7 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 				row.RaidID = old.RaidID
 			}
 			row.CreatedAt = old.CreatedAt
-			if !imported {
-				row.AwardedAt = old.AwardedAt
-			}
+			row.AwardedAt = old.AwardedAt
 			row.AwardedByPlayerID = old.AwardedByPlayerID
 			row.Source = old.Source
 			row.RequestID = old.RequestID
@@ -338,11 +294,11 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 			}
 			row.ItemLockID = old.ItemLockID
 		}
-		completed, err := s.check(ctx, r, row.RaidID, actor, reason, imported)
+		completed, err := s.check(ctx, r, row.RaidID, actor, reason)
 		if err != nil {
 			return err
 		}
-		if !completed && row.ID == 0 && !imported {
+		if !completed && row.ID == 0 {
 			row.UpdatedAt = time.Now().UTC()
 			row.CreatedAt = row.UpdatedAt
 			row.AwardedAt = row.UpdatedAt
@@ -351,13 +307,11 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 			if err := loot.AwardInTransaction(ctx, r.loot, row, reason); err != nil {
 				return err
 			}
-			return s.enqueueWebsiteSync(ctx, r, row, actor)
+			return nil
 		}
 		oldAward, _ := before.(*loot.Award)
-		if !imported {
-			if err := loot.ValidateCatalog(ctx, r.loot, row, oldAward); err != nil {
-				return err
-			}
+		if err := loot.ValidateCatalog(ctx, r.loot, row, oldAward); err != nil {
+			return err
 		}
 		if strings.TrimSpace(row.ItemName) == "" {
 			return ErrInvalid
@@ -378,18 +332,18 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		row.UpdatedAt = time.Now().UTC()
 		old, _ := before.(*loot.Award)
 		recipientChanged := old != nil && (old.AwardedToPlayerID != row.AwardedToPlayerID || !sameCharacter(old.AwardedToCharacterID, row.AwardedToCharacterID))
-		if recipientChanged && !imported {
+		if recipientChanged {
 			row.AwardedToCharacterName = ""
 		} else if old != nil {
 			row.AwardedToCharacterName = old.AwardedToCharacterName
 		}
 		enteringEnhanced := old != nil && old.AwardMethod != loot.Enhanced && row.AwardMethod == loot.Enhanced
-		if !imported && (old == nil || recipientChanged || enteringEnhanced) {
+		if old == nil || recipientChanged || enteringEnhanced {
 			if err := loot.ValidateRecipient(ctx, r.loot, row); err != nil {
 				return err
 			}
 		}
-		if !imported && old == nil {
+		if old == nil {
 			if err := loot.ValidateEnhancedRequest(row); err != nil {
 				return err
 			}
@@ -401,10 +355,8 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		if row.ID == 0 {
 			row.CreatedAt = row.UpdatedAt
 			row.AwardedByPlayerID = actor
-			if !imported {
-				row.AwardedAt = row.UpdatedAt
-				row.Source = "manual"
-			}
+			row.AwardedAt = row.UpdatedAt
+			row.Source = "manual"
 			err = r.loot.CreateAward(ctx, row)
 		} else {
 			err = nil
@@ -412,10 +364,8 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		if err != nil {
 			return err
 		}
-		if !imported {
-			if err := loot.ReconcileEnhanced(ctx, r.loot, row, old, actor, reason); err != nil {
-				return err
-			}
+		if err := loot.ReconcileEnhanced(ctx, r.loot, row, old, actor, reason); err != nil {
+			return err
 		}
 		if err := r.loot.Update(ctx, row); err != nil {
 			return err
@@ -428,12 +378,12 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		if err := s.log(ctx, r, "loot_award", row.ID, actor, reason, before, row); err != nil {
 			return err
 		}
-		return s.enqueueWebsiteSync(ctx, r, row, actor)
+		return nil
 	})
 }
 
 // WithdrawLoot retains the award and its audit history while removing its loot
-// consequences. Only website-created manual awards can be delivered as a sheet withdrawal.
+// consequences. Only manual awards can be withdrawn.
 func (s *Service) WithdrawLoot(ctx context.Context, raidID, id, actor int64, reason string) (*loot.Award, error) {
 	row := &loot.Award{}
 	err := s.repo.InTransaction(ctx, func(r *Repo) error {
@@ -444,7 +394,7 @@ func (s *Service) WithdrawLoot(ctx context.Context, raidID, id, actor int64, rea
 		if old.RaidID != raidID || old.Source != "manual" || old.WithdrawnAt != nil {
 			return ErrInvalid
 		}
-		completed, err := s.check(ctx, r, raidID, actor, reason, false)
+		completed, err := s.check(ctx, r, raidID, actor, reason)
 		if err != nil {
 			return err
 		}
@@ -475,16 +425,9 @@ func (s *Service) WithdrawLoot(ctx context.Context, raidID, id, actor int64, rea
 		if err := s.log(ctx, r, "loot_award", row.ID, actor, reason, old, row); err != nil {
 			return err
 		}
-		return s.enqueueWebsiteSync(ctx, r, row, actor)
+		return nil
 	})
 	return row, err
-}
-
-func (s *Service) enqueueWebsiteSync(ctx context.Context, r *Repo, row *loot.Award, actor int64) error {
-	if s.sync == nil {
-		return nil
-	}
-	return s.sync.EnqueueAward(ctx, r.db, row, actor)
 }
 
 func sameCharacter(a, b *int64) bool {

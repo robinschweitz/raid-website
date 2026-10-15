@@ -1,0 +1,4 @@
+DROP TRIGGER legacy_loot_mapping_supersessions_no_delete;
+DROP TRIGGER legacy_loot_mapping_supersessions_no_update;
+DROP INDEX idx_legacy_loot_mapping_supersessions_scope;
+DROP TABLE legacy_loot_mapping_supersessions;

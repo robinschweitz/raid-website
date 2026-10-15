@@ -14,8 +14,6 @@ import (
 	"raid-website/internal/auth"
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
-	"raid-website/internal/legacyimport"
-	"raid-website/internal/legacyraidlink"
 	"raid-website/internal/loot"
 	"raid-website/internal/player"
 	"raid-website/internal/poll"
@@ -27,7 +25,6 @@ import (
 	"raid-website/internal/registration"
 	"raid-website/internal/roster"
 	"raid-website/internal/validation"
-	"raid-website/internal/websheetsync"
 	"raid-website/internal/wishlist"
 )
 
@@ -51,12 +48,9 @@ type Deps struct {
 	Audit             *audit.Repo
 	Completion        *raidcompletion.Service
 	Corrections       *raidcorrection.Service
-	Imports           *legacyimport.Service
-	LegacyRaidLinks   *legacyraidlink.Service
 	Signups           *raidsignup.Service
 	Registration      *registration.Service
 	AccountMerge      *accountmerge.Service
-	WebsiteSync       *websheetsync.Service
 }
 
 // API holds the dependencies shared by the v1 HTTP handlers.
@@ -122,8 +116,6 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/raids/{id}", RequireRole(validation.RoleRaidassistent, a.configureRaidSchedule))
 	mux.HandleFunc("POST /api/v1/raids/{id}/cancel", RequireRole(validation.RoleRaidassistent, a.cancelRaid))
 	mux.HandleFunc("POST /api/v1/raids/{id}/archive", RequireRole(validation.RoleRaidassistent, a.archiveRaid))
-	mux.HandleFunc("GET /api/v1/raids/{id}/legacy-link", RequireAuth(a.getLegacyRaidLink))
-	mux.HandleFunc("POST /api/v1/raids/{id}/legacy-link", RequireRole(validation.RoleAdmin, a.createLegacyRaidLink))
 	mux.HandleFunc("GET /api/v1/raid-series", RequireAuth(a.listRaidSeries))
 	mux.HandleFunc("POST /api/v1/raid-series", RequireRole(validation.RoleAdmin, a.createRaidSeries))
 	mux.HandleFunc("PATCH /api/v1/raid-series/{id}", RequireRole(validation.RoleAdmin, a.updateRaidSeries))
@@ -141,7 +133,6 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/raids/{id}/loot", RequireRole(validation.RoleRaidassistent, a.createLoot))
 	mux.HandleFunc("PATCH /api/v1/raids/{id}/loot/{recordID}", RequireRole(validation.RoleRaidassistent, a.correctLoot))
 	mux.HandleFunc("POST /api/v1/raids/{id}/loot/{recordID}/withdraw", RequireRole(validation.RoleRaidassistent, a.withdrawLoot))
-	mux.HandleFunc("POST /api/v1/website-sync/flush", RequireRole(validation.RoleAdmin, a.flushWebsiteSync))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/points", RequireAuth(a.getPoints))
 	mux.HandleFunc("GET /api/v1/players/{id}/loot", RequireAuth(a.listPlayerLoot))
@@ -167,13 +158,6 @@ func (a *API) Register(mux *http.ServeMux) {
 
 	WishlistHandlers{Wishlist: wishlist.NewService(a.DB)}.Register(mux)
 
-	mux.HandleFunc("GET /api/v1/imports", RequireRole(validation.RoleAdmin, a.listImports))
-	mux.HandleFunc("POST /api/v1/imports/dry-run", RequireRole(validation.RoleAdmin, a.dryRunImport))
-	mux.HandleFunc("POST /api/v1/imports", RequireRole(validation.RoleAdmin, a.mergeImport))
-	mux.HandleFunc("POST /api/v1/sync/dry-run", RequireRole(validation.RoleAdmin, a.dryRunSync))
-	mux.HandleFunc("POST /api/v1/sync/adopt/dry-run", RequireRole(validation.RoleAdmin, a.dryRunSyncAdoption))
-	mux.HandleFunc("POST /api/v1/sync/adopt", RequireRole(validation.RoleAdmin, a.adoptSync))
-	mux.HandleFunc("POST /api/v1/sync", RequireRole(validation.RoleAdmin, a.mergeSync))
 }
 
 func pathID(r *http.Request, name string) (int64, bool) {

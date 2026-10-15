@@ -309,47 +309,9 @@ function resolveRaid(s, id, options = {}) {
       : r.url === '/api/v1/character-options' ? { Priester: ['Disziplin', 'Heilig', 'Schatten'], Magier: ['Feuer', 'Frost'] }
       : r.url.endsWith('/attendance') ? options.attendance ?? []
       : r.url.endsWith('/loot') ? options.loot ?? []
-      : r.url.endsWith('/legacy-link') ? options.legacyLink ?? null
       : r.url === '/api/v1/loot-catalog' ? options.catalog ?? emptyCatalog() : [])
   }
 }
-
-test('raid detail displays an explicit Google-Sheet link and lets only admins replace it', async () => {
-  const linked = {
-    source: 'google_sheets', sheet_id: 'sheet-123', raid_key: 'ICC25-01',
-    linked_by_player_id: 2, linked_at: '2026-10-13T18:00:00Z', link_reason: 'Historische Zuordnung geprüft',
-  }
-  const s = setup(player(1, 'ADMIN'))
-  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
-  resolveRaid(s, 1, { legacyLink: linked })
-  await flush(view)
-  assert.match(text(view.tree), /Google-Sheet-Verknüpfung.*sheet-123.*ICC25-01.*Historische Zuordnung geprüft/)
-  button(view, 'Planung & Details').props.onClick()
-  view.render()
-  const field = (label) => nodes(view.tree, (node) => node.type === 'input' && node.props['aria-label'] === label)[0]
-  field('Legacy-Sheet-ID').props.onChange(change('sheet-456'))
-  field('Legacy-Raid-Schlüssel').props.onChange(change('ICC25-02'))
-  field('Legacy-Link-Begründung').props.onChange(change('Neu geprüft'))
-  view.render()
-  const linkForm = nodes(view.tree, (node) => node.type === 'form' && nodes(node, (child) => child.type === 'button' && text(child) === 'Google-Sheet-Verknüpfung speichern').length > 0)[0]
-  linkForm.props.onSubmit(event)
-  assert.equal(writes(s).length, 1)
-  assert.equal(writes(s)[0].url, '/api/v1/raids/1/legacy-link')
-  assert.deepEqual(writes(s)[0].body, {
-    source: 'google_sheets', sheet_id: 'sheet-456', raid_key: 'ICC25-02', reason: 'Neu geprüft',
-  })
-  writes(s)[0].resolve({ ...linked, sheet_id: 'sheet-456', raid_key: 'ICC25-02', link_reason: 'Neu geprüft' })
-  await flush(view)
-  assert.match(text(view.tree), /sheet-456.*ICC25-02.*Neu geprüft/)
-
-  const member = setup(player(1, 'MEMBER'))
-  const memberView = member.mount(member.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
-  resolveRaid(member, 1, { legacyLink: linked })
-  await flush(memberView)
-  assert.match(text(memberView.tree), /sheet-123.*ICC25-01/)
-  assert.equal(button(memberView, 'Google-Sheet-Verknüpfung speichern'), undefined)
-  assert.equal(nodes(memberView.tree, (node) => node.type === 'input' && /^Legacy-/.test(node.props['aria-label'] ?? '')).length, 0)
-})
 
 function resolvePlayer(s, id) {
   for (const r of s.requests.filter((r) => r.method === 'get' && !r.resolved)) {
@@ -687,62 +649,6 @@ for (const [file, component, label] of [
     assert.equal(button(view, label).props.disabled, false)
   })
 }
-
-const report = (errors = []) => ({ mode: 'dry_run', raw_hash: 'preview-hash', created: { players: 2, characters: 3, raids: 4, attendance: 5, loot: 6, tokens: 7, points: 8 }, errors, warnings: [], rows_read: 10 })
-test('sync uses preview-first safety and no historical bootstrap setup', async () => {
-  const s = setup()
-  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  form(view).props.onSubmit(event)
-  assert.equal(writes(s).length, 1)
-  assert.equal(writes(s)[0].url, '/api/v1/sync/dry-run')
-  assert.equal('setup' in writes(s)[0].body, false)
-  writes(s)[0].resolve(report())
-  await flush(view)
-  assert.equal(button(view, 'Synchronisierung anwenden').props.disabled, false)
-  assert.match(text(view.tree), /Geplante Änderungen/)
-})
-
-test('sync ignores preview response after source edit and guards apply duplicates', async () => {
-  const s = setup()
-  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  form(view).props.onSubmit(event)
-  nodes(view.tree, (n) => n.type === 'input')[0].props.onChange(change('new-source'))
-  writes(s)[0].resolve(report())
-  await flush(view)
-  assert.equal(button(view, 'Synchronisierung anwenden').props.disabled, true)
-  assert.doesNotMatch(text(view.tree), /Geplante neue Einträge/)
-  form(view).props.onSubmit(event)
-  writes(s).at(-1).resolve(report())
-  await flush(view)
-  const apply = button(view, 'Synchronisierung anwenden').props.onClick()
-  assert.equal(writes(s).at(-1).url, '/api/v1/website-sync/flush')
-  writes(s).at(-1).resolve({ sent: 2, failed: 0 })
-  await flush(view)
-  assert.equal(writes(s).at(-1).url, '/api/v1/sync')
-  assert.equal(writes(s).at(-1).body.sheet_id, 'new-source')
-  assert.equal(writes(s).at(-1).body.raw_hash, 'preview-hash')
-  writes(s).at(-1).resolve({ ...report(), mode: 'merge' })
-  await apply
-  view.render()
-  assert.ok(button(view, 'Ausgehende Änderungen erneut senden'))
-})
-
-test('sync requests never send historical bootstrap setup fields', async () => {
-  const s = setup()
-  const view = s.mount(s.load('pages/Imports.tsx').ImportsPage)
-  form(view).props.onSubmit(event)
-  assert.equal('setup' in writes(s)[0].body, false)
-  writes(s)[0].resolve(report())
-  await flush(view)
-  const staleMerge = button(view, 'Synchronisierung anwenden').props.onClick
-  nodes(view.tree, (n) => n.type === 'input')[0].props.onChange(change('changed-sheet'))
-  await staleMerge()
-  view.render()
-  assert.equal(writes(s).length, 1)
-  assert.equal(button(view, 'Synchronisierung anwenden').props.disabled, true)
-  form(view).props.onSubmit(event)
-  assert.equal('setup' in writes(s).at(-1).body, false)
-})
 
 test('auth distinguishes network failure from anonymous and supports retry', async () => {
   const s = setup()

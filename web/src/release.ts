@@ -1,8 +1,29 @@
-export const appVersion = '1.0.11'
+export const appVersion = '1.0.14'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Google-Sheets-Synchronisierung entfernt',
+    changes: [
+      'Die Oberfläche für Google-Sheets-Import und -Synchronisierung wurde entfernt.',
+    ],
+  },
+  {
+    version: '1.0.13',
+    title: 'Synchronisierungswiederholungen',
+    changes: [
+      'Unveraenderte Google-Sheets-Vorschauen werden ohne neue Import-Historie oder Finalisierung uebersprungen.',
+    ],
+  },
+  {
+    version: '1.0.12',
+    title: 'Enhanced-Synchronisierung',
+    changes: [
+      'Enhanced-Gewinne aus aktiven Google-Sheets-Raids buchen die berechneten Enhance-Points-Kosten.',
+    ],
+  },
+  {
+    version: '1.0.11',
     title: 'Manuelle Sheet-Auswahl',
     changes: [
       'Die manuelle Synchronisierung startet ohne vorausgefüllte Sheet-ID; automatische Synchronisierungen bleiben über ihre gespeicherten Zuordnungen aktiv.',

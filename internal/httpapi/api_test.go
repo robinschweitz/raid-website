@@ -578,7 +578,6 @@ func TestListEndpointsReturnEmptyArrays(t *testing.T) {
 		"/api/v1/polls",
 		"/api/v1/guild-ranks",
 		"/api/v1/raid-groups",
-		"/api/v1/imports",
 		fmt.Sprintf("/api/v1/players/%d/characters", adminID),
 		fmt.Sprintf("/api/v1/players/%d/locks", adminID),
 		fmt.Sprintf("/api/v1/players/%d/loot", adminID),

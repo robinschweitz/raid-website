@@ -10,23 +10,13 @@ import (
 	"strings"
 
 	"github.com/uptrace/bun"
-	"raid-website/internal/attendance"
-	"raid-website/internal/autosync"
-	"raid-website/internal/character"
 	"raid-website/internal/config"
 	"raid-website/internal/db"
-	"raid-website/internal/enhancepoints"
-	"raid-website/internal/googlesheets"
 	"raid-website/internal/httpapi"
-	"raid-website/internal/legacyimport"
-	"raid-website/internal/loot"
 	"raid-website/internal/migrations"
-	"raid-website/internal/player"
 	"raid-website/internal/raid"
-	"raid-website/internal/raidcompletion"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/registration"
-	"raid-website/internal/websheetsync"
 )
 
 func main() {
@@ -57,16 +47,6 @@ func run() (err error) {
 		return fmt.Errorf("naming pattern detection: %w", err)
 	}
 	risingGods := registration.RisingGodsClient{ProxyURL: cfg.RisingGodsProxyURL, ProxyToken: cfg.RisingGodsProxyToken}
-	importFetcher := legacyimport.Fetcher(legacyimport.GoogleFetcher{})
-	var websiteSheets *googlesheets.Client
-	if cfg.GoogleServiceAccountFile != "" {
-		sheets, err := googlesheets.NewFromFile(cfg.GoogleServiceAccountFile)
-		if err != nil {
-			return fmt.Errorf("Google Sheets service account: %w", err)
-		}
-		importFetcher = legacyimport.GoogleFetcher{Sheets: sheets}
-		websiteSheets = sheets
-	}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
 		CookieSecure:      cfg.CookieSecure,
 		TrustProxyHeaders: cfg.TrustProxyHeaders,
@@ -74,25 +54,9 @@ func run() (err error) {
 		AdminUsername:     cfg.AdminUsername,
 		AdminPassword:     cfg.AdminPassword,
 		RegistrationFeed:  risingGods,
-		ImportFetcher:     importFetcher,
-		WebsiteSheets:     websiteSheets,
 	})
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)
-	}
-	if cfg.GoogleServiceAccountFile != "" {
-		imports := legacyimport.NewService(
-			legacyimport.NewRepo(bdb.DB),
-			player.NewRepo(bdb.DB),
-			character.NewRepo(bdb.DB),
-			raid.NewRepo(bdb.DB),
-			attendance.NewRepo(bdb.DB),
-			loot.NewRepo(bdb.DB),
-			enhancepoints.NewRepo(bdb.DB),
-			raidseries.NewRepo(bdb.DB),
-			importFetcher,
-		).WithCompletionService(raidcompletion.NewService(raidcompletion.NewRepo(bdb.DB)))
-		autosync.NewService(imports, player.NewRepo(bdb.DB), websheetsync.NewService(bdb.DB, websiteSheets)).Start(ctx)
 	}
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("listening on %s", addr)

@@ -15,10 +15,11 @@ interface Props {
   isAddOpen?: boolean
   filtered?: boolean
   absences?: Map<number, string>
+  onBench?: (row: Attendance) => void
   children?: ReactNode
 }
 
-export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, isAddOpen, filtered, absences, children }: Props) {
+export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, isAddOpen, filtered, absences, onBench, children }: Props) {
   const member = (row: Attendance) => (
     <li key={row.id} className={`setup-member ${characterClassName(row.class?.trim() ?? '')}${editingID === row.id ? ' is-editing' : ''}`}>
       {editingID === row.id ? <div className="in-place-editor"><h3>{row.character_name || 'Teilnahme'} bearbeiten</h3>{children}</div> : <>
@@ -34,6 +35,7 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
           {row.early_leave && <span className="badge">Früher gegangen</span>}
         </div>
         {absences?.get(row.player_id) && <p className="setup-note">Grund: {absences.get(row.player_id)}</p>}
+        {onBench && absences?.has(row.player_id) && !row.is_bench && <button type="button" className="setup-bench-action" disabled={pending} onClick={() => onBench(row)}>Auf die Bank setzen</button>}
         {row.notes && <p className="setup-note">{row.notes}</p>}
         {canWrite && (!row.character_name?.trim() || !row.class?.trim() || !row.spec?.trim()) && <small className="error">Teilnahme #{row.id}: {[
           !row.character_name?.trim() && 'Charaktername', !row.class?.trim() && 'Klasse', !row.spec?.trim() && 'tatsächlicher Spec',

@@ -1,8 +1,16 @@
-export const appVersion = '1.0.8'
+export const appVersion = '1.0.9'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Absagen: keine EP als Standard, Ersatzbank',
+    changes: [
+      'Beim Archivieren erhalten abgesagte Spieler standardmäßig keine EP. Mit einem Haken („trotzdem EP geben“) bekommen sie die +10 EP doch.',
+      'In der Aufstellung gibt es bei Abgesagten die Schaltfläche „Auf die Bank setzen“.',
+    ],
+  },
+  {
+    version: '1.0.8',
     title: 'Raidgesuchtext im Workspace',
     changes: [
       'Der Gesuchtext mit Soll-Besetzung ist direkt beim jeweiligen aktiven Raid erreichbar (für Raidassistenten und höher).',
@@ -11,7 +19,7 @@ export const changelog = [
     ],
   },
   {
-    version: appVersion,
+    version: '1.0.7',
     title: 'Komfortablere Raidverwaltung, Absagen und EP-Übersicht',
     changes: [
       'Absagen: Spieler können bis zum Raidstart mit „Ich kann nicht kommen“ absagen (optional mit Grund) und mit „Doch dabei“ zurücknehmen. Die Raidleitung sieht Absagen in der Anmeldung und als „Hat abgesagt“ in der Aufstellung und kann sie auch für Spieler eintragen.',

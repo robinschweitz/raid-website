@@ -124,7 +124,7 @@ function RaidDetail({ raidID }: Props) {
   const [absences, setAbsences] = useState<Absence[]>([])
   const [archiveReview, setArchiveReview] = useState(false)
   const [archivePreview, setArchivePreview] = useState<ArchivePreviewRow[] | null>(null)
-  const [withoutPoints, setWithoutPoints] = useState<number[]>([])
+  const [withPoints, setWithPoints] = useState<number[]>([])
   const [characterSearch, setCharacterSearch] = useState('')
   const [quickAdd, setQuickAdd] = useState(false)
   const [quickAddName, setQuickAddName] = useState('')
@@ -359,6 +359,22 @@ function RaidDetail({ raidID }: Props) {
     setAttSnapshot(row ? { character_name: row.character_name || undefined, class: row.class || undefined, spec: row.spec || undefined } : {})
   }
 
+  const benchAttendance = async (row: Attendance) => {
+    if (isPending() || !isActive() || !canWrite || !isActiveRaid || row.raid_id !== raidID || row.is_bench) return
+    await submit(async () => {
+      setError('')
+      setMessage('')
+      try {
+        await api.patch<Attendance>(`/api/v1/raids/${raidID}/attendance/${row.id}`, { is_bench: true })
+        if (!isActive()) return
+        setMessage(`${row.character_name?.trim() || 'Teilnahme'} sitzt jetzt auf der Ersatzbank.`)
+        await load()
+      } catch (err) {
+        if (isActive()) setError(raidError(err, 'Teilnahme fehlgeschlagen'))
+      }
+    })
+  }
+
   const clearAttendanceCharacter = () => {
     if (isPending() || !isActive() || !canWrite || renderedCharacterVersion !== characterVersion.current) return
     ++characterVersion.current
@@ -583,7 +599,7 @@ function RaidDetail({ raidID }: Props) {
       setMessage('')
       try {
         if (name === 'archive') {
-          const result = await api.postEnvelope<ArchiveResponse>(`/api/v1/raids/${raidID}/archive`, archiveReview ? { without_points: withoutPoints.filter((id) => declinedPlayers.includes(id)) } : undefined)
+          const result = await api.postEnvelope<ArchiveResponse>(`/api/v1/raids/${raidID}/archive`, archiveReview ? { without_points: declinedPlayers.filter((id) => !withPoints.includes(id)) } : undefined)
           if (!isActive()) return
           ++characterVersion.current
           ++lootFormVersion.current
@@ -796,16 +812,16 @@ function RaidDetail({ raidID }: Props) {
         <div className="actions">
           {isActiveRaid && <button disabled={pending} onClick={() => action('cancel')}>Absagen</button>}
           <button className="archive-action" disabled={pending || (isActiveRaid && (!raid.series_id || !raid.scheduled_start))} onClick={() => action('archive')}>{archiveReview ? 'Jetzt archivieren' : 'Archivieren'}</button>
-          {archiveReview && <button type="button" disabled={pending} onClick={() => { setArchiveReview(false); setArchivePreview(null); setWithoutPoints([]) }}>Zurück</button>}
+          {archiveReview && <button type="button" disabled={pending} onClick={() => { setArchiveReview(false); setArchivePreview(null); setWithPoints([]) }}>Zurück</button>}
         </div>
         {archiveReview && archivePreview && <section className="subcard archive-review" aria-label="EP-Übersicht">
           <h3>EP-Übersicht vor dem Archivieren</h3>
-          <p className="muted">So würden die EP verteilt. Wer ein Main-Spec-Item bekommen hat, erhält keine EP. Abgesagte Spieler erhalten standardmäßig EP; ankreuzen, um sie auszunehmen.</p>
+          <p className="muted">So würden die EP verteilt. Wer ein Main-Spec-Item bekommen hat, erhält keine EP. Abgesagte Spieler erhalten standardmäßig keine EP; ankreuzen, damit sie trotzdem +10 EP bekommen.</p>
           <table className="table">
             <thead><tr><th>Spieler</th><th>Aktuell</th><th>Neu</th><th>Danach</th><th>Hinweis</th></tr></thead>
             <tbody>{archivePreview.map((row) => {
               const declined = absenceReasons.has(row.player_id)
-              const skipped = declined && withoutPoints.includes(row.player_id)
+              const skipped = declined && row.award > 0 && !withPoints.includes(row.player_id)
               const gain = skipped ? 0 : row.award
               const items = loot.filter((l) => l.awarded_to_player_id === row.player_id && l.is_main_spec).map((l) => l.item_name).join(', ')
               return <tr key={row.player_id}>
@@ -816,7 +832,7 @@ function RaidDetail({ raidID }: Props) {
                 <td>
                   {row.reason === 'main_spec_loot' && `Keine EP: Main-Spec-Loot${items ? ` (${items})` : ''}`}
                   {row.reason === 'already_awarded' && 'EP wurden bereits vergeben'}
-                  {declined && row.award > 0 && <label className="check"><input type="checkbox" checked={skipped} disabled={pending} onChange={(e) => setWithoutPoints((prev) => e.target.checked ? [...prev, row.player_id] : prev.filter((x) => x !== row.player_id))} /> Hat abgesagt{absenceReasons.get(row.player_id) ? ` (${absenceReasons.get(row.player_id)})` : ''} – keine EP</label>}
+                  {declined && row.award > 0 && <label className="check"><input type="checkbox" checked={!skipped} disabled={pending} onChange={(e) => setWithPoints((prev) => e.target.checked ? [...prev, row.player_id] : prev.filter((x) => x !== row.player_id))} /> Hat abgesagt{absenceReasons.get(row.player_id) ? ` (${absenceReasons.get(row.player_id)})` : ''} – trotzdem EP geben</label>}
                   {declined && row.award === 0 && <span className="badge bad"> Hat abgesagt</span>}
                 </td>
               </tr>
@@ -840,7 +856,7 @@ function RaidDetail({ raidID }: Props) {
 
         </div>
         {rosterFiltered && <div className="roster-filter-result"><span className="muted" role="status">{visibleAttendance.length} von {attendance.length} Teilnehmern angezeigt.</span><button type="button" onClick={() => { setRosterSearch(''); setRosterRole(''); setRosterClass(''); setRosterBench('ALL'); setRosterIncomplete(false) }}>Filter zurücksetzen</button></div>}
-        <RaidRosterBoard absences={absenceReasons} attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
+        <RaidRosterBoard onBench={canWrite && isActiveRaid ? benchAttendance : undefined} absences={absenceReasons} attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
         {canWrite && (
           <div>
             {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}

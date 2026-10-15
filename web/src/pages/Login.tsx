@@ -153,7 +153,7 @@ export function LoginPage() {
             Passwort
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
           </label>
-          <button type="submit" disabled={busy}>{busy ? 'Anmelden…' : 'Anmelden'}</button>
+          <button className="primary-action" type="submit" disabled={busy}>{busy ? 'Anmelden…' : 'Anmelden'}</button>
         </form>}
         {mode === 'login' && mfaChallenge && <div className="login-section">
           {mfaFactors.webauthn && mfaMethod === 'webauthn' && <div className="login-section">
@@ -168,7 +168,7 @@ export function LoginPage() {
               MFA-Code
               <input value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} autoComplete="one-time-code" autoFocus />
             </label>
-            <button type="submit" disabled={busy || !mfaCode.trim()}>{busy ? 'Prüfe…' : 'Anmelden'}</button>
+            <button className="primary-action" type="submit" disabled={busy || !mfaCode.trim()}>{busy ? 'Prüfe…' : 'Anmelden'}</button>
             {hasUsableWebAuthn && <button type="button" className="ghost" disabled={busy} onClick={() => setMfaMethod('webauthn')}>Mit YubiKey anmelden</button>}
           </form>}
           {!mfaFactors.webauthn && !hasCodeMFA && <p className="error">Für dieses Konto ist MFA aktiv, aber es ist kein verwendbarer Faktor verfügbar.</p>}
@@ -185,7 +185,7 @@ export function LoginPage() {
             <strong>{row.name}</strong><span>{row.class} · Stufe {row.level || '—'}</span>
           </button>)}</div>}
           <form className="login-action-row" onSubmit={requestRegistration}>
-            <button type="submit" disabled={busy || !selected}>Anfrage erstellen</button>
+            <button className="primary-action" type="submit" disabled={busy || !selected}>Anfrage erstellen</button>
             {selected && <p className="muted">Ausgewählt: {selected.name} · {selected.class}</p>}
           </form>
         </div>}
@@ -194,7 +194,7 @@ export function LoginPage() {
           <label>Code<input value={code} onChange={(e) => setCode(e.target.value)} required /></label>
           <label>Benutzername<input value={regUser} onChange={(e) => setRegUser(e.target.value)} autoComplete="username" required /></label>
           <label>Passwort<input type="password" value={regPass} onChange={(e) => setRegPass(e.target.value)} autoComplete="new-password" required /></label>
-          <button type="submit" disabled={busy || !code.trim() || !regUser.trim() || !regPass.trim()}>Registrieren</button>
+          <button className="primary-action" type="submit" disabled={busy || !code.trim() || !regUser.trim() || !regPass.trim()}>Registrieren</button>
         </form>}
         {error && <p className="error">{error}</p>}
         {requestStatus && <p className="muted" role="status">{requestStatus}</p>}

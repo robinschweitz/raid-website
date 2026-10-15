@@ -30,7 +30,7 @@ export function PlayerProfilePanel({ player, characters, points }: PlayerProfile
       </div>
     </div>
     <div className="profile-recent">
-      <h4>History</h4>
+      <h4>Verlauf</h4>
       {recentTransactions.map((t) => <div className="recent-ep" key={t.id}>
         <span>{t.reason || t.type}</span>
         <span className={`ep-amount ${t.amount > 0 ? 'positive' : t.amount < 0 ? 'negative' : ''}`}>

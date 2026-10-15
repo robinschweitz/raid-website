@@ -40,6 +40,27 @@ func (h WishlistHandlers) listByCharacter(w http.ResponseWriter, r *http.Request
 		WriteError(w, http.StatusUnauthorized, "unauthorized", "Nicht angemeldet")
 		return
 	}
+	// Staff may read any wishlist; everybody else only the wishlists of their own
+	// characters. Ownership is decided by the character, not by list contents,
+	// so an owner can always read an empty wishlist.
+	if !actor.Role.AtLeast(validation.RoleRaidassistent) {
+		owner, err := h.Wishlist.Owner(r.Context(), charID)
+		if err != nil {
+			switch {
+			case errors.Is(err, wishlist.ErrCharacterNotFound):
+				WriteError(w, http.StatusNotFound, "not_found", "Charakter nicht gefunden")
+			case errors.Is(err, wishlist.ErrInvalid):
+				WriteError(w, http.StatusBadRequest, "bad_request", "Ungültige Anfrage")
+			default:
+				WriteError(w, http.StatusInternalServerError, "internal", "Wunschliste konnte nicht geladen werden")
+			}
+			return
+		}
+		if owner != actor.ID {
+			WriteError(w, http.StatusForbidden, "forbidden", "Keine Berechtigung zum Anzeigen dieser Wunschliste")
+			return
+		}
+	}
 	items, err := h.Wishlist.ListByCharacter(r.Context(), charID)
 	if err != nil {
 		if errors.Is(err, wishlist.ErrInvalid) {
@@ -48,18 +69,6 @@ func (h WishlistHandlers) listByCharacter(w http.ResponseWriter, r *http.Request
 		}
 		WriteError(w, http.StatusInternalServerError, "internal", "Wunschliste konnte nicht geladen werden")
 		return
-	}
-	isRA := actor.Role.AtLeast(validation.RoleRaidassistent)
-	if !isRA {
-		if len(items) > 0 {
-			if items[0].PlayerID != actor.ID {
-				WriteError(w, http.StatusForbidden, "forbidden", "Keine Berechtigung zum Anzeigen dieser Wunschliste")
-				return
-			}
-		} else {
-			WriteError(w, http.StatusForbidden, "forbidden", "Keine Berechtigung zum Anzeigen dieser Wunschliste")
-			return
-		}
 	}
 	writeListJSON(w, items)
 }

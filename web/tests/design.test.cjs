@@ -256,11 +256,11 @@ test('statistics derive only from stored raids, attendance and loot', async () =
   assert.match(text(s.tree), /Aktive Spieler 1/)
   assert.match(text(s.tree), /Aktive Charaktere 2/)
   assert.match(text(s.tree), /Archivierte Raids 1/)
-  assert.match(text(s.tree), /Loot-Eintraege 2/)
+  assert.match(text(s.tree), /Loot-Einträge 2/)
   assert.match(text(s.tree), /1 Main-Spec \/ 1 andere/)
   assert.match(text(s.tree), /Arthas 2/)
   assert.match(text(s.tree), /Jaina 1/)
-  assert.match(text(s.tree), /1\s+von\s+3\s+Eintraegen waren Ersatzbank/)
+  assert.match(text(s.tree), /1\s+von\s+3\s+Einträgen waren Ersatzbank/)
   assert.equal(s.requests.filter((r) => r.method !== 'get').length, 0)
 })
 

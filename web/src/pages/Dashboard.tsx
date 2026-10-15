@@ -120,7 +120,7 @@ export function DashboardPage() {
 
     <div className="dashboard-widgets">
       <section className="card widget-composition">
-        <div className="section-heading"><h2>Raid Composition</h2><span className="eyebrow">{nextRaid?.name ?? 'Kein Raid'}</span></div>
+        <div className="section-heading"><h2>Raidaufstellung</h2><span className="eyebrow">{nextRaid?.name ?? 'Kein Raid'}</span></div>
         {attendance ? <RaidCompositionCard attendance={attendance} /> : <p className="muted">Keine Aufstellung verf&uuml;gbar.</p>}
       </section>
 

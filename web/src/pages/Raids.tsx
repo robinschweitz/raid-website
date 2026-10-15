@@ -102,43 +102,6 @@ export function RaidsPage() {
     <div>
       <div className="page-heading"><div><p className="eyebrow">Planung & Historie</p><h1>Raids</h1></div><Link to="/">Zur Übersicht</Link></div>
       {error && <p className="error">{error}</p>}
-      <section className="card directory-panel" aria-label="Raidübersicht">
-      <div className="section-heading"><h2>Raidkalender & Historie</h2><label>Ansicht <select aria-label="Raid-Ansicht" value={filter} onChange={(e) => setFilter(e.target.value)}>
-        <option value="all">Alle Raids</option><option value="upcoming">Anstehend</option><option value="history">Historie</option>
-      </select></label></div>
-      <div className="table-scroll"><table className="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Start</th>
-            <th>Notizen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {visibleRaids.map((raid) => (
-            <tr key={raid.id}>
-              <td>
-                <Link to={`/raids/${raid.id}`}>{raid.name}</Link>
-              </td>
-              <td>
-                <span className={statusClass(raid.status)}>{raid.archived_at ? 'ARCHIVIERT' : raid.status}</span>
-              </td>
-              <td>{raid.scheduled_start ? new Date(raid.scheduled_start).toLocaleString() : '—'}</td>
-              <td>{raid.notes}</td>
-            </tr>
-          ))}
-          {visibleRaids.length === 0 && (
-            <tr>
-              <td colSpan={4} className="muted">
-                Noch keine Raids.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table></div>
-      </section>
-
       {canManage && (
         <details className="card editor-disclosure"><summary>Neuer Raid</summary>
         <form className="card inline-form" onSubmit={onCreate}>
@@ -172,6 +135,43 @@ export function RaidsPage() {
         </form>
         </details>
       )}
+      <section className="card directory-panel" aria-label="Raidübersicht">
+      <div className="section-heading"><h2>Raidkalender & Historie</h2><label>Ansicht <select aria-label="Raid-Ansicht" value={filter} onChange={(e) => setFilter(e.target.value)}>
+        <option value="all">Alle Raids</option><option value="upcoming">Anstehend</option><option value="history">Historie</option>
+      </select></label></div>
+      <div className="table-scroll"><table className="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Start</th>
+            <th>Notizen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibleRaids.map((raid) => (
+            <tr key={raid.id}>
+              <td>
+                <Link to={`/raids/${raid.id}`}>{raid.name}</Link>
+              </td>
+              <td>
+                <span className={statusClass(raid.status)}>{raid.archived_at ? 'ARCHIVIERT' : raid.status}</span>
+              </td>
+              <td>{raid.scheduled_start ? new Date(raid.scheduled_start).toLocaleString() : '—'}</td>
+              <td>{raid.notes}</td>
+            </tr>
+          ))}
+          {visibleRaids.length === 0 && (
+            <tr>
+              <td colSpan={4} className="muted">
+                {canManage ? 'Noch keine Raids. Mit „Neuer Raid“ den ersten Termin anlegen.' : 'Noch keine Raids.'}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table></div>
+      </section>
+
     </div>
   )
 }

@@ -9,6 +9,7 @@ import (
 	"raid-website/internal/raid"
 	"raid-website/internal/raidsignup"
 	"raid-website/internal/validation"
+	"strings"
 	"testing"
 	"time"
 )
@@ -78,4 +79,82 @@ func TestSignupPermissionsAndRoster(t *testing.T) {
 	if !response.Data.Entries[0].IsAccepted {
 		t.Fatal("accepted character missing")
 	}
+}
+
+func TestAbsenceDeclareRevokeAndPermissions(t *testing.T) {
+	srv, database := setupServer(t)
+	client := srv.Client()
+	ctx := context.Background()
+	guest := seedAccount(t, database, "guest", "pw", validation.RoleGuest)
+	member := seedAccount(t, database, "member", "pw", validation.RoleMember)
+	other := seedAccount(t, database, "other", "pw", validation.RoleMember)
+	staff := seedAccount(t, database, "assistant", "pw", validation.RoleRaidassistent)
+	guestToken := login(t, client, srv, "guest", "pw")
+	memberToken := login(t, client, srv, "member", "pw")
+	otherToken := login(t, client, srv, "other", "pw")
+	staffToken := login(t, client, srv, "assistant", "pw")
+	_ = guest
+	now := time.Now().UTC()
+	future, past := now.Add(time.Hour), now.Add(-time.Hour)
+	newRaid := func(name string, start *time.Time) int64 {
+		rd := &raid.Raid{Name: name, RaidLeaderID: staff, Status: validation.RaidStatusPlanned, ScheduledStart: start, CreatedAt: now, UpdatedAt: now}
+		if err := raid.NewRepo(database).Create(ctx, rd); err != nil {
+			t.Fatal(err)
+		}
+		return rd.ID
+	}
+	open, started := newRaid("Open", &future), newRaid("Started", &past)
+	url := func(raidID, playerID int64) string {
+		return fmt.Sprintf("%s/api/v1/raids/%d/absences/%d", srv.URL, raidID, playerID)
+	}
+	check := func(method, u, token string, body any, want int) []byte {
+		t.Helper()
+		status, result := do(t, client, method, u, token, body)
+		if status != want {
+			t.Fatalf("%s %s: %d, want %d: %s", method, u, status, want, result)
+		}
+		return result
+	}
+	absences := func(token string, raidID int64) []raidsignup.Absence {
+		t.Helper()
+		body := check(http.MethodGet, fmt.Sprintf("%s/api/v1/raids/%d/signups", srv.URL, raidID), token, nil, 200)
+		var res struct {
+			Data raidsignup.Overview `json:"data"`
+		}
+		if err := json.Unmarshal(body, &res); err != nil {
+			t.Fatal(err)
+		}
+		if res.Data.Absences == nil {
+			t.Fatal("absences must be []")
+		}
+		return res.Data.Absences
+	}
+	check(http.MethodPut, url(open, member), "", map[string]any{}, 401)
+	check(http.MethodPut, url(open, member), guestToken, map[string]any{}, 403)
+	// Others cannot decline for someone else; staff can.
+	check(http.MethodPut, url(open, member), otherToken, map[string]any{"reason": "x"}, 403)
+	check(http.MethodPut, url(open, member), memberToken, map[string]any{"reason": strings.Repeat("ä", 201)}, 400)
+	check(http.MethodPut, url(open, member), memberToken, map[string]any{"reason": "  Krank  "}, 200)
+	got := absences(otherToken, open)
+	if len(got) != 1 || got[0].PlayerID != member || got[0].Reason != "Krank" {
+		t.Fatalf("absences = %+v", got)
+	}
+	// Updating the reason keeps a single row.
+	check(http.MethodPut, url(open, member), memberToken, map[string]any{"reason": "Urlaub"}, 200)
+	if got := absences(memberToken, open); len(got) != 1 || got[0].Reason != "Urlaub" {
+		t.Fatalf("absences = %+v", got)
+	}
+	check(http.MethodDelete, url(open, member), otherToken, nil, 403)
+	check(http.MethodDelete, url(open, member), memberToken, nil, 200)
+	check(http.MethodDelete, url(open, member), memberToken, nil, 200)
+	if got := absences(memberToken, open); len(got) != 0 {
+		t.Fatalf("absences = %+v", got)
+	}
+	// After the scheduled start only staff may change it.
+	check(http.MethodPut, url(started, member), memberToken, map[string]any{}, 409)
+	check(http.MethodPut, url(started, member), staffToken, map[string]any{"reason": "Telefonisch"}, 200)
+	check(http.MethodDelete, url(started, member), memberToken, nil, 409)
+	check(http.MethodDelete, url(started, member), staffToken, nil, 200)
+	check(http.MethodPut, url(open, 99999), staffToken, map[string]any{}, 404)
+	_ = other
 }

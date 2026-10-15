@@ -607,6 +607,43 @@ function PlayerDetail({ playerID }: Props) {
 
       <section id="profile-characters" hidden={view !== 'characters'} className="card">
         <h2>Charaktere</h2>
+
+        {isAdmin && (
+          <details className="editor-disclosure"><summary>Charakter hinzufügen</summary>
+          {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
+          <form className="inline-form" onSubmit={createCharacter}>
+            <label>Rising-Gods-Charakter<input value={charQuery} onChange={(e) => setCharQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
+            <button type="button" disabled={pending || charQuery.trim().length < 3} onClick={() => void searchNewCharacters()}>{charSearching ? 'Suche…' : 'Suchen'}</button>
+            <label className="check">
+              <input type="checkbox" checked={charIsMain} onChange={(e) => setCharIsMain(e.target.checked)} /> Main
+            </label>
+            <button type="submit" disabled={pending || !charSelected}>Anlegen</button>
+            {charSelected && <p className="muted">Ausgewählt: {charSelected.name} · {charSelected.class} · {charSelected.main_spec}</p>}
+          </form>
+          {charSearching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft… Das kann einige Sekunden dauern. Schneller geht es mit einem Rising-Gods-Profil-Link.</p>}
+          {charResults.length > 0 && <div className="plain-list">{charResults.map((row) => <button key={row.profile_id} type="button" className={charSelected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setCharSelected(row)}>{row.name} · {row.class} · {row.main_spec || 'Spec unbekannt'} · Stufe {row.level || '—'}</button>)}</div>}
+          </details>
+        )}
+        {isOwnProfile && (
+          <details className="editor-disclosure"><summary>Charakter beanspruchen</summary>
+          <p className="muted">Suche deinen Rising-Gods-Charakter. Ein Admin sendet dir den Code ingame an diesen Charakter.</p>
+          <div className="inline-form">
+            <label>Charakter suchen<input value={claimQuery} onChange={(e) => setClaimQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
+            <button type="button" disabled={pending || claimQuery.trim().length < 3} onClick={() => void searchClaimCharacters()}>{claimSearching ? 'Suche…' : 'Suchen'}</button>
+          </div>
+          {claimSearching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft… Das kann einige Sekunden dauern. Schneller geht es mit einem Rising-Gods-Profil-Link.</p>}
+          {claimResults.length > 0 && <div className="plain-list">{claimResults.map((row) => <button key={row.profile_id} type="button" className={claimSelected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setClaimSelected(row)}>{row.name} · {row.class} · Stufe {row.level || '—'}</button>)}</div>}
+          <form className="inline-form" onSubmit={requestClaim}>
+            <button type="submit" disabled={pending || !claimSelected}>Anfrage erstellen</button>
+            {claimSelected && <p className="muted">Ausgewählt: {claimSelected.name} · {claimSelected.class}</p>}
+          </form>
+          <form className="inline-form" onSubmit={redeemClaim}>
+            <label>Code<input value={claimCode} onChange={(e) => setClaimCode(e.target.value)} /></label>
+            <button type="submit" disabled={pending || !claimCode.trim()}>Code einlösen</button>
+          </form>
+          {claimStatus && <p className="muted" role="status">{claimStatus}</p>}
+          </details>
+        )}
         {isAdmin && ownedCharacters.filter((c) => c.active).length > 1 && <form className="inline-form" onSubmit={mergeCharacter}>
           <h3>Doppelte Charaktere zusammenführen</h3>
           <p className="muted">Nur für fehlerhaft doppelt angelegte Charaktere desselben Spielers. Raid- und Loot-Zuordnungen werden korrigiert; bei Konflikten wird nichts verändert.</p>
@@ -676,42 +713,6 @@ function PlayerDetail({ playerID }: Props) {
             )}
           </tbody>
         </table></div>
-        {isAdmin && (
-          <details className="editor-disclosure"><summary>Charakter hinzufügen</summary>
-          {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
-          <form className="inline-form" onSubmit={createCharacter}>
-            <label>Rising-Gods-Charakter<input value={charQuery} onChange={(e) => setCharQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
-            <button type="button" disabled={pending || charQuery.trim().length < 3} onClick={() => void searchNewCharacters()}>{charSearching ? 'Suche…' : 'Suchen'}</button>
-            <label className="check">
-              <input type="checkbox" checked={charIsMain} onChange={(e) => setCharIsMain(e.target.checked)} /> Main
-            </label>
-            <button type="submit" disabled={pending || !charSelected}>Anlegen</button>
-            {charSelected && <p className="muted">Ausgewählt: {charSelected.name} · {charSelected.class} · {charSelected.main_spec}</p>}
-          </form>
-          {charSearching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft… Das kann einige Sekunden dauern. Schneller geht es mit einem Rising-Gods-Profil-Link.</p>}
-          {charResults.length > 0 && <div className="plain-list">{charResults.map((row) => <button key={row.profile_id} type="button" className={charSelected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setCharSelected(row)}>{row.name} · {row.class} · {row.main_spec || 'Spec unbekannt'} · Stufe {row.level || '—'}</button>)}</div>}
-          </details>
-        )}
-        {isOwnProfile && (
-          <details className="editor-disclosure"><summary>Charakter beanspruchen</summary>
-          <p className="muted">Suche deinen Rising-Gods-Charakter. Ein Admin sendet dir den Code ingame an diesen Charakter.</p>
-          <div className="inline-form">
-            <label>Charakter suchen<input value={claimQuery} onChange={(e) => setClaimQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
-            <button type="button" disabled={pending || claimQuery.trim().length < 3} onClick={() => void searchClaimCharacters()}>{claimSearching ? 'Suche…' : 'Suchen'}</button>
-          </div>
-          {claimSearching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft… Das kann einige Sekunden dauern. Schneller geht es mit einem Rising-Gods-Profil-Link.</p>}
-          {claimResults.length > 0 && <div className="plain-list">{claimResults.map((row) => <button key={row.profile_id} type="button" className={claimSelected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setClaimSelected(row)}>{row.name} · {row.class} · Stufe {row.level || '—'}</button>)}</div>}
-          <form className="inline-form" onSubmit={requestClaim}>
-            <button type="submit" disabled={pending || !claimSelected}>Anfrage erstellen</button>
-            {claimSelected && <p className="muted">Ausgewählt: {claimSelected.name} · {claimSelected.class}</p>}
-          </form>
-          <form className="inline-form" onSubmit={redeemClaim}>
-            <label>Code<input value={claimCode} onChange={(e) => setClaimCode(e.target.value)} /></label>
-            <button type="submit" disabled={pending || !claimCode.trim()}>Code einlösen</button>
-          </form>
-          {claimStatus && <p className="muted" role="status">{claimStatus}</p>}
-          </details>
-        )}
       </section>
 
       <section id="profile-locks" hidden={view !== 'locks'} className="card">

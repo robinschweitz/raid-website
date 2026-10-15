@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -449,5 +450,92 @@ func TestSuccessorUsesNameTemplate(t *testing.T) {
 	}
 	if updated.NextRaidNumber != 35 {
 		t.Fatalf("want next raid number 35, got %d", updated.NextRaidNumber)
+	}
+}
+
+func TestArchiveWithoutPointsForDeclinedPlayers(t *testing.T) {
+	ctx := context.Background()
+	archive := func(t *testing.T, without []int64) (balances [2]int, err error) {
+		db := setupDB(t)
+		actor := seedPlayer(t, ctx, player.NewRepo(db), "Actor")
+		other := seedPlayer(t, ctx, player.NewRepo(db), "Other")
+		now := time.Now().UTC()
+		rd := &raid.Raid{Name: "Absence", RaidLeaderID: actor, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
+		seedSchedule(t, ctx, db, rd)
+		if err := raid.NewRepo(db).Create(ctx, rd); err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range []int64{actor, other} {
+			c := seedCharacter(t, ctx, character.NewRepo(db), p, "Char"+strconv.FormatInt(p, 10))
+			a := &attendance.Attendance{RaidID: rd.ID, PlayerID: p, CharacterID: c, CharacterName: "Char", Class: "Krieger", Spec: "Waffen", Role: validation.RoleDD, CreatedAt: now, UpdatedAt: now}
+			if err := attendance.NewRepo(db).Create(ctx, a); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Only "other" declined.
+		if _, err := db.ExecContext(ctx, "INSERT INTO raid_absences (raid_id, player_id, reason, created_at) VALUES (?, ?, '', ?)", rd.ID, other, now); err != nil {
+			t.Fatal(err)
+		}
+		translate := func(ids []int64) []int64 {
+			out := []int64{}
+			for _, id := range ids {
+				if id == 1 {
+					out = append(out, actor)
+				} else {
+					out = append(out, other)
+				}
+			}
+			return out
+		}
+		_, _, err = NewService(NewRepo(db)).ArchiveRaidWithout(ctx, rd.ID, actor, translate(without))
+		for i, p := range []int64{actor, other} {
+			balances[i], _ = enhancepoints.NewRepo(db).Balance(ctx, p)
+		}
+		return balances, err
+	}
+	if b, err := archive(t, nil); err != nil || b != [2]int{10, 10} {
+		t.Fatalf("default: %v %v", b, err)
+	}
+	if b, err := archive(t, []int64{2}); err != nil || b != [2]int{10, 0} {
+		t.Fatalf("declined player excluded: %v %v", b, err)
+	}
+	if _, err := archive(t, []int64{1}); !errors.Is(err, ErrInvalidExclusion) {
+		t.Fatalf("player who did not decline must be rejected: %v", err)
+	}
+}
+
+func TestPreviewArchiveShowsAwardsAndMainSpecExclusion(t *testing.T) {
+	ctx := context.Background()
+	db := setupDB(t)
+	actor := seedPlayer(t, ctx, player.NewRepo(db), "Actor")
+	other := seedPlayer(t, ctx, player.NewRepo(db), "Other")
+	now := time.Now().UTC()
+	rd := &raid.Raid{Name: "Preview", RaidLeaderID: actor, Status: validation.RaidStatusOpen, CreatedAt: now, UpdatedAt: now}
+	seedSchedule(t, ctx, db, rd)
+	if err := raid.NewRepo(db).Create(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []int64{actor, other} {
+		c := seedCharacter(t, ctx, character.NewRepo(db), p, "Char"+strconv.FormatInt(p, 10))
+		a := &attendance.Attendance{RaidID: rd.ID, PlayerID: p, CharacterID: c, CharacterName: "Char", Class: "Krieger", Spec: "Waffen", Role: validation.RoleDD, CreatedAt: now, UpdatedAt: now}
+		if err := attendance.NewRepo(db).Create(ctx, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO enhance_point_transactions (player_id, amount, type, reason, ref_type, ref_id, actor_id, created_at) VALUES (?, 25, 'manual', 'x', 'manual', '1', ?, ?)", actor, actor, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO loot_awards (raid_id, boss, item_id, item_name, awarded_to_player_id, awarded_by_player_id, source, is_main_spec, awarded_at, created_at, updated_at) VALUES (?, 'B', '1', 'Schwert', ?, ?, 'manual', 1, ?, ?, ?)", rd.ID, other, actor, now, now, now); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := NewService(NewRepo(db)).PreviewArchive(ctx, rd.ID)
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("%v %v", rows, err)
+	}
+	if rows[0] != (PreviewRow{PlayerID: actor, Balance: 25, Award: 10, Reason: PreviewAward}) {
+		t.Fatalf("awarded row: %+v", rows[0])
+	}
+	if rows[1] != (PreviewRow{PlayerID: other, Balance: 0, Award: 0, Reason: PreviewMainSpecLoot}) {
+		t.Fatalf("main-spec row: %+v", rows[1])
 	}
 }

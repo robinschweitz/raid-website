@@ -1,13 +1,16 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
+import { useAuth } from '../auth'
 import { Link } from '../router'
-import type { GeneratedRegistrationCode, RegistrationCode, RegistrationRequest } from '../types'
+import { atLeast, type GeneratedRegistrationCode, type RegistrationCode, type RegistrationRequest } from '../types'
 import { useSubmission } from '../useSubmission'
 
 const pageSize = 20
 
 export function RegistrationRequestsPage() {
   const { pending, submit, isActive } = useSubmission()
+  const { player: me } = useAuth()
+  const isAdmin = me ? atLeast(me.role, 'ADMIN') : false
   const [requests, setRequests] = useState<RegistrationRequest[]>([])
   const [codes, setCodes] = useState<Record<number, RegistrationCode[]>>({})
   const [error, setError] = useState('')
@@ -25,7 +28,7 @@ export function RegistrationRequestsPage() {
       .catch((err) => { if (isActive()) setError(err instanceof ApiError ? err.message : 'Anfragen konnten nicht geladen werden.') })
   }, [isActive, view])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (isAdmin) load() }, [load, isAdmin])
 
   const changeView = (next: 'active' | 'history') => {
     setView(next)
@@ -133,6 +136,11 @@ export function RegistrationRequestsPage() {
   const currentPage = Math.min(page, lastPage)
   const visibleRequests = requests.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
 
+  if (me && !isAdmin) return <div className="registration-requests">
+    <p><Link to="/">← Übersicht</Link></p>
+    <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Registrierungsanfragen</h1></div></div>
+    <p className="muted" role="status">Dieser Bereich ist nur für Admins sichtbar.</p>
+  </div>
   return <div className="registration-requests">
     <p><Link to="/roster">← Gildenkonfiguration</Link></p>
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Registrierungsanfragen</h1></div></div>

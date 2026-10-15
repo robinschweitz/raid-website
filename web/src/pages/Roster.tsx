@@ -98,6 +98,14 @@ export function RosterPage() {
 
       <div className="configuration-grid"><section className="card">
         <h2>Gildenränge</h2>
+        {isAdmin && (
+          <details className="editor-disclosure"><summary>Gildenrang hinzufügen</summary>
+          <form className="inline-form" onSubmit={createRank}>
+            <input aria-label="Rangname" placeholder="Rangname" value={rankName} onChange={(e) => setRankName(e.target.value)} required />
+            <button type="submit" disabled={pending}>Anlegen</button>
+          </form>
+          </details>
+        )}
         <ul className="plain-list">
           {ranks.map((r) => (
             <li key={r.id}>
@@ -109,18 +117,19 @@ export function RosterPage() {
           ))}
           {ranks.length === 0 && <li className="muted">Keine Ränge.</li>}
         </ul>
-        {isAdmin && (
-          <details className="editor-disclosure"><summary>Gildenrang hinzufügen</summary>
-          <form className="inline-form" onSubmit={createRank}>
-            <input aria-label="Rangname" placeholder="Rangname" value={rankName} onChange={(e) => setRankName(e.target.value)} required />
-            <button type="submit" disabled={pending}>Anlegen</button>
-          </form>
-          </details>
-        )}
       </section>
 
       <section className="card">
         <h2>Raidgruppen</h2>
+        {isAdmin && (
+          <details className="editor-disclosure"><summary>Raidgruppe hinzufügen</summary>
+          <form className="inline-form" onSubmit={createGroup}>
+            <input aria-label="Gruppenname" placeholder="Gruppenname" value={groupName} onChange={(e) => setGroupName(e.target.value)} required />
+            <input aria-label="Gruppenfarbe" type="color" value={groupColor} onChange={(e) => setGroupColor(e.target.value)} />
+            <button type="submit" disabled={pending}>Anlegen</button>
+          </form>
+          </details>
+        )}
         <ul className="plain-list">
           {groups.map((g) => (
             <li key={g.id}>
@@ -133,15 +142,6 @@ export function RosterPage() {
           ))}
           {groups.length === 0 && <li className="muted">Keine Gruppen.</li>}
         </ul>
-        {isAdmin && (
-          <details className="editor-disclosure"><summary>Raidgruppe hinzufügen</summary>
-          <form className="inline-form" onSubmit={createGroup}>
-            <input aria-label="Gruppenname" placeholder="Gruppenname" value={groupName} onChange={(e) => setGroupName(e.target.value)} required />
-            <input aria-label="Gruppenfarbe" type="color" value={groupColor} onChange={(e) => setGroupColor(e.target.value)} />
-            <button type="submit" disabled={pending}>Anlegen</button>
-          </form>
-          </details>
-        )}
       </section></div>
     </div>
   )

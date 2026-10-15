@@ -147,7 +147,14 @@ export interface RaidSignup {
   attendance_id: number
 }
 
+export interface Absence {
+  player_id: number
+  reason: string
+  created_at: string
+}
+
 export interface SignupOverview {
+  absences: Absence[]
   is_enabled: boolean
   is_open: boolean
   entries: RaidSignup[]

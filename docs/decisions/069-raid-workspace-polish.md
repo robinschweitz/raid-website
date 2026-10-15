@@ -1,0 +1,90 @@
+# ADR 069: Raid workspace polish
+
+Status: Accepted. Amends ADR 068.
+
+## Decision
+
+Picker inputs for attendance characters and catalog items use the full form width, and the
+clear action sits directly next to the field. Suggestions show names only: the item list is
+already limited to one boss, difficulty and raid size, and a character ID or item ID is added
+only when two entries would otherwise look identical. Typing an exact item ID still selects
+that item. Saved-record identities in the correction editor keep showing the item ID. Success messages stay
+visible while the user scrolls, can be closed, and are cleared when the user switches the raid
+tab; they do not use timers. While a roster filter is active, empty roles and the bench say
+"Keine Treffer" instead of "Noch nicht besetzt", and "Filter zurücksetzen" sits with the match
+count. On small screens the raid tabs form a two-column grid instead of a scrolling strip, and
+the attendance role selector has a visible label.
+
+Only loot boss headings stay sticky. Roster column headings are no longer sticky: the columns are
+short and have different heights, so their headings floated over partly hidden members.
+
+## Consequences
+
+The raid page remains dependency-free and the visual language is unchanged. Messages and filters
+are local UI state only; API payloads, authorization and raid history are unaffected.
+
+## Nachtrag: Boss und Schwierigkeit bleiben nach der Vergabe
+
+Nach einer neuen Loot-Vergabe bleiben Boss, Schwierigkeit und Dropliste gewählt; Item, Empfänger,
+Methode, Notizen und Grund werden zurückgesetzt. So lassen sich mehrere Items desselben Bosses
+hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetzt.
+
+## Nachtrag: Formulare oben, Empfänger-Suche, Hinweise
+
+- Hinzufügen-Formulare (Loot erfassen, Teilnahme hinzufügen, Neuer Raid, Neuer Spieler) stehen als
+  eingeklappter Abschnitt oberhalb der jeweiligen Liste, damit sie bei langen Listen ohne Scrollen erreichbar sind.
+- Der Loot-Empfänger ist wie Item und Charakter ein Suchfeld mit Vorschlägen; eine genau eingegebene
+  Charakter-ID wählt ebenfalls aus. Nur bei gleichen Namen erscheint `#ID`.
+- Neben „Vergeben“ erklärt ein Hinweis, was fehlt. Items, die in diesem Raid schon vergeben wurden,
+  tragen „bereits n× vergeben“; mehrfaches Vergeben bleibt erlaubt (mehrere Exemplare, BoE).
+- Enter im Item-Feld fokussiert den Empfänger; Erfolgsmeldungen schließen sich nach 8 Sekunden.
+
+## Nachtrag: Restliche Hinzufügen-Formulare, Mehrfach-Erfassung, leere Zustände
+
+- Auch „Neue Raidserie“, „Neue Umfrage“, „Gildenrang/Raidgruppe hinzufügen“ und die Charakter-Formulare
+  im Spielerprofil stehen oberhalb ihrer Listen.
+- Nach dem Hinzufügen einer Teilnahme bleibt der Abschnitt offen und der Fokus kehrt ins Charakterfeld zurück.
+- Leere Listen nennen für berechtigte Rollen die passende Aktion; andere Rollen sehen den bisherigen Kurztext.
+
+## Nachtrag: Sicherheitsabfragen und einheitliche Texte
+
+- Absagen, Archivieren und Loot zurückziehen verlangen eine Bestätigung (`window.confirm`, wie beim
+  Zusammenführen von Konten); ein abgelehnter Dialog sendet nichts.
+- Sichtbare Beschriftungen sind durchgehend deutsch mit Umlauten; das Status-Diagramm hat eine Legende.
+
+## Nachtrag: Rollenprüfung in der Oberfläche
+
+- Registrierungsanfragen zeigen Nicht-Admins einen Hinweis und laden nichts nach.
+- Die Autorisierungs-Meldungen des Servers (`insufficient permissions`, `login required`) werden im
+  Frontend auf Deutsch dargestellt; die API-Codes bleiben unverändert.
+- Wunschlisten-Schaltflächen erscheinen erst ab der Rolle MEMBER, passend zur Server-Prüfung.
+
+## Nachtrag: Raidanmeldung und Wunschliste
+
+- Die Anmeldung zeigt Checkbox und Charakter in einer Zeile, hebt die Hauptaktionen hervor und erklärt, was zum
+  Absenden fehlt. Bestätigungen nutzen dieselbe schließbare Meldung wie der Rest der Raidseite.
+- Wunschliste lesen: Nicht-Staff darf die Wunschliste eigener Charaktere lesen, auch wenn sie leer ist. Die
+  Berechtigung folgt dem Besitzer des Charakters, nicht dem Listeninhalt. Unbekannte Charaktere liefern 404.
+
+## Nachtrag: Absage durch Spieler
+
+- Neue Tabelle `raid_absences` (Migration 067), eindeutig je Raid und Spieler, mit optionalem Grund (höchstens
+  200 Zeichen). Endpunkte `PUT`/`DELETE /api/v1/raids/{id}/absences/{playerID}`, Rolle MEMBER; die Übersicht der
+  Anmeldungen liefert `absences`.
+- Spieler ändern nur die eigene Absage und nur bis zum geplanten Start (sonst 409 `raid_started`). Die
+  Raidleitung (RAIDASSISTENT+) darf für jeden Spieler eintragen und zurücknehmen, solange der Raid aktiv ist.
+  Jede Änderung wird als `absence_declare`/`absence_revoke` protokolliert.
+- Eine Absage markiert nur: Aufstellung, Anmeldungen und Bank bleiben unverändert, die Raidleitung entscheidet.
+- **EP beim Archivieren:** Die Raidleitung entscheidet pro Spieler. `POST /api/v1/raids/{id}/archive` nimmt
+  optional `{"without_points": [playerID, …]}`; diese Spieler erhalten keine +10 EP. Zulässig sind nur Spieler
+  aus der Aufstellung mit Absage (sonst 400 `invalid_exclusion`). Ohne Angabe bleibt das Verhalten unverändert.
+  Die Entscheidung wird als `archive_without_points` im Audit-Log festgehalten. In der Oberfläche zeigt
+  „Archivieren“ dazu vorab eine Liste mit Ankreuzfeldern („Keine EP für …“).
+
+## Nachtrag: EP-Übersicht vor dem Archivieren
+
+- `GET /api/v1/raids/{id}/archive-preview` (RAIDASSISTENT+) liefert je Spieler der Aufstellung den aktuellen
+  EP-Stand, die zu vergebenden EP (`award`) und den Grund (`award`, `main_spec_loot`, `already_awarded`). Es
+  ändert nichts und nutzt dieselben Regeln wie das Archivieren.
+- „Archivieren“ öffnet bei aktiven Raids immer zuerst diese Übersicht (Aktuell / Neu / Danach / Hinweis). Die
+  Ausnahme für Abgesagte (`without_points`) wird dort pro Zeile gesetzt; die Anzeige rechnet live mit.

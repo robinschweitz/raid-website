@@ -1,3 +1,10 @@
+// The authorization guards answer in English; the UI always shows German.
+function germanGuardMessage(code: string, message?: string): string | undefined {
+  if (code === 'forbidden' && message === 'insufficient permissions') return 'Dafür fehlt dir die Berechtigung.'
+  if (code === 'unauthenticated' && message === 'login required') return 'Bitte melde dich an.'
+  return message
+}
+
 export class ApiError extends Error {
   status: number
   code: string
@@ -46,7 +53,8 @@ async function request<T>(method: string, path: string, body?: unknown, envelope
   }
   if (!res.ok) {
     const env = json as { error?: { code?: string; message?: string }; data?: unknown } | undefined
-    throw new ApiError(res.status, env?.error?.code ?? 'error', env?.error?.message ?? res.statusText, env?.data)
+    const code = env?.error?.code ?? 'error'
+    throw new ApiError(res.status, code, germanGuardMessage(code, env?.error?.message) ?? res.statusText, env?.data)
   }
   if (!envelope && json && typeof json === 'object' && 'data' in json) {
     return (json as { data: T }).data

@@ -14,6 +14,8 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
   const requests = []
   const navigations = []
   const prompts = []
+  const confirms = []
+  const confirmAnswers = []
   const auth = { player: me }
   const jsx = (type, props, key) => ({ type, props: props ?? {}, key })
   const slot = (create) => {
@@ -53,7 +55,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
     useContext: () => auth,
   }
   react.useLayoutEffect = react.useEffect
-  const api = Object.fromEntries(['get', 'post', 'postEnvelope', 'put', 'patch'].map((method) => [method, (url, body) => {
+  const api = Object.fromEntries(['get', 'post', 'postEnvelope', 'put', 'patch', 'del'].map((method) => [method, (url, body) => {
     let resolve, reject
     const promise = new Promise((yes, no) => { resolve = yes; reject = no })
     requests.push({ method, url, body, resolve, reject })
@@ -81,7 +83,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
       const exports = load(path.relative(path.resolve(__dirname, '../src'), resolved + extension))
       return name.endsWith('/api') ? { ...exports, api } : exports
     }
-    vm.runInThisContext(`(function(require,module,exports,window,crypto){${source}\n})`, { filename })(localRequire, module, module.exports, { prompt: () => prompts.shift(), setInterval: () => 0, clearInterval: () => {} }, crypto)
+    vm.runInThisContext(`(function(require,module,exports,window,crypto){${source}\n})`, { filename })(localRequire, module, module.exports, { prompt: () => prompts.shift(), confirm: (message) => { confirms.push(message); return confirmAnswers.length ? confirmAnswers.shift() : true }, setInterval: () => 0, clearInterval: () => {} }, crypto)
     return module.exports
   }
 
@@ -118,7 +120,7 @@ function setup(me = { id: 1, role: 'ADMIN' }) {
     return { render, unmount, get tree() { return tree } }
   }
 
-  return { load, mount, requests, api, auth, navigations, prompts }
+  return { load, mount, requests, api, auth, navigations, prompts, confirms, confirmAnswers }
 }
 
 function nodes(tree, predicate) {
@@ -238,6 +240,105 @@ test('raid signups submit several own characters and guard duplicate submissions
   view.unmount()
 })
 
+test('members can withdraw their own pending signup but not accepted ones or other players', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [{ id: 2, name: 'Ich' }, { id: 3, name: 'Andere' }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: { Magier: ['Feuer'] }, entries: [
+    { id: 4, player_id: 2, character_id: 11, character_name: 'Meiner', class: 'Magier', spec: 'Feuer', is_accepted: false, is_withdrawn: false },
+    { id: 5, player_id: 3, character_id: 12, character_name: 'Fremder', class: 'Magier', spec: 'Feuer', is_accepted: false, is_withdrawn: false },
+    { id: 6, player_id: 2, character_id: 13, character_name: 'Bestaetigt', class: 'Magier', spec: 'Feuer', attendance_id: 44, is_accepted: true, is_withdrawn: false },
+  ] })
+  resolveIf(s, '/api/v1/players/2/characters', [])
+  await flush(view)
+  const withdraws = nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Zurückziehen')
+  assert.equal(withdraws.length, 1, 'only the own, not yet accepted signup can be withdrawn')
+  withdraws[0].props.onClick()
+  assert.equal(writes(s).length, 1)
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/signups/4/withdraw')
+})
+
+test('a signup that closes while a member is choosing explains what happened', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: { Magier: ['Feuer'] }, entries: [] })
+  resolveIf(s, '/api/v1/players/2/characters', [{ id: 11, player_id: 2, name: 'Neuling', class: 'Magier', main_spec: 'Feuer', active: true }])
+  await flush(view)
+  nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')[0].props.onChange({ target: { checked: true } })
+  view.render()
+  assert.doesNotMatch(text(view.tree), /gerade geschlossen/)
+  const refresh = button(view, 'Anmeldungen aktualisieren').props.onClick()
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: false, is_open: false, class_specs: { Magier: ['Feuer'] }, entries: [] })
+  resolveIf(s, '/api/v1/players/2/characters', [])
+  await flush(view)
+  await refresh
+  await flush(view)
+  assert.match(text(view.tree), /gerade geschlossen\. Die angekreuzten Charaktere wurden nicht mehr angemeldet/)
+  assert.equal(form(view), undefined)
+})
+
+test('after the deadline the signup form and withdraw buttons disappear even if the server still says open', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2000-01-01T20:00:00Z' }, attendance: [], players: [{ id: 2, name: 'Ich' }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: { Magier: ['Feuer'] }, entries: [
+    { id: 4, player_id: 2, character_id: 11, character_name: 'Meiner', class: 'Magier', spec: 'Feuer', is_accepted: false, is_withdrawn: false },
+  ] })
+  resolveIf(s, '/api/v1/players/2/characters', [{ id: 11, player_id: 2, name: 'Meiner', class: 'Magier', main_spec: 'Feuer', active: true }])
+  await flush(view)
+  assert.match(text(view.tree), /Anmeldung geschlossen/)
+  assert.equal(form(view), undefined)
+  assert.equal(button(view, 'Zurückziehen'), undefined)
+})
+
+test('staff can switch the roster slot to an alternative and the unchanged character is sent for safety', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, {
+    raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' },
+    attendance: [{ id: 44, player_id: 2, character_id: 11 }], players: [{ id: 2, name: 'Spieler' }], onRosterChange: async () => {},
+  })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [
+    { id: 4, player_id: 2, character_id: 11, character_name: 'Erster', class: 'Magier', spec: 'Feuer', attendance_id: 44, is_accepted: true, is_withdrawn: false },
+    { id: 5, player_id: 2, character_id: 12, character_name: 'Alternative', class: 'Magier', spec: 'Frost', attendance_id: 44, is_accepted: false, is_withdrawn: false },
+  ] })
+  resolveIf(s, '/api/v1/players/1/characters', [])
+  await flush(view)
+  button(view, 'Auf diesen Charakter wechseln').props.onClick()
+  view.render()
+  assert.match(text(view.tree), /ersetzen\?/)
+  button(view, 'Charakterwechsel bestätigen').props.onClick()
+  assert.deepEqual(writes(s)[0].body, { replace_attendance_id: 44, expected_character_id: 11 })
+})
+
+test('signup form hints at the missing choice and hides the button without own characters', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: { Magier: ['Feuer', 'Frost'] }, entries: [] })
+  resolveIf(s, '/api/v1/players/2/characters', [{ id: 11, player_id: 2, name: 'Neuling', class: 'Magier', main_spec: 'Feuer', active: true }])
+  await flush(view)
+  assert.match(text(view.tree), /Mindestens einen Charakter ankreuzen/)
+  assert.equal(button(view, 'Ausgewählte Charaktere anmelden').props.disabled, true)
+  const box = nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')[0]
+  box.props.onChange({ target: { checked: true } })
+  view.render()
+  assert.doesNotMatch(text(view.tree), /Mindestens einen Charakter ankreuzen/)
+  assert.equal(button(view, 'Ausgewählte Charaktere anmelden').props.disabled, false)
+})
+
+test('signup form without own characters offers no submit button', async () => {
+  const s = setup({ id: 3, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [] })
+  resolveIf(s, '/api/v1/players/3/characters', [])
+  await flush(view)
+  assert.match(text(view.tree), /noch keine Charaktere zugeordnet/)
+  assert.equal(button(view, 'Ausgewählte Charaktere anmelden'), undefined)
+})
+
 test('raid assistants explicitly confirm alternative switches after signup closure', async () => {
   const s = setup({ id: 1, role: 'RAIDASSISTENT' })
   const { RaidSignups } = s.load('components/RaidSignups.tsx')
@@ -310,8 +411,19 @@ function resolveRaid(s, id, options = {}) {
       : r.url === '/api/v1/character-options' ? { Priester: ['Disziplin', 'Heilig', 'Schatten'], Magier: ['Feuer', 'Frost'] }
       : r.url.endsWith('/attendance') ? options.attendance ?? []
       : r.url.endsWith('/loot') ? options.loot ?? []
+      : r.url.endsWith('/signups') ? { absences: options.absences ?? [] }
       : r.url === '/api/v1/loot-catalog' ? options.catalog ?? emptyCatalog() : [])
   }
+}
+
+async function startArchive(s, view, rows = []) {
+  const opening = button(view, 'Archivieren').props.onClick()
+  const request = s.requests.find((r) => r.method === 'get' && r.url.endsWith('/archive-preview') && !r.resolved)
+  request.resolved = true
+  request.resolve(rows)
+  await opening
+  view.render()
+  return { done: button(view, 'Jetzt archivieren').props.onClick() }
 }
 
 function resolvePlayer(s, id) {
@@ -499,6 +611,131 @@ test('character search filters the suggestions and clears an unselected identity
   assert.doesNotMatch(characterSuggestions, /Char 11/)
 })
 
+test('selected attendance character can be cleared without retaining its identity', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1)
+  await flush(view)
+  select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
+  view.render()
+  const clearButton = () => nodes(view.tree, (node) => node.type === 'button' && node.props['aria-label'] === 'Ausgewählten Charakter entfernen')[0]
+  assert.ok(clearButton())
+  clearButton().props.onClick()
+  view.render()
+  assert.equal(button(view, 'Hinzufügen').props.disabled, true)
+  assert.equal(clearButton(), undefined)
+  assert.equal(select(view, 'Teilnahme-Charakter').props.value, '')
+})
+
+test('attendance save announces successful completion', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1)
+  await flush(view)
+  select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
+  view.render()
+  const saving = form(view).props.onSubmit(event)
+  writes(s)[0].resolve({ id: 1 })
+  await flush(view)
+  resolveRaid(s, 1)
+  await saving
+  view.render()
+  assert.match(text(view.tree), /Teilnahme hinzugefügt/)
+})
+
+test('roster filters are display-only and can be reset', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { attendance: [recipientRow, { ...recipientRow, id: 10, character_id: 21, character_name: 'Andere Figur', role: 'TANK' }] })
+  await flush(view)
+  input(view, 'Charakter oder Spieler').props.onChange(change('Saved'))
+  view.render()
+  const roster = () => nodes(view.tree, (node) => node.type === 'section' && node.props.id === 'raid-roster')[0]
+  assert.match(text(roster()), /Saved raid character/)
+  assert.doesNotMatch(text(roster()), /Andere Figur/)
+  button(view, 'Filter zurücksetzen').props.onClick()
+  view.render()
+  assert.match(text(roster()), /Andere Figur/)
+})
+
+test('roster filters say there are no matches instead of an unfilled slot', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { attendance: [recipientRow] })
+  await flush(view)
+  const roster = () => nodes(view.tree, (node) => node.type === 'section' && node.props.id === 'raid-roster')[0]
+  assert.match(text(roster()), /Noch nicht besetzt/)
+  assert.doesNotMatch(text(roster()), /Keine Treffer/)
+  input(view, 'Charakter oder Spieler').props.onChange(change('gibt es nicht'))
+  view.render()
+  assert.match(text(roster()), /Keine Treffer auf der Ersatzbank/)
+  assert.match(text(roster()), /0\s+von\s+1\s+Teilnehmern angezeigt/)
+  assert.doesNotMatch(text(roster()), /Noch nicht besetzt/)
+})
+
+test('success message can be closed and does not follow the user to another tab', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1)
+  await flush(view)
+  const closeButton = () => nodes(view.tree, (node) => node.type === 'button' && node.props['aria-label'] === 'Meldung schließen')[0]
+  const addCharacter = async () => {
+    select(view, 'Teilnahme-Charakter').props.onChange(change('10'))
+    view.render()
+    const saving = form(view).props.onSubmit(event)
+    writes(s).at(-1).resolve({ id: 1 })
+    await flush(view)
+    resolveRaid(s, 1)
+    await saving
+    view.render()
+  }
+  await addCharacter()
+  assert.match(text(view.tree), /Teilnahme hinzugefügt/)
+  closeButton().props.onClick()
+  view.render()
+  assert.doesNotMatch(text(view.tree), /Teilnahme hinzugefügt/)
+  assert.equal(closeButton(), undefined)
+  await addCharacter()
+  assert.match(text(view.tree), /Teilnahme hinzugefügt/)
+  nodes(view.tree, (node) => node.type === 'button' && node.props['aria-controls'] === 'raid-loot')[0].props.onClick()
+  view.render()
+  view.render() // the harness does not re-render after an effect sets state
+  assert.doesNotMatch(text(view.tree), /Teilnahme hinzugefügt/)
+})
+
+test('character suggestions hide internal IDs unless two characters look identical', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { characters: [character(10, 1), { ...character(11, 1), name: 'Char 10' }, character(20, 2)].map((row) => ({ ...row, active: true })) })
+  await flush(view)
+  const values = nodes(suggestions(view, 'Teilnahme-Charakter'), (node) => node.type === 'option').map((node) => node.props.value)
+  assert.deepEqual(values, ['Char 10 · Priest · Spieler 1 · #10', 'Char 10 · Priest · Spieler 1 · #11', 'Char 20 · Priest · Spieler 2'])
+  select(view, 'Teilnahme-Charakter').props.onChange(change(values[1]))
+  view.render()
+  assert.equal(button(view, 'Hinzufügen').props.disabled, false)
+})
+
+test('an exact item ID selects the item while only the name is shown', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+  await flush(view)
+  const catalog = catalogFixture()
+  resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
+  await flush(view)
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
+  view.render()
+  const drops = itemDrops(catalog, 'boss:1', 25)
+  resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', drops)
+  await flush(view)
+  const wanted = drops.find((drop) => drop.mode === 'NORMAL')
+  select(view, 'Loot-Item').props.onChange(change(` ${wanted.item_id} `))
+  view.render()
+  assert.match(select(view, 'Loot-Item').props.value, /Katalogitem/)
+  assert.doesNotMatch(select(view, 'Loot-Item').props.value, new RegExp(String(wanted.item_id)))
+  assert.ok(nodes(view.tree, (node) => node.type === 'button' && node.props['aria-label'] === 'Ausgewähltes Item entfernen')[0])
+})
+
 for (const [label, submits] of [['Lock anlegen', true], ['Stornieren', false], ['Anlegen', true], ['Speichern', true]]) {
   test(`player mutation ${label} blocks same-tick duplicates`, async () => {
     const s = setup()
@@ -652,6 +889,24 @@ for (const [file, component, label] of [
     assert.equal(button(view, label).props.disabled, false)
   })
 }
+
+test('player list sorts names naturally and filters by the search text', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/Players.tsx').PlayersPage)
+  const row = (id, name) => ({ id, name, guild_rank_id: null, active: true })
+  s.requests.forEach((r) => r.resolve([row(1, 'Spieler10'), row(2, 'Spieler2'), row(3, 'admin'), row(4, 'Spieler1')]))
+  await flush(view)
+  const names = () => nodes(view.tree, (n) => n.type === 'td').map((n) => text(n)).filter((t) => t && t !== 'aktiv')
+  assert.deepEqual(names(), ['admin', 'Spieler1', 'Spieler2', 'Spieler10'])
+  assert.match(text(view.tree), /4\s+von\s+4\s+Spielern/)
+  input(view, 'Name').props.onChange(change(' spieler1 '))
+  view.render()
+  assert.deepEqual(names(), ['Spieler1', 'Spieler10'])
+  assert.match(text(view.tree), /2\s+von\s+4\s+Spielern/)
+  input(view, 'Name').props.onChange(change('zzz'))
+  view.render()
+  assert.match(text(view.tree), /Kein Spieler mit diesem Namen/)
+})
 
 test('auth distinguishes network failure from anonymous and supports retry', async () => {
   const s = setup()
@@ -813,7 +1068,8 @@ test('archived attendance edits in place, prefills saved values and PATCHes with
   assert.equal(checkbox(view, 'Ersatzbank').props.checked, false)
   assert.equal(input(view, 'Teilnahme-Begründung').props.value, '')
   await flush(view)
-  assert.match(select(view, 'Teilnahme-Charakter').props.value, /#11/)
+  assert.match(select(view, 'Teilnahme-Charakter').props.value, /Char 11/)
+  assert.doesNotMatch(select(view, 'Teilnahme-Charakter').props.value, /#11/)
   await form(view).props.onSubmit(event)
   assert.equal(writes(s).length, 0)
   select(view, 'Teilnahme-Rolle').props.onChange(change('TANK'))
@@ -849,7 +1105,8 @@ test('loot corrections replace identity only from source and preserve audited re
   view.render()
   assert.ok(nodes(view.tree, (n) => n.type === 'tr' && nodes(n, (child) => child.type === 'form').length === 1).length)
   assert.equal(input(view, 'Item'), undefined)
-  assert.equal(select(view, 'Loot-Empfänger').props.value, '11')
+  const originalRecipient = select(view, 'Loot-Empfänger').props.value
+  assert.match(originalRecipient, /Spieler 1/)
   assert.equal(input(view, 'Loot-Notizen').props.value, 'old loot note')
   await form(view, 1).props.onSubmit(event)
   assert.equal(writes(s).length, 0)
@@ -859,7 +1116,7 @@ test('loot corrections replace identity only from source and preserve audited re
   input(view, 'Loot-Notizen').props.onChange(change('new loot note'))
   input(view, 'Loot-Begründung').props.onChange(change(' wrong recipient '))
   view.render()
-  assert.equal(select(view, 'Loot-Empfänger').props.value, '20')
+  assert.notEqual(select(view, 'Loot-Empfänger').props.value, originalRecipient)
   const submit = form(view, 1).props.onSubmit
   const first = submit(event)
   await submit(event)
@@ -1186,8 +1443,8 @@ test('archive preserves successor, invalidates old submits and requires reasons 
   view.render()
   const oldLootSubmit = form(view, 1).props.onSubmit
   assert.equal(button(view, 'Abschließen'), undefined)
-  const first = button(view, 'Archivieren').props.onClick()
-  await button(view, 'Archivieren').props.onClick()
+  const first = (await startArchive(s, view)).done
+  await button(view, 'Jetzt archivieren').props.onClick()
   assert.equal(writes(s).length, 1)
   assert.equal(writes(s)[0].method, 'postEnvelope')
   assert.equal(writes(s)[0].url, '/api/v1/raids/1/archive')
@@ -1248,13 +1505,13 @@ test('series assignment PATCHes existing active raid and archive errors are loca
   writes(s)[0].resolve({ ...raid(1), series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' })
   await attach
   view.render()
-  const archive = button(view, 'Archivieren').props.onClick()
+  const archive = (await startArchive(s, view)).done
   const { ApiError } = s.load('api.ts')
   writes(s)[1].reject(new ApiError(409, 'local_time_ambiguous', 'English backend message'))
   await archive
   view.render()
   assert.match(text(view.tree), /Zeitumstellung mehrdeutig/)
-  assert.equal(button(view, 'Archivieren').props.disabled, false)
+  assert.equal(button(view, 'Jetzt archivieren').props.disabled, false)
 })
 
 test('archived attendance uses saved name, class and actual spec; missing history stays unavailable', async () => {
@@ -1437,6 +1694,28 @@ for (const role of ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER']) {
     assert.equal(form(view), undefined)
   })
 }
+
+test('guard errors from the server are shown in German', async (t) => {
+  t.mock.method(global, 'fetch', async () => ({ status: 403, ok: false, text: async () => JSON.stringify({ error: { code: 'forbidden', message: 'insufficient permissions' } }) }))
+  const { api } = setup().load('api.ts')
+  await assert.rejects(() => api.get('/api/v1/registration-requests'), (err) => err.code === 'forbidden' && /Berechtigung/.test(err.message))
+})
+
+test('registration requests tell non-admins the area is admin-only and load nothing', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const view = s.mount(s.load('pages/RegistrationRequests.tsx').RegistrationRequestsPage)
+  await flush(view)
+  assert.match(text(view.tree), /nur für Admins/)
+  assert.equal(s.requests.some((r) => r.url.includes('registration-requests')), false)
+})
+
+test('guests get no wishlist controls and no wishlist reads in the catalog', async () => {
+  const s = setup({ id: 4, role: 'GUEST' })
+  const view = s.mount(s.load('pages/LootCatalog.tsx').LootCatalogPage)
+  await flush(view)
+  assert.equal(s.requests.some((r) => /players\/4\/characters|wishlist/.test(r.url)), false)
+  assert.doesNotMatch(text(view.tree), /Wunschliste/)
+})
 
 test('fetch wrapper keeps archive sibling fields and sends session credentials', async (t) => {
   const envelope = { data: raid(1), next_raid: raid(2) }
@@ -1628,7 +1907,7 @@ test('roster_incomplete archive errors identify missing row details and leave co
   resolveRaid(s, 1, { raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' }, attendance: [{ ...attendanceRow, character_name: 'Saved name', class: '', spec: '' }] })
   await flush(view)
   assert.match(text(view.tree), /Teilnahme #.*7.*Klasse, tatsächlicher Spec.*fehlt/)
-  const first = button(view, 'Archivieren').props.onClick()
+  const first = (await startArchive(s, view)).done
   const { ApiError } = s.load('api.ts')
   writes(s)[0].reject(new ApiError(409, 'roster_incomplete', 'raid roster is incomplete'))
   await first
@@ -1650,10 +1929,9 @@ for (const method of ['MAIN', 'SECOND', 'ENHANCED', 'BOE']) {
     const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
     resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow, { ...attendanceRow, raid_id: 2, character_id: 99 }] }))
     await flush(view)
-    const recipients = nodes(select(view, 'Loot-Empfänger'), (n) => n.type === 'option')
-    assert.match(text(recipients), /Saved raid character/)
-    assert.equal(recipients.some((n) => Number(n.props.value) === 99), false)
-    assert.equal(recipients.some((n) => Number(n.props.value) === 1), false)
+    const recipients = nodes(suggestions(view, 'Loot-Empfänger'), (n) => n.type === 'option')
+    assert.match(recipients.map((n) => n.props.value).join(' '), /Saved raid character/)
+    assert.equal(recipients.length, 1)
     assert.equal(s.requests.some((r) => /players\/\d+\/characters/.test(r.url)), false)
     await chooseSourceDrop(s, view)
     select(view, 'Loot-Empfänger').props.onChange(change('20'))
@@ -1822,7 +2100,9 @@ test('associated loot filters by persisted instance and size, preserves mixed so
   view.render()
   assert.equal(resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25)), true)
   await flush(view)
-  assert.match(nodes(suggestions(view, 'Loot-Item'), (node) => node.type === 'option').map((node) => node.props.value).join(' '), /Katalogitem.*25\s+Spieler.*Normal/)
+  const itemSuggestions = nodes(suggestions(view, 'Loot-Item'), (node) => node.type === 'option').map((node) => node.props.value).join(' ')
+  assert.match(itemSuggestions, /Katalogitem/)
+  assert.doesNotMatch(itemSuggestions, /Item-ID|Spieler|Normal/)
   const variants = nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)
   assert.equal(variants.length, 1)
   assert.equal(select(view, 'Loot-Modus').props.value, 'NORMAL')
@@ -1849,6 +2129,147 @@ test('associated loot filters by persisted instance and size, preserves mixed so
   assert.deepEqual(writes(s)[1].body, write.body)
   writes(s)[1].reject(new Error('offline'))
   await retry
+})
+
+test('after recording catalog loot the boss and mode stay selected for the next item', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  const catalog = catalogFixture()
+  resolveRaid(s, 1, { raid: { catalog_instance_id: 'map:631', raid_size: 25 }, attendance: [recipientRow], catalog })
+  await flush(view)
+  resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
+  await flush(view)
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
+  view.render()
+  resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
+  await flush(view)
+  select(view, 'Loot-Modus').props.onChange(change('HEROIC'))
+  view.render()
+  select(view, 'Loot-Item').props.onChange(change(nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0].props.value))
+  select(view, 'Loot-Empfänger').props.onChange(change('20'))
+  view.render()
+  const submit = form(view, 1).props.onSubmit(event)
+  writes(s)[0].resolve({ id: 9 })
+  await flush(view)
+  resolveRaid(s, 1, { raid: { catalog_instance_id: 'map:631', raid_size: 25 }, attendance: [recipientRow], catalog })
+  await submit
+  await flush(view)
+  assert.equal(select(view, 'Loot-Boss').props.value, 'boss:1')
+  assert.equal(select(view, 'Loot-Modus').props.value, 'HEROIC')
+  assert.equal(select(view, 'Loot-Item').props.value, '')
+  assert.equal(select(view, 'Loot-Empfänger').props.value, '')
+})
+
+test('loot form: recipient type-ahead, submit hint, awarded marker and Enter moves to the recipient', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  const catalog = catalogFixture()
+  const awarded = { ...lootRow, id: 30, item_id: '12345', item_name: 'Katalogitem', awarded_to_character_id: 20, awarded_to_player_id: 2 }
+  resolveRaid(s, 1, { raid: { catalog_instance_id: 'map:631', raid_size: 25 }, attendance: [recipientRow], catalog, loot: [awarded] })
+  await flush(view)
+  resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
+  await flush(view)
+  assert.match(text(view.tree), /Zuerst ein Item wählen/)
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
+  view.render()
+  resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
+  await flush(view)
+  const itemOptions = nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option').map((n) => n.props.value)
+  assert.match(itemOptions[0], /bereits 1× vergeben/)
+  select(view, 'Loot-Item').props.onChange(change(itemOptions[0]))
+  view.render()
+  assert.match(text(view.tree), /Empfänger-Charakter wählen/)
+  select(view, 'Loot-Item').props.onKeyDown({ key: 'Enter', preventDefault() {} })
+  select(view, 'Loot-Empfänger').props.onChange(change('Saved'))
+  view.render()
+  const recipientOptions = nodes(suggestions(view, 'Loot-Empfänger'), (n) => n.type === 'option').map((n) => n.props.value)
+  assert.equal(recipientOptions.length, 1)
+  assert.match(recipientOptions[0], /Saved raid character · DD/)
+  assert.equal(button(view, 'Vergeben').props.disabled, true)
+  select(view, 'Loot-Empfänger').props.onChange(change(recipientOptions[0]))
+  view.render()
+  assert.equal(button(view, 'Vergeben').props.disabled, false)
+  assert.doesNotMatch(text(view.tree), /Empfänger-Charakter wählen\./)
+})
+
+test('Enter in the item field moves focus to the recipient and other keys do not', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  const catalog = catalogFixture()
+  resolveRaid(s, 1, { raid: { catalog_instance_id: 'map:631', raid_size: 25 }, attendance: [recipientRow], catalog })
+  await flush(view)
+  resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
+  await flush(view)
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
+  view.render()
+  resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
+  await flush(view)
+  let focused = 0
+  select(view, 'Loot-Empfänger').props.ref.current = { focus: () => { focused += 1 } }
+  const enter = () => select(view, 'Loot-Item').props.onKeyDown({ key: 'Enter', preventDefault() {} })
+  enter()
+  assert.equal(focused, 0, 'no item chosen yet: Enter does not jump')
+  select(view, 'Loot-Item').props.onChange(change(nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option')[0].props.value))
+  view.render()
+  select(view, 'Loot-Item').props.onKeyDown({ key: 'a', preventDefault() {} })
+  assert.equal(focused, 0)
+  enter()
+  assert.equal(focused, 1)
+})
+
+test('success messages close themselves after a few seconds', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  const timers = []
+  const realSetTimeout = global.setTimeout
+  global.setTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length }
+  try {
+    resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+    await flush(view)
+    await chooseSourceDrop(s, view)
+    select(view, 'Loot-Empfänger').props.onChange(change('20'))
+    view.render()
+    const submit = form(view, 1).props.onSubmit(event)
+    writes(s)[0].resolve({ id: 9 })
+    await flush(view)
+    resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+    await submit
+    await flush(view)
+    const toast = () => nodes(view.tree, (n) => n.props?.className === 'success-message')
+    assert.equal(toast().length, 1)
+    assert.match(text(toast()), /Loot vergeben\./)
+    const dismiss = timers.filter((t) => t.ms === 8000).pop()
+    assert.ok(dismiss, 'an 8 second dismiss timer is armed')
+    dismiss.fn()
+    view.render()
+    assert.equal(toast().length, 0)
+  } finally {
+    global.setTimeout = realSetTimeout
+  }
+})
+
+test('empty loot list tells staff how to start', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+  await flush(view)
+  assert.match(text(view.tree), /Noch kein Loot vergeben\. Mit „Loot erfassen“/)
+})
+
+test('cancelling a raid asks for confirmation and a declined prompt sends nothing', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { raid: { status: 'OPEN' }, attendance: [recipientRow] })
+  await flush(view)
+  s.confirmAnswers.push(false)
+  await button(view, 'Absagen').props.onClick()
+  assert.equal(writes(s).length, 0)
+  assert.match(s.confirms[0], /absagen/)
+  const accepted = button(view, 'Absagen').props.onClick()
+  assert.equal(writes(s).length, 1)
+  assert.match(writes(s)[0].url, /cancel$/)
+  writes(s)[0].reject(new Error('offline'))
+  await accepted
 })
 
 test('unsaved association is preview only; saved context invalidates old loot requests and handlers', async () => {
@@ -2094,8 +2515,7 @@ for (const code of ['catalog_item_invalid', 'request_id_required']) {
     view.render()
     assert.doesNotMatch(text(view.tree), /English server fallback/)
     assert.match(text(view.tree), code === 'catalog_item_invalid' ? /Zuordnung prüfen.*Beute erneut wählen/ : /Speicherschlüssel.*erneut speichern/)
-    assert.match(text(form(view, 1)), /Katalogitem/)
-    assert.notEqual(select(view, 'Loot-Item').props.value, '')
+    assert.match(select(view, 'Loot-Item').props.value, /Katalogitem/)
   })
 }
 
@@ -2453,4 +2873,114 @@ test('anonymous dashboard shows public widgets without profile or personal reque
   assert.match(text(view.tree), /Gildenübersicht|Bratwurst des Schicksals/)
   assert.equal(s.requests.some((request) => /\/points|\/characters|\/votes/.test(request.url)), false)
   view.unmount()
+})
+
+test('a member can announce an absence with a reason and take it back before the raid starts', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [{ id: 2, name: 'Ich' }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [], absences: [] })
+  resolveIf(s, '/api/v1/players/2/characters', [])
+  await flush(view)
+  assert.match(text(view.tree), /Kannst du nicht kommen/)
+  const reason = nodes(view.tree, (n) => n.type === 'input' && n.props.placeholder?.startsWith('z. B.'))[0]
+  reason.props.onChange(change('Krank'))
+  view.render()
+  button(view, 'Ich kann nicht kommen').props.onClick()
+  assert.equal(writes(s)[0].method, 'put')
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/absences/2')
+  assert.deepEqual(writes(s)[0].body, { reason: 'Krank' })
+})
+
+test('an announced absence shows the reason and can be revoked with "Doch dabei"', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [{ id: 2, name: 'Ich' }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [], absences: [{ player_id: 2, reason: 'Urlaub', created_at: '2030-01-01T00:00:00Z' }] })
+  resolveIf(s, '/api/v1/players/2/characters', [])
+  await flush(view)
+  assert.match(text(view.tree), /Du hast abgesagt.*Urlaub/s)
+  assert.equal(button(view, 'Ich kann nicht kommen'), undefined)
+  button(view, 'Doch dabei').props.onClick()
+  assert.equal(writes(s)[0].method, 'del')
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/absences/2')
+})
+
+test('no absence form once the raid has started; staff can still manage absences', async () => {
+  const started = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = started.load('components/RaidSignups.tsx')
+  const old = { ...raid(8), scheduled_start: '2000-01-01T20:00:00Z' }
+  const view = started.mount(RaidSignups, { raid: old, attendance: [], players: [], onRosterChange: async () => {} })
+  resolveIf(started, '/api/v1/raids/8/signups', { is_enabled: false, is_open: false, class_specs: {}, entries: [], absences: [] })
+  resolveIf(started, '/api/v1/players/2/characters', [])
+  await flush(view)
+  assert.doesNotMatch(text(view.tree), /Kannst du nicht kommen/)
+
+  const s = setup({ id: 9, role: 'RAIDASSISTENT' })
+  const staffView = s.mount(s.load('components/RaidSignups.tsx').RaidSignups, { raid: old, attendance: [], players: [{ id: 3, name: 'Tom', active: true }, { id: 4, name: 'Eva', active: true }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: false, is_open: false, class_specs: {}, entries: [], absences: [{ player_id: 3, reason: 'Telefonisch', created_at: '2030-01-01T00:00:00Z' }] })
+  resolveIf(s, '/api/v1/players/9/characters', [])
+  await flush(staffView)
+  assert.match(text(staffView.tree), /Tom.*Hat abgesagt.*Telefonisch/s)
+  button(staffView, 'Absage zurücknehmen').props.onClick()
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/absences/3')
+  const options = nodes(staffView.tree, (n) => n.type === 'option').map((n) => text(n))
+  assert.ok(options.includes('Eva') && !options.includes('Tom'), 'only players without absence are offered')
+})
+
+test('roster rows of players who declined carry a badge and reason', () => {
+  const board = setup().load('components/RaidRosterBoard.tsx').RaidRosterBoard({
+    attendance: [{ id: 1, player_id: 3, character_name: 'A', class: 'Magier', spec: 'Feuer', role: 'DD' }, { id: 2, player_id: 4, character_name: 'B', class: 'Magier', spec: 'Feuer', role: 'DD' }],
+    playerName: () => '', canWrite: false, pending: false, onEdit: () => {}, absences: new Map([[3, 'Krank']]),
+  })
+  const flat = text(board)
+  assert.equal((flat.match(/Hat abgesagt/g) ?? []).length, 1)
+  assert.match(flat, /Grund:\s+Krank/)
+})
+
+test('archive review shows who gets which EP, who gets none because of loot, and lets staff exclude declined players', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, {
+    raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' },
+    attendance: [recipientRow, { ...recipientRow, id: 10, player_id: 1 }],
+    loot: [{ id: 1, raid_id: 1, item_name: 'Schwert', awarded_to_player_id: 1, is_main_spec: true }],
+    absences: [{ player_id: 2, reason: 'Krank', created_at: '2026-10-01T00:00:00Z' }],
+  })
+  await flush(view)
+  const opening = button(view, 'Archivieren').props.onClick()
+  assert.equal(writes(s).length, 0, 'the first click only opens the review')
+  const request = s.requests.find((r) => r.url.endsWith('/archive-preview'))
+  request.resolve([{ player_id: 1, balance: 40, award: 0, reason: 'main_spec_loot' }, { player_id: 2, balance: 25, award: 10, reason: 'award' }])
+  await opening
+  view.render()
+  assert.equal(s.confirms.length, 0)
+  let flat = text(view.tree)
+  assert.match(flat, /Keine EP: Main-Spec-Loot \(Schwert\)/)
+  assert.match(flat, /25\s+\+10\s+35/)
+  const check = nodes(view.tree, (n) => n.type === 'label' && /Hat abgesagt/.test(text(n)))[0]
+  nodes(check, (n) => n.type === 'input')[0].props.onChange({ target: { checked: true } })
+  view.render()
+  flat = text(view.tree)
+  assert.match(flat, /25\s+0\s+25/)
+  const done = button(view, 'Jetzt archivieren').props.onClick()
+  assert.equal(writes(s).length, 1)
+  assert.deepEqual(writes(s)[0].body, { without_points: [2] })
+  writes(s)[0].reject(new Error('offline'))
+  await done
+})
+
+test('archive review can be left with "Zurück" without sending anything', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' }, attendance: [recipientRow] })
+  await flush(view)
+  const opening = button(view, 'Archivieren').props.onClick()
+  s.requests.find((r) => r.url.endsWith('/archive-preview')).resolve([])
+  await opening
+  view.render()
+  button(view, 'Zurück').props.onClick()
+  view.render()
+  assert.ok(button(view, 'Archivieren'))
+  assert.equal(writes(s).length, 0)
 })

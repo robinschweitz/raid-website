@@ -23,6 +23,7 @@ var (
 	ErrConflict  = errors.New("roster changed or character already accepted")
 	ErrNotFound  = errors.New("signup reference not found")
 	ErrRaidState = errors.New("raid is no longer active")
+	ErrTooLate   = errors.New("raid has already started")
 )
 
 // Choice is a player's requested character and spec.
@@ -44,12 +45,23 @@ type Entry struct {
 	AttendanceID  int64  `json:"attendance_id"`
 }
 
+// Absence marks a player who announced not to attend. It never changes the roster.
+type Absence struct {
+	PlayerID  int64     `json:"player_id"`
+	Reason    string    `json:"reason"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// MaxAbsenceReason limits the optional free-text reason in characters.
+const MaxAbsenceReason = 200
+
 // Overview includes effective availability, evaluated against the server clock.
 type Overview struct {
 	IsEnabled  bool                `json:"is_enabled"`
 	IsOpen     bool                `json:"is_open"`
 	Entries    []Entry             `json:"entries"`
 	ClassSpecs map[string][]string `json:"class_specs"`
+	Absences   []Absence           `json:"absences"`
 }
 
 // Service coordinates signup changes and audited roster acceptance.
@@ -117,7 +129,7 @@ func (s *Service) Overview(ctx context.Context, raidID int64) (*Overview, error)
 		if err != nil {
 			return err
 		}
-		result = &Overview{IsEnabled: enabled, IsOpen: enabled && active(rd) && rd.ScheduledStart != nil && s.now().Before(*rd.ScheduledStart), Entries: []Entry{}, ClassSpecs: validation.ClassSpecs}
+		result = &Overview{IsEnabled: enabled, IsOpen: enabled && active(rd) && rd.ScheduledStart != nil && s.now().Before(*rd.ScheduledStart), Entries: []Entry{}, ClassSpecs: validation.ClassSpecs, Absences: []Absence{}}
 		for _, row := range rows {
 			c, err := r.characters.Get(ctx, row.CharacterID)
 			if err != nil {
@@ -134,6 +146,13 @@ func (s *Service) Overview(ctx context.Context, raidID int64) (*Overview, error)
 				}
 			}
 			result.Entries = append(result.Entries, entry)
+		}
+		abs, err := r.absences(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		for _, a := range abs {
+			result.Absences = append(result.Absences, Absence{PlayerID: a.PlayerID, Reason: a.Reason, CreatedAt: a.CreatedAt})
 		}
 		return nil
 	})
@@ -355,5 +374,93 @@ func (s *Service) Accept(ctx context.Context, raidID, id, actor, expectedAttenda
 			return err
 		}
 		return s.log(ctx, r, raidID, actor, "accept", current, after)
+	})
+}
+
+// absenceTarget authorizes declaring or revoking an absence. Players may only
+// change their own absence until the scheduled start; staff may change anyone's
+// while the raid is active.
+func (s *Service) absenceTarget(ctx context.Context, r *Repo, raidID, actor, target int64) error {
+	if target == 0 {
+		target = actor
+	}
+	if err := s.authorize(ctx, r, actor, validation.RoleMember); err != nil {
+		return err
+	}
+	rd, err := r.raids.Get(ctx, raidID)
+	if err != nil {
+		return reference(err)
+	}
+	if !active(rd) {
+		return ErrRaidState
+	}
+	p, err := r.players.Get(ctx, actor)
+	if err != nil {
+		return reference(err)
+	}
+	if target != actor {
+		if !p.Role.AtLeast(validation.RoleRaidassistent) {
+			return ErrForbidden
+		}
+		if _, err := r.players.Get(ctx, target); err != nil {
+			return reference(err)
+		}
+		return nil
+	}
+	if rd.ScheduledStart != nil && !s.now().Before(*rd.ScheduledStart) {
+		return ErrTooLate
+	}
+	return nil
+}
+
+// Decline records or updates an absence with an optional reason.
+func (s *Service) Decline(ctx context.Context, raidID, actor, target int64, reason string) error {
+	reason = strings.TrimSpace(reason)
+	if len([]rune(reason)) > MaxAbsenceReason {
+		return ErrInvalid
+	}
+	if target == 0 {
+		target = actor
+	}
+	return s.repo.transaction(ctx, func(r *Repo) error {
+		if err := s.absenceTarget(ctx, r, raidID, actor, target); err != nil {
+			return err
+		}
+		row := &absenceRow{RaidID: raidID, PlayerID: target, Reason: reason, CreatedAt: s.now()}
+		var before any
+		if existing, err := r.absence(ctx, raidID, target); err == nil {
+			before = existing
+			row.ID = existing.ID
+			row.CreatedAt = existing.CreatedAt
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if err := r.saveAbsence(ctx, row); err != nil {
+			return err
+		}
+		return s.log(ctx, r, raidID, actor, "absence_declare", before, row)
+	})
+}
+
+// Revoke removes an absence; it is idempotent.
+func (s *Service) Revoke(ctx context.Context, raidID, actor, target int64) error {
+	if target == 0 {
+		target = actor
+	}
+	return s.repo.transaction(ctx, func(r *Repo) error {
+		if err := s.absenceTarget(ctx, r, raidID, actor, target); err != nil {
+			return err
+		}
+		existing, err := r.absence(ctx, raidID, target)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := r.deleteAbsence(ctx, existing.ID); err != nil {
+			return err
+		}
+		return s.log(ctx, r, raidID, actor, "absence_revoke", existing, nil)
 	})
 }

@@ -1,11 +1,11 @@
-export const appVersion = '1.0.5'
+export const appVersion = '1.0.6'
 
 export const changelog = [
   {
     version: appVersion,
-    title: 'Oeffentliche Uebersicht',
+    title: 'Direkte Auswahl bei Teilnahme und Loot',
     changes: [
-      'Die Gildenuebersicht ist jetzt auch ohne Anmeldung sichtbar.',
+      'Charaktere und Loot können jetzt in einem gemeinsamen Eingabefeld gesucht und ausgewählt werden.',
     ],
   },
   {

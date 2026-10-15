@@ -16,7 +16,6 @@ import (
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	v1 "raid-website/internal/httpapi/v1"
-	"raid-website/internal/legacyimport"
 	"raid-website/internal/loot"
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
@@ -66,19 +65,6 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	}
 	registrationSvc := registration.NewService(db, players, chars, audits, authSvc, registrationFeed)
 
-	importsSvc := legacyimport.NewService(
-		legacyimport.NewRepo(db),
-		players,
-		chars,
-		raids,
-		att,
-		lootRepo,
-		points,
-		raidseries.NewRepo(db),
-		legacyimport.GoogleFetcher{},
-	)
-	importsSvc.WithExternalClient(registrationFeed)
-
 	if err := authSvc.BootstrapAdmin(context.Background(), opts.AdminUsername, opts.AdminPassword); err != nil {
 		return nil, fmt.Errorf("bootstrap admin: %w", err)
 	}
@@ -103,7 +89,6 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Audit:             audits,
 		Completion:        raidcompletion.NewService(raidcompletion.NewRepo(db)),
 		Corrections:       corrections,
-		Imports:           importsSvc,
 		Signups:           raidsignup.NewService(raidsignup.NewRepo(db)),
 		Registration:      registrationSvc,
 		AccountMerge:      accountmerge.NewService(accountmerge.NewRepo(db)),

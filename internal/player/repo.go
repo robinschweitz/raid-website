@@ -2,8 +2,11 @@ package player
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/uptrace/bun"
+
+	"raid-website/internal/validation"
 )
 
 type Repo struct {
@@ -45,6 +48,24 @@ func (r *Repo) FindByUsername(ctx context.Context, username string) (*Player, er
 	p := new(Player)
 	err := r.db.NewSelect().Model(p).Where("username = ?", username).Scan(ctx)
 	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// FindActiveAdmin returns a real account that can be used for server-initiated audits.
+func (r *Repo) FindActiveAdmin(ctx context.Context) (*Player, error) {
+	p := new(Player)
+	err := r.db.NewSelect().Model(p).
+		Where("role = ?", validation.RoleAdmin).
+		Where("active = ?", true).
+		OrderExpr("id ASC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, sql.ErrNoRows
+		}
 		return nil, err
 	}
 	return p, nil

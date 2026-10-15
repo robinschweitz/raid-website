@@ -206,35 +206,11 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Guild ranks and raid groups are configurable rows in the database, not hard-coded constants
   (ADR 009).
 
-### Legacy Google Sheet import
-- Source tabs: `Raid Archive`, `Loot Archive`, `Charaktere`, `Punkte`.
-  Current setup additionally reads `ICC25 Raidsetup` A–F (ADR 029): the first numbered
-  roster block, with explicit administrator-supplied schedule and leader. One source/sheet
-  bootstrap creates a PLANNED raid and series; repeat imports preserve that setup.
-  Sheet ID `1N5EgBixB1RNxZagK5d0ie_DMTcYmznpvW5UzuyEWgRU`; fetched as CSV via
-  `https://docs.google.com/spreadsheets/d/<id>/gviz/tq?tqx=out:csv&sheet=<escaped-name>`.
-- Sheet date format is German `DD.MM.YYYY`; raid IDs look like `ICC25-01`.
-- `Loot Archive`'s `Spieler` column contains character names, not player names (ADR 035).
-  Resolve the character's owner and persist the source character name on the loot award.
-  Loot alone never fabricates attendance; existing imports are not silently rewritten.
-- **Never overwrite existing data.** Import is dry-run first, merge only when explicitly requested,
-  and always returns a report (ADR 008).
-- Imports are de-duplicated by `raw_hash`: an identical source is skipped and the previous report is
-  returned instead of re-processing.
-- Parse problems are reported as warnings, not silent data loss.
-- The sheet's `Priority` is recorded as the award method: `Main` → `MAIN`, `Second`/`Token` →
-  `SECOND`, `Enhanced` → `ENHANCED`, `BoE` → `BOE`. Unknown or empty values become `SECOND` plus a
-  warning, never main-spec loot (ADR 028).
-- An imported armor token never blocks +10 EP, whatever priority the sheet recorded; the token
-  ledger still follows the item. An imported `ENHANCED` award counts as main-spec loot but costs 0
-  EP — no historical enhanced charge is ever recreated.
-- An imported loot boss is derived from the bundled catalog only when the item belongs to exactly one
-  boss; ambiguous or uncatalogued items stay unknown and are reported. Item names are never
-  rewritten.
-- The sheet raid key is the catalog context: `ICC25-01` → instance `631`, `raid_size` `25`, applied
-  only to raids this import creates.
-- Rising-Gods enrichment during import uses exact per-character lookup. This remains best-effort
-  metadata enrichment and never blocks historical imports (ADR 044).
+### Historical legacy import
+- Google Sheets import and synchronization were removed (ADR 066). Existing imported domain data
+  remains authoritative; no Google credentials, import endpoints, or runtime mappings exist.
+- A future exceptional historical import is an offline, one-time Python operation with an explicit
+  dry-run and report, never a recurring web feature.
 
 ### Core hardening decisions (ADR 017-020)
 - Only one matching active item lock may exist per raid. Competing locks are rejected;
@@ -247,18 +223,6 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Completed corrections append only the before/after EP eligibility difference. This preserves
   imported opening balances and never recreates historical raid rewards. Token visibility follows
   the corrected loot award; consumed locks are not implicitly revived.
-- Incremental loot imports use an optional permanent, unique `Import ID` source column.
-  Edited IDs, duplicate IDs, and ambiguous no-ID changes are conflicts, not overwrites.
-  A conflict rejects the entire merge with a report and no domain writes.
-- Import raid identity is scoped to source and sheet provenance. New rows in existing
-  imported raids require audited correction consequences and an explicit reason when archived; name
-  collisions without provenance and additions to cancelled raids are conflicts.
-  ADR 029 permits ADMIN import-only additions to provenance-mapped archived COMPLETED
-  raids, with actor/reason audit and append-only EP/token differences. ADR 032 also permits ordinary
-  archived corrections by raid staff with a reason. Imported historical raids are archived; archival
-  classification of older imports never re-awards EP or creates recurrence successors.
-- An error-free server-side preview must exist for the source, sheet, and raw hash before a
-  new merge. Preview metadata may be persisted; previews never write domain records.
 - Production requires explicit nondefault bootstrap credentials. Configuration, migrations,
   and bootstrap failures stop startup. SQLite foreign keys are enabled on every connection.
 

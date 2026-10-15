@@ -1,0 +1,2 @@
+-- The owner explicitly requested permanent removal of legacy Sheet synchronization metadata.
+-- Domain data remains intact, but this migration cannot restore deleted provenance.

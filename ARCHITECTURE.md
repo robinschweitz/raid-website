@@ -1,6 +1,6 @@
 # Architecture
 
-Modular monolith. Domains: players/characters, raids/attendance, loot, enhancepoints (ledger), roster (configurable ranks/groups), audit, legacyimport/export, httpapi (v1). Armor tokens are derived from loot awards. `raidcompletion` and `raidcorrection` coordinate cross-domain writes through repository-owned transactions.
+Modular monolith. Domains: players/characters, raids/attendance, loot, enhancepoints (ledger), roster (configurable ranks/groups), audit, httpapi (v1). Armor tokens are derived from loot awards. `raidcompletion` and `raidcorrection` coordinate cross-domain writes through repository-owned transactions.
 
 `raidseries` owns explicit recurring schedule configuration and local-calendar calculations.
 `raidsignup` owns future-raid signup availability, player-owned character/spec alternatives,
@@ -14,11 +14,6 @@ Frontend editors are rendered inside the selected record (ADR 032).
 `raidcorrection` also owns atomic raid quick-add: staff may create a character and optional
 credential-free player together with audited attendance. Persisted retry receipts prevent
 duplicate onboarding, and the frontend selects existing characters directly (ADR 037).
-
-`legacyimport` permits provenance-checked, audited additions to archived historical imports.
-It imports the first roster block in `ICC25 Raidsetup` A–F and uses explicit administrator
-schedule input to bootstrap one PLANNED raid and series. Source/sheet setup mappings and
-configuration-bound previews prevent duplicate bootstrap or silent replacement (ADR 029).
 
 `loot` records outside MAIN/SECOND/ENHANCED/BOE outcomes and coordinates linked enhanced
 EP costs; `raidcorrection` appends coupled compensation and audit snapshots. EP is a

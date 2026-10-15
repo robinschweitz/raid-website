@@ -14,7 +14,6 @@ import (
 	"raid-website/internal/auth"
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
-	"raid-website/internal/legacyimport"
 	"raid-website/internal/loot"
 	"raid-website/internal/player"
 	"raid-website/internal/poll"
@@ -49,7 +48,6 @@ type Deps struct {
 	Audit             *audit.Repo
 	Completion        *raidcompletion.Service
 	Corrections       *raidcorrection.Service
-	Imports           *legacyimport.Service
 	Signups           *raidsignup.Service
 	Registration      *registration.Service
 	AccountMerge      *accountmerge.Service
@@ -134,6 +132,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/raids/{id}/loot", RequireAuth(a.listLoot))
 	mux.HandleFunc("POST /api/v1/raids/{id}/loot", RequireRole(validation.RoleRaidassistent, a.createLoot))
 	mux.HandleFunc("PATCH /api/v1/raids/{id}/loot/{recordID}", RequireRole(validation.RoleRaidassistent, a.correctLoot))
+	mux.HandleFunc("POST /api/v1/raids/{id}/loot/{recordID}/withdraw", RequireRole(validation.RoleRaidassistent, a.withdrawLoot))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/points", RequireAuth(a.getPoints))
 	mux.HandleFunc("GET /api/v1/players/{id}/loot", RequireAuth(a.listPlayerLoot))
@@ -159,9 +158,6 @@ func (a *API) Register(mux *http.ServeMux) {
 
 	WishlistHandlers{Wishlist: wishlist.NewService(a.DB)}.Register(mux)
 
-	mux.HandleFunc("GET /api/v1/imports", RequireRole(validation.RoleAdmin, a.listImports))
-	mux.HandleFunc("POST /api/v1/imports/dry-run", RequireRole(validation.RoleAdmin, a.dryRunImport))
-	mux.HandleFunc("POST /api/v1/imports", RequireRole(validation.RoleAdmin, a.mergeImport))
 }
 
 func pathID(r *http.Request, name string) (int64, bool) {

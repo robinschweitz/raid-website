@@ -1,4 +1,4 @@
-export const appVersion = '1.0.3'
+export const appVersion = '1.0.5'
 
 export const changelog = [
   {
@@ -6,6 +6,20 @@ export const changelog = [
     title: 'Oeffentliche Uebersicht',
     changes: [
       'Die Gildenuebersicht ist jetzt auch ohne Anmeldung sichtbar.',
+    ],
+  },
+  {
+    version: '1.0.4',
+    title: 'Aufgeräumte Versionshinweise',
+    changes: [
+      'Nicht mehr verfügbare Google-Sheets-Funktionen wurden aus der Versionshistorie entfernt.',
+    ],
+  },
+  {
+    version: '1.0.3',
+    title: 'Google-Sheets-Synchronisierung entfernt',
+    changes: [
+      'Die Oberfläche für Google-Sheets-Import und -Synchronisierung wurde entfernt.',
     ],
   },
   {
@@ -30,7 +44,7 @@ export const changelog = [
     changes: [
       'Raids mit Aufstellung, Beute und Enhance-Points-Verarbeitung verwalten.',
       'Spieler, Charaktere, Umfragen und Raidserien in einer gemeinsamen Gildenverwaltung pflegen.',
-      'Historische Raids, Beute und Teilnahme nachvollziehen sowie Legacy-Daten importieren.',
+      'Historische Raids, Beute und Teilnahme nachvollziehen.',
     ],
   },
 ]

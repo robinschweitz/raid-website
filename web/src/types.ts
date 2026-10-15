@@ -399,55 +399,6 @@ export interface Vote {
   voted_at: string
 }
 
-export interface ImportCounts {
-	series?: number
-  players: number
-  characters: number
-  raids: number
-  attendance: number
-  loot: number
-  tokens: number
-  points: number
-}
-
-export interface ImportReport {
-	archived_raids?: number
-	setup?: { name: string; leader: string; scheduled_start: string; timezone: string; weekdays: number[]; interval_weeks: number; attendance: number; already_imported: boolean }
-  mode: string
-  source: string
-  raw_hash: string
-  rows_read: number
-  players: number
-  characters: number
-  raids: number
-  attendance: number
-  loot: number
-  tokens: number
-  points_entries: number
-  created: ImportCounts
-  skipped: boolean
-  warnings: string[] | null
-  errors: string[] | null
-}
-
-export interface ImportRecord {
-  id: number
-  actor_id: number
-  source: string
-  source_url: string
-  raw_hash: string
-  dry_run_report: string
-  status: string
-  warnings_count: number
-  errors_count: number
-  created_count: number
-  updated_count: number
-  unchanged_count: number
-  started_at: string | null
-  completed_at: string | null
-  notes: string
-}
-
 export type AwardMethod = 'MAIN' | 'SECOND' | 'ENHANCED' | 'BOE'
 
 export interface AddonInviteExport { text: string }

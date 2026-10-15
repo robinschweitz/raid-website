@@ -75,7 +75,7 @@ func (s *Service) AddNewCharacter(ctx context.Context, raidID, actor int64, inpu
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		if _, err := s.check(ctx, r, raidID, actor, input.Reason, false); err != nil {
+		if _, err := s.check(ctx, r, raidID, actor, input.Reason); err != nil {
 			return err
 		}
 		now := time.Now().UTC()

@@ -187,3 +187,32 @@ func (a *API) createLoot(w http.ResponseWriter, r *http.Request) {
 		"token_award": loot.IsTokenAward(award.ItemName),
 	})
 }
+
+type withdrawLootRequest struct {
+	Reason string `json:"reason"`
+}
+
+func (a *API) withdrawLoot(w http.ResponseWriter, r *http.Request) {
+	actor, _ := ActorID(r)
+	raidID, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid raid id")
+		return
+	}
+	id, ok := pathID(r, "recordID")
+	if !ok {
+		BadRequest(w, "invalid loot id")
+		return
+	}
+	var req withdrawLootRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	row, err := a.Corrections.WithdrawLoot(r.Context(), raidID, id, actor, req.Reason)
+	if err != nil {
+		writeCorrectionError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": row})
+}

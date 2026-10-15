@@ -39,7 +39,9 @@ and a real-data dashboard. No external artwork, fake progression, or new UI depe
   use Raid Archive's source values. Older missing snapshots are shown as unavailable,
   not guessed from current characters. Final archive requires a complete active roster.
 - Incremental Loot Archive rows should have a unique, permanent `Import ID` column.
-  Changed or ambiguous source rows produce a conflict report, never an overwrite.
+  For explicitly linked two-way raids, a changed ID row is an audited correction,
+  omission withdraws the award, and a reappearance restores it. Rows without an ID
+  remain conflict-only after the initial import.
 - EP is tracking-only: there is no website roll or standalone spend action. The shifted
   outside range is `1 + X` to `100 + X`, where `X = min(balance, 50)`. Only an enhanced
   loot winner pays, as part of staff recording that outside outcome.
@@ -119,13 +121,10 @@ endpoint is removed. Existing completed history never triggers new historical re
 or a recurrence chain. Migrations 004 and 005 preserve existing records without automatic
 awards or invented schedules.
 
-## Import API
+## Historical Imports
 
-Call `POST /api/v1/imports/dry-run` with `{"sheet_id":"..."}` first. Review the report,
-then call `POST /api/v1/imports` with `{"sheet_id":"...","raw_hash":"<preview hash>"}`.
-Include `"reason":"..."` when adding rows to an existing imported raid; these changes
-use the same audited correction and ledger rules as manual corrections.
-Both routes are Admin-only. A changed source requires a new preview; report errors prevent
-all domain writes. Identical replay returns the saved report without reprocessing.
+Google Sheets import and synchronization are not part of the running application. Existing
+historical data is local and authoritative. If an exceptional historical import is required,
+use a dedicated offline Python script with an explicit dry-run, report, and database backup.
 
 See ARCHITECTURE.md and docs/decisions/ for details.

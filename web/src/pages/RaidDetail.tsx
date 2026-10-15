@@ -541,6 +541,23 @@ function RaidDetail({ raidID }: Props) {
     })
   }
 
+	const withdrawLoot = async () => {
+		if (!lootEditing || !canWrite || (lootNeedsReason && !lootReason.trim())) return
+		await submit(async () => {
+			setError('')
+			try {
+				await api.post<LootAward>(`/api/v1/raids/${raidID}/loot/${lootEditing.id}/withdraw`, {
+					...(lootNeedsReason ? { reason: lootReason.trim() } : {}),
+				})
+				if (!isActive()) return
+				editLoot(null)
+				await load()
+			} catch (err) {
+				if (isActive()) setError(raidError(err, 'Loot konnte nicht zurückgezogen werden.'))
+			}
+		})
+	}
+
   if (!raid) {
     return (
       <div>
@@ -754,8 +771,9 @@ function RaidDetail({ raidID }: Props) {
               <label>Notizen<input disabled={pending} placeholder="Loot-Notizen" value={lootNotes} onChange={(e) => changeLoot(() => setLootNotes(e.target.value))} /></label>
               {lootNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Loot-Begründung" value={lootReason} onChange={(e) => changeLoot(() => setLootReason(e.target.value))} required /></label>}
               {lootEditing && error && <p className="error" role="alert">{error}</p>}
-              <button type="submit" disabled={pending || !lootItem.trim() || !hasLootRecipient || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : 'Vergeben'}</button>
-              {lootEditing && <button type="button" disabled={pending} onClick={() => editLoot(null)}>Bearbeitung abbrechen</button>}
+               <button type="submit" disabled={pending || !lootItem.trim() || !hasLootRecipient || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : 'Vergeben'}</button>
+				{lootEditing && <button type="button" disabled={pending || (lootNeedsReason && !lootReason.trim())} onClick={() => void withdrawLoot()}>Loot zurückziehen</button>}
+               {lootEditing && <button type="button" disabled={pending} onClick={() => editLoot(null)}>Bearbeitung abbrechen</button>}
             </form>
           </div>
         )}

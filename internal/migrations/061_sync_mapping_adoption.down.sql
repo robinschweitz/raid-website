@@ -1,0 +1,3 @@
+DROP TABLE legacy_sync_character_mappings;
+DROP TABLE legacy_sync_player_mappings;
+DROP TABLE legacy_sync_raid_mappings;

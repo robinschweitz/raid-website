@@ -405,7 +405,12 @@ label.inline-choice {
   border-radius: 999px;
   background: transparent;
   border-color: transparent;
-  color: var(--muted);
+  color: #c5d6e5;
+}
+
+.login-card .login-tabs button:not(.active) {
+  background: #1d3c50;
+  border-color: #3d6279;
 }
 
 .login-tabs button.active {
@@ -1814,4 +1819,22 @@ input[type='checkbox'] {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+.login-card button.primary-action {
+  color: #06111c;
+  background: linear-gradient(135deg, #7ad7ff, #d7f4ff);
+  border-color: #d7f4ff;
+  font-weight: 700;
+}
+
+.login-card button.primary-action:hover:not(:disabled) {
+  border-color: #fff;
+  box-shadow: 0 0 14px #7ad7ff55;
+}
+
+.login-card button.primary-action:disabled {
+  color: #9fb4c6;
+  background: #254d65;
+  border-color: #5989a3;
 }

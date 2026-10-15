@@ -92,7 +92,7 @@ function Layout() {
         </nav>
         <div className="sidebar-footer">
           <Link to="/changelog">Version {appVersion}</Link>
-          <span>Changelog ansehen</span>
+          <span>Änderungen ansehen</span>
         </div>
       </aside>
       <div className="main-shell">

@@ -1,8 +1,16 @@
-export const appVersion = '1.0.14'
+export const appVersion = '1.0.15'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Besser lesbare Anmeldung',
+    changes: [
+      'Anmeldeseite: Die Reiter „Code anfordern“ und „Registrieren“ sind besser lesbar, „Anmelden“ ist als Hauptaktion hervorgehoben.',
+      'Der Versionsverlauf heißt jetzt „Änderungsprotokoll“.',
+    ],
+  },
+  {
+    version: '1.0.14',
     title: 'Spielersuche und feinere Details',
     changes: [
       'Spielerliste: Suchfeld mit Trefferanzahl und natürliche Sortierung (Spieler2 vor Spieler10).',

@@ -5,7 +5,7 @@ export function ChangelogPage() {
     <div className="page-heading">
       <div>
         <p className="eyebrow">Versionsverlauf</p>
-        <h1>Changelog</h1>
+        <h1>Änderungsprotokoll</h1>
       </div>
     </div>
     {changelog.map((release) => <section className="card changelog-release" key={release.version}>

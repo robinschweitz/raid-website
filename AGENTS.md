@@ -291,7 +291,10 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Roles, ascending: `GUEST` < `MEMBER` < `RAIDASSISTENT` < `RAIDLEADER` < `ADMIN`, stored in
   `players.role`; higher roles include all powers of lower ones (`Role.AtLeast`).
 - Matrix:
-  - **Read** — any authenticated role: all `GET` endpoints.
+  - **Read** — any authenticated role: all `GET` endpoints except the public dashboard reads below.
+  - **Public dashboard** — visitors may call `GET /api/v1/raids`, `GET /api/v1/players`,
+    `GET /api/v1/polls`, and `GET /api/v1/raids/{id}/attendance` without a session. All other
+    reads require authentication; every mutation retains its existing authorization check (ADR 067).
   - **Config (`ADMIN`)** — create player; set account/credentials; create or update characters;
     guild ranks; raid groups; recurring raid series; list/import legacy data.
   - **Raid operations (`RAIDASSISTENT` and up, i.e. RA + RL)** — create raid; configure its

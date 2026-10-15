@@ -1,8 +1,15 @@
-export const appVersion = '1.0.2'
+export const appVersion = '1.0.3'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Oeffentliche Uebersicht',
+    changes: [
+      'Die Gildenuebersicht ist jetzt auch ohne Anmeldung sichtbar.',
+    ],
+  },
+  {
+    version: '1.0.2',
     title: 'Zusammenführungen',
     changes: [
       'Doppelte Charaktere und zusammengeführte Spielerkonten werden nach der Übertragung gelöscht.',

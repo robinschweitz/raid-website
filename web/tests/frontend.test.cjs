@@ -804,7 +804,7 @@ test('login has a synchronous guard and German network failure feedback', async 
   assert.equal(nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit' && text(n) === 'Anmelden')[0].props.disabled, false)
 })
 
-test('auth gate shows retry instead of login when session lookup fails', () => {
+test('auth gate shows retry when session lookup fails and dashboard for anonymous visitors', () => {
   const s = setup(null)
   s.auth.error = 'Sitzung konnte nicht geladen werden.'
   s.auth.loading = false
@@ -814,7 +814,7 @@ test('auth gate shows retry instead of login when session lookup fails', () => {
   assert.match(text(gate.tree), /Sitzung konnte nicht geladen/)
   s.auth.error = ''
   gate.render()
-  assert.equal(gate.tree.type.name, 'LoginPage')
+  assert.equal(gate.tree.type.name, 'Layout')
 })
 
 test('logout UI guards duplicates and handles network rejection without losing identity', async () => {

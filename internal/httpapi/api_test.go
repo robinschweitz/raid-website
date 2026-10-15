@@ -481,6 +481,47 @@ func TestMissingSessionRejected(t *testing.T) {
 	}
 }
 
+func TestPublicDashboardReads(t *testing.T) {
+	srv, bdb := setupServer(t)
+	client := srv.Client()
+	adminID := seedAccount(t, bdb, "admin", "admin-pw", validation.RoleAdmin)
+	token := login(t, client, srv, "admin", "admin-pw")
+
+	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/raids", token, map[string]any{"name": "ICC", "raid_leader_id": adminID})
+	if status != http.StatusCreated {
+		t.Fatalf("create raid: status %d body %s", status, body)
+	}
+	var raidOut struct {
+		Data struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &raidOut); err != nil {
+		t.Fatalf("decode raid: %v", err)
+	}
+	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/polls", token, map[string]any{"title": "Termin"})
+	if status != http.StatusCreated {
+		t.Fatalf("create poll: status %d body %s", status, body)
+	}
+
+	for _, path := range []string{
+		"/api/v1/raids",
+		"/api/v1/players",
+		"/api/v1/polls",
+		fmt.Sprintf("/api/v1/raids/%d/attendance", raidOut.Data.ID),
+	} {
+		status, body = do(t, client, http.MethodGet, srv.URL+path, "", nil)
+		if status != http.StatusOK {
+			t.Fatalf("anonymous GET %s: want 200 got %d body %s", path, status, body)
+		}
+	}
+
+	status, _ = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/points", srv.URL, adminID), "", nil)
+	if status != http.StatusUnauthorized {
+		t.Fatalf("anonymous points read: want 401 got %d", status)
+	}
+}
+
 func TestRoleEnforcement(t *testing.T) {
 	srv, bdb := setupServer(t)
 	client := srv.Client()

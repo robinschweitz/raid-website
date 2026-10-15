@@ -489,16 +489,19 @@ function RaidDetail({ raidID }: Props) {
         ++lootFormVersion.current
         ++lootEditorVersion.current
         ++catalogVersion.current
-        setCatalogBoss('')
+        // Neue Vergabe: Boss, Schwierigkeit und Dropliste bleiben für das nächste Item stehen.
+        if (lootEditing) {
+          setCatalogBoss('')
+          setCatalogItems([])
+          setCatalogDifficulty('')
+          setLootBoss('')
+        }
         setCatalogItem('')
         setCatalogSearch('')
-        setCatalogItems([])
-        setCatalogDifficulty('')
         if (catalogBosses.length) setCatalogStatus('')
         lootRequest.current = null
         setLootItem('')
         setLootItemID('')
-        setLootBoss('')
         setLootPlayer('')
         setLootEditing(null)
         setLootCharacter('')

@@ -22,3 +22,9 @@ short and have different heights, so their headings floated over partly hidden m
 
 The raid page remains dependency-free and the visual language is unchanged. Messages and filters
 are local UI state only; API payloads, authorization and raid history are unaffected.
+
+## Nachtrag: Boss und Schwierigkeit bleiben nach der Vergabe
+
+Nach einer neuen Loot-Vergabe bleiben Boss, Schwierigkeit und Dropliste gewählt; Item, Empfänger,
+Methode, Notizen und Grund werden zurückgesetzt. So lassen sich mehrere Items desselben Bosses
+hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetzt.

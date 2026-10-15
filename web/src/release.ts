@@ -1,8 +1,15 @@
-export const appVersion = '1.0.9'
+export const appVersion = '1.0.10'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Mehrere Items hintereinander vergeben',
+    changes: [
+      'Nach dem Vergeben bleiben Boss und Schwierigkeit ausgewählt, damit das nächste Item vom selben Boss direkt gewählt werden kann.',
+    ],
+  },
+  {
+    version: '1.0.9',
     title: 'Auswahl ohne interne IDs',
     changes: [
       'Charakter- und Item-Vorschläge zeigen nur noch Namen. Eine ID erscheint nur, wenn zwei Einträge sonst nicht zu unterscheiden wären.',

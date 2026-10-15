@@ -1979,6 +1979,35 @@ test('associated loot filters by persisted instance and size, preserves mixed so
   await retry
 })
 
+test('after recording catalog loot the boss and mode stay selected for the next item', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  const catalog = catalogFixture()
+  resolveRaid(s, 1, { raid: { catalog_instance_id: 'map:631', raid_size: 25 }, attendance: [recipientRow], catalog })
+  await flush(view)
+  resolveIf(s, '/api/v1/loot-catalog/bosses?instance_id=map%3A631', catalog.bosses.filter((boss) => boss.instance_id === 'map:631'))
+  await flush(view)
+  select(view, 'Loot-Boss').props.onChange(change('boss:1'))
+  view.render()
+  resolveIf(s, '/api/v1/loot-catalog/items?boss_id=boss%3A1&raid_size=25', itemDrops(catalog, 'boss:1', 25))
+  await flush(view)
+  select(view, 'Loot-Modus').props.onChange(change('HEROIC'))
+  view.render()
+  select(view, 'Loot-Item').props.onChange(change(nodes(suggestions(view, 'Loot-Item'), (n) => n.type === 'option' && n.props.value)[0].props.value))
+  select(view, 'Loot-Empfänger').props.onChange(change('20'))
+  view.render()
+  const submit = form(view, 1).props.onSubmit(event)
+  writes(s)[0].resolve({ id: 9 })
+  await flush(view)
+  resolveRaid(s, 1, { raid: { catalog_instance_id: 'map:631', raid_size: 25 }, attendance: [recipientRow], catalog })
+  await submit
+  await flush(view)
+  assert.equal(select(view, 'Loot-Boss').props.value, 'boss:1')
+  assert.equal(select(view, 'Loot-Modus').props.value, 'HEROIC')
+  assert.equal(select(view, 'Loot-Item').props.value, '')
+  assert.equal(select(view, 'Loot-Empfänger').props.value, '')
+})
+
 test('unsaved association is preview only; saved context invalidates old loot requests and handlers', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })

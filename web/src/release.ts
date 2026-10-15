@@ -1,8 +1,17 @@
-export const appVersion = '1.0.15'
+export const appVersion = '1.0.16'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Klarere Rechte für Mitglieder und Gäste',
+    changes: [
+      'Registrierungsanfragen: Wer kein Admin ist, sieht einen klaren Hinweis statt einer englischen Fehlermeldung.',
+      'Fehlende Berechtigungen und fehlende Anmeldung werden auf Deutsch gemeldet.',
+      'Gäste sehen in der Beute keine Wunschlisten-Schaltflächen mehr, die sie nicht nutzen dürfen.',
+    ],
+  },
+  {
+    version: '1.0.15',
     title: 'Besser lesbare Anmeldung',
     changes: [
       'Anmeldeseite: Die Reiter „Code anfordern“ und „Registrieren“ sind besser lesbar, „Anmelden“ ist als Hauptaktion hervorgehoben.',

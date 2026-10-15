@@ -1585,6 +1585,28 @@ for (const role of ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER']) {
   })
 }
 
+test('guard errors from the server are shown in German', async (t) => {
+  t.mock.method(global, 'fetch', async () => ({ status: 403, ok: false, text: async () => JSON.stringify({ error: { code: 'forbidden', message: 'insufficient permissions' } }) }))
+  const { api } = setup().load('api.ts')
+  await assert.rejects(() => api.get('/api/v1/registration-requests'), (err) => err.code === 'forbidden' && /Berechtigung/.test(err.message))
+})
+
+test('registration requests tell non-admins the area is admin-only and load nothing', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const view = s.mount(s.load('pages/RegistrationRequests.tsx').RegistrationRequestsPage)
+  await flush(view)
+  assert.match(text(view.tree), /nur für Admins/)
+  assert.equal(s.requests.some((r) => r.url.includes('registration-requests')), false)
+})
+
+test('guests get no wishlist controls and no wishlist reads in the catalog', async () => {
+  const s = setup({ id: 4, role: 'GUEST' })
+  const view = s.mount(s.load('pages/LootCatalog.tsx').LootCatalogPage)
+  await flush(view)
+  assert.equal(s.requests.some((r) => /players\/4\/characters|wishlist/.test(r.url)), false)
+  assert.doesNotMatch(text(view.tree), /Wunschliste/)
+})
+
 test('fetch wrapper keeps archive sibling fields and sends session credentials', async (t) => {
   const envelope = { data: raid(1), next_raid: raid(2) }
   const calls = []

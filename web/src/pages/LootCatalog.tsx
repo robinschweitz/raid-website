@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../api'
-import { catalogModeLabels, type CatalogItemDrop, type LootCatalog, type Character, type WishlistWish } from '../types'
+import { atLeast, catalogModeLabels, type CatalogItemDrop, type LootCatalog, type Character, type WishlistWish } from '../types'
 import { matchesCatalogItem } from '../catalog'
 import { useSubmission } from '../useSubmission'
 import { useAuth } from '../auth'
@@ -165,7 +165,7 @@ export function LootCatalogPage() {
   }, [isActive])
   useEffect(() => { void load() }, [load])
   useEffect(() => {
-    if (!me) { setOwnChars([]); setCharWishes({}); return; }
+    if (!me || !atLeast(me.role, 'MEMBER')) { setOwnChars([]); setCharWishes({}); return; }
     api.get<Character[]>(`/api/v1/players/${me.id}/characters`).catch(() => []).then(async (chars) => {
       const nextChars = chars ?? []
       setOwnChars(nextChars)
@@ -254,7 +254,7 @@ export function LootCatalogPage() {
             </div>}
             {localizedTooltipLines(item).length > 0 && <ul className="catalog-effects">{localizedTooltipLines(item).map((line) => <li key={line}>{line}</li>)}</ul>}
           </div>
-          {me && ownChars.length > 0 && <div className="catalog-wishlist"><strong>Wunschliste</strong><div>
+          {me && atLeast(me.role, 'MEMBER') && ownChars.length > 0 && <div className="catalog-wishlist"><strong>Wunschliste</strong><div>
             {ownChars.map((char) => {
               const wished = charWishes[char.id]?.has(item.item_id) ?? false
               const disabled = pendingWish === `${char.id}:${item.item_id}`

@@ -51,3 +51,10 @@ hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetz
 - Absagen, Archivieren und Loot zurückziehen verlangen eine Bestätigung (`window.confirm`, wie beim
   Zusammenführen von Konten); ein abgelehnter Dialog sendet nichts.
 - Sichtbare Beschriftungen sind durchgehend deutsch mit Umlauten; das Status-Diagramm hat eine Legende.
+
+## Nachtrag: Rollenprüfung in der Oberfläche
+
+- Registrierungsanfragen zeigen Nicht-Admins einen Hinweis und laden nichts nach.
+- Die Autorisierungs-Meldungen des Servers (`insufficient permissions`, `login required`) werden im
+  Frontend auf Deutsch dargestellt; die API-Codes bleiben unverändert.
+- Wunschlisten-Schaltflächen erscheinen erst ab der Rolle MEMBER, passend zur Server-Prüfung.

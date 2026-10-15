@@ -1,8 +1,18 @@
-export const appVersion = '1.0.16'
+export const appVersion = '1.0.17'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Übersichtlichere Raidanmeldung',
+    changes: [
+      'Anmeldung: Checkbox und Charaktername stehen in einer Zeile, „Ausgewählte Charaktere anmelden“ und „In Aufstellung übernehmen“ sind als Hauptaktionen hervorgehoben.',
+      'Ein Hinweis erklärt, dass mindestens ein Charakter angekreuzt werden muss. Ohne eigene Charaktere gibt es keine nutzlose Schaltfläche mehr.',
+      'Bestätigungen („Anmeldungen geöffnet.“) sind wie im Rest der Seite gestaltet und schließen sich nach einigen Sekunden.',
+      'Wunschliste: Wer einen eigenen Charakter hat, kann dessen leere Wunschliste wieder lesen.',
+    ],
+  },
+  {
+    version: '1.0.16',
     title: 'Klarere Rechte für Mitglieder und Gäste',
     changes: [
       'Registrierungsanfragen: Wer kein Admin ist, sieht einen klaren Hinweis statt einer englischen Fehlermeldung.',

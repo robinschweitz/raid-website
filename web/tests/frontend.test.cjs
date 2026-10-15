@@ -240,6 +240,33 @@ test('raid signups submit several own characters and guard duplicate submissions
   view.unmount()
 })
 
+test('signup form hints at the missing choice and hides the button without own characters', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: { Magier: ['Feuer', 'Frost'] }, entries: [] })
+  resolveIf(s, '/api/v1/players/2/characters', [{ id: 11, player_id: 2, name: 'Neuling', class: 'Magier', main_spec: 'Feuer', active: true }])
+  await flush(view)
+  assert.match(text(view.tree), /Mindestens einen Charakter ankreuzen/)
+  assert.equal(button(view, 'Ausgewählte Charaktere anmelden').props.disabled, true)
+  const box = nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')[0]
+  box.props.onChange({ target: { checked: true } })
+  view.render()
+  assert.doesNotMatch(text(view.tree), /Mindestens einen Charakter ankreuzen/)
+  assert.equal(button(view, 'Ausgewählte Charaktere anmelden').props.disabled, false)
+})
+
+test('signup form without own characters offers no submit button', async () => {
+  const s = setup({ id: 3, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [] })
+  resolveIf(s, '/api/v1/players/3/characters', [])
+  await flush(view)
+  assert.match(text(view.tree), /noch keine Charaktere zugeordnet/)
+  assert.equal(button(view, 'Ausgewählte Charaktere anmelden'), undefined)
+})
+
 test('raid assistants explicitly confirm alternative switches after signup closure', async () => {
   const s = setup({ id: 1, role: 'RAIDASSISTENT' })
   const { RaidSignups } = s.load('components/RaidSignups.tsx')

@@ -346,3 +346,6 @@
   .character-facts dl > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .setup-member-info > .setup-edit { min-height: 42px; width: 42px; right: 0; top: 4px; }
 }
+
+.secondary-page label.check input[type='checkbox'] { width: auto; flex: 0 0 auto; }
+.secondary-page .subcard > label.check { font-weight: 700; }

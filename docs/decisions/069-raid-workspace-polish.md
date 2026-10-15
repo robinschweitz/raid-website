@@ -58,3 +58,10 @@ hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetz
 - Die Autorisierungs-Meldungen des Servers (`insufficient permissions`, `login required`) werden im
   Frontend auf Deutsch dargestellt; die API-Codes bleiben unverändert.
 - Wunschlisten-Schaltflächen erscheinen erst ab der Rolle MEMBER, passend zur Server-Prüfung.
+
+## Nachtrag: Raidanmeldung und Wunschliste
+
+- Die Anmeldung zeigt Checkbox und Charakter in einer Zeile, hebt die Hauptaktionen hervor und erklärt, was zum
+  Absenden fehlt. Bestätigungen nutzen dieselbe schließbare Meldung wie der Rest der Raidseite.
+- Wunschliste lesen: Nicht-Staff darf die Wunschliste eigener Charaktere lesen, auch wenn sie leer ist. Die
+  Berechtigung folgt dem Besitzer des Charakters, nicht dem Listeninhalt. Unbekannte Charaktere liefern 404.

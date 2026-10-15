@@ -51,6 +51,12 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
   }, [load, raid.scheduled_start, raid.status, isActive])
 
   useEffect(() => {
+    if (!message) return undefined
+    const timer = setTimeout(() => setMessage(''), 8000)
+    return () => clearTimeout(timer)
+  }, [message])
+
+  useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [])
@@ -92,7 +98,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
     <h2>Anmeldungen</h2>
     <p className="muted">Melde einen oder mehrere eigene Charaktere mit deinem gewünschten Spec an. Die Raidleitung übernimmt einen Charakter pro Spieler in die Aufstellung.</p>
     {error && <p className="error" role="alert">{error}</p>}
-    {message && <p role="status">{message}</p>}
+    {message && <p className="success-message" role="status"><span>{message}</span><button type="button" aria-label="Meldung schließen" onClick={() => setMessage('')}>Schließen</button></p>}
     {pending && <p role="status">Wird gespeichert…</p>}
     <button type="button" disabled={pending} onClick={() => { void submit(async () => {
       try { await load(); await onRosterChange(); if (isActive()) setError('') }
@@ -117,7 +123,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
           const selected = character.id in choices
           const defaultSpec = specs.includes(entry?.spec ?? '') ? entry!.spec : specs.includes(character.main_spec) ? character.main_spec : specs[0] ?? ''
           return <div className="subcard" key={character.id}>
-            <label className={characterClassName(character.class)}>
+            <label className={`check ${characterClassName(character.class)}`}>
               <input type="checkbox" checked={selected} disabled={pending || accepted || !specs.length} onChange={(event) => {
                 const checked = event.target.checked
                 setChoices((previous) => {
@@ -135,7 +141,10 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
             </label>
           </div>
         })}
-        <button disabled={pending || !Object.keys(choices).length}>Ausgewählte Charaktere anmelden</button>
+        {characters.length > 0 && <>
+          {!Object.keys(choices).length && !pending && <p className="field-hint">Mindestens einen Charakter ankreuzen.</p>}
+          <button className="primary-action" disabled={pending || !Object.keys(choices).length}>Ausgewählte Charaktere anmelden</button>
+        </>}
       </form>}
       <h3>Charakteroptionen nach Spieler</h3>
       {!overview.entries.some((entry) => !entry.is_withdrawn) && <p className="muted">Noch keine Anmeldungen.</p>}
@@ -146,7 +155,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
           {isOpen && canSignup && playerID === player?.id && !entry.is_accepted && <button type="button" disabled={pending} onClick={() => {
             void mutate(() => api.post(`${base}/${entry.id}/withdraw`), 'Anmeldung zurückgezogen.')
           }}>Zurückziehen</button>}
-          {canManage && isActiveRaid && !entry.is_accepted && <button type="button" disabled={pending} onClick={() => {
+          {canManage && isActiveRaid && !entry.is_accepted && <button type="button" className="primary-action" disabled={pending} onClick={() => {
             if (entry.attendance_id) setSwitchEntry(entry)
             else accept(entry)
           }}>{entry.attendance_id ? 'Auf diesen Charakter wechseln' : 'In Aufstellung übernehmen'}</button>}

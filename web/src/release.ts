@@ -1,11 +1,11 @@
-export const appVersion = '1.0.6'
+export const appVersion = '1.0.7'
 
 export const changelog = [
   {
     version: appVersion,
-    title: 'Direkte Auswahl bei Teilnahme und Loot',
+    title: 'Raidgesuchtext im Workspace',
     changes: [
-      'Charaktere und Loot können jetzt in einem gemeinsamen Eingabefeld gesucht und ausgewählt werden.',
+      'Der Gesuchtext mit Soll-Besetzung ist direkt beim jeweiligen aktiven Raid erreichbar.',
     ],
   },
   {

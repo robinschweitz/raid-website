@@ -15,6 +15,7 @@ import { RaidQuickAdd } from '../components/RaidQuickAdd'
 import { AddonInviteExport } from '../components/AddonInviteExport'
 import { AddonLootImport } from '../components/AddonLootImport'
 import { AddonRosterImport } from '../components/AddonRosterImport'
+import { RaidRecruitment } from './Recruitment'
 
 interface Props {
   raidID: number
@@ -91,7 +92,7 @@ function RaidDetail({ raidID }: Props) {
   const catalogVersion = useRef(0)
   const associationVersion = useRef(0)
   const persistedCatalogContext = useRef('')
-  const [view, setView] = useState<'roster' | 'loot' | 'planning' | 'signups'>('roster')
+  const [view, setView] = useState<'roster' | 'loot' | 'planning' | 'signups' | 'recruitment'>('roster')
   const { player: me } = useAuth()
   const [raid, setRaid] = useState<Raid | null>(null)
   const [attendance, setAttendance] = useState<Attendance[]>([])
@@ -600,9 +601,11 @@ function RaidDetail({ raidID }: Props) {
         <button type="button" aria-pressed={view === 'signups'} aria-controls="raid-signups" onClick={() => setView('signups')}>Anmeldungen</button>
         <button type="button" aria-pressed={view === 'roster'} aria-controls="raid-roster" onClick={() => setView('roster')}>Aufstellung ({attendance.length})</button>
         <button type="button" aria-pressed={view === 'loot'} aria-controls="raid-loot" onClick={() => setView('loot')}>Loot ({loot.length})</button>
+        {isActiveRaid && <button type="button" aria-pressed={view === 'recruitment'} aria-controls="raid-recruitment" onClick={() => setView('recruitment')}>Gesuchtext</button>}
         <button type="button" aria-pressed={view === 'planning'} aria-controls="raid-planning" onClick={() => setView('planning')}>Planung & Details</button>
       </nav>
       {view === 'signups' && <div id="raid-signups"><RaidSignups raid={raid} attendance={attendance} players={players} onRosterChange={load} /></div>}
+      {isActiveRaid && <section id="raid-recruitment" hidden={view !== 'recruitment'} className="raid-recruitment" aria-label="Raidgesuchtext">{view === 'recruitment' && <RaidRecruitment raidID={raidID} attendance={attendance} onRefresh={load} />}</section>}
       <section id="raid-planning" hidden={view !== 'planning'} className="card raid-summary" aria-label="Raidübersicht">
       <h2>Übersicht</h2>
       {raid.archived_at && <p className="muted">Archivierte Historie: Änderungen erfordern eine Begründung und werden protokolliert.</p>}

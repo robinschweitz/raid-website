@@ -114,6 +114,20 @@
   background: linear-gradient(0deg, #21486199, transparent);
 }
 
+.raid-recruitment { min-width: 0; }
+.raid-recruitment > div > .muted { max-width: 860px; }
+.recruitment-setup { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0 20px; }
+.recruitment-group { min-width: 0; border: 1px solid #31536a; border-top: 2px solid #77cce9; border-radius: 5px; background: linear-gradient(160deg, #10273a, #071521); overflow: hidden; }
+.recruitment-group > header { padding: 9px 12px; border-bottom: 1px solid #28485e; color: #c7efff; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.recruitment-slots { display: grid; }
+.recruitment-slot { display: grid; gap: 5px; padding: 9px 10px; border-bottom: 1px solid #233e5066; }
+.recruitment-slot:last-child { border-bottom: 0; }
+.recruitment-slot label { min-width: 0; font-size: 11px; }
+.recruitment-slot select { width: 100%; min-height: 36px; }
+.recruitment-slot .badge { justify-self: start; white-space: nowrap; }
+.recruitment-missing { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 24px; margin-bottom: 0; padding-left: 20px; }
+.raid-recruitment textarea { display: block; width: min(100%, 760px); }
+
 .raid-detail .raid-banner { min-height: 200px; margin-bottom: 16px; }
 .raid-detail .raid-banner-content { max-width: none; padding: 28px; }
 .raid-detail .raid-banner::after { background: linear-gradient(90deg, #081724f5, #08172470); }
@@ -310,6 +324,8 @@
   .raid-detail .raid-banner-content { padding: 20px; }
   .secondary-page .page-heading { padding: 16px; }
   .secondary-page .inline-form > label { flex-basis: 100%; }
+  .recruitment-setup { grid-template-columns: minmax(0, 1fr); }
+  .recruitment-missing { grid-template-columns: minmax(0, 1fr); }
   .secondary-page .loot-boss-heading { align-items: flex-start; flex-direction: column; }
   .character-profile-page .character-hero { align-items: flex-start; flex-direction: column; }
   .character-facts dl > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }

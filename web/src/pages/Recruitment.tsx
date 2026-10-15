@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react'
-import { api, ApiError } from '../api'
-import type { Attendance, Raid } from '../types'
+import type { Attendance } from '../types'
 import { defaultRecruitmentTemplate, recruitmentRoles, renderRecruitmentText } from '../recruitmentText'
 import { iccIdealSetup, matchRaidSetup, setupOptions, type RaidSetup } from '../raidSetup'
+
+interface Props {
+  raidID: number
+  attendance: Attendance[]
+  onRefresh: () => Promise<void>
+}
 
 interface StoredTemplate { text: string; setup: RaidSetup }
 const defaultSetup = () => iccIdealSetup.map((group) => [...group])
@@ -24,46 +29,24 @@ function loadTemplate(raidID: number): StoredTemplate {
   }
 }
 
-export function RecruitmentPage() {
-  const [raids, setRaids] = useState<Raid[]>([])
-  const [raidID, setRaidID] = useState(0)
-  const [attendance, setAttendance] = useState<Attendance[]>([])
+export function RaidRecruitment({ raidID, attendance, onRefresh }: Props) {
   const [template, setTemplate] = useState<StoredTemplate>({ text: defaultRecruitmentTemplate, setup: defaultSetup() })
   const [error, setError] = useState('')
   const [copyStatus, setCopyStatus] = useState('')
 
   useEffect(() => {
-    let active = true
-    api.get<Raid[]>('/api/v1/raids?include_archived=false').then((rows) => {
-      if (!active) return
-      const current = rows.filter((raid) => !raid.archived_at && (raid.status === 'OPEN' || raid.status === 'PLANNED'))
-      setRaids(current)
-      setRaidID((previous) => current.some((raid) => raid.id === previous) ? previous : (current[0]?.id ?? 0))
-    }).catch((err) => { if (active) setError(err instanceof ApiError ? err.message : 'Raids konnten nicht geladen werden.') })
-    return () => { active = false }
-  }, [])
-
-  useEffect(() => {
-    setTemplate(raidID ? loadTemplate(raidID) : { text: defaultRecruitmentTemplate, setup: defaultSetup() })
+    setTemplate(loadTemplate(raidID))
     setCopyStatus('')
   }, [raidID])
 
   useEffect(() => {
-    if (!raidID) return
-    let active = true
-    const refresh = () => api.get<Attendance[]>(`/api/v1/raids/${raidID}/attendance`)
-      .then((rows) => { if (active) { setAttendance(rows); setError('') } })
-      .catch((err) => { if (active) setError(err instanceof ApiError ? err.message : 'Aufstellung konnte nicht geladen werden.') })
-    setAttendance([])
-    void refresh()
-    const timer = window.setInterval(() => { void refresh() }, 15000)
-    return () => { active = false; window.clearInterval(timer) }
-  }, [raidID])
+    const timer = window.setInterval(() => { void onRefresh() }, 15000)
+    return () => window.clearInterval(timer)
+  }, [onRefresh])
 
   const updateTemplate = (next: StoredTemplate) => {
     setTemplate(next)
     setCopyStatus('')
-    if (!raidID) return
     try {
       window.localStorage.setItem(storageKey(raidID), JSON.stringify(next))
     } catch {
@@ -83,48 +66,44 @@ export function RecruitmentPage() {
   }
 
   return <div>
-    <div className="page-heading"><div><p className="eyebrow">Raidplanung</p><h1>Gesuchtext</h1></div></div>
     <p className="muted">Die Zahlen werden aus der gespeicherten Raidaufstellung berechnet und alle 15 Sekunden aktualisiert. Ersatzbank-Spieler zählen nicht als besetzte Plätze.</p>
     <p className="muted">Vorlage und Soll-Besetzung werden pro Raid in diesem Browser gespeichert, nicht auf dem Server.</p>
     {error && <p className="error" role="alert">{error}</p>}
     <section className="card">
       <h2>Raid und Soll-Besetzung</h2>
-      <label htmlFor="recruitment-raid">Raid</label>
-      <select id="recruitment-raid" value={raidID} onChange={(event) => setRaidID(Number(event.target.value))}>
-        {raids.length === 0 && <option value={0}>Keine aktiven Raids</option>}
-        {raids.map((raid) => <option key={raid.id} value={raid.id}>{raid.name}</option>)}
-      </select>
       <p className="muted">Das ICC-Idealsetup ist vorbelegt. Jede Gruppe hat fünf Positionen; „Leer“ deaktiviert einen Platz. Jeder aufgestellte Charakter kann nur einen Platz erfüllen.</p>
       <div className="actions">
-        <button type="button" disabled={!raidID} onClick={() => updateTemplate({ ...template, setup: defaultSetup() })}>ICC-Idealsetup laden</button>
-        <button type="button" disabled={!raidID} onClick={() => updateTemplate({ ...template, setup: Array.from({ length: 5 }, () => Array(5).fill('Leer')) })}>Setup leeren</button>
+        <button type="button" onClick={() => updateTemplate({ ...template, setup: defaultSetup() })}>ICC-Idealsetup laden</button>
+        <button type="button" onClick={() => updateTemplate({ ...template, setup: Array.from({ length: 5 }, () => Array(5).fill('Leer')) })}>Setup leeren</button>
       </div>
-      <div className="table-scroll"><table className="table">
-        <thead><tr>{template.setup.map((_, index) => <th key={index}>Gruppe {index + 1}</th>)}</tr></thead>
-        <tbody>{Array.from({ length: 5 }, (_, row) => <tr key={row}>
-          {template.setup.map((group, column) => {
+      <div className="recruitment-setup" aria-label="Soll-Besetzung">
+        {template.setup.map((group, column) => <section className="recruitment-group" key={column}>
+          <header>Gruppe {column + 1}</header>
+          <div className="recruitment-slots">{group.map((slot, row) => {
             const slotIndex = column * 5 + row
-            return <td key={column}>
-              <select aria-label={`Gruppe ${column + 1}, Platz ${row + 1}`} value={group[row]} disabled={!raidID}
-                onChange={(event) => updateTemplate({ ...template, setup: template.setup.map((oldGroup, index) => index === column ? oldGroup.map((value, position) => position === row ? event.target.value : value) : [...oldGroup]) })}>
-                {setupOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-              {group[row] !== 'Leer' && <span className={matchedIndices.has(slotIndex) ? 'badge ok' : 'badge'}>{matchedIndices.has(slotIndex) ? 'Besetzt' : 'Gesucht'}</span>}
-            </td>
-          })}
-        </tr>)}</tbody>
-      </table></div>
+            return <div className="recruitment-slot" key={row}>
+              <label>Platz {row + 1}
+                <select aria-label={`Gruppe ${column + 1}, Platz ${row + 1}`} value={slot}
+                  onChange={(event) => updateTemplate({ ...template, setup: template.setup.map((oldGroup, index) => index === column ? oldGroup.map((value, position) => position === row ? event.target.value : value) : [...oldGroup]) })}>
+                  {setupOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </label>
+              {slot !== 'Leer' && <span className={matchedIndices.has(slotIndex) ? 'badge ok' : 'badge'}>{matchedIndices.has(slotIndex) ? 'Besetzt' : 'Gesucht'}</span>}
+            </div>
+          })}</div>
+        </section>)}
+      </div>
       <h3>Noch gesuchte Positionen</h3>
-      {missingSlots.length ? <ul>{missingSlots.map((slot) => <li key={slot.index}>Gruppe {Math.floor(slot.index / 5) + 1}: {slot.label}</li>)}</ul> : <p>Alle geplanten Positionen sind besetzt.</p>}
+      {missingSlots.length ? <ul className="recruitment-missing">{missingSlots.map((slot) => <li key={slot.index}>Gruppe {Math.floor(slot.index / 5) + 1}: {slot.label}</li>)}</ul> : <p>Alle geplanten Positionen sind besetzt.</p>}
     </section>
     <section className="card">
       <h2>Textvorlage</h2>
       <p className="muted">Platzhalter: {recruitmentRoles.map((role) => role.token).join(', ')} und {'{{SETUP}}'} für die konkret gesuchten Positionen. Alle anderen Wörter bleiben unverändert.</p>
-      <textarea aria-label="Gesuchtext-Vorlage" rows={5} value={template.text} disabled={!raidID}
+      <textarea aria-label="Gesuchtext-Vorlage" rows={5} value={template.text}
         onChange={(event) => updateTemplate({ ...template, text: event.target.value })} />
       <h3>Aktueller Text zum Kopieren</h3>
       <textarea aria-label="Fertiger Gesuchtext" readOnly rows={5} value={preview} />
-      <div className="actions"><button type="button" disabled={!raidID || !!error} onClick={() => void copyText()}>Text kopieren</button><span role="status">{copyStatus}</span></div>
+      <div className="actions"><button type="button" disabled={!!error} onClick={() => void copyText()}>Text kopieren</button><span role="status">{copyStatus}</span></div>
     </section>
   </div>
 }

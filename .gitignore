@@ -54,3 +54,8 @@ Thumbs.db
 logs/
 *.log
 .cache
+
+# Local SQLite databases
+*.db
+*.db-shm
+*.db-wal

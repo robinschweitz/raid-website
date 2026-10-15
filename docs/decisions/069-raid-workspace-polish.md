@@ -88,3 +88,12 @@ hintereinander erfassen. Nach einer Korrektur wird weiterhin alles zurückgesetz
   ändert nichts und nutzt dieselben Regeln wie das Archivieren.
 - „Archivieren“ öffnet bei aktiven Raids immer zuerst diese Übersicht (Aktuell / Neu / Danach / Hinweis). Die
   Ausnahme für Abgesagte (`without_points`) wird dort pro Zeile gesetzt; die Anzeige rechnet live mit.
+
+## Nachtrag: Standard bei Absagen und Ersatzbank
+
+- Im Archiv-Dialog gilt für abgesagte Spieler in der Aufstellung jetzt standardmäßig „keine EP“; ein Haken
+  („trotzdem EP geben“) hebt das auf. Die API bleibt unverändert: `without_points` listet die Spieler ohne EP,
+  die Oberfläche füllt es mit allen Abgesagten ohne Haken.
+- „Auf die Bank setzen“ in der Aufstellung nutzt die vorhandene Korrektur (`PATCH …/attendance/{id}` mit
+  `is_bench: true`) und ist nur bei aktiven Raids sichtbar. Die Bank erhält weiterhin EP; wer keine EP bekommen
+  soll, wird im Archiv-Dialog abgewählt. Es gibt weiterhin kein Löschen von Teilnahmen.

@@ -2934,7 +2934,7 @@ test('roster rows of players who declined carry a badge and reason', () => {
   assert.match(flat, /Grund:\s+Krank/)
 })
 
-test('archive review shows who gets which EP, who gets none because of loot, and lets staff exclude declined players', async () => {
+test('archive review shows who gets which EP, who gets none because of loot, and declined players get no EP unless staff ticks them', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, {
@@ -2953,12 +2953,15 @@ test('archive review shows who gets which EP, who gets none because of loot, and
   assert.equal(s.confirms.length, 0)
   let flat = text(view.tree)
   assert.match(flat, /Keine EP: Main-Spec-Loot \(Schwert\)/)
-  assert.match(flat, /25\s+\+10\s+35/)
-  const check = nodes(view.tree, (n) => n.type === 'label' && /Hat abgesagt/.test(text(n)))[0]
+  assert.match(flat, /25\s+0\s+25/, 'declined players get no EP by default')
+  assert.match(flat, /trotzdem EP geben/)
+  const check = nodes(view.tree, (n) => n.type === 'label' && /trotzdem EP geben/.test(text(n)))[0]
   nodes(check, (n) => n.type === 'input')[0].props.onChange({ target: { checked: true } })
   view.render()
   flat = text(view.tree)
-  assert.match(flat, /25\s+0\s+25/)
+  assert.match(flat, /25\s+\+10\s+35/)
+  nodes(nodes(view.tree, (n) => n.type === 'label' && /trotzdem EP geben/.test(text(n)))[0], (n) => n.type === 'input')[0].props.onChange({ target: { checked: false } })
+  view.render()
   const done = button(view, 'Jetzt archivieren').props.onClick()
   assert.equal(writes(s).length, 1)
   assert.deepEqual(writes(s)[0].body, { without_points: [2] })
@@ -2979,4 +2982,19 @@ test('archive review can be left with "Zurück" without sending anything', async
   view.render()
   assert.ok(button(view, 'Archivieren'))
   assert.equal(writes(s).length, 0)
+})
+
+test('staff can bench a declined player straight from the roster', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' }, attendance: [recipientRow, { ...recipientRow, id: 10, player_id: 1 }], absences: [{ player_id: 2, reason: '', created_at: '2026-10-01T00:00:00Z' }] })
+  await flush(view)
+  const buttons = nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Auf die Bank setzen')
+  assert.equal(buttons.length, 1, 'only the declined player offers it')
+  const done = buttons[0].props.onClick()
+  assert.equal(writes(s)[0].method, 'patch')
+  assert.equal(writes(s)[0].url, '/api/v1/raids/1/attendance/9')
+  assert.deepEqual(writes(s)[0].body, { is_bench: true })
+  writes(s)[0].reject(new Error('offline'))
+  await done
 })

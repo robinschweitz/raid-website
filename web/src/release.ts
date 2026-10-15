@@ -1,6 +1,14 @@
-export const appVersion = '1.0.7'
+export const appVersion = '1.0.9'
 
 export const changelog = [
+  {
+    version: appVersion,
+    title: 'Absagen: keine EP als Standard, Ersatzbank',
+    changes: [
+      'Beim Archivieren erhalten abgesagte Spieler standardmäßig keine EP. Mit einem Haken („trotzdem EP geben“) bekommen sie die +10 EP doch.',
+      'In der Aufstellung gibt es bei Abgesagten die Schaltfläche „Auf die Bank setzen“.',
+    ],
+  },
   {
     version: appVersion,
     title: 'Komfortablere Raidverwaltung, Absagen und EP-Übersicht',

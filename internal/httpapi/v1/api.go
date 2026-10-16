@@ -91,6 +91,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/registration-requests/{id}/reject", RequireRole(validation.RoleAdmin, a.rejectRegistrationRequest))
 	mux.HandleFunc("POST /api/v1/registration-codes/{id}/sent", RequireRole(validation.RoleAdmin, a.markRegistrationCodeSent))
 	mux.HandleFunc("POST /api/v1/registration-codes/{id}/revoke", RequireRole(validation.RoleAdmin, a.revokeRegistrationCode))
+	mux.HandleFunc("GET /api/v1/audit-log", RequireRole(validation.RoleAdmin, a.listAuditLog))
 	mux.HandleFunc("POST /api/v1/characters/claim-requests", RequireAuth(a.createCharacterClaimRequest))
 	mux.HandleFunc("POST /api/v1/characters/claim-with-code", RequireAuth(a.claimCharacterWithCode))
 

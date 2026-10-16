@@ -371,4 +371,4 @@ A change is done when:
 - No `DELETE` endpoint is exposed. Archive/expire flows only (ADR 007 remains the intent).
 - `internal/export` is an empty directory; general data export is not implemented. The RaidSync
   addon exchange lives in `internal/addonsync` (ADR 045).
-- The audit log is written but has no read endpoint yet.
+- Admins can view the read-only audit log at `GET /api/v1/audit-log`; no non-Admin read endpoint exists.

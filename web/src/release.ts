@@ -1,8 +1,15 @@
-export const appVersion = '1.0.9'
+export const appVersion = '1.0.11'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Lesbares Audit-Protokoll',
+    changes: [
+      'Das Audit-Protokoll fasst Änderungen als verständliche Ereignisse mit Namen, deutschen Aktionen und Feldvergleich zusammen. Technische Rohdaten bleiben bei Bedarf aufklappbar.',
+    ],
+  },
+  {
+    version: '1.0.9',
     title: 'Absagen: keine EP als Standard, Ersatzbank',
     changes: [
       'Beim Archivieren erhalten abgesagte Spieler standardmäßig keine EP. Mit einem Haken („trotzdem EP geben“) bekommen sie die +10 EP doch.',

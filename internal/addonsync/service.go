@@ -213,7 +213,7 @@ func (s *Service) ApplyLootImport(ctx context.Context, raidID, actorID int64, te
 		case line.Error != "":
 			result.Status, result.Code, result.Message = ResultFailed, "invalid_line", line.Error
 		case !line.State.Importable():
-			result.Status, result.Code, result.Message = ResultFailed, "not_importable", "Gelöschte oder verwahrte Zeilen werden nicht übernommen"
+			result.Status, result.Code, result.Message = ResultFailed, "not_importable", "Gelöschte, verwahrte, entzauberte oder für die Gildenbank bestimmte Zeilen werden nicht übernommen"
 		case hasAward(imported, selection.LineKey):
 			award := imported[selection.LineKey]
 			result.Status, result.AwardID = ResultAlreadyImported, &award.ID
@@ -496,6 +496,12 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 		row.Warnings = append(row.Warnings, "Im Addon gelöscht – bei Bedarf über die Loot-Korrektur zurückziehen")
 	case line.State == LootDeleted:
 		row.Warnings = append(row.Warnings, "Im Addon gelöscht – wird nicht übernommen")
+	case (line.State == LootDisenchanted || line.State == LootBank) && isImported:
+		row.Warnings = append(row.Warnings, "Im Addon jetzt für Entzaubern oder Gildenbank – bei Bedarf über die Loot-Korrektur zurückziehen")
+	case line.State == LootDisenchanted:
+		row.Warnings = append(row.Warnings, fmt.Sprintf("Entzaubert (bei %s) – kein Loot eines Spielers, wird nicht übernommen", line.RecipientName))
+	case line.State == LootBank:
+		row.Warnings = append(row.Warnings, fmt.Sprintf("Für die Gildenbank (bei %s) – kein Loot eines Spielers, wird nicht übernommen", line.RecipientName))
 	}
 	if x := line.EnhancedPoints(); x > 0 && entry != nil && !isImported {
 		if want := r.enhancedPoints(ctx, entry.attendance.PlayerID); want != x {
@@ -517,10 +523,11 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 }
 
 // Importable is false for drops that are not awards (yet): parked items wait
-// for their roll and deleted ones were removed in the addon. Staff decide
-// about those; the import never changes anything for them.
+// for their roll, deleted ones were removed in the addon, and disenchanted or
+// banked items belong to nobody. Staff decide about those; the import never
+// changes anything for them.
 func (s LootState) Importable() bool {
-	return s != LootParked && s != LootDeleted
+	return s != LootParked && s != LootDeleted && s != LootDisenchanted && s != LootBank
 }
 
 // defaultMethod suggests the award method: an enhanced roll range means

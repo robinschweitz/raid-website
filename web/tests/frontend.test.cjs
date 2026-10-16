@@ -2774,13 +2774,17 @@ test('addon loot import shows RS2 rolls and preselects held drops with a known w
     row(2, { character_id: 10, character_name: 'Rüdiger' }),
     row(3, { state: 'parked', recipient_name: 'Thorgrim', character_id: null, character_name: '', is_importable: false, warnings: ['Wird von Thorgrim verwahrt und ist noch nicht verlost – wird nicht übernommen'] }),
     row(4, { state: 'deleted', is_importable: false, character_id: null, character_name: '' }),
+    row(5, { state: 'disenchanted', is_importable: false, character_id: null, character_name: '' }),
+    row(6, { state: 'bank', is_importable: false, character_id: null, character_name: '' }),
   ] })
   await flush(view)
   const boxes = nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')
-  assert.deepEqual(boxes.map((box) => box.props.checked), [true, false, false, false])
+  assert.deepEqual(boxes.map((box) => box.props.checked), [true, false, false, false, false, false])
   assert.match(text(view.tree), /Wurf 131 \(31-130, Main-Spec, Enhanced 30 EP\)/)
   assert.match(text(view.tree), /verwahrt, noch nicht verlost/)
   assert.match(text(view.tree), /im Addon gelöscht/)
+  assert.match(text(view.tree), /entzaubert/)
+  assert.match(text(view.tree), /für die Gildenbank/)
   assert.equal(select(view, 'Vergabeart für Zeile 1').props.value, 'ENHANCED')
 })
 

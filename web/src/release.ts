@@ -1,8 +1,15 @@
-export const appVersion = '1.0.10'
+export const appVersion = '1.0.11'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Loot-Import: Entzaubern und Gildenbank',
+    changes: [
+      'Der Loot-Import zeigt Items, die im Addon entzaubert oder für die Gildenbank behalten wurden. Sie gehören keinem Spieler und werden nicht übernommen.',
+    ],
+  },
+  {
+    version: '1.0.10',
     title: 'Wunschliste fürs Addon, Loot-Import mit Würfen',
     changes: [
       'Auf der Charakterseite steht die Wunschliste: Für jedes Item lässt sich Main- oder Second-Spec wählen und bei Main-Spec „Enhanced“ ankreuzen. „Nach oben“ ändert die Reihenfolge.',

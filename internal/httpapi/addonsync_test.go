@@ -205,9 +205,11 @@ func TestAddonLootPreviewReadsRS2RollsAndStates(t *testing.T) {
 		fmt.Sprintf("4;1760000400;-;%s;%s;parked;-;-;-;-", f.ordinaryItem, second),
 		fmt.Sprintf("5;1760000500;-;%s;%s;deleted;12;ms;1-100;%s", f.ordinaryItem, first, first),
 		fmt.Sprintf("6;1760000600;-;%s;%s;given;99;ms;21-120;%s", f.ordinaryItem, first, first),
+		fmt.Sprintf("7;1760000700;-;%s;%s;disenchanted;-;-;-;-", f.ordinaryItem, second),
+		fmt.Sprintf("8;1760000800;-;%s;%s;bank;-;-;-;-", f.ordinaryItem, second),
 	}, "\n")
 	rows := f.addonPreview(payload).Rows
-	if len(rows) != 6 {
+	if len(rows) != 8 {
 		t.Fatalf("rows: %+v", rows)
 	}
 	if r := rows[0]; !r.IsImportable || r.AwardMethod != "MAIN" || r.Roll == nil || *r.Roll != 87 || r.Spec != "ms" || r.RollRange != "1-100" || r.EnhancedPoints != 0 {
@@ -219,7 +221,7 @@ func TestAddonLootPreviewReadsRS2RollsAndStates(t *testing.T) {
 	if r := rows[2]; !r.IsImportable || r.AwardMethod != "SECOND" || *r.CharacterID != f.secondChar {
 		t.Fatalf("off-spec row: %+v", r)
 	}
-	for _, r := range rows[3:5] {
+	for _, r := range append(rows[3:5:5], rows[6:8]...) {
 		if r.IsImportable || r.CharacterID != nil || len(r.Errors) != 0 || len(r.Warnings) != 1 || !strings.Contains(r.Warnings[0], "nicht übernommen") {
 			t.Fatalf("parked and deleted rows are shown only: %+v", r)
 		}
@@ -232,8 +234,10 @@ func TestAddonLootPreviewReadsRS2RollsAndStates(t *testing.T) {
 		{"line_key": rows[1].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": rows[1].AwardMethod},
 		{"line_key": rows[3].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
 		{"line_key": rows[4].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"},
+		{"line_key": rows[6].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
+		{"line_key": rows[7].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
 	})
-	if len(results) != 3 || results[0].Status != "created" || results[1].Code != "not_importable" || results[2].Code != "not_importable" {
+	if len(results) != 5 || results[0].Status != "created" || results[1].Code != "not_importable" || results[2].Code != "not_importable" || results[3].Code != "not_importable" || results[4].Code != "not_importable" {
 		t.Fatalf("results: %+v", results)
 	}
 	f.points(f.first, 0)

@@ -127,12 +127,15 @@ func TestParseLootExportV2(t *testing.T) {
 		"11;1760001000;-;50415;Shanna;given;90;ds;1-100;Shanna",
 		"12;1760001100;-;50415;Shanna;given;90;ms;100-1;Shanna",
 		"13;1760001200;-;50415;Shanna;given;90;ms;1-100",
+		"14;1760001300;-;50415;Rüdiger;disenchanted;-;-;-;-",
+		"15;1760001400;-;50415;Bankchar;bank;-;-;-;-",
+		"16;1760001500;-;50415;-;bank;-;-;-;-",
 	}, "\n")
 	export, err := ParseLootExport(text)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if export.Version != "RS2" || export.RaidID != 7 || export.Recorder != "Rüdiger" || !export.StartedAt.Equal(time.Unix(1760000000, 0)) || len(export.Lines) != 13 {
+	if export.Version != "RS2" || export.RaidID != 7 || export.Recorder != "Rüdiger" || !export.StartedAt.Equal(time.Unix(1760000000, 0)) || len(export.Lines) != 16 {
 		t.Fatalf("export: %+v", export)
 	}
 	if l := export.Lines[0]; l.Error != "" || l.State != LootGiven || l.Roll != 87 || l.Spec != SpecMain || l.RollLow != 1 || l.RollHigh != 100 || l.WinnerName != "Shanna" || l.EnhancedPoints() != 0 {
@@ -153,8 +156,14 @@ func TestParseLootExportV2(t *testing.T) {
 	if l := export.Lines[5]; l.Error != "" || l.State != LootManual {
 		t.Fatalf("manual line: %+v", l)
 	}
-	// no item, unknown state, missing recipient, roll above 150, unknown spec, reversed range, nine fields
-	for _, broken := range export.Lines[6:] {
+	if l := export.Lines[13]; l.Error != "" || l.State != LootDisenchanted || l.RecipientName != "Rüdiger" || l.State.Importable() {
+		t.Fatalf("disenchanted line: %+v", l)
+	}
+	if l := export.Lines[14]; l.Error != "" || l.State != LootBank || l.State.Importable() {
+		t.Fatalf("bank line: %+v", l)
+	}
+	// no item, unknown state, missing recipient, roll above 150, unknown spec, reversed range, nine fields, bank without holder
+	for _, broken := range append(export.Lines[6:13:13], export.Lines[15]) {
 		if broken.Error == "" {
 			t.Fatalf("broken line must be reported: %+v", broken)
 		}

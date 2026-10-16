@@ -18,7 +18,7 @@ interface Choice {
 const methodLabels: Record<AwardMethod, string> = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
 const resultLabels: Record<AddonLootImportResult['status'], string> = { created: 'Übernommen', already_imported: 'Bereits importiert', failed: 'Fehler' }
 
-const stateLabels: Partial<Record<AddonLootPreviewRow['state'], string>> = { held: 'beim Plündermeister', parked: 'verwahrt, noch nicht verlost', deleted: 'im Addon gelöscht' }
+const stateLabels: Partial<Record<AddonLootPreviewRow['state'], string>> = { held: 'beim Plündermeister', parked: 'verwahrt, noch nicht verlost', deleted: 'im Addon gelöscht', disenchanted: 'entzaubert', bank: 'für die Gildenbank' }
 
 function rollText(row: AddonLootPreviewRow) {
   if (row.roll == null) return ''

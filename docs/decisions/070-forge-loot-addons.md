@@ -48,6 +48,14 @@ Wishlist export (website → addon):
   balance after an enhanced win until the next export. It never chooses another amount (ADR 023).
 - Wish JSON now uses snake_case field names, as every other endpoint and the frontend types expect.
 
+## Nachtrag: Entzaubern und Gildenbank
+
+ForgeLootLedger 1.6 kann Items, die niemand will, entzaubern lassen oder für die Gildenbank behalten.
+RS2 kennt dafür die Zustände `disenchanted` und `bank`; der Empfänger ist, wer das Item hat (der
+Entzauberer oder der Bankcharakter). Solche Zeilen sind kein Loot eines Spielers: die Vorschau zeigt sie
+mit Hinweis, sie werden nie übernommen (`not_importable`), und eine früher übernommene Zeile, die im
+Addon später so markiert wurde, ändert sich nur über die Loot-Korrektur.
+
 ## Consequences
 
 RaidSync (RS1) keeps working unchanged. A new export field or state needs a new version prefix and

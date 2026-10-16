@@ -426,7 +426,7 @@ export interface AddonLootPreviewRow {
   item_id: string
   item_name: string
   recipient_name: string
-  state: '' | 'given' | 'held' | 'manual' | 'parked' | 'deleted'
+  state: '' | 'given' | 'held' | 'manual' | 'parked' | 'deleted' | 'disenchanted' | 'bank'
   character_id: number | null
   character_name: string
   catalog_boss_id: string | null

@@ -88,6 +88,12 @@ const (
 	LootParked LootState = "parked"
 	// LootDeleted (RS2) is an award the recorder removed in the addon.
 	LootDeleted LootState = "deleted"
+	// LootDisenchanted (RS2) is an item nobody wanted, given to the recipient
+	// to disenchant; it is nobody's award.
+	LootDisenchanted LootState = "disenchanted"
+	// LootBank (RS2) is an item nobody wanted, kept by the recipient for the
+	// guild bank; it is nobody's award.
+	LootBank LootState = "bank"
 )
 
 // Roll specs written by RS2 exports.
@@ -222,7 +228,7 @@ func parseLootLineV2(lineNumber int, raw string) LootLine {
 		line.RecipientName = strings.TrimSpace(parts[4])
 	}
 	switch state := LootState(parts[5]); state {
-	case LootGiven, LootHeld, LootManual, LootParked, LootDeleted:
+	case LootGiven, LootHeld, LootManual, LootParked, LootDeleted, LootDisenchanted, LootBank:
 		line.State = state
 	default:
 		line.Error = "Unbekannter Status"

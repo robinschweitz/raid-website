@@ -1,8 +1,16 @@
-export const appVersion = '1.0.11'
+export const appVersion = '1.0.12'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'RaidLedger ersetzt RaidSync',
+    changes: [
+      'Die Einladungsliste für das Addon ist jetzt für RaidLedger (Knopf „RAID“ im Spiel). Das alte RaidSync-Addon wird nicht mehr gebraucht.',
+      'Der Aufstellungs-Import liest den Teilnahme-Export von RaidLedger; Exporte von RaidSync funktionieren weiterhin.',
+    ],
+  },
+  {
+    version: '1.0.11',
     title: 'Loot-Import: Entzaubern und Gildenbank',
     changes: [
       'Der Loot-Import zeigt Items, die im Addon entzaubert oder für die Gildenbank behalten wurden. Sie gehören keinem Spieler und werden nicht übernommen.',
@@ -13,8 +21,8 @@ export const changelog = [
     title: 'Wunschliste fürs Addon, Loot-Import mit Würfen',
     changes: [
       'Auf der Charakterseite steht die Wunschliste: Für jedes Item lässt sich Main- oder Second-Spec wählen und bei Main-Spec „Enhanced“ ankreuzen. „Nach oben“ ändert die Reihenfolge.',
-      '„Für Addon exportieren“ erzeugt den Text für das Wunschlisten-Addon (ingame /flw import), samt aktuellem EP-Stand. Enhanced würfelt 1+X bis 100+X mit X = EP-Stand, höchstens 50.',
-      'Der Loot-Import liest auch Exporte von ForgeLootLedger: Wurf, Spec und Wurfbereich stehen in der Vorschau, Enhanced-Würfe sind als Enhanced vorausgewählt, und Items beim Plündermeister mit bekanntem Gewinner sind für den Gewinner vorausgewählt.',
+      '„Für Addon exportieren“ erzeugt den Text für das Wunschlisten-Addon (ingame /wish import), samt aktuellem EP-Stand. Enhanced würfelt 1+X bis 100+X mit X = EP-Stand, höchstens 50.',
+      'Der Loot-Import liest auch Exporte von RaidLedger: Wurf, Spec und Wurfbereich stehen in der Vorschau, Enhanced-Würfe sind als Enhanced vorausgewählt, und Items beim Plündermeister mit bekanntem Gewinner sind für den Gewinner vorausgewählt.',
       'Verwahrte (noch nicht verloste) und im Addon gelöschte Items werden angezeigt, aber nie übernommen. Über bereits übernommene Items entscheidet die Raidleitung per Loot-Korrektur.',
       'Die Herzen im Loot-Katalog zeigen wieder an, welche Items schon auf der Wunschliste stehen, und Wunschlisten sind wieder nach Priorität sortiert.',
     ],

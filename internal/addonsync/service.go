@@ -29,7 +29,7 @@ var (
 )
 
 // importNote marks awards created from an addon export.
-const importNote = "Aus RaidSync-Addon importiert"
+const importNote = "Aus dem Loot-Addon importiert"
 
 // encounterNPCs maps the creatures that die in multi-creature encounters to the
 // catalog's encounter keys. Single-creature bosses use their creature ID as key.

@@ -82,7 +82,7 @@ export function AddonLootImport({ raidID, onImported }: Props) {
 
   return <section className="subcard addon-loot-import" aria-label="Loot aus Addon importieren">
     <h3>Loot aus Addon importieren</h3>
-    <p className="muted">Den Loot-Export des RaidSync-Addons einfügen, prüfen und Empfänger und Vergabeart je Gegenstand wählen. Hat jemand anderes ein Item per Handel weitergegeben, hier den tatsächlichen Gewinner wählen. Locks, Enhanced-Kosten und Raidkader werden wie bei manueller Erfassung geprüft. Bereits importierte Zeilen werden übersprungen.</p>
+    <p className="muted">Den Export aus RaidLedger („EXPORT“) einfügen, prüfen und Empfänger und Vergabeart je Gegenstand wählen. Hat jemand anderes ein Item per Handel weitergegeben, hier den tatsächlichen Gewinner wählen. Locks, Enhanced-Kosten und Raidkader werden wie bei manueller Erfassung geprüft. Bereits importierte Zeilen werden übersprungen.</p>
     <textarea className="addon-code-export" aria-label="Loot-Export" rows={4} value={payload} disabled={pending} placeholder="RS1|LOOT|…" onChange={(e) => setPayload(e.target.value)} />
     <div className="actions">
       <button type="button" disabled={pending || !payload.trim()} onClick={() => void runPreview()}>Vorschau</button>

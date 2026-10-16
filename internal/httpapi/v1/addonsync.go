@@ -9,7 +9,8 @@ import (
 	"raid-website/internal/validation"
 )
 
-// AddonSyncHandlers serve the copy-and-paste exchange with the RaidSync WoW addon.
+// AddonSyncHandlers serve the copy-and-paste exchange with the raid lead's WoW
+// addon (ForgeLootLedger; formerly RaidSync).
 type AddonSyncHandlers struct {
 	AddonSync *addonsync.Service
 }
@@ -146,7 +147,7 @@ func writeAddonSyncError(w http.ResponseWriter, err error) {
 	case errors.Is(err, addonsync.ErrRaidNotFound):
 		WriteError(w, http.StatusNotFound, "not_found", "Raid nicht gefunden")
 	case errors.Is(err, addonsync.ErrInvalidPayload):
-		WriteError(w, http.StatusBadRequest, "invalid_addon_export", "Der Text ist kein passender Export des RaidSync-Addons")
+		WriteError(w, http.StatusBadRequest, "invalid_addon_export", "Der Text ist kein passender Export von ForgeLootLedger")
 	case errors.Is(err, addonsync.ErrRaidState):
 		WriteError(w, http.StatusConflict, "raid_state", "Addon-Daten können nur in geplante oder offene, nicht archivierte Raids importiert werden")
 	case errors.Is(err, loot.ErrCatalogContextRequired):

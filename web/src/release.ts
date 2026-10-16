@@ -1,8 +1,16 @@
-export const appVersion = '1.0.11'
+export const appVersion = '1.0.12'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'ForgeLootLedger ersetzt RaidSync',
+    changes: [
+      'Die Einladungsliste für das Addon ist jetzt für ForgeLootLedger (Knopf „RAID“ im Spiel). Das alte RaidSync-Addon wird nicht mehr gebraucht.',
+      'Der Aufstellungs-Import liest den Teilnahme-Export von ForgeLootLedger; Exporte von RaidSync funktionieren weiterhin.',
+    ],
+  },
+  {
+    version: '1.0.11',
     title: 'Loot-Import: Entzaubern und Gildenbank',
     changes: [
       'Der Loot-Import zeigt Items, die im Addon entzaubert oder für die Gildenbank behalten wurden. Sie gehören keinem Spieler und werden nicht übernommen.',

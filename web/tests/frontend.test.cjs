@@ -2708,10 +2708,10 @@ test('addon invite export loads the roster text and reloads with the bench', asy
   const s = setup()
   const view = s.mount(s.load('components/AddonInviteExport.tsx').AddonInviteExport, { raidID: 1, rosterKey: '1:10:false' })
   assert.equal(s.requests[0].url, '/api/v1/raids/1/addon-invite-export')
-  s.requests[0].resolve({ text: 'RS1|INV|1|Raid 1|25\nShanna|HEAL|Priester|0' })
+  s.requests[0].resolve({ text: 'RS2;INV;1;Raid 1;25\nShanna;HEAL;Priester;0' })
   await flush(view)
   const exported = nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Einladungs-Export')[0]
-  assert.equal(exported.props.value, 'RS1|INV|1|Raid 1|25\nShanna|HEAL|Priester|0')
+  assert.equal(exported.props.value, 'RS2;INV;1;Raid 1;25\nShanna;HEAL;Priester;0')
   assert.match(text(view.tree), /1\s+Charaktere/)
   assert.equal(button(view, 'Für Addon kopieren').props.disabled, false)
   checkbox(view, 'Ersatzbank einbeziehen').props.onChange({ target: { checked: true } })

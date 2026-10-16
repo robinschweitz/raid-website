@@ -56,6 +56,17 @@ Entzauberer oder der Bankcharakter). Solche Zeilen sind kein Loot eines Spielers
 mit Hinweis, sie werden nie übernommen (`not_importable`), und eine früher übernommene Zeile, die im
 Addon später so markiert wurde, ändert sich nur über die Loot-Korrektur.
 
+## Nachtrag: ForgeLootLedger ersetzt RaidSync
+
+ForgeLootLedger übernimmt auch Einladungen, Gruppensortierung und den Teilnahme-Export von RaidSync;
+RaidSync wird nicht mehr verwendet. Alle Formate sind jetzt `;`-getrennt (RS2):
+
+- Einladungs-Export (Webseite → Addon): `RS2;INV;<raidID>;<raidName>;<raidSize>`, dann je Zeile
+  `<name>;<TANK|HEAL|DD>;<class>;<bench 0/1>`. Freitext ersetzt `;` durch `,` und `|` durch `/`.
+- Teilnahme-Export (Addon → Webseite): `RS2;ROSTER;<raidID>;<recorder>;<exportUnix>`, dann je Zeile
+  `<name>;<classToken or ->;<firstSeenUnix>`. Der Import liest weiterhin auch RS1 (`|`) von RaidSync.
+- Der Loot-Import liest RS1 und RS2 wie bisher.
+
 ## Consequences
 
 RaidSync (RS1) keeps working unchanged. A new export field or state needs a new version prefix and

@@ -71,7 +71,7 @@ export function AddonRosterImport({ raidID, onImported, onQuickAdd }: Props) {
 
   return <section className="subcard addon-roster-import" aria-label="Aufstellung aus Addon abgleichen">
     <h3>Aufstellung aus Addon abgleichen</h3>
-    <p className="muted">Im Spiel nachgeladene Charaktere (z. B. aus dem Weltchat) übernehmen: im RaidSync-Addon „Aufstellung exportieren“ klicken und den Text hier einfügen. Unbekannte Charaktere werden per Schnellanlage angelegt.</p>
+    <p className="muted">Im Spiel nachgeladene Charaktere (z. B. aus dem Weltchat) übernehmen: in ForgeLootLedger unter „RAID“ bei „Teilnahme für die Webseite“ auf „EXPORT“ klicken und den Text hier einfügen. Unbekannte Charaktere werden per Schnellanlage angelegt.</p>
     <textarea className="addon-code-export" aria-label="Aufstellungs-Export" rows={4} value={payload} disabled={pending} placeholder="RS1|ROSTER|…" onChange={(e) => setPayload(e.target.value)} />
     <div className="actions">
       <button type="button" disabled={pending || !payload.trim()} onClick={() => void runPreview()}>Abgleichen</button>

@@ -183,8 +183,10 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - The legacy sheet's "Tokens gesammelt" total is **reconciliation-only** and must never be written
   over derived data.
 
-### RaidSync addon exchange (ADR 045)
-- The in-game addon RaidSync (separate `wow-addons` repository) exchanges copy-and-paste text with the
+### Raid addon exchange (ADR 045, ADR 070)
+- ForgeLootLedger replaced RaidSync (both in the `wow-addons` repository). Its formats are `;`-separated
+  RS2: invite export `RS2;INV`, attendance `RS2;ROSTER`, loot `RS2;LOOT`; the imports still read RS1.
+- The in-game addon (originally RaidSync) exchanges copy-and-paste text with the
   website: an invite export of the saved roster (current character names, bench optional), a roster
   export of who was actually in the raid, and a loot export recorded in game by master loot, including
   trades of items the loot master held.

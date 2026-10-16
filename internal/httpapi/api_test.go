@@ -14,6 +14,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/audit"
 	"raid-website/internal/auth"
 	"raid-website/internal/character"
 	"raid-website/internal/db"
@@ -481,6 +482,59 @@ func TestMissingSessionRejected(t *testing.T) {
 	}
 }
 
+func TestAuditLogIsVisibleOnlyToAdmins(t *testing.T) {
+	srv, bdb := setupServer(t)
+	client := srv.Client()
+	adminID := seedAccount(t, bdb, "admin", "admin-pw", validation.RoleAdmin)
+	seedAccount(t, bdb, "member", "member-pw", validation.RoleMember)
+	adminToken := login(t, client, srv, "admin", "admin-pw")
+	memberToken := login(t, client, srv, "member", "member-pw")
+
+	now := time.Now().UTC()
+	if err := audit.NewRepo(bdb).Insert(t.Context(), &audit.Log{
+		ActorID:    &adminID,
+		EntityType: "attendance",
+		EntityID:   "42",
+		Action:     "correction",
+		BeforeJSON: `{"role":"DD"}`,
+		AfterJSON:  `{"role":"HEAL"}`,
+		Reason:     "Korrektur der Rolle",
+		CreatedAt:  now,
+	}); err != nil {
+		t.Fatalf("insert audit log: %v", err)
+	}
+
+	for _, caller := range []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{name: "anonymous", wantStatus: http.StatusUnauthorized},
+		{name: "member", token: memberToken, wantStatus: http.StatusForbidden},
+	} {
+		t.Run(caller.name, func(t *testing.T) {
+			status, body := do(t, client, http.MethodGet, srv.URL+"/api/v1/audit-log", caller.token, nil)
+			if status != caller.wantStatus {
+				t.Fatalf("list audit log: want %d got %d body %s", caller.wantStatus, status, body)
+			}
+		})
+	}
+
+	status, body := do(t, client, http.MethodGet, srv.URL+"/api/v1/audit-log", adminToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("admin list audit log: status %d body %s", status, body)
+	}
+	var out struct {
+		Data []audit.Entry `json:"data"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatalf("decode audit log: %v", err)
+	}
+	if len(out.Data) != 1 || out.Data[0].ActorName == nil || *out.Data[0].ActorName != "admin" || out.Data[0].BeforeJSON != `{"role":"DD"}` || out.Data[0].AfterJSON != `{"role":"HEAL"}` {
+		t.Fatalf("unexpected audit log response: %s", body)
+	}
+}
+
 func TestPublicDashboardReads(t *testing.T) {
 	srv, bdb := setupServer(t)
 	client := srv.Client()
@@ -616,6 +670,7 @@ func TestListEndpointsReturnEmptyArrays(t *testing.T) {
 	}
 
 	for _, path := range []string{
+		"/api/v1/audit-log",
 		"/api/v1/polls",
 		"/api/v1/guild-ranks",
 		"/api/v1/raid-groups",

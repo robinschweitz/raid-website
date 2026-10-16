@@ -96,6 +96,19 @@ export interface RegistrationCode {
   revoked_at: string | null
 }
 
+export interface AuditLogEntry {
+  id: number
+  actor_id: number | null
+  actor_name: string | null
+  entity_type: string
+  entity_id: string
+  action: string
+  before_json: string
+  after_json: string
+  reason: string
+  created_at: string
+}
+
 export interface GeneratedRegistrationCode {
   code_record: RegistrationCode
   code: string

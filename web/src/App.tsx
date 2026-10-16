@@ -19,6 +19,7 @@ import { NavIcon } from './components/NavIcon'
 import { LootCatalogPage } from './pages/LootCatalog'
 import { RegistrationRequestsPage } from './pages/RegistrationRequests'
 import { ChangelogPage } from './pages/Changelog'
+import { AuditLogPage } from './pages/AuditLog'
 import { appVersion } from './release'
 
 function Routes() {
@@ -50,6 +51,7 @@ function Routes() {
     return <PollsPage />
   }
   if (parts[0] === 'registration-requests') return <RegistrationRequestsPage />
+  if (parts[0] === 'audit-log') return <AuditLogPage />
   if (parts[0] === 'changelog') return <ChangelogPage />
   return <p className="muted">Seite nicht gefunden.</p>
 }
@@ -88,6 +90,7 @@ function Layout() {
             <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
             <Link className={path === '/raid-series' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/raid-series"><NavIcon name="series" />Raidserien</Link>
             <Link className={path === '/registration-requests' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/registration-requests"><NavIcon name="players" />Registrierung</Link>
+            <Link className={path === '/audit-log' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/audit-log"><NavIcon name="fileText" />Audit-Protokoll</Link>
           </>}
         </nav>
         <div className="sidebar-footer">

@@ -3132,3 +3132,28 @@ test('a failed template save keeps the draft and shows the error', async () => {
   assert.equal(nodes(view.tree, (n) => n.type === 'textarea' && !n.props.readOnly)[0].props.value, 'Entwurf')
   assert.equal(button(view, 'Vorlage speichern').props.disabled, false)
 })
+
+test('audit log translates technical snapshots into meaningful changes and stays admin-only', async () => {
+  const admin = setup({ id: 1, name: 'Admin', role: 'ADMIN' })
+  const view = admin.mount(admin.load('pages/AuditLog.tsx').AuditLogPage)
+  assert.equal(admin.requests.length, 1)
+  assert.equal(admin.requests[0].url, '/api/v1/audit-log')
+  admin.requests[0].resolve([{
+    id: 1, actor_id: 1, actor_name: 'Admin', entity_type: 'attendance', entity_id: '42', action: 'correction',
+    before_json: '{"raid_id":7,"character_name":"Kleinesonne","class":"Krieger","spec":"Waffen","role":"DD","is_bench":false}',
+    after_json: '{"raid_id":7,"character_name":"Kleinesonne","class":"Krieger","spec":"Waffen","role":"HEAL","is_bench":false}',
+    reason: 'Rolle korrigiert', created_at: '2026-10-04T18:00:00Z',
+  }])
+  await flush(view)
+  assert.match(text(view.tree), /Admin.*Teilnahme: Kleinesonne in Raid #\s*7.*Korrigiert.*Rolle korrigiert/)
+  assert.match(text(view.tree), /Rolle.*Schaden.*Heiler/)
+  assert.match(text(view.tree), /"role": "HEAL"/)
+  input(view, 'Akteur, Aktion, Objekt oder Grund').props.onChange(change('healer'))
+  view.render()
+  assert.match(text(view.tree), /Keine Einträge für diese Suche/)
+
+  const member = setup({ id: 2, name: 'Mitglied', role: 'MEMBER' })
+  const memberView = member.mount(member.load('pages/AuditLog.tsx').AuditLogPage)
+  assert.equal(member.requests.length, 0)
+  assert.match(text(memberView.tree), /nur für Admins sichtbar/)
+})

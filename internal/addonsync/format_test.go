@@ -11,11 +11,11 @@ import (
 
 func TestBuildInviteExport(t *testing.T) {
 	size := 25
-	got := BuildInviteExport(7, "ICC25 | Donnerstag", &size, []InviteMember{
+	got := BuildInviteExport(7, "ICC25 | Donnerstag; Gruppe 2", &size, []InviteMember{
 		{Name: "Shanna", Role: validation.RoleHeal, Class: "Priester"},
 		{Name: "Thorgrim", Role: validation.RoleTank, Class: "Krieger", IsBench: true},
 	})
-	want := "RS1|INV|7|ICC25 / Donnerstag|25\nShanna|HEAL|Priester|0\nThorgrim|TANK|Krieger|1"
+	want := "RS2;INV;7;ICC25 / Donnerstag, Gruppe 2;25\nShanna;HEAL;Priester;0\nThorgrim;TANK;Krieger;1"
 	if got != want {
 		t.Fatalf("export:\n%s\nwant:\n%s", got, want)
 	}
@@ -104,7 +104,11 @@ func TestParseRosterExport(t *testing.T) {
 			t.Fatalf("broken line must be reported: %+v", broken)
 		}
 	}
-	for _, text := range []string{"", "RS1|LOOT|7|A|1", "RS1|ROSTER|x|A|1", "RS1|ROSTER|7|A"} {
+	v2, err := ParseRosterExport("RS2;ROSTER;7;Rüdiger;1760007200\nShanna;PRIEST;1760000000\nWeltchat;-;1760003600\nkaputt|x|1")
+	if err != nil || v2.RaidID != 7 || len(v2.Members) != 3 || v2.Members[0].Name != "Shanna" || v2.Members[0].ClassToken != "PRIEST" || v2.Members[1].ClassToken != "" || v2.Members[2].Error == "" {
+		t.Fatalf("RS2 roster: %+v %v", v2, err)
+	}
+	for _, text := range []string{"", "RS1|LOOT|7|A|1", "RS1|ROSTER|x|A|1", "RS1|ROSTER|7|A", "RS2;ROSTER;7;A", "RS2;ROSTER;7;A;1;2", "RS2;INV;7;A;1"} {
 		if _, err := ParseRosterExport(text); !errors.Is(err, ErrInvalidPayload) {
 			t.Fatalf("%q: expected ErrInvalidPayload, got %v", text, err)
 		}

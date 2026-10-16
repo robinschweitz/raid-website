@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// addonFormat versions the wishlist text the ForgeLootWishlist WoW addon
+// addonFormat versions the wishlist text the RaidWishlist WoW addon
 // imports by copy and paste (ADR 070).
 const addonFormat = "WL2"
 

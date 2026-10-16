@@ -2829,7 +2829,7 @@ test('character wishlist saves the roll choice and exports it for the addon', as
   exportRequest.resolve({ text: 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;' })
   await flush(view)
   assert.equal(nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Wunschlisten-Export')[0].props.value, 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;')
-  assert.match(text(view.tree), /\/flw import/)
+  assert.match(text(view.tree), /\/wish import/)
 })
 
 test('character wishlist is read-only for staff', async () => {

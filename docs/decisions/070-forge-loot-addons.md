@@ -1,11 +1,11 @@
-# ADR 070: ForgeLootLedger loot import (RS2) and wishlist export for ForgeLootWishlist (WL2)
+# ADR 070: RaidLedger loot import (RS2) and wishlist export for RaidWishlist (WL2)
 
 Status: Accepted. Extends ADR 045; applies ADR 023 to the addons.
 
 ## Context
 
-The guild's raid leads record loot in game with ForgeLootLedger and raid members use
-ForgeLootWishlist (both WoW 3.3.5a, maintained in `robinschweitz/addon-forge`, `examples/`). The
+The guild's raid leads record loot in game with RaidLedger and raid members use
+RaidWishlist (both WoW 3.3.5a, maintained in `robinschweitz/addon-forge`, `examples/`). The
 ledger runs the roll (`/rnd 100` main spec, `/rnd 99` second spec, enhanced `1+X..100+X`), tracks
 items that are still open, and exports its awards as RS2. The wishlist addon imports a member's
 wishlist and rolls for them, or prompts them, when the ledger starts a roll on a wished item.
@@ -50,15 +50,15 @@ Wishlist export (website → addon):
 
 ## Nachtrag: Entzaubern und Gildenbank
 
-ForgeLootLedger 1.6 kann Items, die niemand will, entzaubern lassen oder für die Gildenbank behalten.
+RaidLedger 1.6 kann Items, die niemand will, entzaubern lassen oder für die Gildenbank behalten.
 RS2 kennt dafür die Zustände `disenchanted` und `bank`; der Empfänger ist, wer das Item hat (der
 Entzauberer oder der Bankcharakter). Solche Zeilen sind kein Loot eines Spielers: die Vorschau zeigt sie
 mit Hinweis, sie werden nie übernommen (`not_importable`), und eine früher übernommene Zeile, die im
 Addon später so markiert wurde, ändert sich nur über die Loot-Korrektur.
 
-## Nachtrag: ForgeLootLedger ersetzt RaidSync
+## Nachtrag: RaidLedger ersetzt RaidSync
 
-ForgeLootLedger übernimmt auch Einladungen, Gruppensortierung und den Teilnahme-Export von RaidSync;
+RaidLedger übernimmt auch Einladungen, Gruppensortierung und den Teilnahme-Export von RaidSync;
 RaidSync wird nicht mehr verwendet. Alle Formate sind jetzt `;`-getrennt (RS2):
 
 - Einladungs-Export (Webseite → Addon): `RS2;INV;<raidID>;<raidName>;<raidSize>`, dann je Zeile

@@ -188,7 +188,7 @@ func TestAddonLootPreviewResolvesBossRecipientAndProblems(t *testing.T) {
 	}
 }
 
-// RS2 (ForgeLootLedger) adds the roll: the spec and an enhanced range pick the
+// RS2 (RaidLedger) adds the roll: the spec and an enhanced range pick the
 // default method, a held item suggests its roll winner, and parked or deleted
 // lines are shown but never imported.
 func TestAddonLootPreviewReadsRS2RollsAndStates(t *testing.T) {

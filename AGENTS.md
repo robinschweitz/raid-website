@@ -184,7 +184,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   over derived data.
 
 ### Raid addon exchange (ADR 045, ADR 070)
-- ForgeLootLedger replaced RaidSync (both in the `wow-addons` repository). Its formats are `;`-separated
+- RaidLedger replaced RaidSync (both in the `wow-addons` repository). Its formats are `;`-separated
   RS2: invite export `RS2;INV`, attendance `RS2;ROSTER`, loot `RS2;LOOT`; the imports still read RS1.
 - The in-game addon (originally RaidSync) exchanges copy-and-paste text with the
   website: an invite export of the saved roster (current character names, bench optional), a roster
@@ -199,11 +199,11 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   derived from the addon's entry ID, so repeated imports create nothing new even after a trade changed
   the recipient. `raidsync-` request IDs are raid-scoped (`loot.RaidScopedRequestPrefix`, checked in the
   write transaction and by `idx_loot_raid_request`), unlike ordinary per-actor request IDs.
-- ForgeLootLedger exports loot as RS2 (`;`-separated, with roll, spec, range and winner; ADR 070).
+- RaidLedger exports loot as RS2 (`;`-separated, with roll, spec, range and winner; ADR 070).
   Enhanced ranges default to `ENHANCED`, second-spec rolls to `SECOND`; `held` lines with a winner
   suggest the winner; `parked` and `deleted` lines are shown but never imported.
 - Wishes carry `spec` (MAIN/SECOND) and `is_enhanced` (MAIN only). The owner edits them; owner and
-  staff can export WL2 with the owner's EP balance for ForgeLootWishlist (ADR 070).
+  staff can export WL2 with the owner's EP balance for RaidWishlist (ADR 070).
 
 ### Loot, attendance, and character corrections
 - Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived

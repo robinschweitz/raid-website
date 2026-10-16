@@ -30,7 +30,7 @@ export function AddonInviteExport({ raidID, rosterKey }: Props) {
 
   return <section className="subcard" aria-label="Einladungen für Addon">
     <h3>Einladungen für Addon</h3>
-    <p className="muted">In ForgeLootLedger unter „RAID“ (oder /forgeloot setup) einfügen und „EINLESEN“ klicken. Das Addon lädt diese Charaktere ingame in den Raid ein.</p>
+    <p className="muted">In RaidLedger unter „RAID“ (oder /ledger setup) einfügen und „EINLESEN“ klicken. Das Addon lädt diese Charaktere ingame in den Raid ein.</p>
     {error && <p className="error" role="alert">{error}</p>}
     <label className="check"><input type="checkbox" checked={includeBench} onChange={(e) => setIncludeBench(e.target.checked)} /> Ersatzbank einbeziehen</label>
     <textarea className="addon-code-export" aria-label="Einladungs-Export" readOnly value={text} rows={Math.min(8, Math.max(3, memberCount + 1))} />

@@ -1,5 +1,5 @@
 // Package addonsync converts raid data to and from the line-based text format
-// that the raid lead's WoW addon (ForgeLootLedger; formerly RaidSync) exchanges
+// that the raid lead's WoW addon (RaidLedger; formerly RaidSync) exchanges
 // by copy and paste. WoW addons have no network access, so this text is the
 // only channel between game and website.
 package addonsync
@@ -18,7 +18,7 @@ import (
 // formatVersion prefixes every export so a future format can be told apart.
 const formatVersion = "RS1"
 
-// formatV2 is ForgeLootLedger's format: ";"-separated (a WoW EditBox treats
+// formatV2 is RaidLedger's format: ";"-separated (a WoW EditBox treats
 // "|" as an escape character); its loot export adds roll details.
 const formatV2 = "RS2"
 
@@ -36,7 +36,7 @@ type InviteMember struct {
 	IsBench bool
 }
 
-// BuildInviteExport renders the invite list for ForgeLootLedger:
+// BuildInviteExport renders the invite list for RaidLedger:
 //
 //	RS2;INV;<raidID>;<raidName>;<raidSize>
 //	<name>;<role>;<class>;<bench 0/1>
@@ -140,7 +140,7 @@ func (l LootLine) EnhancedPoints() int {
 //	RS1|LOOT|<raidID>|<recorder>|<startUnix>
 //	<entryID>|<unixTime>|<npcID or ->|<itemID>|<recipient or ->|<state or ->
 //
-// and the ForgeLootLedger format
+// and the RaidLedger format
 //
 //	RS2;LOOT;<raidID>;<recorder>;<startUnix>;<exportUnix>
 //	<entryID>;<unixTime>;<npcID or ->;<itemID>;<recipient>;<state>;<roll or ->;<ms|os|->;<low-high or ->;<winner or ->
@@ -319,7 +319,7 @@ type RosterMember struct {
 	Error      string
 }
 
-// ParseRosterExport reads ForgeLootLedger's attendance export
+// ParseRosterExport reads RaidLedger's attendance export
 //
 //	RS2;ROSTER;<raidID>;<recorder>;<exportUnix>
 //	<name>;<classToken or ->;<firstSeenUnix>

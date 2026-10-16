@@ -28,7 +28,9 @@ ProtectControlGroups=true
 ProtectProc=invisible
 ProcSubset=pid
 ReadWritePaths=/opt/raid-website/source /opt/raid-website/build /var/lib/raiddeploy
-CapabilityBoundingSet=
+# sudo needs only these capabilities to enter the separately sandboxed
+# root-owned publisher unit; sudoers restricts the permitted command.
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID
 LockPersonality=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictNamespaces=true

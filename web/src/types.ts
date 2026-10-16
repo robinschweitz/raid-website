@@ -392,8 +392,16 @@ export interface WishlistWish {
   item_name: string
   priority: number
   notes: string
+  spec: WishlistSpec
+  is_enhanced: boolean
   created_at: string
   updated_at: string
+}
+
+export type WishlistSpec = 'MAIN' | 'SECOND'
+
+export interface WishlistAddonExport {
+  text: string
 }
 
 export interface WishlistCharacterInterest {
@@ -431,12 +439,17 @@ export interface AddonLootPreviewRow {
   item_id: string
   item_name: string
   recipient_name: string
-  state: '' | 'given' | 'held' | 'manual'
+  state: '' | 'given' | 'held' | 'manual' | 'parked' | 'deleted' | 'disenchanted' | 'bank'
   character_id: number | null
   character_name: string
   catalog_boss_id: string | null
   boss_options: CatalogBoss[]
   award_method: AwardMethod
+  roll: number | null
+  spec: '' | 'ms' | 'os'
+  roll_range: string
+  winner_name: string
+  enhanced_points: number
   is_importable: boolean
   is_already_imported: boolean
   warnings: string[]

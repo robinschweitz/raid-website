@@ -4,6 +4,7 @@ import { Link } from '../router'
 import { characterClassName } from '../characterTheme'
 import { useAuth } from '../auth'
 import { useSubmission } from '../useSubmission'
+import { CharacterWishlist } from '../components/CharacterWishlist'
 import { atLeast, type Character, type LootAward, type NameHistory, type Player } from '../types'
 
 const LOOT_METHOD_LABELS = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
@@ -70,6 +71,11 @@ function CharacterDetail({ characterID }: Props) {
   const visibleLoot = exactLoot.length > 0 ? exactLoot : nameFallbackLoot
   const hasNameHistory = history.length > 0
   const canReloadProfile = Boolean(me && atLeast(me.role, 'ADMIN') && character.external_source === 'rising-gods' && character.external_profile_id)
+
+  // The server lets owners and staff read a wishlist; only the owner (MEMBER and up) edits it.
+  const isOwner = Boolean(me && me.id === character.player_id)
+  const canReadWishlist = Boolean(me && (isOwner || atLeast(me.role, 'RAIDASSISTENT')))
+  const canEditWishlist = Boolean(me && isOwner && atLeast(me.role, 'MEMBER'))
 
   const canRetryLink = Boolean(me && atLeast(me.role, 'ADMIN') && !character.external_profile_id && !character.external_source)
 
@@ -143,6 +149,8 @@ function CharacterDetail({ characterID }: Props) {
         <div><dt>Rising Gods</dt><dd>{character.external_profile_url ? <a href={character.external_profile_url} target="_blank" rel="noreferrer">Profil öffnen</a> : '—'}</dd></div>
       </dl>
     </section>
+
+    {canReadWishlist && <CharacterWishlist characterID={character.id} canEdit={canEditWishlist} />}
 
     <section className="card character-loot-history">
       <div className="section-heading"><div><h2>Loot-Historie</h2><p className="muted">Direkte Charaktertreffer über gespeicherte Charakter-ID.</p></div><span className="badge info">{visibleLoot.length}</span></div>

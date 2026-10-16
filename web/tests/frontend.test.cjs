@@ -2708,10 +2708,10 @@ test('addon invite export loads the roster text and reloads with the bench', asy
   const s = setup()
   const view = s.mount(s.load('components/AddonInviteExport.tsx').AddonInviteExport, { raidID: 1, rosterKey: '1:10:false' })
   assert.equal(s.requests[0].url, '/api/v1/raids/1/addon-invite-export')
-  s.requests[0].resolve({ text: 'RS1|INV|1|Raid 1|25\nShanna|HEAL|Priester|0' })
+  s.requests[0].resolve({ text: 'RS2;INV;1;Raid 1;25\nShanna;HEAL;Priester;0' })
   await flush(view)
   const exported = nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Einladungs-Export')[0]
-  assert.equal(exported.props.value, 'RS1|INV|1|Raid 1|25\nShanna|HEAL|Priester|0')
+  assert.equal(exported.props.value, 'RS2;INV;1;Raid 1;25\nShanna;HEAL;Priester;0')
   assert.match(text(view.tree), /1\s+Charaktere/)
   assert.equal(button(view, 'Für Addon kopieren').props.disabled, false)
   checkbox(view, 'Ersatzbank einbeziehen').props.onChange({ target: { checked: true } })
@@ -2760,6 +2760,87 @@ test('addon loot import previews, requires a boss choice and applies the selecti
   await flush(view)
   assert.match(text(view.tree), /Zeile\s+2\s*:\s*Übernommen\s*·\s*Shanna/)
   assert.match(text(view.tree), /Zeile\s+3\s*:\s*Fehler\s*·\s*Spieler hat keine EP für Enhanced-Loot/)
+})
+
+test('addon loot import shows RS2 rolls and preselects held drops with a known winner', async () => {
+  const s = setup()
+  const view = s.mount(s.load('components/AddonLootImport.tsx').AddonLootImport, { raidID: 1, onImported: async () => {} })
+  nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Loot-Export')[0].props.onChange(change('RS2;LOOT;1;Rüdiger;1;2'))
+  view.render()
+  button(view, 'Vorschau').props.onClick()
+  const row = (line, extra) => ({ line_key: `key-${line}`, line_number: line, looted_at: null, npc_id: '', item_id: '50415', item_name: `Item ${line}`, recipient_name: 'Rüdiger', state: 'held', character_id: 20, character_name: 'Shanna', catalog_boss_id: '36612', boss_options: [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }], award_method: 'MAIN', roll: null, spec: '', roll_range: '', winner_name: '', enhanced_points: 0, is_importable: true, is_already_imported: false, warnings: [], errors: [], ...extra })
+  writes(s)[0].resolve({ raid_id: 1, header_raid_id: 1, recorder: 'Rüdiger', warnings: [], recipient_options: [{ character_id: 20, character_name: 'Shanna' }], rows: [
+    row(1, { award_method: 'ENHANCED', roll: 131, spec: 'ms', roll_range: '31-130', winner_name: 'Shanna', enhanced_points: 30 }),
+    row(2, { character_id: 10, character_name: 'Rüdiger' }),
+    row(3, { state: 'parked', recipient_name: 'Thorgrim', character_id: null, character_name: '', is_importable: false, warnings: ['Wird von Thorgrim verwahrt und ist noch nicht verlost – wird nicht übernommen'] }),
+    row(4, { state: 'deleted', is_importable: false, character_id: null, character_name: '' }),
+    row(5, { state: 'disenchanted', is_importable: false, character_id: null, character_name: '' }),
+    row(6, { state: 'bank', is_importable: false, character_id: null, character_name: '' }),
+  ] })
+  await flush(view)
+  const boxes = nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')
+  assert.deepEqual(boxes.map((box) => box.props.checked), [true, false, false, false, false, false])
+  assert.match(text(view.tree), /Wurf 131 \(31-130, Main-Spec, Enhanced 30 EP\)/)
+  assert.match(text(view.tree), /verwahrt, noch nicht verlost/)
+  assert.match(text(view.tree), /im Addon gelöscht/)
+  assert.match(text(view.tree), /entzaubert/)
+  assert.match(text(view.tree), /für die Gildenbank/)
+  assert.equal(select(view, 'Vergabeart für Zeile 1').props.value, 'ENHANCED')
+})
+
+test('character profile shows the wishlist to its owner and staff only', async () => {
+  for (const [me, owner, shown, editable] of [[{ id: 1, role: 'MEMBER' }, 1, true, true], [{ id: 2, role: 'MEMBER' }, 1, false, false], [{ id: 2, role: 'RAIDASSISTENT' }, 1, true, false], [{ id: 1, role: 'GUEST' }, 1, true, false]]) {
+    const s = setup(me)
+    const view = s.mount(s.load('pages/CharacterDetail.tsx').CharacterDetailPage, { characterID: 10 })
+    resolveIf(s, '/api/v1/characters/10', character(10, owner))
+    await flush(view)
+    const wishlist = nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'CharacterWishlist')
+    assert.equal(wishlist.length, shown ? 1 : 0, JSON.stringify(me))
+    if (shown) assert.equal(wishlist[0].props.canEdit, editable, JSON.stringify(me))
+  }
+})
+
+test('character wishlist saves the roll choice and exports it for the addon', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const view = s.mount(s.load('components/CharacterWishlist.tsx').CharacterWishlist, { characterID: 10, canEdit: true })
+  const wish = (id, extra) => ({ id, player_id: 1, character_id: 10, item_id: String(50000 + id), item_name: `Item ${id}`, priority: 0, notes: '', spec: 'MAIN', is_enhanced: false, created_at: '', updated_at: '', ...extra })
+  resolveIf(s, '/api/v1/characters/10/wishlist', [wish(1, { priority: 2 }), wish(2)])
+  await flush(view)
+  assert.equal(select(view, 'Enhanced für Item 1').props.disabled, false)
+  select(view, 'Enhanced für Item 1').props.onChange({ target: { checked: true } })
+  assert.equal(writes(s)[0].url, '/api/v1/characters/10/wishlist/items/50001')
+  assert.deepEqual(writes(s)[0].body, { priority: 2, notes: '', spec: 'MAIN', is_enhanced: true })
+  writes(s)[0].resolve(wish(1, { priority: 2, is_enhanced: true }))
+  await flush(view)
+  assert.equal(select(view, 'Enhanced für Item 1').props.checked, true)
+  // Second spec cannot be enhanced, so switching clears it.
+  select(view, 'Spec für Item 1').props.onChange(change('SECOND'))
+  assert.deepEqual(writes(s)[1].body, { priority: 2, notes: '', spec: 'SECOND', is_enhanced: false })
+  writes(s)[1].resolve(wish(1, { priority: 2, spec: 'SECOND' }))
+  await flush(view)
+  assert.equal(select(view, 'Enhanced für Item 1').props.disabled, true)
+  nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Nach oben')[1].props.onClick()
+  assert.deepEqual(writes(s)[2].body, { priority: 3, notes: '', spec: 'MAIN', is_enhanced: false })
+  writes(s)[2].resolve(wish(2, { priority: 3 }))
+  await flush(view)
+  assert.match(text(view.tree), /Item 2.*Item 1/)
+  button(view, 'Für Addon exportieren').props.onClick()
+  const exportRequest = s.requests.find((r) => r.url === '/api/v1/characters/10/wishlist/addon-export')
+  exportRequest.resolve({ text: 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;' })
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Wunschlisten-Export')[0].props.value, 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;')
+  assert.match(text(view.tree), /\/wish import/)
+})
+
+test('character wishlist is read-only for staff', async () => {
+  const s = setup({ id: 2, role: 'RAIDASSISTENT' })
+  const view = s.mount(s.load('components/CharacterWishlist.tsx').CharacterWishlist, { characterID: 10, canEdit: false })
+  resolveIf(s, '/api/v1/characters/10/wishlist', [{ id: 1, player_id: 1, character_id: 10, item_id: '50001', item_name: 'Item 1', priority: 0, notes: '', spec: 'SECOND', is_enhanced: false, created_at: '', updated_at: '' }])
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.type === 'select').length, 0)
+  assert.equal(button(view, 'Entfernen'), undefined)
+  assert.match(text(view.tree), /Second-Spec/)
+  assert.ok(button(view, 'Für Addon exportieren'))
 })
 
 test('addon loot import lets staff pick the winner and leaves held drops unselected', async () => {

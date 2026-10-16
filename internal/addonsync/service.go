@@ -29,7 +29,7 @@ var (
 )
 
 // importNote marks awards created from an addon export.
-const importNote = "Aus RaidSync-Addon importiert"
+const importNote = "Aus dem Loot-Addon importiert"
 
 // encounterNPCs maps the creatures that die in multi-creature encounters to the
 // catalog's encounter keys. Single-creature bosses use their creature ID as key.
@@ -105,23 +105,29 @@ type RecipientOption struct {
 // LootPreviewRow is one recorded drop with everything the website resolved for
 // it. IsImportable rows can be applied once a boss is chosen.
 type LootPreviewRow struct {
-	LineKey           string             `json:"line_key"`
-	LineNumber        int                `json:"line_number"`
-	LootedAt          *time.Time         `json:"looted_at"`
-	NPCID             string             `json:"npc_id"`
-	ItemID            string             `json:"item_id"`
-	ItemName          string             `json:"item_name"`
-	RecipientName     string             `json:"recipient_name"`
-	State             LootState          `json:"state"`
-	CharacterID       *int64             `json:"character_id"`
-	CharacterName     string             `json:"character_name"`
-	CatalogBossID     *string            `json:"catalog_boss_id"`
-	BossOptions       []lootcatalog.Boss `json:"boss_options"`
-	AwardMethod       loot.Method        `json:"award_method"`
-	IsImportable      bool               `json:"is_importable"`
-	IsAlreadyImported bool               `json:"is_already_imported"`
-	Warnings          []string           `json:"warnings"`
-	Errors            []string           `json:"errors"`
+	LineKey       string             `json:"line_key"`
+	LineNumber    int                `json:"line_number"`
+	LootedAt      *time.Time         `json:"looted_at"`
+	NPCID         string             `json:"npc_id"`
+	ItemID        string             `json:"item_id"`
+	ItemName      string             `json:"item_name"`
+	RecipientName string             `json:"recipient_name"`
+	State         LootState          `json:"state"`
+	CharacterID   *int64             `json:"character_id"`
+	CharacterName string             `json:"character_name"`
+	CatalogBossID *string            `json:"catalog_boss_id"`
+	BossOptions   []lootcatalog.Boss `json:"boss_options"`
+	AwardMethod   loot.Method        `json:"award_method"`
+	// Roll details of RS2 exports; empty for RS1.
+	Roll              *int     `json:"roll"`
+	Spec              string   `json:"spec"`
+	RollRange         string   `json:"roll_range"`
+	WinnerName        string   `json:"winner_name"`
+	EnhancedPoints    int      `json:"enhanced_points"`
+	IsImportable      bool     `json:"is_importable"`
+	IsAlreadyImported bool     `json:"is_already_imported"`
+	Warnings          []string `json:"warnings"`
+	Errors            []string `json:"errors"`
 }
 
 // PreviewLootImport resolves boss, item and recipient for every recorded drop.
@@ -206,6 +212,8 @@ func (s *Service) ApplyLootImport(ctx context.Context, raidID, actorID int64, te
 			result.Status, result.Code, result.Message = ResultFailed, "unknown_line", "Zeile ist nicht im Export enthalten"
 		case line.Error != "":
 			result.Status, result.Code, result.Message = ResultFailed, "invalid_line", line.Error
+		case !line.State.Importable():
+			result.Status, result.Code, result.Message = ResultFailed, "not_importable", "Gelöschte, verwahrte, entzauberte oder für die Gildenbank bestimmte Zeilen werden nicht übernommen"
 		case hasAward(imported, selection.LineKey):
 			award := imported[selection.LineKey]
 			result.Status, result.AwardID = ResultAlreadyImported, &award.ID
@@ -409,6 +417,14 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 		row.Errors = append(row.Errors, fmt.Sprintf("Zeile %d: %s", line.LineNumber, line.Error))
 		return row
 	}
+	if line.Roll > 0 {
+		roll := line.Roll
+		row.Roll = &roll
+	}
+	if line.RollLow > 0 {
+		row.RollRange = fmt.Sprintf("%d-%d", line.RollLow, line.RollHigh)
+	}
+	row.Spec, row.WinnerName, row.EnhancedPoints = line.Spec, line.WinnerName, line.EnhancedPoints()
 	lootedAt := line.LootedAt
 	row.LootedAt = &lootedAt
 	existing, isImported := r.imported[key]
@@ -441,17 +457,20 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 		}
 	}
 
-	row.AwardMethod = loot.Main
-	if loot.IsTokenAward(row.ItemName) {
-		row.AwardMethod = loot.Second
-	}
+	row.AwardMethod = defaultMethod(line, row.ItemName)
 
 	// The recipient is only a suggestion: staff may pick another roster
 	// character, because a trade between two other players is invisible to
 	// the recorder.
 	// Once imported, only a recipient that differs from the stored award matters.
-	entry := findRosterEntry(r.roster, line.RecipientName)
+	suggested := line.RecipientName
+	if line.State == LootHeld && line.WinnerName != "" {
+		// The recorder still carries the item, but the roll already has a winner.
+		suggested = line.WinnerName
+	}
+	entry := findRosterEntry(r.roster, suggested)
 	switch {
+	case !line.State.Importable() && !isImported:
 	case isImported && entry != nil:
 		characterID := entry.attendance.CharacterID
 		row.CharacterID = &characterID
@@ -464,10 +483,30 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 		row.CharacterID = &characterID
 		row.CharacterName = entry.currentName
 	default:
-		row.Warnings = append(row.Warnings, fmt.Sprintf("%s steht nicht in der Aufstellung – Empfänger wählen oder zuerst per Schnellaufnahme hinzufügen", line.RecipientName))
+		row.Warnings = append(row.Warnings, fmt.Sprintf("%s steht nicht in der Aufstellung – Empfänger wählen oder zuerst per Schnellaufnahme hinzufügen", suggested))
 	}
-	if line.State == LootHeld && !isImported {
+	switch {
+	case line.State == LootHeld && !isImported && line.WinnerName != "":
+		row.Warnings = append(row.Warnings, fmt.Sprintf("Noch beim Plündermeister – gewonnen von %s, Handel steht aus", line.WinnerName))
+	case line.State == LootHeld && !isImported:
 		row.Warnings = append(row.Warnings, "Noch beim Plündermeister – Empfänger prüfen")
+	case line.State == LootParked && !isImported:
+		row.Warnings = append(row.Warnings, fmt.Sprintf("Wird von %s verwahrt und ist noch nicht verlost – wird nicht übernommen", line.RecipientName))
+	case line.State == LootDeleted && isImported:
+		row.Warnings = append(row.Warnings, "Im Addon gelöscht – bei Bedarf über die Loot-Korrektur zurückziehen")
+	case line.State == LootDeleted:
+		row.Warnings = append(row.Warnings, "Im Addon gelöscht – wird nicht übernommen")
+	case (line.State == LootDisenchanted || line.State == LootBank) && isImported:
+		row.Warnings = append(row.Warnings, "Im Addon jetzt für Entzaubern oder Gildenbank – bei Bedarf über die Loot-Korrektur zurückziehen")
+	case line.State == LootDisenchanted:
+		row.Warnings = append(row.Warnings, fmt.Sprintf("Entzaubert (bei %s) – kein Loot eines Spielers, wird nicht übernommen", line.RecipientName))
+	case line.State == LootBank:
+		row.Warnings = append(row.Warnings, fmt.Sprintf("Für die Gildenbank (bei %s) – kein Loot eines Spielers, wird nicht übernommen", line.RecipientName))
+	}
+	if x := line.EnhancedPoints(); x > 0 && entry != nil && !isImported {
+		if want := r.enhancedPoints(ctx, entry.attendance.PlayerID); want != x {
+			row.Warnings = append(row.Warnings, fmt.Sprintf("Enhanced-Wurf mit %d EP, laut Konto sind es %d (Kontostand, höchstens %d) – abgebucht wird der Kontowert", x, want, maxEnhancedPoints))
+		}
 	}
 	if isImported && existing.AwardedToCharacterID != nil && (row.CharacterID == nil || *existing.AwardedToCharacterID != *row.CharacterID) {
 		row.Warnings = append(row.Warnings, fmt.Sprintf("Bereits importiert an %s, der Export nennt %s – bitte über die Loot-Korrektur ändern", r.characterName(ctx, *existing.AwardedToCharacterID), displayRecipient(line.RecipientName)))
@@ -479,8 +518,39 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 		}
 	}
 
-	row.IsImportable = len(row.Errors) == 0 && !row.IsAlreadyImported
+	row.IsImportable = len(row.Errors) == 0 && !row.IsAlreadyImported && line.State.Importable()
 	return row
+}
+
+// Importable is false for drops that are not awards (yet): parked items wait
+// for their roll, deleted ones were removed in the addon, and disenchanted or
+// banked items belong to nobody. Staff decide about those; the import never
+// changes anything for them.
+func (s LootState) Importable() bool {
+	return s != LootParked && s != LootDeleted && s != LootDisenchanted && s != LootBank
+}
+
+// defaultMethod suggests the award method: an enhanced roll range means
+// ENHANCED, tokens stay SECOND (ADR 028), and an RS2 off-spec roll SECOND.
+func defaultMethod(line LootLine, itemName string) loot.Method {
+	switch {
+	case line.EnhancedPoints() > 0:
+		return loot.Enhanced
+	case loot.IsTokenAward(itemName), line.Spec == SpecOff:
+		return loot.Second
+	default:
+		return loot.Main
+	}
+}
+
+// enhancedPoints is X = min(balance, 50) for the player (ADR 023); -1 when the
+// balance cannot be read, so the preview warns instead of guessing.
+func (r *resolver) enhancedPoints(ctx context.Context, playerID int64) int {
+	balance, err := r.service.points.Balance(ctx, playerID)
+	if err != nil {
+		return -1
+	}
+	return max(0, min(balance, maxEnhancedPoints))
 }
 
 func displayRecipient(name string) string {

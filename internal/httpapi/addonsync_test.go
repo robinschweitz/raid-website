@@ -32,6 +32,11 @@ type addonPreviewRow struct {
 	CatalogBossID     *string            `json:"catalog_boss_id"`
 	BossOptions       []lootcatalog.Boss `json:"boss_options"`
 	AwardMethod       string             `json:"award_method"`
+	Roll              *int               `json:"roll"`
+	Spec              string             `json:"spec"`
+	RollRange         string             `json:"roll_range"`
+	WinnerName        string             `json:"winner_name"`
+	EnhancedPoints    int                `json:"enhanced_points"`
 	IsImportable      bool               `json:"is_importable"`
 	IsAlreadyImported bool               `json:"is_already_imported"`
 	Warnings          []string           `json:"warnings"`
@@ -114,8 +119,8 @@ func TestAddonInviteExportUsesCurrentNamesAndBench(t *testing.T) {
 		query string
 		want  string
 	}{
-		{"", fmt.Sprintf("RS1|INV|%d|Correction raid|25\nUmbenannt|DD|Magier|0", f.raidID)},
-		{"?bench=1", fmt.Sprintf("RS1|INV|%d|Correction raid|25\nUmbenannt|DD|Magier|0\nCorrection1|DD|Magier|1", f.raidID)},
+		{"", fmt.Sprintf("RS2;INV;%d;Correction raid;25\nUmbenannt;DD;Magier;0", f.raidID)},
+		{"?bench=1", fmt.Sprintf("RS2;INV;%d;Correction raid;25\nUmbenannt;DD;Magier;0\nCorrection1;DD;Magier;1", f.raidID)},
 	} {
 		status, body := do(t, f.srv.Client(), http.MethodGet, fmt.Sprintf("%s/api/v1/raids/%d/addon-invite-export%s", f.srv.URL, f.raidID, tc.query), f.memberToken, nil)
 		if status != http.StatusOK {
@@ -180,6 +185,64 @@ func TestAddonLootPreviewResolvesBossRecipientAndProblems(t *testing.T) {
 	awards, err := loot.NewRepo(f.db).ListByRaid(context.Background(), f.raidID)
 	if err != nil || len(awards) != 0 {
 		t.Fatalf("preview wrote loot: %v %v", awards, err)
+	}
+}
+
+// RS2 (RaidLedger) adds the roll: the spec and an enhanced range pick the
+// default method, a held item suggests its roll winner, and parked or deleted
+// lines are shown but never imported.
+func TestAddonLootPreviewReadsRS2RollsAndStates(t *testing.T) {
+	f := newCorrectionFixture(t)
+	f.attend(f.first, f.firstChar)
+	f.attend(f.second, f.secondChar)
+	f.seedPoints(f.first, 30)
+	first, second := f.characterName(f.firstChar), f.characterName(f.secondChar)
+	payload := strings.Join([]string{
+		fmt.Sprintf("RS2;LOOT;%d;%s;1760000000;1760009000", f.raidID, second),
+		fmt.Sprintf("1;1760000100;-;%s;%s;given;87;ms;1-100;%s", f.ordinaryItem, first, first),
+		fmt.Sprintf("2;1760000200;-;%s;%s;held;131;ms;31-130;%s", f.ordinaryItem, second, first),
+		fmt.Sprintf("3;1760000300;-;%s;%s;given;64;os;1-99;%s", f.ordinaryItem, second, second),
+		fmt.Sprintf("4;1760000400;-;%s;%s;parked;-;-;-;-", f.ordinaryItem, second),
+		fmt.Sprintf("5;1760000500;-;%s;%s;deleted;12;ms;1-100;%s", f.ordinaryItem, first, first),
+		fmt.Sprintf("6;1760000600;-;%s;%s;given;99;ms;21-120;%s", f.ordinaryItem, first, first),
+		fmt.Sprintf("7;1760000700;-;%s;%s;disenchanted;-;-;-;-", f.ordinaryItem, second),
+		fmt.Sprintf("8;1760000800;-;%s;%s;bank;-;-;-;-", f.ordinaryItem, second),
+	}, "\n")
+	rows := f.addonPreview(payload).Rows
+	if len(rows) != 8 {
+		t.Fatalf("rows: %+v", rows)
+	}
+	if r := rows[0]; !r.IsImportable || r.AwardMethod != "MAIN" || r.Roll == nil || *r.Roll != 87 || r.Spec != "ms" || r.RollRange != "1-100" || r.EnhancedPoints != 0 {
+		t.Fatalf("main-spec row: %+v", r)
+	}
+	if r := rows[1]; !r.IsImportable || r.AwardMethod != "ENHANCED" || r.EnhancedPoints != 30 || r.CharacterID == nil || *r.CharacterID != f.firstChar || !strings.Contains(strings.Join(r.Warnings, " "), "gewonnen von "+first) || strings.Contains(strings.Join(r.Warnings, " "), "laut Konto") {
+		t.Fatalf("held row must suggest the winner and ENHANCED: %+v", r)
+	}
+	if r := rows[2]; !r.IsImportable || r.AwardMethod != "SECOND" || *r.CharacterID != f.secondChar {
+		t.Fatalf("off-spec row: %+v", r)
+	}
+	for _, r := range append(rows[3:5:5], rows[6:8]...) {
+		if r.IsImportable || r.CharacterID != nil || len(r.Errors) != 0 || len(r.Warnings) != 1 || !strings.Contains(r.Warnings[0], "nicht übernommen") {
+			t.Fatalf("parked and deleted rows are shown only: %+v", r)
+		}
+	}
+	if r := rows[5]; !r.IsImportable || r.EnhancedPoints != 20 || !strings.Contains(strings.Join(r.Warnings, " "), "laut Konto sind es 30") {
+		t.Fatalf("an enhanced roll that disagrees with the balance must warn: %+v", r)
+	}
+
+	results := f.addonImport(f.token, payload, []map[string]any{
+		{"line_key": rows[1].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": rows[1].AwardMethod},
+		{"line_key": rows[3].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
+		{"line_key": rows[4].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"},
+		{"line_key": rows[6].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
+		{"line_key": rows[7].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
+	})
+	if len(results) != 5 || results[0].Status != "created" || results[1].Code != "not_importable" || results[2].Code != "not_importable" || results[3].Code != "not_importable" || results[4].Code != "not_importable" {
+		t.Fatalf("results: %+v", results)
+	}
+	f.points(f.first, 0)
+	if r := f.addonPreview(strings.Replace(payload, ";given;87;", ";deleted;87;", 1)).Rows; r[1].IsImportable || !strings.Contains(strings.Join(r[0].Warnings, " "), "Im Addon gelöscht") {
+		t.Fatalf("rows after import: %+v", r)
 	}
 }
 
@@ -455,7 +518,7 @@ func TestAddonRosterImportAddsKnownCharactersOnce(t *testing.T) {
 	f := newCorrectionFixture(t)
 	f.attend(f.first, f.firstChar)
 	second := f.characterName(f.secondChar)
-	payload := fmt.Sprintf("RS1|ROSTER|%d|x|1760007200\n%s|MAGE|1760003600", f.raidID, second)
+	payload := fmt.Sprintf("RS2;ROSTER;%d;x;1760007200\n%s;MAGE;1760003600", f.raidID, second)
 	results := f.rosterImport(payload, []map[string]any{
 		{"character_id": f.secondChar, "role": "HEAL", "late_join": true},
 		{"character_id": f.firstChar, "role": "DD"},

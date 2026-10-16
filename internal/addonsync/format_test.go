@@ -2,6 +2,7 @@ package addonsync
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -106,6 +107,74 @@ func TestParseRosterExport(t *testing.T) {
 	for _, text := range []string{"", "RS1|LOOT|7|A|1", "RS1|ROSTER|x|A|1", "RS1|ROSTER|7|A"} {
 		if _, err := ParseRosterExport(text); !errors.Is(err, ErrInvalidPayload) {
 			t.Fatalf("%q: expected ErrInvalidPayload, got %v", text, err)
+		}
+	}
+}
+
+func TestParseLootExportV2(t *testing.T) {
+	text := strings.Join([]string{
+		"RS2;LOOT;7;Rüdiger;1760000000;1760009000",
+		"1;1760000100;36612;50415;Shanna;given;87;ms;1-100;Shanna",
+		"2;1760000200;-;50274;Rüdiger;held;131;ms;31-130;Thorgrim",
+		"3;1760000250;-;50274;Rüdiger;held;-;-;-;-",
+		"4;1760000300;-;50415;Thorgrim;parked;-;-;-;-",
+		"5;1760000400;-;50415;Shanna;deleted;44;os;1-99;Shanna",
+		"6;1760000500;-;50415;Shanna;manual;-;-;-;-",
+		"7;1760000600;-;-;Shanna;manual;-;-;-;-",
+		"8;1760000700;-;50415;Shanna;lost;-;-;-;-",
+		"9;1760000800;-;50415;-;given;-;-;-;-",
+		"10;1760000900;-;50415;Shanna;given;151;ms;51-150;Shanna",
+		"11;1760001000;-;50415;Shanna;given;90;ds;1-100;Shanna",
+		"12;1760001100;-;50415;Shanna;given;90;ms;100-1;Shanna",
+		"13;1760001200;-;50415;Shanna;given;90;ms;1-100",
+	}, "\n")
+	export, err := ParseLootExport(text)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if export.Version != "RS2" || export.RaidID != 7 || export.Recorder != "Rüdiger" || !export.StartedAt.Equal(time.Unix(1760000000, 0)) || len(export.Lines) != 13 {
+		t.Fatalf("export: %+v", export)
+	}
+	if l := export.Lines[0]; l.Error != "" || l.State != LootGiven || l.Roll != 87 || l.Spec != SpecMain || l.RollLow != 1 || l.RollHigh != 100 || l.WinnerName != "Shanna" || l.EnhancedPoints() != 0 {
+		t.Fatalf("given line: %+v", l)
+	}
+	if l := export.Lines[1]; l.Error != "" || l.State != LootHeld || l.WinnerName != "Thorgrim" || l.EnhancedPoints() != 30 {
+		t.Fatalf("held enhanced line: %+v", l)
+	}
+	if l := export.Lines[2]; l.Error != "" || l.Roll != 0 || l.Spec != "" || l.WinnerName != "" {
+		t.Fatalf("open held line: %+v", l)
+	}
+	if l := export.Lines[3]; l.Error != "" || l.State != LootParked || l.RecipientName != "Thorgrim" {
+		t.Fatalf("parked line: %+v", l)
+	}
+	if l := export.Lines[4]; l.Error != "" || l.State != LootDeleted || l.Spec != SpecOff || l.EnhancedPoints() != 0 {
+		t.Fatalf("deleted line: %+v", l)
+	}
+	if l := export.Lines[5]; l.Error != "" || l.State != LootManual {
+		t.Fatalf("manual line: %+v", l)
+	}
+	// no item, unknown state, missing recipient, roll above 150, unknown spec, reversed range, nine fields
+	for _, broken := range export.Lines[6:] {
+		if broken.Error == "" {
+			t.Fatalf("broken line must be reported: %+v", broken)
+		}
+	}
+	for _, text := range []string{"RS2;LOOT;7;A;1", "RS2;LOOT;7;A;1;x", "RS2;ROSTER;7;A;1;2", "RS2;LOOT;x;A;1;2"} {
+		if _, err := ParseLootExport(text); !errors.Is(err, ErrInvalidPayload) {
+			t.Fatalf("%q: expected ErrInvalidPayload, got %v", text, err)
+		}
+	}
+	if _, err := ParseRosterExport("RS2;LOOT;7;A;1;2"); !errors.Is(err, ErrInvalidPayload) {
+		t.Fatal("RS2 is only a loot format")
+	}
+}
+
+func TestEnhancedPointsFollowTheMinBalanceRule(t *testing.T) {
+	for _, tc := range []struct{ low, high, want int }{
+		{1, 100, 0}, {1, 99, 0}, {2, 101, 1}, {31, 130, 30}, {51, 150, 50}, {52, 151, 0}, {31, 129, 0},
+	} {
+		if got := (LootLine{RollLow: tc.low, RollHigh: tc.high}).EnhancedPoints(); got != tc.want {
+			t.Fatalf("%d-%d: %d, want %d", tc.low, tc.high, got, tc.want)
 		}
 	}
 }

@@ -1,8 +1,19 @@
-export const appVersion = '1.0.9'
+export const appVersion = '1.0.10'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Wunschliste fürs Addon, Loot-Import mit Würfen',
+    changes: [
+      'Auf der Charakterseite steht die Wunschliste: Für jedes Item lässt sich Main- oder Second-Spec wählen und bei Main-Spec „Enhanced“ ankreuzen. „Nach oben“ ändert die Reihenfolge.',
+      '„Für Addon exportieren“ erzeugt den Text für das Wunschlisten-Addon (ingame /flw import), samt aktuellem EP-Stand. Enhanced würfelt 1+X bis 100+X mit X = EP-Stand, höchstens 50.',
+      'Der Loot-Import liest auch Exporte von ForgeLootLedger: Wurf, Spec und Wurfbereich stehen in der Vorschau, Enhanced-Würfe sind als Enhanced vorausgewählt, und Items beim Plündermeister mit bekanntem Gewinner sind für den Gewinner vorausgewählt.',
+      'Verwahrte (noch nicht verloste) und im Addon gelöschte Items werden angezeigt, aber nie übernommen. Über bereits übernommene Items entscheidet die Raidleitung per Loot-Korrektur.',
+      'Die Herzen im Loot-Katalog zeigen wieder an, welche Items schon auf der Wunschliste stehen, und Wunschlisten sind wieder nach Priorität sortiert.',
+    ],
+  },
+  {
+    version: '1.0.9',
     title: 'Absagen: keine EP als Standard, Ersatzbank',
     changes: [
       'Beim Archivieren erhalten abgesagte Spieler standardmäßig keine EP. Mit einem Haken („trotzdem EP geben“) bekommen sie die +10 EP doch.',

@@ -26,6 +26,10 @@ and a real-data dashboard. No external artwork, fake progression, or new UI depe
 
 - Production requires `ENV=production` and explicit nondefault `ADMIN_USERNAME` and
   `ADMIN_PASSWORD`. Startup fails on configuration, migration, or admin bootstrap errors.
+- Production binds to `127.0.0.1:PORT` unless an explicit loopback `LISTEN_ADDR` is
+  configured. Put nginx or another TLS reverse proxy in front; never expose the Go port.
+- `deploy/` contains the production systemd and SSH templates plus verified, compressed
+  SQLite snapshots. See `deploy/README.md` for setup, retention, verification, and recovery.
 - SQLite foreign keys are enabled automatically. Back up an existing database before
   deployment; migration `003_import_identity` adds import provenance and preview metadata.
 - Attendance and loot edits require a reason and write an audit trail. Completed-raid

@@ -1,0 +1,30 @@
+[Unit]
+Description=Publish a built Raid Website binary
+After=raid-website-backup.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/local/sbin/raid-website-publish
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ReadWritePaths=/opt/raid-website /var/backups/raid-website
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_FOWNER CAP_KILL
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native

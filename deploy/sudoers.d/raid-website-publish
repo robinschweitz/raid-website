@@ -1,0 +1,3 @@
+# The unprivileged builder can start only the fixed root-owned publishing unit.
+# The publisher validates its fixed build paths and Git revision before acting.
+raiddeploy ALL=(root) NOPASSWD: /usr/bin/systemctl start raid-website-publish.service

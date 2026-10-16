@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly Raid Website database snapshots
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=5m
+Unit=raid-website-backup.service
+
+[Install]
+WantedBy=timers.target

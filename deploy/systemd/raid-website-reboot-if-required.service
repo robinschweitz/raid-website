@@ -1,0 +1,8 @@
+[Unit]
+Description=Reboot after a scheduled security update when required
+ConditionPathExists=/var/run/reboot-required
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl reboot

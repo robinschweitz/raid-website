@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 type Config struct {
 	Port                 string
+	ListenAddr           string
 	DatabaseURL          string
 	Env                  string
 	CookieSecure         bool
@@ -22,8 +24,18 @@ type Config struct {
 
 func Load() (*Config, error) {
 	env := getEnv("ENV", "development")
+	port := getEnv("PORT", "8080")
+	listenAddr := getEnv("LISTEN_ADDR", "")
+	if listenAddr == "" {
+		if env == "production" {
+			listenAddr = "127.0.0.1:" + port
+		} else {
+			listenAddr = ":" + port
+		}
+	}
 	c := &Config{
-		Port:                 getEnv("PORT", "8080"),
+		Port:                 port,
+		ListenAddr:           listenAddr,
 		DatabaseURL:          getEnv("DATABASE_URL", "file:raid.db?_pragma=journal_mode(WAL)"),
 		Env:                  env,
 		CookieSecure:         getEnv("COOKIE_SECURE", "") == "true" || env == "production",
@@ -48,6 +60,14 @@ func Load() (*Config, error) {
 		password := os.Getenv("ADMIN_PASSWORD")
 		if username == "" || strings.EqualFold(username, "Robin") || strings.TrimSpace(password) == "" || password == "test" || password == "development-password" {
 			return nil, errors.New("production requires explicit nondefault ADMIN_USERNAME and ADMIN_PASSWORD")
+		}
+		host, _, err := net.SplitHostPort(c.ListenAddr)
+		if err != nil || host == "" {
+			return nil, errors.New("LISTEN_ADDR must be a host:port address")
+		}
+		ip := net.ParseIP(host)
+		if (ip != nil && !ip.IsLoopback()) || (ip == nil && !strings.EqualFold(host, "localhost")) {
+			return nil, errors.New("production LISTEN_ADDR must use a loopback host")
 		}
 	}
 	return c, nil

@@ -1,0 +1,10 @@
+[Unit]
+Description=Scheduled security reboot check at 03:00 Europe/Berlin
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Europe/Berlin
+Persistent=true
+Unit=raid-website-reboot-if-required.service
+
+[Install]
+WantedBy=timers.target

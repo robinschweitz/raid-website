@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly Raid Website update check
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=10m
+Unit=raid-website-update.service
+
+[Install]
+WantedBy=timers.target

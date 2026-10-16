@@ -58,9 +58,8 @@ func run() (err error) {
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)
 	}
-	addr := fmt.Sprintf(":%s", cfg.Port)
-	log.Printf("listening on %s", addr)
-	if err := http.ListenAndServe(addr, h); err != nil && err != http.ErrServerClosed {
+	log.Printf("listening on %s", cfg.ListenAddr)
+	if err := http.ListenAndServe(cfg.ListenAddr, h); err != nil && err != http.ErrServerClosed {
 		return err
 	}
 	return nil

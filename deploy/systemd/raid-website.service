@@ -1,0 +1,42 @@
+[Unit]
+Description=Raid Website
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=raidweb
+Group=raidweb
+WorkingDirectory=/var/lib/raid-website
+EnvironmentFile=/etc/raid-website.env
+# The backend is only reachable through the local nginx reverse proxy.
+Environment=LISTEN_ADDR=127.0.0.1:8080
+ExecStart=/opt/raid-website/server
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectProc=invisible
+ProcSubset=pid
+ReadWritePaths=/var/lib/raid-website
+CapabilityBoundingSet=
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,37 @@
+[Unit]
+Description=Build and publish a reviewed Raid Website revision from GitHub
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=raiddeploy
+Group=raiddeploy
+WorkingDirectory=/opt/raid-website/source
+Environment=HOME=/var/lib/raiddeploy
+Environment=GOPATH=/var/lib/raiddeploy/go
+Environment=GOMODCACHE=/var/lib/raiddeploy/go/pkg/mod
+Environment=GOCACHE=/var/lib/raiddeploy/.cache/go-build
+EnvironmentFile=/etc/raid-website-update.env
+ExecStart=/usr/local/sbin/raid-website-update
+UMask=0077
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectProc=invisible
+ProcSubset=pid
+ReadWritePaths=/opt/raid-website/source /opt/raid-website/build /var/lib/raiddeploy
+CapabilityBoundingSet=
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native

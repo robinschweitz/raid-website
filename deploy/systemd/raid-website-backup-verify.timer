@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly Raid Website database snapshot verification
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30:00 UTC
+Persistent=true
+RandomizedDelaySec=30m
+Unit=raid-website-backup-verify.service
+
+[Install]
+WantedBy=timers.target

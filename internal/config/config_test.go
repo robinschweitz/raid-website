@@ -45,6 +45,35 @@ func TestDevelopmentDefaults(t *testing.T) {
 	if cfg.AdminUsername != "Robin" || cfg.AdminPassword != "development-password" {
 		t.Fatal("development defaults changed")
 	}
+	if cfg.ListenAddr != ":8080" {
+		t.Fatalf("ListenAddr = %q, want :8080", cfg.ListenAddr)
+	}
+}
+
+func TestProductionListenAddress(t *testing.T) {
+	for _, tc := range []struct {
+		name, listenAddr string
+		valid            bool
+	}{
+		{"default", "", true},
+		{"ipv4 loopback", "127.0.0.1:8080", true},
+		{"ipv6 loopback", "[::1]:8080", true},
+		{"localhost", "localhost:8080", true},
+		{"public interface", ":8080", false},
+		{"public address", "192.0.2.1:8080", false},
+		{"invalid", "127.0.0.1", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("ENV", "production")
+			t.Setenv("ADMIN_USERNAME", "owner")
+			t.Setenv("ADMIN_PASSWORD", "unique-password")
+			t.Setenv("LISTEN_ADDR", tc.listenAddr)
+			_, err := Load()
+			if (err == nil) != tc.valid {
+				t.Fatalf("Load error = %v, want valid %v", err, tc.valid)
+			}
+		})
+	}
 }
 
 func TestRisingGodsProxyConfiguration(t *testing.T) {

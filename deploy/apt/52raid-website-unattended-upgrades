@@ -1,0 +1,7 @@
+// Keep Debian's configured stable and security origins. Never reboot a raid
+// service without an explicitly planned maintenance window.
+Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+Unattended-Upgrade::MinimalSteps "true";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "false";

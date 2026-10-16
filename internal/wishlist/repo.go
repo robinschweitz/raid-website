@@ -30,7 +30,7 @@ func (r *Repo) listByCharacter(ctx context.Context, charID int64) ([]Wish, error
 	if err := r.db.NewSelect().
 		Model(&rows).
 		Where("character_id = ?", charID).
-		Order("priority DESC, id ASC").
+		OrderExpr("priority DESC, id ASC").
 		Scan(ctx); err != nil {
 		return nil, err
 	}
@@ -56,6 +56,29 @@ func (r *Repo) add(ctx context.Context, wish *Wish) error {
 		return err
 	}
 	return nil
+}
+
+func (r *Repo) update(ctx context.Context, charID int64, itemID string, priority int, notes string, choice RollChoice) (*Wish, error) {
+	res, err := r.db.NewUpdate().
+		Model((*Wish)(nil)).
+		Set("priority = ?", priority).
+		Set("notes = ?", notes).
+		Set("spec = ?", choice.Spec).
+		Set("is_enhanced = ?", choice.IsEnhanced).
+		Set("updated_at = ?", time.Now().UTC()).
+		Where("character_id = ? AND item_id = ?", charID, itemID).
+		Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, ErrNotFound
+	}
+	wish := &Wish{}
+	if err := r.db.NewSelect().Model(wish).Where("character_id = ? AND item_id = ?", charID, itemID).Scan(ctx); err != nil {
+		return nil, err
+	}
+	return wish, nil
 }
 
 func (r *Repo) remove(ctx context.Context, charID int64, itemID string) error {
@@ -127,7 +150,7 @@ func (r *Repo) BulkByItemsForRaid(ctx context.Context, raidID int64) ([]RaidWish
 		Join("JOIN characters c ON c.id = cw.character_id").
 		Join("JOIN players p ON p.id = cw.player_id").
 		Join("LEFT JOIN raid_attendance a ON a.raid_id = ? AND a.character_id = cw.character_id", raidID).
-		Order("cw.item_id ASC, character_name ASC").
+		OrderExpr("cw.item_id ASC, character_name ASC").
 		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

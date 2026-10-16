@@ -18,9 +18,19 @@ interface Choice {
 const methodLabels: Record<AwardMethod, string> = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
 const resultLabels: Record<AddonLootImportResult['status'], string> = { created: 'Übernommen', already_imported: 'Bereits importiert', failed: 'Fehler' }
 
+const stateLabels: Partial<Record<AddonLootPreviewRow['state'], string>> = { held: 'beim Plündermeister', parked: 'verwahrt, noch nicht verlost', deleted: 'im Addon gelöscht' }
+
+function rollText(row: AddonLootPreviewRow) {
+  if (row.roll == null) return ''
+  const spec = row.spec === 'ms' ? 'Main-Spec' : row.spec === 'os' ? 'Second-Spec' : ''
+  const parts = [row.roll_range, spec, row.enhanced_points > 0 ? `Enhanced ${row.enhanced_points} EP` : ''].filter(Boolean)
+  return `Wurf ${row.roll}${parts.length > 0 ? ` (${parts.join(', ')})` : ''}`
+}
+
 function initialChoices(preview: AddonLootPreview): Record<string, Choice> {
-  // Held drops are still with the loot master, so they wait for an explicit choice.
-  return Object.fromEntries(preview.rows.map((row) => [row.line_key, { isSelected: row.is_importable && row.character_id != null && row.state !== 'held', bossID: row.catalog_boss_id ?? '', characterID: row.character_id != null ? String(row.character_id) : '', method: row.award_method }]))
+  // Held drops are still with the loot master, so they wait for an explicit
+  // choice unless the addon already knows the roll winner (RS2).
+  return Object.fromEntries(preview.rows.map((row) => [row.line_key, { isSelected: row.is_importable && row.character_id != null && (row.state !== 'held' || Boolean(row.winner_name)), bossID: row.catalog_boss_id ?? '', characterID: row.character_id != null ? String(row.character_id) : '', method: row.award_method }]))
 }
 
 export function AddonLootImport({ raidID, onImported }: Props) {
@@ -89,7 +99,8 @@ export function AddonLootImport({ raidID, onImported }: Props) {
               const choice = choices[row.line_key]
               return <tr key={row.line_key}>
                 <td><input type="checkbox" aria-label={`Zeile ${row.line_number} übernehmen`} disabled={pending || !row.is_importable} checked={choice?.isSelected ?? false} onChange={(e) => choose(row, { isSelected: e.target.checked })} /></td>
-                <td>{row.item_name || 'Unbekannter Gegenstand'}{row.item_id && <span className="muted"> · {row.item_id}</span>}</td>
+                <td>{row.item_name || 'Unbekannter Gegenstand'}{row.item_id && <span className="muted"> · {row.item_id}</span>}
+                  {rollText(row) && <div className="muted">{rollText(row)}</div>}</td>
                 <td className="addon-boss">{row.is_importable && row.boss_options.length > 1
                   ? <select aria-label={`Boss für Zeile ${row.line_number}`} disabled={pending} value={choice?.bossID ?? ''} onChange={(e) => choose(row, { bossID: e.target.value })}>
                     <option value="">Boss wählen</option>
@@ -103,7 +114,7 @@ export function AddonLootImport({ raidID, onImported }: Props) {
                   </select>
                   : row.character_name || row.recipient_name || '—'}
                   {row.is_importable && row.recipient_name && row.recipient_name.toLocaleLowerCase('de') !== (row.character_name || '').toLocaleLowerCase('de') && <div className="muted">Addon: {row.recipient_name}</div>}
-                  {row.state === 'held' && <div className="muted">beim Plündermeister</div>}</td>
+                  {stateLabels[row.state] && <div className="muted">{stateLabels[row.state]}</div>}</td>
                 <td>{row.is_importable
                   ? <select aria-label={`Vergabeart für Zeile ${row.line_number}`} disabled={pending} value={choice?.method ?? row.award_method} onChange={(e) => choose(row, { method: e.target.value as AwardMethod })}>
                     {Object.entries(methodLabels).map(([method, label]) => <option key={method} value={method}>{label}</option>)}

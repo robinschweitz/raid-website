@@ -119,7 +119,7 @@ func (s *Service) Update(ctx context.Context, actorID, charID int64, itemID stri
 	return s.repo.update(ctx, charID, itemID, priority, notes, choice)
 }
 
-// AddonExport renders the character's wishlist for the ForgeLootWishlist
+// AddonExport renders the character's wishlist for the RaidWishlist
 // addon, with the owner's EP balance for enhanced rolls.
 func (s *Service) AddonExport(ctx context.Context, charID int64, now time.Time) (string, error) {
 	if charID <= 0 {

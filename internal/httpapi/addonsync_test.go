@@ -119,8 +119,8 @@ func TestAddonInviteExportUsesCurrentNamesAndBench(t *testing.T) {
 		query string
 		want  string
 	}{
-		{"", fmt.Sprintf("RS1|INV|%d|Correction raid|25\nUmbenannt|DD|Magier|0", f.raidID)},
-		{"?bench=1", fmt.Sprintf("RS1|INV|%d|Correction raid|25\nUmbenannt|DD|Magier|0\nCorrection1|DD|Magier|1", f.raidID)},
+		{"", fmt.Sprintf("RS2;INV;%d;Correction raid;25\nUmbenannt;DD;Magier;0", f.raidID)},
+		{"?bench=1", fmt.Sprintf("RS2;INV;%d;Correction raid;25\nUmbenannt;DD;Magier;0\nCorrection1;DD;Magier;1", f.raidID)},
 	} {
 		status, body := do(t, f.srv.Client(), http.MethodGet, fmt.Sprintf("%s/api/v1/raids/%d/addon-invite-export%s", f.srv.URL, f.raidID, tc.query), f.memberToken, nil)
 		if status != http.StatusOK {
@@ -188,7 +188,7 @@ func TestAddonLootPreviewResolvesBossRecipientAndProblems(t *testing.T) {
 	}
 }
 
-// RS2 (ForgeLootLedger) adds the roll: the spec and an enhanced range pick the
+// RS2 (RaidLedger) adds the roll: the spec and an enhanced range pick the
 // default method, a held item suggests its roll winner, and parked or deleted
 // lines are shown but never imported.
 func TestAddonLootPreviewReadsRS2RollsAndStates(t *testing.T) {
@@ -518,7 +518,7 @@ func TestAddonRosterImportAddsKnownCharactersOnce(t *testing.T) {
 	f := newCorrectionFixture(t)
 	f.attend(f.first, f.firstChar)
 	second := f.characterName(f.secondChar)
-	payload := fmt.Sprintf("RS1|ROSTER|%d|x|1760007200\n%s|MAGE|1760003600", f.raidID, second)
+	payload := fmt.Sprintf("RS2;ROSTER;%d;x;1760007200\n%s;MAGE;1760003600", f.raidID, second)
 	results := f.rosterImport(payload, []map[string]any{
 		{"character_id": f.secondChar, "role": "HEAL", "late_join": true},
 		{"character_id": f.firstChar, "role": "DD"},

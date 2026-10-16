@@ -1,6 +1,7 @@
 // Package addonsync converts raid data to and from the line-based text format
-// that the RaidSync WoW addon exchanges by copy and paste. WoW addons have no
-// network access, so this text is the only channel between game and website.
+// that the raid lead's WoW addon (RaidLedger; formerly RaidSync) exchanges
+// by copy and paste. WoW addons have no network access, so this text is the
+// only channel between game and website.
 package addonsync
 
 import (
@@ -17,14 +18,14 @@ import (
 // formatVersion prefixes every export so a future format can be told apart.
 const formatVersion = "RS1"
 
-// lootFormatV2 is the loot export of ForgeLootLedger: ";"-separated (a WoW
-// EditBox treats "|" as an escape character) and with roll details.
-const lootFormatV2 = "RS2"
+// formatV2 is RaidLedger's format: ";"-separated (a WoW EditBox treats
+// "|" as an escape character); its loot export adds roll details.
+const formatV2 = "RS2"
 
 // maxEnhancedPoints is the most EP an enhanced roll can add (ADR 023).
 const maxEnhancedPoints = 50
 
-// ErrInvalidPayload marks pasted text that is not the expected RaidSync export.
+// ErrInvalidPayload marks pasted text that is not the expected addon export.
 var ErrInvalidPayload = errors.New("invalid addon export")
 
 // InviteMember is one roster entry the addon should invite.
@@ -35,22 +36,22 @@ type InviteMember struct {
 	IsBench bool
 }
 
-// BuildInviteExport renders the invite list:
+// BuildInviteExport renders the invite list for RaidLedger:
 //
-//	RS1|INV|<raidID>|<raidName>|<raidSize>
-//	<name>|<role>|<class>|<bench 0/1>
+//	RS2;INV;<raidID>;<raidName>;<raidSize>
+//	<name>;<role>;<class>;<bench 0/1>
 func BuildInviteExport(raidID int64, raidName string, raidSize *int, members []InviteMember) string {
 	size := ""
 	if raidSize != nil {
 		size = strconv.Itoa(*raidSize)
 	}
-	lines := []string{strings.Join([]string{formatVersion, "INV", strconv.FormatInt(raidID, 10), field(raidName), size}, "|")}
+	lines := []string{strings.Join([]string{formatV2, "INV", strconv.FormatInt(raidID, 10), field(raidName), size}, ";")}
 	for _, member := range members {
 		bench := "0"
 		if member.IsBench {
 			bench = "1"
 		}
-		lines = append(lines, strings.Join([]string{field(member.Name), string(member.Role), field(member.Class), bench}, "|"))
+		lines = append(lines, strings.Join([]string{field(member.Name), string(member.Role), field(member.Class), bench}, ";"))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -58,6 +59,7 @@ func BuildInviteExport(raidID int64, raidName string, raidSize *int, members []I
 // field keeps free text from breaking the line and column separators.
 func field(value string) string {
 	value = strings.ReplaceAll(value, "|", "/")
+	value = strings.ReplaceAll(value, ";", ",")
 	value = strings.ReplaceAll(value, "\r", " ")
 	value = strings.ReplaceAll(value, "\n", " ")
 	return strings.TrimSpace(value)
@@ -138,7 +140,7 @@ func (l LootLine) EnhancedPoints() int {
 //	RS1|LOOT|<raidID>|<recorder>|<startUnix>
 //	<entryID>|<unixTime>|<npcID or ->|<itemID>|<recipient or ->|<state or ->
 //
-// and the ForgeLootLedger format
+// and the RaidLedger format
 //
 //	RS2;LOOT;<raidID>;<recorder>;<startUnix>;<exportUnix>
 //	<entryID>;<unixTime>;<npcID or ->;<itemID>;<recipient>;<state>;<roll or ->;<ms|os|->;<low-high or ->;<winner or ->
@@ -151,7 +153,7 @@ func ParseLootExport(text string) (*LootExport, error) {
 	}
 	export := &LootExport{Version: header.version, RaidID: header.raidID, Recorder: header.recorder, StartedAt: header.at}
 	parse := parseLootLine
-	if header.version == lootFormatV2 {
+	if header.version == formatV2 {
 		parse = parseLootLineV2
 	}
 	entryIDs := map[string]bool{}
@@ -317,12 +319,13 @@ type RosterMember struct {
 	Error      string
 }
 
-// ParseRosterExport reads:
+// ParseRosterExport reads RaidLedger's attendance export
 //
-//	RS1|ROSTER|<raidID>|<recorder>|<exportUnix>
-//	<name>|<classToken or ->|<firstSeenUnix>
+//	RS2;ROSTER;<raidID>;<recorder>;<exportUnix>
+//	<name>;<classToken or ->;<firstSeenUnix>
 //
-// A broken header rejects the whole text; a broken member line is kept with Error set.
+// and RaidSync's RS1 version, which uses "|" instead of ";". A broken header
+// rejects the whole text; a broken member line is kept with Error set.
 func ParseRosterExport(text string) (*RosterExport, error) {
 	header, body, err := parseHeader(text, "ROSTER")
 	if err != nil {
@@ -331,7 +334,7 @@ func ParseRosterExport(text string) (*RosterExport, error) {
 	export := &RosterExport{RaidID: header.raidID, Recorder: header.recorder, ExportedAt: header.at}
 	for _, row := range body {
 		member := RosterMember{LineNumber: row.number, Raw: row.text}
-		parts := strings.Split(row.text, "|")
+		parts := strings.Split(row.text, header.separator())
 		switch {
 		case len(parts) != 3:
 			member.Error = "Zeile hat nicht drei Felder"
@@ -355,7 +358,7 @@ func ParseRosterExport(text string) (*RosterExport, error) {
 }
 
 type exportHeader struct {
-	version  string
+	version  string // RS1 ("|") or RS2 (";")
 	raidID   int64
 	recorder string
 	at       time.Time
@@ -366,9 +369,17 @@ type bodyLine struct {
 	text   string
 }
 
-// parseHeader checks "RS1|<kind>|<raidID>|<recorder>|<unix>" (or, for loot,
-// "RS2;LOOT;<raidID>;<recorder>;<startUnix>;<exportUnix>") on the first
-// non-empty line and returns the remaining non-empty lines with their numbers.
+func (h exportHeader) separator() string {
+	if h.version == formatV2 {
+		return ";"
+	}
+	return "|"
+}
+
+// parseHeader checks "RS1|<kind>|<raidID>|<recorder>|<unix>" or
+// "RS2;<kind>;<raidID>;<recorder>;<unix>" (RS2 loot adds ";<exportUnix>") on
+// the first non-empty line and returns the remaining non-empty lines with
+// their numbers.
 func parseHeader(text, kind string) (exportHeader, []bodyLine, error) {
 	var lines []string
 	for _, line := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
@@ -386,9 +397,11 @@ func parseHeader(text, kind string) (exportHeader, []bodyLine, error) {
 	}
 	header := strings.Split(lines[headerIndex], "|")
 	version := formatVersion
-	if kind == "LOOT" && strings.HasPrefix(lines[headerIndex], lootFormatV2+";") {
+	if strings.HasPrefix(lines[headerIndex], formatV2+";") {
 		header = strings.Split(lines[headerIndex], ";")
-		version = lootFormatV2
+		version = formatV2
+	}
+	if version == formatV2 && kind == "LOOT" {
 		if len(header) == 6 {
 			if _, err := strconv.ParseInt(header[5], 10, 64); err != nil {
 				return exportHeader{}, nil, fmt.Errorf("export time %q: %w", header[5], ErrInvalidPayload)

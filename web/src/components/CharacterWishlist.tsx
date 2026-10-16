@@ -13,7 +13,7 @@ const specLabels: Record<WishlistSpec, string> = { MAIN: 'Main-Spec', SECOND: 'S
 type RollChange = Partial<Pick<WishlistWish, 'spec' | 'is_enhanced' | 'priority'>>
 
 // CharacterWishlist shows a character's wishlist with the roll the owner wants
-// per item and exports it for the ForgeLootWishlist addon (WL2, ADR 070).
+// per item and exports it for the RaidWishlist addon (WL2, ADR 070).
 export function CharacterWishlist({ characterID, canEdit }: Props) {
   const { pending, submit, isActive } = useSubmission()
   const [wishes, setWishes] = useState<WishlistWish[] | null>(null)
@@ -111,7 +111,7 @@ export function CharacterWishlist({ characterID, canEdit }: Props) {
       {copied && <span className="muted" role="status">Kopiert.</span>}
     </div>}
     {exportText && <>
-      <p className="muted">Im Spiel <code>/flw import</code> eingeben und den Text einfügen.</p>
+      <p className="muted">Im Spiel <code>/wish import</code> eingeben und den Text einfügen.</p>
       <textarea className="addon-code-export" aria-label="Wunschlisten-Export" readOnly value={exportText} rows={Math.min(8, rows.length + 1)} />
     </>}
   </section>

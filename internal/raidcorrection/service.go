@@ -24,6 +24,7 @@ var (
 	ErrReason    = errors.New("correction requires a nonblank reason and actor")
 	ErrInvalid   = errors.New("invalid correction")
 	ErrConflict  = errors.New("attendance already exists")
+	ErrHasLoot   = errors.New("character still holds loot in this raid")
 )
 
 // Service applies history changes with audit and append-only compensation.
@@ -242,6 +243,61 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 			return s.log(ctx, r, "attendance", row.ID, actor, reason, before, row)
 		}
 		return nil
+	})
+}
+
+// RemoveAttendance hard-deletes a roster row from a planned or open raid
+// (ADR 076). Completed, archived and cancelled raids keep their roster. A row
+// whose character still holds unwithdrawn loot in this raid cannot be removed;
+// the loot must be withdrawn first. The audit log keeps the removed row.
+func (s *Service) RemoveAttendance(ctx context.Context, raidID, id, actor int64) error {
+	return s.repo.InTransaction(ctx, func(r *Repo) error {
+		if actor <= 0 {
+			return ErrReason
+		}
+		if _, err := r.players.Get(ctx, actor); err != nil {
+			return referenceError(err)
+		}
+		rd, err := r.raids.Get(ctx, raidID)
+		if err != nil {
+			return referenceError(err)
+		}
+		if rd.ArchivedAt != nil || (rd.Status != validation.RaidStatusPlanned && rd.Status != validation.RaidStatusOpen) {
+			return ErrRaidState
+		}
+		row, err := r.attendance.Get(ctx, id)
+		if err != nil {
+			return referenceError(err)
+		}
+		if row.RaidID != raidID {
+			return ErrNotFound
+		}
+		awards, err := r.loot.ListByRaid(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		for _, award := range awards {
+			if award.WithdrawnAt != nil {
+				continue
+			}
+			if award.AwardedToCharacterID != nil && *award.AwardedToCharacterID == row.CharacterID {
+				return ErrHasLoot
+			}
+			if award.AwardedToCharacterID == nil && award.AwardedToPlayerID == row.PlayerID {
+				return ErrHasLoot
+			}
+		}
+		if err := r.deleteQuickAddRequests(ctx, row.ID); err != nil {
+			return err
+		}
+		if err := r.attendance.Delete(ctx, row.ID); err != nil {
+			return err
+		}
+		before, err := json.Marshal(row)
+		if err != nil {
+			return err
+		}
+		return r.audit.Insert(ctx, &audit.Log{ActorID: &actor, EntityType: "attendance", EntityID: strconv.FormatInt(row.ID, 10), Action: "remove", BeforeJSON: string(before), AfterJSON: "null", CreatedAt: time.Now().UTC()})
 	})
 }
 

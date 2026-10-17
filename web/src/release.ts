@@ -1,8 +1,15 @@
-export const appVersion = '1.0.13'
+export const appVersion = '1.0.14'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Teilnehmer aus dem Raid entfernen',
+    changes: [
+      'In der Aufstellung geplanter und offener Raids lässt sich ein Charakter über „Bearbeiten“ mit „Aus dem Raid entfernen“ wieder herausnehmen. Hat er in diesem Raid schon Loot erhalten, muss der Loot zuerst zurückgezogen werden.',
+    ],
+  },
+  {
+    version: '1.0.13',
     title: 'Lesbares Audit-Protokoll',
     changes: [
       'Das Audit-Protokoll fasst Änderungen als verständliche Ereignisse mit Namen, deutschen Aktionen und Feldvergleich zusammen. Technische Rohdaten bleiben bei Bedarf aufklappbar.',

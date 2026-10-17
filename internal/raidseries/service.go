@@ -62,6 +62,8 @@ func (s *Service) Save(ctx context.Context, series *Series) error {
 
 // Changes contains only explicitly supplied configuration fields.
 type Changes struct {
+	// ActorID is the player making the change; it is written to the audit log.
+	ActorID           int64
 	CatalogInstanceID *string
 	RaidSize          *int
 	Name              *string
@@ -79,12 +81,15 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 	var result *Series
 	err := s.repo.InTransaction(ctx, func(repo *Repo) error {
 		series := new(Series)
+		var before *Series
 		if id != 0 {
 			var err error
 			series, err = repo.Get(ctx, id)
 			if err != nil {
 				return err
 			}
+			snapshot := *series
+			before = &snapshot
 		}
 		if changes.Name != nil {
 			series.Name = *changes.Name
@@ -131,6 +136,13 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		}
 		series.UpdatedAt = now
 		if err := repo.Save(ctx, series); err != nil {
+			return err
+		}
+		action := "update"
+		if id == 0 {
+			action, before = "create", nil
+		}
+		if err := repo.Audit(ctx, changes.ActorID, series.ID, action, before, series); err != nil {
 			return err
 		}
 		result = series

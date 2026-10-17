@@ -20,13 +20,33 @@ const fieldLabels: Record<string, string> = {
   role: 'Rolle', second_spec: 'Zweitspezialisierung', setup: 'Soll-Aufstellung', status: 'Status',
   text: 'Gesuchtext', without_points: 'Keine EP', is_enabled: 'Anmeldungen aktiviert', item_name: 'Gegenstand',
   withdrawn_at: 'Zurückgezogen', withdrawn_reason: 'Grund für Rücknahme', spec: 'Spezialisierung',
+  title: 'Titel', description: 'Beschreibung', choices: 'Auswahl', allow_multiple: 'Mehrfachauswahl', closes_at: 'Endet am',
+  poll_type: 'Umfrageart', priority: 'Priorität', is_enhanced: 'Enhanced', scheduled_start: 'Geplanter Start',
+  scheduled_end: 'Geplantes Ende', raid_size: 'Raidgröße', cancelled_at: 'Abgesagt am', archived_at: 'Archiviert am',
+  completed_at: 'Abgeschlossen am', started_at: 'Gestartet am', name_template: 'Namensvorlage', next_raid_number: 'Nächste Raidnummer',
+  weekdays: 'Wochentage', interval_weeks: 'Intervall (Wochen)', start_time: 'Startzeit', timezone: 'Zeitzone',
+  sort_order: 'Reihenfolge', color: 'Farbe', username: 'Benutzername', password_changed: 'Passwort geändert',
+  security_key: 'Sicherheitsschlüssel', purpose: 'Zweck', locked_at: 'Gesperrt am', used_at: 'Verwendet am',
+  expired_at: 'Abgelaufen am', sent_at: 'Versendet am', revoked_at: 'Widerrufen am', expires_at: 'Gültig bis',
 }
 
 const hiddenFields = new Set([
   'id', 'player_id', 'character_id', 'awarded_to_player_id', 'awarded_to_character_id', 'awarded_by_player_id',
   'raid_id', 'created_at', 'updated_at', 'name_changed_at', 'external_source', 'external_profile_id',
   'external_profile_url', 'catalog_boss_id', 'item_id', 'item_lock_id', 'request_id', 'source',
+  'series_id', 'previous_raid_id', 'raid_leader_id', 'catalog_instance_id', 'created_by', 'created_by_player_id',
+  'used_by_player_id', 'used_by_username', 'guild_rank_id', 'actor_id', 'options', 'requester_player_id',
 ])
+
+const valueLabels: Record<string, string> = {
+  DD: 'Schaden', HEAL: 'Heiler', TANK: 'Tank', MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhance', BOE: 'BoE',
+  PLANNED: 'Geplant', OPEN: 'Offen', COMPLETED: 'Abgeschlossen', CANCELLED: 'Abgesagt', CLOSED: 'Geschlossen',
+  ARCHIVED: 'Archiviert', ACTIVE: 'Aktiv', USED: 'Verwendet', EXPIRED: 'Abgelaufen', ADMIN: 'Admin',
+  RAIDASSISTENT: 'Raidassistent', MEMBER: 'Mitglied', GUEST: 'Gast', pending: 'Offen', approved: 'Freigegeben',
+  rejected: 'Abgelehnt', consumed: 'Eingelöst', new_account: 'Neues Konto', claim: 'Charakter übernehmen',
+}
+
+const isoTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
 
 function parseSnapshot(snapshot: string): AuditSnapshot {
   try {
@@ -54,13 +74,8 @@ function textValue(snapshot: AuditSnapshot, field: string): string {
 function formatValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return 'Nicht gesetzt'
   if (typeof value === 'boolean') return value ? 'Ja' : 'Nein'
-  if (value === 'DD') return 'Schaden'
-  if (value === 'HEAL') return 'Heiler'
-  if (value === 'TANK') return 'Tank'
-  if (value === 'MAIN') return 'Main-Spec'
-  if (value === 'SECOND') return 'Second-Spec'
-  if (value === 'ENHANCED') return 'Enhance'
-  if (value === 'BOE') return 'BoE'
+  if (typeof value === 'string' && valueLabels[value]) return valueLabels[value]
+  if (typeof value === 'string' && isoTimestamp.test(value) && !Number.isNaN(Date.parse(value))) return new Date(value).toLocaleString('de-DE')
   if (Array.isArray(value)) return value.map(formatValue).join(', ') || 'Keine'
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
@@ -88,7 +103,15 @@ function changesFor(before: AuditSnapshot, after: AuditSnapshot): AuditChange[] 
 
 function actionLabel(entry: AuditLogEntry, before: AuditSnapshot): string {
   if (entry.action === 'correction') return before ? 'Korrigiert' : 'Hinzugefügt'
+  if (entry.action === 'cancel' && entry.entity_type === 'item_lock') return 'Aufgehoben'
+  if (entry.action === 'create' && entry.entity_type === 'wishlist_item') return 'Auf die Wunschliste gesetzt'
+  if (entry.action === 'delete' && entry.entity_type === 'wishlist_item') return 'Von der Wunschliste entfernt'
   const labels: Record<string, string> = {
+    create: 'Angelegt', cancel: 'Abgesagt', archive: 'Archiviert', create_successor: 'Folgeraid angelegt', delete: 'Gelöscht',
+    close: 'Geschlossen', vote: 'Abgestimmt', set_account: 'Zugang geändert', password_change: 'Passwort geändert',
+    totp_enable: 'Authenticator aktiviert', totp_disable: 'Authenticator entfernt', security_key_add: 'Sicherheitsschlüssel hinzugefügt',
+    security_key_remove: 'Sicherheitsschlüssel entfernt', create_code: 'Code erstellt', reject: 'Abgelehnt', revoke: 'Widerrufen',
+    mark_sent: 'Als versendet markiert', redeem: 'Code eingelöst',
     accept: 'Bestätigt', absence_declare: 'Abgesagt', absence_revoke: 'Absage zurückgenommen',
     archive_without_points: 'EP-Ausnahme festgelegt', availability: 'Anmeldungen geändert', award: 'Beute vergeben',
     create_linked_character: 'Charakter angelegt', link_rising_gods_profile: 'Rising-Gods-Profil verknüpft',
@@ -114,7 +137,15 @@ function entityDescription(entry: AuditLogEntry, before: AuditSnapshot, after: A
       return `Beute: ${textValue(snapshot, 'item_name') || 'Unbekannter Gegenstand'}${recipient ? ` an ${recipient}` : ''}${raid}`
     }
     case 'player': return `Spieler: ${name || `#${entry.entity_id}`}`
-    case 'raid': return `Raid #${entry.entity_id}`
+    case 'raid': return name ? `Raid: ${name}` : `Raid #${entry.entity_id}`
+    case 'raid_series': return `Raidserie: ${name || `#${entry.entity_id}`}`
+    case 'wishlist_item': return `Wunschliste: ${textValue(snapshot, 'item_name') || 'Unbekannter Gegenstand'}`
+    case 'poll': return `Umfrage: ${textValue(snapshot, 'title') || `#${entry.entity_id}`}`
+    case 'item_lock': return `Item-Lock: ${textValue(snapshot, 'item_name') || 'Unbekannter Gegenstand'}${raid}`
+    case 'guild_rank': return `Gildenrang: ${name || `#${entry.entity_id}`}`
+    case 'raid_group': return `Raidgruppe: ${name || `#${entry.entity_id}`}`
+    case 'registration_request': return `Registrierungsanfrage: ${name || `#${entry.entity_id}`}`
+    case 'registration_code': return `Registrierungscode #${entry.entity_id}`
     case 'raid_signup': return `Raid-Anmeldung für Raid #${entry.entity_id}`
     case 'raid_recruitment_template': return 'Raid-Gesuchtext'
     default: return `${entry.entity_type} #${entry.entity_id}`
@@ -125,6 +156,14 @@ function entityTarget(entry: AuditLogEntry, before: AuditSnapshot, after: AuditS
   if (entry.entity_type === 'character') return `/characters/${entry.entity_id}`
   if (entry.entity_type === 'player') return `/players/${entry.entity_id}`
   if (entry.entity_type === 'raid' || entry.entity_type === 'raid_signup') return `/raids/${entry.entity_id}`
+  if (entry.entity_type === 'wishlist_item') {
+    const characterID = (after ?? before)?.character_id
+    return typeof characterID === 'number' ? `/characters/${characterID}` : null
+  }
+  if (entry.entity_type === 'poll') return '/polls'
+  if (entry.entity_type === 'raid_series') return '/raid-series'
+  if (entry.entity_type === 'guild_rank' || entry.entity_type === 'raid_group') return '/roster'
+  if (entry.entity_type === 'registration_request' || entry.entity_type === 'registration_code') return '/registration-requests'
   const raidID = (after ?? before)?.raid_id
   return typeof raidID === 'number' ? `/raids/${raidID}` : null
 }

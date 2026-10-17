@@ -2,8 +2,12 @@ package poll
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
+
+	"raid-website/internal/audit"
 )
 
 type Repo struct {
@@ -36,7 +40,7 @@ func (r *Repo) CreatePollWithOptions(ctx context.Context, p *Poll, labels []stri
 			}
 			p.Options = append(p.Options, *opt)
 		}
-		return nil
+		return audit.NewRepo(tx).Record(ctx, p.CreatedBy, "poll", p.ID, "create", nil, p, "")
 	})
 }
 
@@ -91,6 +95,22 @@ func (r *Repo) UpdatePoll(ctx context.Context, p *Poll) error {
 	return err
 }
 
+// ClosePoll stores the closed poll and records who closed it (ADR 077).
+func (r *Repo) ClosePoll(ctx context.Context, p *Poll, before Poll, actorID int64) error {
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.NewUpdate().Model(p).WherePK().Exec(ctx); err != nil {
+			return err
+		}
+		return audit.NewRepo(tx).Record(ctx, actorID, "poll", p.ID, "close", before, p, "")
+	})
+}
+
+// voteAudit is the readable snapshot of a vote in the audit log.
+type voteAudit struct {
+	Title   string   `json:"title"`
+	Choices []string `json:"choices"`
+}
+
 func (r *Repo) UpsertVote(ctx context.Context, v *Vote) error {
 	_, err := r.db.NewInsert().Model(v).
 		On("CONFLICT (poll_id, player_id) DO UPDATE").
@@ -100,8 +120,17 @@ func (r *Repo) UpsertVote(ctx context.Context, v *Vote) error {
 	return err
 }
 
-func (r *Repo) UpsertVoteWithChoices(ctx context.Context, v *Vote, optionIDsByLabel map[string]int64) error {
+// UpsertVoteWithChoices stores a player's vote and records it in the audit
+// log with the previous choices, if any (ADR 077). title names the poll there.
+func (r *Repo) UpsertVoteWithChoices(ctx context.Context, v *Vote, optionIDsByLabel map[string]int64, title string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var before any
+		previous, err := r.WithTx(tx).FindVote(ctx, v.PollID, v.PlayerID)
+		if err == nil && previous != nil {
+			before = voteAudit{Title: title, Choices: previous.Choices}
+		} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
 		if _, err := tx.NewInsert().Model(v).
 			On("CONFLICT (poll_id, player_id) DO UPDATE").
 			Set("choice = EXCLUDED.choice").
@@ -128,7 +157,7 @@ func (r *Repo) UpsertVoteWithChoices(ctx context.Context, v *Vote, optionIDsByLa
 				}
 			}
 		}
-		return nil
+		return audit.NewRepo(tx).Record(ctx, v.PlayerID, "poll", v.PollID, "vote", before, voteAudit{Title: title, Choices: v.Choices}, "")
 	})
 }
 

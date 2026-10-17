@@ -43,7 +43,8 @@ func (a *API) listRaids(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
+	actor, ok := ActorID(r)
+	if !ok {
 		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
 		return
 	}
@@ -90,7 +91,7 @@ func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
-	if err := raid.NewService(a.Raids).CreateRaid(r.Context(), rd); err != nil {
+	if err := raid.NewService(a.Raids).CreateRaid(r.Context(), rd, actor); err != nil {
 		if errors.Is(err, raid.ErrNameRequired) {
 			WriteError(w, http.StatusBadRequest, "name_required", "name is required")
 			return

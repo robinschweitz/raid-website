@@ -9,6 +9,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/audit"
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
 )
@@ -23,6 +24,18 @@ func NewRepo(db bun.IDB) *Repo {
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
+}
+
+// Audit records a raid lifecycle change in the same transaction.
+func (r *Repo) Audit(ctx context.Context, actorID, raidID int64, action string, before, after *Raid) error {
+	var b, a any
+	if before != nil {
+		b = before
+	}
+	if after != nil {
+		a = after
+	}
+	return audit.NewRepo(r.db).Record(ctx, actorID, "raid", raidID, action, b, a, "")
 }
 
 // Catalog binds catalog validation to the lifecycle transaction.

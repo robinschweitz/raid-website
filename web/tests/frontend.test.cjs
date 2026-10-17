@@ -3189,3 +3189,35 @@ test('audit log translates technical snapshots into meaningful changes and stays
   assert.equal(member.requests.length, 0)
   assert.match(text(memberView.tree), /nur für Admins sichtbar/)
 })
+
+test('audit log describes roster additions, wishlist, polls, locks and account changes in German', async () => {
+  const admin = setup({ id: 1, name: 'Admin', role: 'ADMIN' })
+  const view = admin.mount(admin.load('pages/AuditLog.tsx').AuditLogPage)
+  const entry = (id, entity_type, action, before, after, actor_name = 'Admin') => ({ id, actor_id: 1, actor_name, entity_type, entity_id: String(id), action, before_json: before === null ? 'null' : JSON.stringify(before), after_json: after === null ? 'null' : JSON.stringify(after), reason: '', created_at: '2026-10-04T18:00:00Z' })
+  admin.requests[0].resolve([
+    entry(1, 'attendance', 'correction', null, { raid_id: 7, character_name: 'Kleinesonne', role: 'DD' }),
+    entry(2, 'wishlist_item', 'create', null, { character_id: 5, item_name: 'Schattenschneide', priority: 1, is_enhanced: true }, 'Spieler'),
+    entry(3, 'wishlist_item', 'delete', { character_id: 5, item_name: 'Schattenschneide' }, null, 'Spieler'),
+    entry(4, 'poll', 'vote', null, { title: 'Raidtag', choices: ['Mittwoch'] }, 'Spieler'),
+    entry(5, 'item_lock', 'cancel', { raid_id: 7, item_name: 'Schattenschneide', status: 'ACTIVE' }, { raid_id: 7, item_name: 'Schattenschneide', status: 'CANCELLED' }, 'Spieler'),
+    entry(6, 'raid', 'create', null, { name: 'ICC25-12', status: 'PLANNED', scheduled_start: '2026-10-08T18:30:00Z' }),
+    entry(7, 'player', 'password_change', null, { name: 'Spieler' }, 'Spieler'),
+    entry(8, 'guild_rank', 'update', { name: 'Raider', sort_order: 1 }, { name: 'Raider', sort_order: 2 }),
+  ])
+  await flush(view)
+  const flat = text(view.tree)
+  assert.match(flat, /Teilnahme: Kleinesonne in Raid #\s*7.*Hinzugefügt/)
+  assert.match(flat, /Wunschliste: Schattenschneide.*Auf die Wunschliste gesetzt/)
+  assert.match(flat, /Von der Wunschliste entfernt/)
+  assert.match(flat, /Umfrage: Raidtag.*Abgestimmt/)
+  assert.match(flat, /Item-Lock: Schattenschneide in Raid #\s*7.*Aufgehoben/)
+  assert.match(flat, /Status.*Aktiv.*Abgesagt/)
+  assert.match(flat, /Raid: ICC25-12.*Angelegt/)
+  assert.match(flat, /Geplanter Start.*8\.10\.2026/)
+  assert.match(flat, /Spieler: Spieler.*Passwort geändert/)
+  assert.match(flat, /Gildenrang: Raider.*Aktualisiert.*Reihenfolge/)
+  const links = nodes(view.tree, (n) => n.props && typeof n.props.to === 'string').map((n) => n.props.to)
+  assert.ok(links.includes('/characters/5'), 'wishlist entries link to the character')
+  assert.ok(links.includes('/polls'))
+  assert.ok(links.includes('/roster'))
+})

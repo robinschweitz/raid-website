@@ -670,7 +670,6 @@ func TestListEndpointsReturnEmptyArrays(t *testing.T) {
 	}
 
 	for _, path := range []string{
-		"/api/v1/audit-log",
 		"/api/v1/polls",
 		"/api/v1/guild-ranks",
 		"/api/v1/raid-groups",

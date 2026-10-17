@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"raid-website/internal/audit"
 )
 
 // Repo owns wishlist persistence.
@@ -23,6 +25,39 @@ func NewRepo(db bun.IDB) *Repo {
 // WithTx binds the repository to a transaction.
 func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
+}
+
+// inTransaction runs fn with a repository bound to one transaction, so a
+// wishlist change and its audit entry are written together.
+func (r *Repo) inTransaction(ctx context.Context, fn func(*Repo) error) error {
+	if _, bound := r.db.(bun.Tx); bound {
+		return fn(r)
+	}
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		return fn(r.WithTx(tx))
+	})
+}
+
+func (r *Repo) get(ctx context.Context, charID int64, itemID string) (*Wish, error) {
+	wish := &Wish{}
+	err := r.db.NewSelect().Model(wish).Where("character_id = ? AND item_id = ?", charID, itemID).Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return wish, err
+}
+
+// audit records a wishlist change (ADR 077).
+func (r *Repo) audit(ctx context.Context, actorID int64, action string, before, after *Wish) error {
+	var b, a any
+	id := int64(0)
+	if before != nil {
+		b, id = before, before.ID
+	}
+	if after != nil {
+		a, id = after, after.ID
+	}
+	return audit.NewRepo(r.db).Record(ctx, actorID, "wishlist_item", id, action, b, a, "")
 }
 
 func (r *Repo) listByCharacter(ctx context.Context, charID int64) ([]Wish, error) {

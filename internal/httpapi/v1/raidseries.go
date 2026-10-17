@@ -33,6 +33,7 @@ func (a *API) listRaidSeries(w http.ResponseWriter, r *http.Request) {
 func (a *API) createRaidSeries(w http.ResponseWriter, r *http.Request) { a.saveRaidSeries(w, r, false) }
 func (a *API) updateRaidSeries(w http.ResponseWriter, r *http.Request) { a.saveRaidSeries(w, r, true) }
 func (a *API) saveRaidSeries(w http.ResponseWriter, r *http.Request, update bool) {
+	actor, _ := ActorID(r)
 	id := int64(0)
 	if update {
 		var ok bool
@@ -47,7 +48,7 @@ func (a *API) saveRaidSeries(w http.ResponseWriter, r *http.Request, update bool
 		BadRequest(w, "malformed json body")
 		return
 	}
-	series, err := raidseries.NewService(a.RaidSeries).Configure(r.Context(), id, raidseries.Changes{Name: req.Name, NameTemplate: req.NameTemplate, NextRaidNumber: req.NextRaidNumber, RaidLeaderID: req.RaidLeaderID, Weekdays: req.Weekdays, IntervalWeeks: req.IntervalWeeks, StartTime: req.StartTime, Timezone: req.Timezone, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize})
+	series, err := raidseries.NewService(a.RaidSeries).Configure(r.Context(), id, raidseries.Changes{ActorID: actor, Name: req.Name, NameTemplate: req.NameTemplate, NextRaidNumber: req.NextRaidNumber, RaidLeaderID: req.RaidLeaderID, Weekdays: req.Weekdays, IntervalWeeks: req.IntervalWeeks, StartTime: req.StartTime, Timezone: req.Timezone, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize})
 	if err != nil {
 		if !writeSeriesError(w, err) {
 			WriteError(w, http.StatusInternalServerError, "internal", "could not save series")

@@ -91,9 +91,11 @@ func TestRosterSnapshotsPreserveHistoryAndAuditedRaidReality(t *testing.T) {
 		t.Fatalf("archived read: %d %s", status, body)
 	}
 	logs, err := audit.NewRepo(f.db).ListByEntity(ctx, "attendance", fmt.Sprint(row.ID))
-	if err != nil || len(logs) != 6 {
+	if err != nil || len(logs) != 7 || logs[0].BeforeJSON != "null" {
 		t.Fatalf("audit: %+v %v", logs, err)
 	}
+	// The first entry is the original addition (ADR 077); corrections follow.
+	logs = logs[1:]
 	var before, after attendance.Attendance
 	if err := json.Unmarshal([]byte(logs[0].BeforeJSON), &before); err != nil {
 		t.Fatal(err)

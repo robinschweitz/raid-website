@@ -62,6 +62,7 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 			return fmt.Errorf("load raid %d: %w", raidID, err)
 		}
 		archived = rd
+		before := *rd
 		now := s.now().UTC().Truncate(time.Microsecond)
 
 		switch rd.Status {
@@ -72,6 +73,9 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 				rd.ArchivedAt = &now
 				rd.UpdatedAt = now
 				if err := raids.Update(ctx, rd); err != nil {
+					return err
+				}
+				if err := raids.Audit(ctx, actorID, rd.ID, "archive", &before, rd); err != nil {
 					return err
 				}
 			}
@@ -130,6 +134,9 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 			if err := raids.Create(ctx, next); err != nil {
 				return fmt.Errorf("create successor: %w", err)
 			}
+			if err := raids.Audit(ctx, actorID, next.ID, "create_successor", nil, next); err != nil {
+				return err
+			}
 			if series.NameTemplate != "" {
 				if err := repo.series.Save(ctx, series); err != nil {
 					return fmt.Errorf("increment series counter: %w", err)
@@ -152,6 +159,9 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 		rd.UpdatedAt = now
 		if err := raids.Update(ctx, rd); err != nil {
 			return fmt.Errorf("complete raid %d: %w", raidID, err)
+		}
+		if err := raids.Audit(ctx, actorID, rd.ID, "archive", &before, rd); err != nil {
+			return err
 		}
 
 		skip := make(map[int64]bool, len(withoutPoints))

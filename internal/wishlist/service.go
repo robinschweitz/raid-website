@@ -93,7 +93,13 @@ func (s *Service) Add(ctx context.Context, actorID, charID int64, itemID, itemNa
 		Spec:        choice.Spec,
 		IsEnhanced:  choice.IsEnhanced,
 	}
-	if err := s.repo.add(ctx, w); err != nil {
+	err = s.repo.inTransaction(ctx, func(repo *Repo) error {
+		if err := repo.add(ctx, w); err != nil {
+			return err
+		}
+		return repo.audit(ctx, actorID, "create", nil, w)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return w, nil
@@ -116,7 +122,22 @@ func (s *Service) Update(ctx context.Context, actorID, charID int64, itemID stri
 	if owner != actorID {
 		return nil, ErrNotOwner
 	}
-	return s.repo.update(ctx, charID, itemID, priority, notes, choice)
+	var updated *Wish
+	err = s.repo.inTransaction(ctx, func(repo *Repo) error {
+		before, err := repo.get(ctx, charID, itemID)
+		if err != nil {
+			return err
+		}
+		updated, err = repo.update(ctx, charID, itemID, priority, notes, choice)
+		if err != nil {
+			return err
+		}
+		return repo.audit(ctx, actorID, "update", before, updated)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 // AddonExport renders the character's wishlist for the RaidWishlist
@@ -155,7 +176,16 @@ func (s *Service) Remove(ctx context.Context, actorID, charID int64, itemID stri
 	if owner != actorID {
 		return ErrNotOwner
 	}
-	return s.repo.remove(ctx, charID, itemID)
+	return s.repo.inTransaction(ctx, func(repo *Repo) error {
+		before, err := repo.get(ctx, charID, itemID)
+		if err != nil {
+			return err
+		}
+		if err := repo.remove(ctx, charID, itemID); err != nil {
+			return err
+		}
+		return repo.audit(ctx, actorID, "delete", before, nil)
+	})
 }
 
 // BulkByItemForRaid returns interests for a single item in a raid.

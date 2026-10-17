@@ -150,12 +150,13 @@ func (a *API) listRegistrationCodes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) rejectRegistrationRequest(w http.ResponseWriter, r *http.Request) {
+	actor, _ := ActorID(r)
 	id, ok := pathID(r, "id")
 	if !ok {
 		BadRequest(w, "invalid request id")
 		return
 	}
-	req, err := a.Registration.RejectRequest(r.Context(), id)
+	req, err := a.Registration.RejectRequest(r.Context(), actor, id)
 	if err != nil {
 		registrationError(w, err)
 		return
@@ -164,12 +165,13 @@ func (a *API) rejectRegistrationRequest(w http.ResponseWriter, r *http.Request) 
 }
 
 func (a *API) revokeRegistrationCode(w http.ResponseWriter, r *http.Request) {
+	actor, _ := ActorID(r)
 	id, ok := pathID(r, "id")
 	if !ok {
 		BadRequest(w, "invalid code id")
 		return
 	}
-	code, err := a.Registration.RevokeCode(r.Context(), id)
+	code, err := a.Registration.RevokeCode(r.Context(), actor, id)
 	if err != nil {
 		registrationError(w, err)
 		return
@@ -178,12 +180,13 @@ func (a *API) revokeRegistrationCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) markRegistrationCodeSent(w http.ResponseWriter, r *http.Request) {
+	actor, _ := ActorID(r)
 	id, ok := pathID(r, "id")
 	if !ok {
 		BadRequest(w, "invalid code id")
 		return
 	}
-	code, err := a.Registration.MarkCodeSent(r.Context(), id)
+	code, err := a.Registration.MarkCodeSent(r.Context(), actor, id)
 	if err != nil {
 		registrationError(w, err)
 		return

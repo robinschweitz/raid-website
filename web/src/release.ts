@@ -1,8 +1,16 @@
-export const appVersion = '1.0.14'
+export const appVersion = '1.0.15'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Audit-Protokoll zeigt alle Änderungen',
+    changes: [
+      'Das Audit-Protokoll zeigt jetzt auch alltägliche Änderungen: Charaktere in die Aufstellung aufnehmen, Raids anlegen, planen, absagen und archivieren, Wunschlisten, Umfragen und Stimmen, Item-Locks, Raidserien, Gildenränge und Raidgruppen, neue Spieler, Zugänge, Passwort- und Zwei-Faktor-Änderungen sowie Registrierungen.',
+      'Passwörter, Codes und andere Geheimnisse werden dabei nie gespeichert.',
+    ],
+  },
+  {
+    version: '1.0.14',
     title: 'Teilnehmer aus dem Raid entfernen',
     changes: [
       'In der Aufstellung geplanter und offener Raids lässt sich ein Charakter über „Bearbeiten“ mit „Aus dem Raid entfernen“ wieder herausnehmen. Hat er in diesem Raid schon Loot erhalten, muss der Loot zuerst zurückgezogen werden.',

@@ -239,10 +239,9 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 				return err
 			}
 		}
-		if completed || before != nil {
-			return s.log(ctx, r, "attendance", row.ID, actor, reason, before, row)
-		}
-		return nil
+		// Additions to active raids are logged too, so the audit log shows who
+		// put a character into the roster (ADR 077).
+		return s.log(ctx, r, "attendance", row.ID, actor, reason, before, row)
 	})
 }
 

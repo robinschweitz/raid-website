@@ -30,7 +30,8 @@ func (a *API) listGuildRanks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) createGuildRank(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
+	actor, ok := ActorID(r)
+	if !ok {
 		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
 		return
 	}
@@ -51,7 +52,7 @@ func (a *API) createGuildRank(w http.ResponseWriter, r *http.Request) {
 	if req.Active != nil {
 		g.Active = *req.Active
 	}
-	if err := a.Roster.CreateGuildRank(r.Context(), g); err != nil {
+	if err := a.Roster.CreateGuildRank(r.Context(), g, actor); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not create guild rank")
 		return
 	}
@@ -59,7 +60,8 @@ func (a *API) createGuildRank(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) updateGuildRank(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
+	actor, ok := ActorID(r)
+	if !ok {
 		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
 		return
 	}
@@ -82,6 +84,7 @@ func (a *API) updateGuildRank(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not load guild rank")
 		return
 	}
+	before := *g
 	if req.Name != "" {
 		g.Name = req.Name
 	}
@@ -92,7 +95,7 @@ func (a *API) updateGuildRank(w http.ResponseWriter, r *http.Request) {
 		g.Active = *req.Active
 	}
 	g.UpdatedAt = time.Now().UTC()
-	if err := a.Roster.UpdateGuildRank(r.Context(), g); err != nil {
+	if err := a.Roster.UpdateGuildRank(r.Context(), g, before, actor); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not update guild rank")
 		return
 	}
@@ -109,7 +112,8 @@ func (a *API) listRaidGroups(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) createRaidGroup(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
+	actor, ok := ActorID(r)
+	if !ok {
 		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
 		return
 	}
@@ -130,7 +134,7 @@ func (a *API) createRaidGroup(w http.ResponseWriter, r *http.Request) {
 	if req.Active != nil {
 		g.Active = *req.Active
 	}
-	if err := a.Roster.CreateRaidGroup(r.Context(), g); err != nil {
+	if err := a.Roster.CreateRaidGroup(r.Context(), g, actor); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not create raid group")
 		return
 	}
@@ -138,7 +142,8 @@ func (a *API) createRaidGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) updateRaidGroup(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
+	actor, ok := ActorID(r)
+	if !ok {
 		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
 		return
 	}
@@ -161,6 +166,7 @@ func (a *API) updateRaidGroup(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not load raid group")
 		return
 	}
+	before := *g
 	if req.Name != "" {
 		g.Name = req.Name
 	}
@@ -174,7 +180,7 @@ func (a *API) updateRaidGroup(w http.ResponseWriter, r *http.Request) {
 		g.Active = *req.Active
 	}
 	g.UpdatedAt = time.Now().UTC()
-	if err := a.Roster.UpdateRaidGroup(r.Context(), g); err != nil {
+	if err := a.Roster.UpdateRaidGroup(r.Context(), g, before, actor); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not update raid group")
 		return
 	}

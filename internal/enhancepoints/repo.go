@@ -7,6 +7,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/audit"
 	"raid-website/internal/validation"
 )
 
@@ -20,6 +21,15 @@ func NewRepo(db bun.IDB) *Repo {
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
+}
+
+// AuditLock records an item-lock change in the same transaction (ADR 077).
+func (r *Repo) AuditLock(ctx context.Context, actorID int64, action string, before, after *ItemLock) error {
+	var b any
+	if before != nil {
+		b = before
+	}
+	return audit.NewRepo(r.db).Record(ctx, actorID, "item_lock", after.ID, action, b, after, "")
 }
 
 // InTransaction passes a transaction-bound repository to fn. All queries in fn

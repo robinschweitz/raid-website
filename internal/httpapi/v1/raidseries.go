@@ -58,11 +58,19 @@ func (a *API) saveRaidSeries(w http.ResponseWriter, r *http.Request, update bool
 		return
 	}
 	// Saving the series also tops up its automatic planning window (ADR 078).
-	if _, err := raid.NewService(a.Raids).PlanAhead(r.Context(), series.ID, actor); err != nil {
+	planned, err := raid.NewService(a.Raids).PlanAhead(r.Context(), series.ID, actor)
+	if err != nil {
 		if !writeSeriesError(w, err) {
 			WriteError(w, http.StatusInternalServerError, "internal", "series saved, but future raids could not be planned")
 		}
 		return
+	}
+	if len(planned) > 0 {
+		// Planning advanced the name counter; return the series as stored now.
+		if series, err = a.RaidSeries.Get(r.Context(), series.ID); err != nil {
+			WriteError(w, http.StatusInternalServerError, "internal", "could not load series")
+			return
+		}
 	}
 	status := http.StatusCreated
 	if update {

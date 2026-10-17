@@ -91,7 +91,17 @@ func TestPlanSeriesRaidsAhead(t *testing.T) {
 		t.Fatalf("second plan created %+v %v", planned.Data, err)
 	}
 	// A rolling window keeps six weeks planned as soon as the series is saved.
-	call(admin, http.MethodPatch, fmt.Sprintf("/api/v1/raid-series/%d", seriesID), map[string]any{"plan_weeks_ahead": 6}, http.StatusOK)
+	var saved struct {
+		Data struct {
+			NextRaidNumber int `json:"next_raid_number"`
+		}
+	}
+	if err := json.Unmarshal(call(admin, http.MethodPatch, fmt.Sprintf("/api/v1/raid-series/%d", seriesID), map[string]any{"plan_weeks_ahead": 6}, http.StatusOK), &saved); err != nil {
+		t.Fatal(err)
+	}
+	if saved.Data.NextRaidNumber != 7 {
+		t.Fatalf("saved series must show the counter after planning: %d", saved.Data.NextRaidNumber)
+	}
 	if rows := seriesRaids(seriesID); len(rows) != 6 {
 		t.Fatalf("rolling window: want 6 raids, got %d: %+v", len(rows), rows)
 	}

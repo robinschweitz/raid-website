@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "node --test tests/frontend.test.cjs tests/design.test.cjs tests/boss-data.test.cjs tests/recruitment.test.cjs tests/raid-setup.test.cjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "npm run build && playwright test"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
+    "@playwright/test": "^1.56.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

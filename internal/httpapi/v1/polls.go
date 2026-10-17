@@ -154,7 +154,7 @@ func (a *API) votePoll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := &poll.Vote{PollID: id, PlayerID: actor, Choice: strings.Join(choices, ", "), Choices: choices, VotedAt: now}
-	if err := a.Polls.UpsertVoteWithChoices(r.Context(), v, optionIDsByLabel); err != nil {
+	if err := a.Polls.UpsertVoteWithChoices(r.Context(), v, optionIDsByLabel, p.Title); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not record vote")
 		return
 	}
@@ -181,7 +181,8 @@ func (a *API) listPollVotes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) closePoll(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
+	actor, ok := ActorID(r)
+	if !ok {
 		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
 		return
 	}
@@ -203,9 +204,10 @@ func (a *API) closePoll(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusConflict, "poll_closed", "poll is already closed")
 		return
 	}
+	before := *p
 	p.Status = validation.PollStatusClosed
 	p.UpdatedAt = time.Now().UTC()
-	if err := a.Polls.UpdatePoll(r.Context(), p); err != nil {
+	if err := a.Polls.ClosePoll(r.Context(), p, before, actor); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not close poll")
 		return
 	}

@@ -529,7 +529,7 @@ func TestCorrectionsPlannedAndOpenAuditTokensPermissionsAndLocks(t *testing.T) {
 				entity string
 				id     int64
 				count  int
-			}{{"attendance", attendanceID, 1}, {"loot_award", awardID, 3}} {
+			}{{"attendance", attendanceID, 2}, {"loot_award", awardID, 3}} {
 				logs, err := audit.NewRepo(f.db).ListByEntity(ctx, expected.entity, fmt.Sprint(expected.id))
 				if err != nil {
 					t.Fatal(err)
@@ -538,6 +538,13 @@ func TestCorrectionsPlannedAndOpenAuditTokensPermissionsAndLocks(t *testing.T) {
 					t.Fatalf("%s audit count: got %d want %d", expected.entity, len(logs), expected.count)
 				}
 				for _, log := range logs {
+					if log.BeforeJSON == "null" {
+						// The original addition is logged too (ADR 077); it has no reason.
+						if log.ActorID == nil || !json.Valid([]byte(log.AfterJSON)) {
+							t.Fatalf("invalid addition audit: %+v", log)
+						}
+						continue
+					}
 					if log.ActorID == nil || *log.ActorID != f.actor || log.Reason == "" || log.BeforeJSON == log.AfterJSON || !json.Valid([]byte(log.BeforeJSON)) || !json.Valid([]byte(log.AfterJSON)) {
 						t.Fatalf("invalid active correction audit: %+v", log)
 					}

@@ -94,7 +94,7 @@ func (s *Service) CreateLock(ctx context.Context, lock *ItemLock, actorID int64)
 		if err := repo.CreateLock(ctx, lock); err != nil {
 			return fmt.Errorf("create lock: %w", err)
 		}
-		return nil
+		return repo.AuditLock(ctx, actorID, "create", nil, lock)
 	})
 }
 
@@ -119,6 +119,7 @@ func (s *Service) CancelLock(ctx context.Context, playerID, lockID, actorID int6
 		if lock.Status != validation.LockStatusActive {
 			return ErrLockNotActive
 		}
+		before := *lock
 		now := time.Now().UTC()
 		lock.Status = validation.LockStatusCancelled
 		lock.CancelledAt = &now
@@ -126,7 +127,7 @@ func (s *Service) CancelLock(ctx context.Context, playerID, lockID, actorID int6
 		if err := repo.UpdateLock(ctx, lock); err != nil {
 			return fmt.Errorf("cancel lock: %w", err)
 		}
-		return nil
+		return repo.AuditLock(ctx, actorID, "cancel", &before, lock)
 	})
 	if err != nil {
 		return nil, err

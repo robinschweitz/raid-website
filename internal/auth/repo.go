@@ -6,6 +6,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/audit"
 	"raid-website/internal/player"
 )
 
@@ -26,6 +27,12 @@ func (r *Repo) InTransaction(ctx context.Context, fn func(*player.Repo) error) e
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		return fn(player.NewRepo(tx))
 	})
+}
+
+// AuditSecurity records an account-security change the player made for
+// themselves. details never contain secrets, hashes or codes (ADR 077).
+func (r *Repo) AuditSecurity(ctx context.Context, playerID int64, action string, details map[string]any) error {
+	return audit.NewRepo(r.db).Record(ctx, playerID, "player", playerID, action, nil, details, "")
 }
 
 func (r *Repo) CreateSession(ctx context.Context, s *Session) error {

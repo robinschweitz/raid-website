@@ -2,6 +2,11 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -48,4 +53,23 @@ func (r *Repo) List(ctx context.Context) ([]Entry, error) {
 		return nil, err
 	}
 	return entries, nil
+}
+
+// Record writes one append-only entry with JSON snapshots of the record before
+// and after the change. A nil snapshot is stored as JSON null. actorID 0 means
+// the system acted without a signed-in player.
+func (r *Repo) Record(ctx context.Context, actorID int64, entityType string, entityID int64, action string, before, after any, reason string) error {
+	beforeJSON, err := json.Marshal(before)
+	if err != nil {
+		return fmt.Errorf("marshal audit before snapshot: %w", err)
+	}
+	afterJSON, err := json.Marshal(after)
+	if err != nil {
+		return fmt.Errorf("marshal audit after snapshot: %w", err)
+	}
+	entry := &Log{EntityType: entityType, EntityID: strconv.FormatInt(entityID, 10), Action: action, BeforeJSON: string(beforeJSON), AfterJSON: string(afterJSON), Reason: strings.TrimSpace(reason), CreatedAt: time.Now().UTC()}
+	if actorID > 0 {
+		entry.ActorID = &actorID
+	}
+	return r.Insert(ctx, entry)
 }

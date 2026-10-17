@@ -395,6 +395,7 @@ func (a *API) changeOwnPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
+	actorID, _ := ActorID(r)
 	id, ok := pathID(r, "id")
 	if !ok {
 		BadRequest(w, "invalid player id")
@@ -414,7 +415,7 @@ func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "invalid role")
 		return
 	}
-	p, err := a.Auth.SetCredentials(r.Context(), id, req.Username, req.Password, role)
+	p, err := a.Auth.SetCredentials(r.Context(), id, req.Username, req.Password, role, actorID)
 	if err != nil {
 		if isNotFound(err) {
 			WriteError(w, http.StatusNotFound, "not_found", "player not found")

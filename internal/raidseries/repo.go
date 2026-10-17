@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"raid-website/internal/audit"
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
 )
@@ -39,6 +41,15 @@ func (r *Repo) Catalog() *lootcatalog.Service {
 	return lootcatalog.NewService(lootcatalog.NewRepo(r.db))
 }
 func (r *Repo) WithTx(tx bun.Tx) *Repo { return NewRepo(tx) }
+
+// Audit records a series change in the same transaction.
+func (r *Repo) Audit(ctx context.Context, actorID, seriesID int64, action string, before, after *Series) error {
+	var b any
+	if before != nil {
+		b = before
+	}
+	return audit.NewRepo(r.db).Record(ctx, actorID, "raid_series", seriesID, action, b, after, "")
+}
 func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		// Reserve the writer before reading configuration to avoid stale PATCH merges.

@@ -167,7 +167,7 @@ func TestConcurrentCredentialsPreservePassword(t *testing.T) {
 	for _, password := range []string{"replacement-password", ""} {
 		go func(password string) {
 			<-start
-			_, err := svc.SetCredentials(ctx, before.ID, "owner", password, validation.RoleMember)
+			_, err := svc.SetCredentials(ctx, before.ID, "owner", password, validation.RoleMember, 0)
 			results <- err
 		}(password)
 	}
@@ -204,7 +204,7 @@ func TestSetCredentialsRollback(t *testing.T) {
 	if _, err := bdb.DB.ExecContext(ctx, "CREATE TRIGGER reject_credentials AFTER UPDATE ON players BEGIN SELECT RAISE(ABORT, 'injected failure'); END"); err != nil {
 		t.Fatal(err)
 	}
-	if p, err := svc.SetCredentials(ctx, before.ID, "renamed", "replacement-password", validation.RoleMember); err == nil || p != nil {
+	if p, err := svc.SetCredentials(ctx, before.ID, "renamed", "replacement-password", validation.RoleMember, 0); err == nil || p != nil {
 		t.Fatalf("SetCredentials = %v, %v; want failure without player", p, err)
 	}
 	after, err := players.Get(ctx, before.ID)

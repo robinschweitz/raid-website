@@ -89,7 +89,8 @@ func (a *API) listPlayers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) createPlayer(w http.ResponseWriter, r *http.Request) {
-	if _, ok := ActorID(r); !ok {
+	actorID, ok := ActorID(r)
+	if !ok {
 		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
 		return
 	}
@@ -123,7 +124,7 @@ func (a *API) createPlayer(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := a.Players.Create(r.Context(), p); err != nil {
+	if err := a.Players.CreateAudited(r.Context(), p, actorID); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not create player")
 		return
 	}

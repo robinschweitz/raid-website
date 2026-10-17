@@ -121,6 +121,23 @@ func (s *Service) VerifyPassword(ctx context.Context, playerID int64, password s
 	return nil
 }
 
+// auditSecurity records a security change with the player's name so the
+// audit page can show whose account it was.
+func (s *Service) auditSecurity(ctx context.Context, playerID int64, action string, details map[string]any) error {
+	p, err := s.players.Get(ctx, playerID)
+	if err != nil {
+		return fmt.Errorf("load player for security audit: %w", err)
+	}
+	if details == nil {
+		details = map[string]any{}
+	}
+	details["name"] = p.Name
+	if err := s.sessions.AuditSecurity(ctx, playerID, action, details); err != nil {
+		return fmt.Errorf("record security audit: %w", err)
+	}
+	return nil
+}
+
 func (s *Service) ChangeOwnPassword(ctx context.Context, playerID int64, currentPassword, newPassword string) error {
 	if err := s.VerifyPassword(ctx, playerID, currentPassword); err != nil {
 		return err
@@ -141,7 +158,7 @@ func (s *Service) ChangeOwnPassword(ctx context.Context, playerID int64, current
 	if err := s.players.Update(ctx, p); err != nil {
 		return fmt.Errorf("update own password: %w", err)
 	}
-	return nil
+	return s.auditSecurity(ctx, playerID, "password_change", nil)
 }
 
 // BootstrapAdmin creates an initial account atomically without changing existing accounts.
@@ -179,7 +196,7 @@ func (s *Service) BootstrapAdmin(ctx context.Context, username, password string)
 }
 
 // SetCredentials assigns login credentials and role to an existing player.
-func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, password string, role validation.Role) (*player.Player, error) {
+func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, password string, role validation.Role, actorID int64) (*player.Player, error) {
 	var updated *player.Player
 	err := s.sessions.InTransaction(ctx, func(players *player.Repo) error {
 		p, err := players.Get(ctx, playerID)
@@ -193,6 +210,7 @@ func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, 
 		if !role.Valid() {
 			return errors.New("invalid role")
 		}
+		before := *p
 		hash := p.PasswordHash
 		if password != "" {
 			if err := ValidatePassword(password); err != nil {
@@ -211,7 +229,7 @@ func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, 
 			return fmt.Errorf("update player credentials: %w", err)
 		}
 		updated = p
-		return nil
+		return players.Audit(ctx, actorID, p.ID, "set_account", &before, player.AccountAudit{Player: p, PasswordChanged: password != ""})
 	})
 	if err != nil {
 		return nil, err
@@ -409,6 +427,9 @@ func (s *Service) EnableTOTP(ctx context.Context, playerID int64, code string) (
 			return nil, fmt.Errorf("create recovery code: %w", err)
 		}
 	}
+	if err := s.auditSecurity(ctx, playerID, "totp_enable", nil); err != nil {
+		return nil, err
+	}
 	return recovery, nil
 }
 
@@ -467,7 +488,7 @@ func (s *Service) DisableTOTP(ctx context.Context, playerID int64, currentPasswo
 	if err := s.sessions.DeleteRecoveryCodes(ctx, playerID); err != nil {
 		return fmt.Errorf("delete recovery codes: %w", err)
 	}
-	return nil
+	return s.auditSecurity(ctx, playerID, "totp_disable", nil)
 }
 
 func (s *Service) DeleteWebAuthnCredential(ctx context.Context, playerID, credentialID int64, currentPassword string) error {
@@ -484,7 +505,7 @@ func (s *Service) DeleteWebAuthnCredential(ctx context.Context, playerID, creden
 	if err := s.sessions.DeleteWebAuthnCredential(ctx, credentialID); err != nil {
 		return fmt.Errorf("delete webauthn credential: %w", err)
 	}
-	return nil
+	return s.auditSecurity(ctx, playerID, "security_key_remove", map[string]any{"security_key": credential.Name})
 }
 
 func (s *Service) VerifyMFAChallenge(ctx context.Context, challenge, code string) (string, *player.Player, error) {

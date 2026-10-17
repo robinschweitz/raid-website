@@ -143,7 +143,7 @@ func TestNewEnhancedLootRequiresRequestIDWithoutSideEffects(t *testing.T) {
 						t.Fatalf("ledger escaped rejection: %v %v", entries, err)
 					}
 					var count int
-					if err := f.db.NewSelect().TableExpr("audit_log").ColumnExpr("COUNT(*)").Scan(context.Background(), &count); err != nil || count != 0 {
+					if err := f.db.NewSelect().TableExpr("audit_log").ColumnExpr("COUNT(*)").Where("entity_type = 'loot_award'").Scan(context.Background(), &count); err != nil || count != 0 {
 						t.Fatalf("audit escaped rejection: %d %v", count, err)
 					}
 				})

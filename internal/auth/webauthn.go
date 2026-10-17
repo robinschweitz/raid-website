@@ -102,7 +102,10 @@ func (s *Service) FinishWebAuthnRegistration(ctx context.Context, playerID int64
 	if err := s.sessions.CreateWebAuthnCredential(ctx, &WebAuthnCredential{PlayerID: playerID, CredentialIDHash: hashBytes(credential.ID), Name: "YubiKey", CredentialJSON: string(credentialJSON), CreatedAt: now, UpdatedAt: now}); err != nil {
 		return fmt.Errorf("create webauthn credential: %w", err)
 	}
-	return s.sessions.MarkWebAuthnSessionUsed(ctx, stored.ID, now)
+	if err := s.sessions.MarkWebAuthnSessionUsed(ctx, stored.ID, now); err != nil {
+		return err
+	}
+	return s.auditSecurity(ctx, playerID, "security_key_add", map[string]any{"security_key": "YubiKey"})
 }
 
 func (s *Service) BeginWebAuthnMFA(ctx context.Context, mfaChallenge, rpID, origin string) (*WebAuthnBeginLogin, error) {

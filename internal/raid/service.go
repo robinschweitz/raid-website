@@ -42,11 +42,15 @@ func (s *Service) CancelRaid(ctx context.Context, raidID, actorID int64) (*Raid,
 		if rd.ArchivedAt != nil || IsCompletedOrCancelled(rd.Status) {
 			return ErrNotCancellable
 		}
+		before := *rd
 		now := time.Now().UTC()
 		rd.Status = validation.RaidStatusCancelled
 		rd.CancelledAt = &now
 		rd.UpdatedAt = now
-		return repo.Update(ctx, rd)
+		if err := repo.Update(ctx, rd); err != nil {
+			return err
+		}
+		return repo.Audit(ctx, actorID, rd.ID, "cancel", &before, rd)
 	})
 	return rd, err
 }
@@ -75,6 +79,7 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 		if rd.ArchivedAt != nil || (rd.Status != validation.RaidStatusPlanned && rd.Status != validation.RaidStatusOpen) {
 			return ErrScheduleNotEditable
 		}
+		before := *rd
 		if changes.SeriesID != nil {
 			if *changes.SeriesID <= 0 {
 				return raidseries.ErrSeriesRequired
@@ -120,7 +125,10 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 		}
 		now := time.Now().UTC()
 		rd.UpdatedAt = now
-		return repo.Update(ctx, rd)
+		if err := repo.Update(ctx, rd); err != nil {
+			return err
+		}
+		return repo.Audit(ctx, actorID, rd.ID, "update", &before, rd)
 	})
 	if err != nil {
 		return nil, err
@@ -131,7 +139,7 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 // CreateRaid accepts concrete legacy manual paths, while validating any selected series.
 // Without an explicit name the selected series derives it: the naming template with the next
 // counter (incremented in the same transaction), or the series name when the template is empty.
-func (s *Service) CreateRaid(ctx context.Context, rd *Raid) error {
+func (s *Service) CreateRaid(ctx context.Context, rd *Raid, actorID int64) error {
 	return s.repo.InTransaction(ctx, func(repo *Repo) error {
 		if rd.SeriesID != nil {
 			seriesRepo := raidseries.NewRepo(repo.db)
@@ -171,7 +179,10 @@ func (s *Service) CreateRaid(ctx context.Context, rd *Raid) error {
 		if err := repo.Catalog().ValidateAssociation(ctx, rd.CatalogInstanceID, rd.RaidSize); err != nil {
 			return err
 		}
-		return repo.Create(ctx, rd)
+		if err := repo.Create(ctx, rd); err != nil {
+			return err
+		}
+		return repo.Audit(ctx, actorID, rd.ID, "create", nil, rd)
 	})
 }
 

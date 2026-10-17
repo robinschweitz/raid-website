@@ -277,6 +277,26 @@ func (s *Service) loadUsableProfile(ctx context.Context, profileID string) (Exte
 	return profile, raw, nil
 }
 
+// requestAudit is the readable audit snapshot of a registration request; the
+// raw Rising-Gods profile JSON is left out (ADR 077).
+type requestAudit struct {
+	CharacterName string `json:"character_name"`
+	Class         string `json:"class"`
+	Status        string `json:"status"`
+	Purpose       string `json:"purpose"`
+}
+
+func requestSnapshot(req *Request) requestAudit {
+	return requestAudit{CharacterName: req.CharacterName, Class: req.Class, Status: req.Status, Purpose: req.Purpose}
+}
+
+func actorOrSystem(actorID *int64) int64 {
+	if actorID == nil {
+		return 0
+	}
+	return *actorID
+}
+
 func (s *Service) CreateRequest(ctx context.Context, requesterID *int64, profileID string) (*Request, error) {
 	if existing, err := s.repo.FindBlockingRequest(ctx, ExternalSourceRisingGods, profileID); err != nil {
 		return nil, err
@@ -293,8 +313,14 @@ func (s *Service) CreateRequest(ctx context.Context, requesterID *int64, profile
 	}
 	now := time.Now().UTC()
 	req := &Request{RequesterPlayerID: requesterID, Status: StatusPending, Purpose: purpose, ExternalSource: ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, CharacterName: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, GearScore: profile.GearScore, Level: profile.Level, Race: profile.Race, Faction: profile.Faction, RawProfileJSON: raw, CreatedAt: now, UpdatedAt: now}
-	if err := s.repo.CreateRequest(ctx, req); err != nil {
-		return nil, fmt.Errorf("create registration request: %w", err)
+	err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := NewRepo(tx).CreateRequest(ctx, req); err != nil {
+			return fmt.Errorf("create registration request: %w", err)
+		}
+		return audit.NewRepo(tx).Record(ctx, actorOrSystem(requesterID), "registration_request", req.ID, "create", nil, requestSnapshot(req), "")
+	})
+	if err != nil {
+		return nil, err
 	}
 	return req, nil
 }
@@ -343,12 +369,16 @@ func (s *Service) CreateCode(ctx context.Context, actorID, requestID int64) (*Ge
 	code := &Code{RequestID: requestID, CodeHash: hash, CreatedByPlayerID: actorID, CreatedAt: now, ExpiresAt: now.Add(codeTTL)}
 	err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		repo := NewRepo(tx)
+		before := requestSnapshot(req)
 		req.Status = StatusApproved
 		req.UpdatedAt = now
 		if err := repo.UpdateRequest(ctx, req); err != nil {
 			return err
 		}
-		return repo.CreateCode(ctx, code)
+		if err := repo.CreateCode(ctx, code); err != nil {
+			return err
+		}
+		return audit.NewRepo(tx).Record(ctx, actorID, "registration_request", req.ID, "create_code", before, requestSnapshot(req), "")
 	})
 	if err != nil {
 		return nil, err
@@ -356,7 +386,7 @@ func (s *Service) CreateCode(ctx context.Context, actorID, requestID int64) (*Ge
 	return &GeneratedCode{CodeRecord: *code, PlainCode: plain}, nil
 }
 
-func (s *Service) RevokeCode(ctx context.Context, codeID int64) (*Code, error) {
+func (s *Service) RevokeCode(ctx context.Context, actorID, codeID int64) (*Code, error) {
 	code, err := s.repo.GetCode(ctx, codeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -364,15 +394,22 @@ func (s *Service) RevokeCode(ctx context.Context, codeID int64) (*Code, error) {
 		}
 		return nil, err
 	}
+	before := *code
 	now := time.Now().UTC()
 	code.RevokedAt = &now
-	if err := s.repo.UpdateCode(ctx, code); err != nil {
+	err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := NewRepo(tx).UpdateCode(ctx, code); err != nil {
+			return err
+		}
+		return audit.NewRepo(tx).Record(ctx, actorID, "registration_code", code.ID, "revoke", before, code, "")
+	})
+	if err != nil {
 		return nil, err
 	}
 	return code, nil
 }
 
-func (s *Service) MarkCodeSent(ctx context.Context, codeID int64) (*Code, error) {
+func (s *Service) MarkCodeSent(ctx context.Context, actorID, codeID int64) (*Code, error) {
 	code, err := s.repo.GetCode(ctx, codeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -381,16 +418,23 @@ func (s *Service) MarkCodeSent(ctx context.Context, codeID int64) (*Code, error)
 		return nil, err
 	}
 	if code.SentAt == nil {
+		before := *code
 		now := time.Now().UTC()
 		code.SentAt = &now
-		if err := s.repo.UpdateCode(ctx, code); err != nil {
+		err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			if err := NewRepo(tx).UpdateCode(ctx, code); err != nil {
+				return err
+			}
+			return audit.NewRepo(tx).Record(ctx, actorID, "registration_code", code.ID, "mark_sent", before, code, "")
+		})
+		if err != nil {
 			return nil, err
 		}
 	}
 	return code, nil
 }
 
-func (s *Service) RejectRequest(ctx context.Context, requestID int64) (*Request, error) {
+func (s *Service) RejectRequest(ctx context.Context, actorID, requestID int64) (*Request, error) {
 	req, err := s.repo.GetRequest(ctx, requestID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -401,9 +445,16 @@ func (s *Service) RejectRequest(ctx context.Context, requestID int64) (*Request,
 	if req.Status == StatusConsumed {
 		return nil, ErrInvalid
 	}
+	before := requestSnapshot(req)
 	req.Status = StatusRejected
 	req.UpdatedAt = time.Now().UTC()
-	if err := s.repo.UpdateRequest(ctx, req); err != nil {
+	err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := NewRepo(tx).UpdateRequest(ctx, req); err != nil {
+			return err
+		}
+		return audit.NewRepo(tx).Record(ctx, actorID, "registration_request", req.ID, "reject", before, requestSnapshot(req), "")
+	})
+	if err != nil {
 		return nil, err
 	}
 	return req, nil
@@ -544,9 +595,13 @@ func (s *Service) consumeCode(ctx context.Context, codeValue string, apply func(
 		if err := repo.UpdateCode(ctx, &row.Code); err != nil {
 			return err
 		}
+		before := requestSnapshot(row.Request)
 		row.Request.Status = StatusConsumed
 		row.Request.UpdatedAt = now
-		return repo.UpdateRequest(ctx, row.Request)
+		if err := repo.UpdateRequest(ctx, row.Request); err != nil {
+			return err
+		}
+		return audit.NewRepo(tx).Record(ctx, usedBy, "registration_request", row.Request.ID, "redeem", before, requestSnapshot(row.Request), "")
 	})
 }
 

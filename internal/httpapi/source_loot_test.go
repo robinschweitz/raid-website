@@ -77,7 +77,7 @@ func TestNewLootRequiresSourceSelectionWithoutSideEffects(t *testing.T) {
 					t.Fatalf("lock changed: %v %v", stored, err)
 				}
 				var count int
-				if err := f.db.NewSelect().TableExpr("audit_log").ColumnExpr("COUNT(*)").Scan(ctx, &count); err != nil || count != 0 {
+				if err := f.db.NewSelect().TableExpr("audit_log").ColumnExpr("COUNT(*)").Where("entity_type = 'loot_award'").Scan(ctx, &count); err != nil || count != 0 {
 					t.Fatalf("audit escaped rejection: %d %v", count, err)
 				}
 				entries, err := enhancepoints.NewRepo(f.db).ListByPlayer(ctx, f.first)

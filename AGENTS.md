@@ -62,6 +62,9 @@ wins and the difference is fixed here first.
    require an actor and write an audit log entry. A reason is mandatory only for archived raid changes
    (ADR 032 supersedes the reason requirement in ADR 006). Numeric corrections prefer new
    adjustment transactions over mutating values.
+   Since ADR 077 every website write (raid lifecycle, roster additions, wishlist, polls, item
+   locks, guild configuration, players, accounts, registration) also writes an audit entry with
+   its actor; snapshots never contain secrets.
 8. **UTC in storage, local time at display.** Persist all timestamps in UTC; the frontend formats in
    the user's timezone. Import must convert German sheet timestamps explicitly (ADR 003).
 9. **Authorization is server-side.** The client never decides permissions. Every mutation is checked

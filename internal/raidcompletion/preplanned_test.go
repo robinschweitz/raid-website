@@ -112,8 +112,15 @@ func TestArchiveReusesPreplannedOccurrenceWithoutOverwriting(t *testing.T) {
 			svc := NewService(NewRepo(database))
 			svc.now = func() time.Time { return now }
 			archived, next, archiveErr := svc.ArchiveRaid(ctx, current.ID, actor)
-			shouldSucceed := scenario == "planned" || scenario == "open" || scenario == "same_parent"
-			if shouldSucceed {
+			shouldSucceed := scenario == "planned" || scenario == "open" || scenario == "same_parent" || scenario == "cancelled"
+			if scenario == "cancelled" {
+				// ADR 078: a cancelled future raid is skipped and left untouched; the
+				// following occurrence becomes the successor.
+				if archiveErr != nil || archived.Status != validation.RaidStatusCompleted || next == nil || next.ID == future.ID || !next.ScheduledStart.After(*future.ScheduledStart) {
+					t.Fatalf("cancelled occurrence not skipped: %+v %+v %v", archived, next, archiveErr)
+				}
+				beforeList = append(beforeList, *next)
+			} else if shouldSucceed {
 				if archiveErr != nil || archived.Status != validation.RaidStatusCompleted || next == nil || next.ID != future.ID {
 					t.Fatalf("preplanned reuse: %+v %+v %v", archived, next, archiveErr)
 				}

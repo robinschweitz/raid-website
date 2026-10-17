@@ -120,6 +120,21 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 		if err != nil {
 			return fmt.Errorf("find successor occurrence: %w", err)
 		}
+		// A cancelled future raid (for example a holiday week planned ahead) is
+		// skipped; the next occurrence in the same rhythm becomes the successor (ADR 078).
+		for skipped := 0; next != nil && next.Status == validation.RaidStatusCancelled && next.ArchivedAt == nil; skipped++ {
+			if skipped >= 7*raidseries.MaxPlanWeeks {
+				return raid.ErrOccurrenceConflict
+			}
+			scheduled, err = raidseries.NextOccurrence(series, scheduled, now)
+			if err != nil {
+				return err
+			}
+			next, err = raids.FindOccurrence(ctx, series.ID, scheduled)
+			if err != nil {
+				return fmt.Errorf("find successor occurrence: %w", err)
+			}
+		}
 		if next == nil {
 			if err := raids.Catalog().ValidateAssociation(ctx, series.CatalogInstanceID, series.RaidSize); err != nil {
 				return err
@@ -136,6 +151,9 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 			}
 			if err := raids.Audit(ctx, actorID, next.ID, "create_successor", nil, next); err != nil {
 				return err
+			}
+			if err := raids.OpenSignups(ctx, next.ID); err != nil {
+				return fmt.Errorf("open successor signups: %w", err)
 			}
 			if series.NameTemplate != "" {
 				if err := repo.series.Save(ctx, series); err != nil {
@@ -162,6 +180,9 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 		}
 		if err := raids.Audit(ctx, actorID, rd.ID, "archive", &before, rd); err != nil {
 			return err
+		}
+		if _, err := raid.PlanAheadInTransaction(ctx, raids, series.ID, actorID, now); err != nil {
+			return fmt.Errorf("plan series ahead: %w", err)
 		}
 
 		skip := make(map[int64]bool, len(withoutPoints))

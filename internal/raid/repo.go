@@ -38,6 +38,13 @@ func (r *Repo) Audit(ctx context.Context, actorID, raidID int64, action string, 
 	return audit.NewRepo(r.db).Record(ctx, actorID, "raid", raidID, action, b, a, "")
 }
 
+// OpenSignups enables signups for a raid; raids planned from a series open
+// their signup right away (ADR 078).
+func (r *Repo) OpenSignups(ctx context.Context, raidID int64) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO raid_signup_settings (raid_id, is_enabled) VALUES (?, TRUE) ON CONFLICT(raid_id) DO UPDATE SET is_enabled = TRUE", raidID)
+	return err
+}
+
 // Catalog binds catalog validation to the lifecycle transaction.
 func (r *Repo) Catalog() *lootcatalog.Service {
 	return lootcatalog.NewService(lootcatalog.NewRepo(r.db))

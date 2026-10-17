@@ -27,6 +27,7 @@ type row struct {
 	IntervalWeeks     int64
 	StartTime         string
 	Timezone          string
+	PlanWeeksAhead    int
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
@@ -67,7 +68,7 @@ func (r *Repo) RequireLeader(ctx context.Context, id int64) error {
 	return err
 }
 func decode(rd row) (*Series, error) {
-	s := &Series{ID: rd.ID, Name: rd.Name, NameTemplate: rd.NameTemplate, NextRaidNumber: rd.NextRaidNumber, RaidLeaderID: rd.RaidLeaderID, IntervalWeeks: rd.IntervalWeeks, StartTime: rd.StartTime, Timezone: rd.Timezone, CreatedAt: rd.CreatedAt, UpdatedAt: rd.UpdatedAt}
+	s := &Series{ID: rd.ID, Name: rd.Name, NameTemplate: rd.NameTemplate, NextRaidNumber: rd.NextRaidNumber, RaidLeaderID: rd.RaidLeaderID, IntervalWeeks: rd.IntervalWeeks, StartTime: rd.StartTime, Timezone: rd.Timezone, PlanWeeksAhead: rd.PlanWeeksAhead, CreatedAt: rd.CreatedAt, UpdatedAt: rd.UpdatedAt}
 	s.CatalogInstanceID, s.RaidSize = rd.CatalogInstanceID, rd.RaidSize
 	if err := json.Unmarshal([]byte(rd.Weekdays), &s.Weekdays); err != nil {
 		return nil, errors.Join(ErrInvalid, err)
@@ -104,7 +105,7 @@ func (r *Repo) Save(ctx context.Context, s *Series) error {
 	if err != nil {
 		return err
 	}
-	rd := &row{ID: s.ID, Name: s.Name, NameTemplate: s.NameTemplate, NextRaidNumber: s.NextRaidNumber, RaidLeaderID: s.RaidLeaderID, Weekdays: string(weekdays), IntervalWeeks: s.IntervalWeeks, StartTime: s.StartTime, Timezone: s.Timezone, CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt}
+	rd := &row{ID: s.ID, Name: s.Name, NameTemplate: s.NameTemplate, NextRaidNumber: s.NextRaidNumber, RaidLeaderID: s.RaidLeaderID, Weekdays: string(weekdays), IntervalWeeks: s.IntervalWeeks, StartTime: s.StartTime, Timezone: s.Timezone, PlanWeeksAhead: s.PlanWeeksAhead, CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt}
 	rd.CatalogInstanceID, rd.RaidSize = s.CatalogInstanceID, s.RaidSize
 	if s.ID == 0 {
 		_, err = r.db.NewInsert().Model(rd).Exec(ctx)

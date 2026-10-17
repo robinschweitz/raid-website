@@ -140,6 +140,7 @@ function text(tree) {
 const button = (view, label) => nodes(view.tree, (n) => n.type === 'button' && text(n) === label)[0]
 const form = (view, index = 0) => nodes(view.tree, (n) => n.type === 'form')[index]
 const input = (view, placeholder) => nodes(view.tree, (n) => n.type === 'input' && n.props.placeholder === placeholder)[0]
+const labelled = (view, label) => nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === label)[0]
 const select = (view, label) => nodes(view.tree, (n) => (n.type === 'select' || n.type === 'input') && n.props['aria-label'] === label)[0]
 const suggestions = (view, label) => nodes(view.tree, (n) => n.type === 'datalist' && n.props.id === select(view, label)?.props.list)[0]
 const checkbox = (view, label) => nodes(view.tree, (n) => n.type === 'label' && n.props.className === 'check' && text(n).trim() === label)[0].props.children[0]
@@ -1619,6 +1620,59 @@ test('raid list includes archived raids, filters history and creates with config
   assert.deepEqual(s.navigations, ['/raids/3'])
 })
 
+test('raid assistants plan series raids ahead up to a date', async () => {
+  const s = setup(player(1, 'RAIDASSISTENT'))
+  const view = s.mount(s.load('pages/Raids.tsx').RaidsPage)
+  s.requests.forEach((r) => r.resolve(r.url === '/api/v1/loot-catalog' ? catalogFixture() : r.url === '/api/v1/raid-series' ? [seriesRow] : r.url === '/api/v1/players' ? [player(1), player(2)] : [raid(1)]))
+  await flush(view)
+  const planForm = () => nodes(view.tree, (n) => n.type === 'form')[1]
+  assert.equal(nodes(planForm(), (n) => n.type === 'button')[0].props.disabled, true, 'needs series and date')
+  select(view, 'Raidserie für Vorausplanung').props.onChange(change('3'))
+  labelled(view, 'Planen bis').props.onChange(change('2026-12-31'))
+  view.render()
+  const planning = planForm().props.onSubmit(event)
+  assert.equal(writes(s)[0].url, '/api/v1/raid-series/3/plan')
+  assert.deepEqual(writes(s)[0].body, { until: '2026-12-31' })
+  writes(s)[0].resolve([raid(5), raid(6)])
+  await flush(view)
+  s.requests.at(-1).resolve([raid(1), raid(5), raid(6)])
+  await planning
+  view.render()
+  assert.match(text(view.tree), /2 Raids angelegt\. Die Anmeldung ist offen\./)
+  assert.match(text(view.tree), /Raid 6/)
+  const { ApiError } = s.load('api.ts')
+  const failing = planForm().props.onSubmit(event)
+  writes(s)[1].reject(new ApiError(400, 'plan_until_past', 'past'))
+  await failing
+  view.render()
+  assert.match(text(view.tree), /Datum in der Zukunft/)
+})
+
+test('members do not see raid planning', async () => {
+  const s = setup(player(1, 'MEMBER'))
+  const view = s.mount(s.load('pages/Raids.tsx').RaidsPage)
+  s.requests.forEach((r) => r.resolve(r.url === '/api/v1/loot-catalog' ? catalogFixture() : r.url === '/api/v1/raid-series' ? [seriesRow] : r.url === '/api/v1/players' ? [player(1)] : [raid(1)]))
+  await flush(view)
+  assert.doesNotMatch(text(view.tree), /Termine im Voraus anlegen/)
+})
+
+test('series form keeps a rolling planning window', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidSeries.tsx').RaidSeriesPage)
+  s.requests.forEach((r) => r.resolve(r.url === '/api/v1/loot-catalog' ? catalogFixture() : r.url === '/api/v1/raid-series' ? [{ ...seriesRow, plan_weeks_ahead: 4 }] : [player(1), player(2)]))
+  await flush(view)
+  assert.match(text(view.tree), /Automatisch\s+4 Wochen\s+im Voraus geplant/)
+  button(view, 'Serie bearbeiten').props.onClick()
+  view.render()
+  assert.equal(labelled(view, 'Wochen im Voraus').props.value, '4')
+  labelled(view, 'Wochen im Voraus').props.onChange(change('8'))
+  view.render()
+  const saving = form(view).props.onSubmit(event)
+  assert.equal(writes(s)[0].body.plan_weeks_ahead, 8)
+  writes(s)[0].reject(new Error('offline'))
+  await saving
+})
+
 test('raid creation without a series requires an explicit name', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/Raids.tsx').RaidsPage)
@@ -1667,7 +1721,7 @@ test('admin series form starts empty, validates weekdays, creates and edits full
   await form(view).props.onSubmit(event)
   assert.equal(writes(s).length, 1)
   assert.equal(writes(s)[0].url, '/api/v1/raid-series')
-  assert.deepEqual(JSON.parse(JSON.stringify(writes(s)[0].body)), { name: 'Explicit name', raid_leader_id: 2, weekdays: [0], interval_weeks: 3, start_time: '19:45', timezone: 'Europe/Berlin', catalog_instance_id: 'map:631', raid_size: 25 })
+  assert.deepEqual(JSON.parse(JSON.stringify(writes(s)[0].body)), { name: 'Explicit name', raid_leader_id: 2, weekdays: [0], interval_weeks: 3, start_time: '19:45', timezone: 'Europe/Berlin', plan_weeks_ahead: 0, catalog_instance_id: 'map:631', raid_size: 25 })
   writes(s)[0].resolve({ ...seriesRow, id: 4 })
   await first
   view.render()

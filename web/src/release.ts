@@ -1,8 +1,17 @@
-export const appVersion = '1.0.15'
+export const appVersion = '1.0.16'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Raids im Voraus planen',
+    changes: [
+      'Auf der Raidseite legt „Termine im Voraus anlegen“ alle Raids einer Serie bis zu einem gewählten Tag an. Die Anmeldung ist sofort offen, sodass sich alle schon Wochen vorher anmelden können.',
+      'Bei jeder Raidserie lässt sich einstellen, wie viele Wochen automatisch im Voraus geplant bleiben. Aufgefüllt wird beim Speichern der Serie und bei jedem Archivieren.',
+      'Abgesagte Termine werden beim Archivieren übersprungen; der nächste Termin der Serie wird zum Nachfolger.',
+    ],
+  },
+  {
+    version: '1.0.15',
     title: 'Audit-Protokoll zeigt alle Änderungen',
     changes: [
       'Das Audit-Protokoll zeigt jetzt auch alltägliche Änderungen: Charaktere in die Aufstellung aufnehmen, Raids anlegen, planen, absagen und archivieren, Wunschlisten, Umfragen und Stimmen, Item-Locks, Raidserien, Gildenränge und Raidgruppen, neue Spieler, Zugänge, Passwort- und Zwei-Faktor-Änderungen sowie Registrierungen.',

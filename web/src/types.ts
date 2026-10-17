@@ -202,6 +202,7 @@ export interface RaidSeries {
   interval_weeks: number
   start_time: string
   timezone: string
+  plan_weeks_ahead?: number
   catalog_instance_id?: string | null
   raid_size?: number | null
 }

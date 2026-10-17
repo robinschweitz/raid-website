@@ -51,6 +51,9 @@ export function RaidsPage() {
   const [players, setPlayers] = useState<Player[]>([])
   const [leaderID, setLeaderID] = useState('')
   const [filter, setFilter] = useState('all')
+  const [planSeriesID, setPlanSeriesID] = useState('')
+  const [planUntil, setPlanUntil] = useState('')
+  const [planMessage, setPlanMessage] = useState('')
   const [catalog, setCatalog] = useState<LootCatalog | null>(null)
   const [catalogError, setCatalogError] = useState('')
   const [instanceID, setInstanceID] = useState('')
@@ -98,6 +101,30 @@ export function RaidsPage() {
     })
   }
 
+  const onPlan = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!canManage || !planSeriesID || !planUntil) return
+    await submit(async () => {
+      setError('')
+      setPlanMessage('')
+      try {
+        const planned = await api.post<Raid[]>(`/api/v1/raid-series/${planSeriesID}/plan`, { until: planUntil })
+        if (!isActive()) return
+        const rows = await api.get<Raid[]>('/api/v1/raids?include_archived=true')
+        if (!isActive()) return
+        setRaids(rows)
+        setPlanMessage(planned.length === 0
+          ? 'Alle Termine bis zu diesem Datum sind schon angelegt.'
+          : `${planned.length === 1 ? '1 Raid' : `${planned.length} Raids`} angelegt. Die Anmeldung ist offen.`)
+      } catch (err) {
+        if (!isActive()) return
+        if (err instanceof ApiError && err.code === 'plan_until_past') setError('Bitte ein Datum in der Zukunft wählen.')
+        else if (err instanceof ApiError && err.code === 'plan_too_far') setError('So weit im Voraus kann nicht geplant werden (höchstens zehn Jahre).')
+        else setError(err instanceof ApiError ? err.message : 'Planen fehlgeschlagen')
+      }
+    })
+  }
+
   return (
     <div>
       <div className="page-heading"><div><p className="eyebrow">Planung & Historie</p><h1>Raids</h1></div><Link to="/">Zur Übersicht</Link></div>
@@ -132,6 +159,19 @@ export function RaidsPage() {
             <input disabled={pending} required type="datetime-local" value={scheduled} onChange={(e) => setScheduled(e.target.value)} />
           </label>
           <button type="submit" disabled={pending || !associationValid}>{pending ? 'Anlegen…' : 'Anlegen'}</button>
+        </form>
+        </details>
+      )}
+      {canManage && series.length > 0 && (
+        <details className="card editor-disclosure"><summary>Termine im Voraus anlegen</summary>
+        <form className="card inline-form" onSubmit={onPlan}>
+          <p className="muted">Legt alle Raids der Serie bis zum gewählten Tag an, nach deren Wochentagen und Startzeit. Bereits angelegte Termine bleiben unverändert, die Anmeldung ist sofort offen.</p>
+          <label>Raidserie<select aria-label="Raidserie für Vorausplanung" disabled={pending} required value={planSeriesID} onChange={(e) => { setPlanSeriesID(e.target.value); setPlanMessage('') }}>
+            <option value="">Raidserie auswählen</option>{series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select></label>
+          <label>Bis einschließlich<input aria-label="Planen bis" disabled={pending} required type="date" value={planUntil} onChange={(e) => { setPlanUntil(e.target.value); setPlanMessage('') }} /></label>
+          {planMessage && <p className="success-message" role="status"><span>{planMessage}</span></p>}
+          <button type="submit" disabled={pending || !planSeriesID || !planUntil}>{pending ? 'Anlegen…' : 'Raids anlegen'}</button>
         </form>
         </details>
       )}

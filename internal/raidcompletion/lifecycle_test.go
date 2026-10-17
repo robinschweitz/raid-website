@@ -354,7 +354,8 @@ func TestArchiveScheduleErrorsAndOccurrenceConflictAreAtomic(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				existing := &raid.Raid{Name: "Existing occurrence", RaidLeaderID: actor, SeriesID: &series.ID, Status: validation.RaidStatusCancelled, ScheduledStart: &nextStart, CreatedAt: now, UpdatedAt: now}
+				// Cancelled occurrences are skipped (ADR 078); a completed one still conflicts.
+				existing := &raid.Raid{Name: "Existing occurrence", RaidLeaderID: actor, SeriesID: &series.ID, Status: validation.RaidStatusCompleted, CompletedAt: &now, ScheduledStart: &nextStart, CreatedAt: now, UpdatedAt: now}
 				if err := raids.Create(ctx, existing); err != nil {
 					t.Fatal(err)
 				}

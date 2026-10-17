@@ -46,6 +46,13 @@ func (r *Repo) saveQuickAddRequest(ctx context.Context, raidID, actor int64, req
 	return err
 }
 
+// deleteQuickAddRequests drops the idempotency records that point at a removed
+// roster row; they only exist to replay a quick-add and reference the row by FK.
+func (r *Repo) deleteQuickAddRequests(ctx context.Context, attendanceID int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM raid_quick_add_requests WHERE attendance_id = ?", attendanceID)
+	return err
+}
+
 func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
 	if _, isBound := r.db.(bun.Tx); isBound {
 		if err := r.loot.ReserveWriter(ctx); err != nil {

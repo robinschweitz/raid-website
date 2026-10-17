@@ -3085,6 +3085,38 @@ test('staff can bench a declined player straight from the roster', async () => {
   await done
 })
 
+test('staff can remove a participant from an open raid after confirming', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { raid: { series_id: 3, scheduled_start: '2026-10-04T18:30:00Z' }, attendance: [recipientRow] })
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Aus dem Raid entfernen').length, 0, 'only offered while editing a row')
+  nodes(view.tree, (n) => n.type === 'button' && n.props.title === 'Teilnahme korrigieren')[0].props.onClick()
+  view.render()
+  s.confirmAnswers.push(false)
+  await button(view, 'Aus dem Raid entfernen').props.onClick()
+  assert.equal(writes(s).length, 0, 'declining the confirmation sends nothing')
+  assert.match(s.confirms[0], /Saved raid character wirklich aus dem Raid entfernen/)
+  const done = button(view, 'Aus dem Raid entfernen').props.onClick()
+  assert.equal(writes(s)[0].method, 'del')
+  assert.equal(writes(s)[0].url, '/api/v1/raids/1/attendance/9')
+  const { ApiError } = s.load('api.ts')
+  writes(s)[0].reject(new ApiError(409, 'attendance_has_loot', 'loot'))
+  await done
+  view.render()
+  assert.match(text(view.tree), /zuerst den Loot zurückziehen/)
+})
+
+test('completed raids do not offer removing participants', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { raid: { status: 'COMPLETED' }, attendance: [recipientRow] })
+  await flush(view)
+  nodes(view.tree, (n) => n.type === 'button' && n.props.title === 'Teilnahme korrigieren')[0].props.onClick()
+  view.render()
+  assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Aus dem Raid entfernen').length, 0)
+})
+
 test('recruitment template is loaded from the server, saved explicitly and the refresh only reloads the roster', async () => {
   const s = setup({ id: 1, role: 'RAIDASSISTENT' })
   const { RaidRecruitment } = s.load('pages/Recruitment.tsx')

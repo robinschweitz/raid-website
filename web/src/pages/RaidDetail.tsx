@@ -62,6 +62,7 @@ function raidError(err: unknown, fallback: string): string {
     series_not_editable: 'Bei diesem Raid kann die Serie nicht mehr geändert werden.',
     schedule_not_editable: 'Die Planung eines abgeschlossenen, abgesagten oder archivierten Raids kann nicht mehr geändert werden. Bitte neu laden.',
     name_required: 'Bitte einen Raidnamen eintragen.',
+    attendance_has_loot: 'Dieser Charakter hat in diesem Raid schon Loot erhalten. Bitte zuerst den Loot zurückziehen.',
     name_not_editable: 'Raidnamen aus einer Raidserie können nicht direkt geändert werden.',
     invalid_scheduled_start: 'Bitte einen gültigen geplanten Start angeben.',
     roster_incomplete: 'Die Teilnahme ist unvollständig. Bitte die betroffenen Zeilen korrigieren: gespeicherter Charaktername, gültige Klasse, tatsächlicher Spec und Rolle sind zum Archivieren erforderlich.',
@@ -371,6 +372,33 @@ function RaidDetail({ raidID }: Props) {
         await load()
       } catch (err) {
         if (isActive()) setError(raidError(err, 'Teilnahme fehlgeschlagen'))
+      }
+    })
+  }
+
+  const removeAttendance = async (row: Attendance) => {
+    if (isPending() || !isActive() || !canWrite || !isActiveRaid || row.raid_id !== raidID) return
+    const name = row.character_name?.trim() || 'Diese Teilnahme'
+    if (!window.confirm(`${name} wirklich aus dem Raid entfernen?`)) return
+    await submit(async () => {
+      setError('')
+      setMessage('')
+      try {
+        await api.del<void>(`/api/v1/raids/${raidID}/attendance/${row.id}`)
+        if (!isActive()) return
+        ++characterVersion.current
+        setAttEditing(null)
+        setAttPlayer('')
+        setAttCharacter('')
+        setCharacterSearch('')
+        setAttRole('DD')
+        setAttDetails({ is_bench: false, late_join: false, early_leave: false })
+        setAttReason('')
+        setAttSnapshot({})
+        setMessage(`${name} wurde aus dem Raid entfernt.`)
+        await load()
+      } catch (err) {
+        if (isActive()) setError(raidError(err, 'Entfernen fehlgeschlagen'))
       }
     })
   }
@@ -899,6 +927,7 @@ function RaidDetail({ raidID }: Props) {
               {!pending && (!hasAttCharacter ? <p className="field-hint">Zuerst einen Charakter wählen.</p> : attNeedsReason && !attReason.trim() ? <p className="field-hint">Begründung eintragen.</p> : null)}
               <button className="primary-action" type="submit" disabled={pending || !hasAttCharacter || (attNeedsReason && !attReason.trim())}>{attEditing ? 'Teilnahme-Korrektur speichern' : 'Hinzufügen'}</button>
               {attEditing && <button type="button" disabled={pending} onClick={() => editAttendance(null)}>Bearbeitung abbrechen</button>}
+              {attEditing && isActiveRaid && <button type="button" disabled={pending} onClick={() => void removeAttendance(attEditing)}>Aus dem Raid entfernen</button>}
             </form>}
           </div>
         )}

@@ -56,6 +56,8 @@ wins and the difference is fixed here first.
 6. **Archive by default.** History-affecting records are archived (`archived_at`), never deleted.
    A hard delete must be explicitly requested by a human and is Admin-only (ADR 007).
    For raids, archiving means final processing, not removal or hiding (ADR 021).
+   Exception: a roster row of a planned or open raid may be hard-deleted by staff; the audit log
+   keeps the removed row and loot in that raid blocks it (ADR 076).
 7. **Edits are audited.** Changes to history-affecting records (loot, attendance, character renames)
    require an actor and write an audit log entry. A reason is mandatory only for archived raid changes
    (ADR 032 supersedes the reason requirement in ADR 006). Numeric corrections prefer new

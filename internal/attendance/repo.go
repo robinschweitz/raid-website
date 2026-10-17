@@ -34,6 +34,13 @@ func (r *Repo) Update(ctx context.Context, a *Attendance) error {
 	return err
 }
 
+// Delete hard-removes one roster row. Only the raid correction service calls
+// it, for planned or open raids (ADR 076).
+func (r *Repo) Delete(ctx context.Context, id int64) error {
+	_, err := r.db.NewDelete().Model((*Attendance)(nil)).Where("id = ?", id).Exec(ctx)
+	return err
+}
+
 func (r *Repo) Exists(ctx context.Context, raidID, playerID, characterID int64) (bool, error) {
 	count, err := r.db.NewSelect().Model((*Attendance)(nil)).
 		Where("raid_id = ?", raidID).

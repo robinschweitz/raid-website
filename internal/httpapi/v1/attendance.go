@@ -93,6 +93,26 @@ func (a *API) correctAttendance(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]any{"data": row})
 }
 
+// removeAttendance hard-deletes a roster row from a planned or open raid (ADR 076).
+func (a *API) removeAttendance(w http.ResponseWriter, r *http.Request) {
+	actor, _ := ActorID(r)
+	raidID, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid raid id")
+		return
+	}
+	id, ok := pathID(r, "recordID")
+	if !ok {
+		BadRequest(w, "invalid attendance id")
+		return
+	}
+	if err := a.Corrections.RemoveAttendance(r.Context(), raidID, id, actor); err != nil {
+		writeCorrectionError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (a *API) listAttendance(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r, "id")
 	if !ok {
@@ -189,6 +209,8 @@ func writeCorrectionError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusConflict, "raid_state", "Raid erlaubt diese Aenderung nicht")
 	case errors.Is(err, loot.ErrLockConflict):
 		WriteError(w, http.StatusConflict, "item_lock_conflict", "Mehrere aktive Item-Locks passen auf dieses Item")
+	case errors.Is(err, raidcorrection.ErrHasLoot):
+		WriteError(w, http.StatusConflict, "attendance_has_loot", "Charakter hat in diesem Raid noch Loot; zuerst den Loot zurueckziehen")
 	case errors.Is(err, raidcorrection.ErrConflict):
 		WriteError(w, http.StatusConflict, "attendance_conflict", "Teilnahme ist bereits vorhanden")
 	default:

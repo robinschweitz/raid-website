@@ -22,6 +22,9 @@ read-only player-facing ledger, never an in-app roll generator (ADR 023-024).
 mirrors it into the foreign-key tables at startup, and normalizes source paths into explicit
 NORMAL/HEROIC/HARDMODE modes; there is no runtime catalog write. The SVG/CSS design uses only
 supported data (ADR 026).
+`addons` embeds the shipped RaidLedger/RaidWishlist files (`internal/addons/bundle`, synced from
+the wow-addons repository by `cmd/sync-addons`) and builds their download zips at startup; an
+incomplete bundle stops startup like the catalog (ADR 085).
 
 Principles:
 - Domain-first, boring/explicit/predictable

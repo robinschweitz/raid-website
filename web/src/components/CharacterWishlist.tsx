@@ -104,7 +104,7 @@ export function CharacterWishlist({ characterID, canEdit }: Props) {
         <button type="button" className="primary-action" disabled={pending} onClick={() => void copyExport()}>Export kopieren</button>
         {copied && <span className="badge ok" role="status">Kopiert – jetzt im Spiel /wish import</span>}
       </div>
-      <p className="muted">Der Export enthält deinen aktuellen EP-Stand. Nach neuen EP oder Änderungen einfach erneut kopieren.</p>
+      <p className="muted">Der Export enthält deinen aktuellen EP-Stand. Nach neuen EP oder Änderungen einfach erneut kopieren. Noch kein Addon? <Link to="/addons/raidwishlist">RaidWishlist herunterladen</Link></p>
     </div>}
     {wishes !== null && <div className="table-scroll"><table className="table small">
       <thead><tr><th>Item</th><th>Spec</th><th>Enhanced</th>{canEdit && <th>Aktionen</th>}</tr></thead>

@@ -11,11 +11,24 @@ import (
 
 func TestBuildInviteExport(t *testing.T) {
 	size := 25
-	got := BuildInviteExport(7, "ICC25 | Donnerstag; Gruppe 2", &size, []InviteMember{
+	got := BuildInviteExport(7, "ICC25 | Donnerstag; Gruppe 2", &size, nil, []InviteMember{
 		{Name: "Shanna", Role: validation.RoleHeal, Class: "Priester"},
 		{Name: "Thorgrim", Role: validation.RoleTank, Class: "Krieger", IsBench: true},
 	})
 	want := "RS2;INV;7;ICC25 / Donnerstag, Gruppe 2;25\nShanna;HEAL;Priester;0\nThorgrim;TANK;Krieger;1"
+	if got != want {
+		t.Fatalf("export:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestBuildInviteExportWithRealmStart(t *testing.T) {
+	berlin, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, time.November, 5, 19, 0, 0, 0, time.UTC).In(berlin)
+	got := BuildInviteExport(7, "ICC25", nil, &start, []InviteMember{{Name: "Shanna", Role: validation.RoleHeal, Class: "Priester"}})
+	want := "RS2;INV;7;ICC25;;2026-11-05;20:00\nShanna;HEAL;Priester;0"
 	if got != want {
 		t.Fatalf("export:\n%s\nwant:\n%s", got, want)
 	}

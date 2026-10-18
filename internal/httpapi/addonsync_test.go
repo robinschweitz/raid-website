@@ -19,6 +19,7 @@ import (
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcorrection"
+	"raid-website/internal/raidseries"
 	"raid-website/internal/validation"
 )
 
@@ -133,6 +134,51 @@ func TestAddonInviteExportUsesCurrentNamesAndBench(t *testing.T) {
 		if out.Data.Text != tc.want {
 			t.Fatalf("export %q:\n%s\nwant:\n%s", tc.query, out.Data.Text, tc.want)
 		}
+	}
+}
+
+// The invite list carries the raid's date and start time in the series'
+// timezone (realm time), which RaidLedger needs for its calendar event. A raid
+// without a series has no known timezone and keeps the short header.
+func TestAddonInviteExportCarriesSeriesStartTime(t *testing.T) {
+	f := newCorrectionFixture(t)
+	f.attend(f.first, f.firstChar)
+	ctx := context.Background()
+	raids := raid.NewRepo(f.db)
+	rd, err := raids.Get(ctx, f.raidID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, time.November, 5, 19, 0, 0, 0, time.UTC)
+	rd.ScheduledStart = &start
+	if err := raids.Update(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	export := func() string {
+		status, body := do(t, f.srv.Client(), http.MethodGet, fmt.Sprintf("%s/api/v1/raids/%d/addon-invite-export", f.srv.URL, f.raidID), f.memberToken, nil)
+		if status != http.StatusOK {
+			t.Fatalf("export: %d %s", status, body)
+		}
+		var out struct{ Data struct{ Text string } }
+		if err := json.Unmarshal(body, &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.Data.Text
+	}
+	if got, want := export(), fmt.Sprintf("RS2;INV;%d;Correction raid;25\nCorrection0;DD;Magier;0", f.raidID); got != want {
+		t.Fatalf("without series:\n%s\nwant:\n%s", got, want)
+	}
+
+	series := &raidseries.Series{Name: "Donnerstag", RaidLeaderID: f.actor, Weekdays: []int{4}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "Europe/Berlin"}
+	if err := raidseries.NewService(raidseries.NewRepo(f.db)).Save(ctx, series); err != nil {
+		t.Fatal(err)
+	}
+	rd.SeriesID = &series.ID
+	if err := raids.Update(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := export(), fmt.Sprintf("RS2;INV;%d;Correction raid;25;2026-11-05;20:00\nCorrection0;DD;Magier;0", f.raidID); got != want {
+		t.Fatalf("with series:\n%s\nwant:\n%s", got, want)
 	}
 }
 

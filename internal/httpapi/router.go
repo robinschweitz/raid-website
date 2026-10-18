@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"raid-website/internal/accountmerge"
+	"raid-website/internal/addons"
 	"raid-website/internal/addonsync"
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
@@ -49,6 +50,13 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		return nil, fmt.Errorf("initialize bundled catalog: %w", err)
 	}
 	log.Printf("bundled catalog source=%s revision=%s hash=%s inserted=%d updated=%d retained=%d unchanged=%d warnings=%d (full report: loot_catalog_initializations)", report.Source.ID, report.Source.Revision, report.SourceHash, report.Inserted, report.Updated, report.Retained, report.Unchanged, len(report.Warnings))
+	bundledAddons, err := addons.Load()
+	if err != nil {
+		return nil, fmt.Errorf("load bundled addons: %w", err)
+	}
+	for _, addon := range bundledAddons.List() {
+		log.Printf("bundled addon %s version=%s files=%d zip_bytes=%d", addon.Name, addon.Version, len(addon.Files), addon.SizeBytes)
+	}
 	players := player.NewRepo(db)
 	chars := character.NewRepo(db)
 	raids := raid.NewRepo(db)
@@ -99,7 +107,8 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	mux := http.NewServeMux()
 	api.Register(mux)
 	v1.CatalogHandlers{Catalog: catalog}.Register(mux)
-	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, att, chars, players, catalog, lootRepo, points, corrections)}.Register(mux)
+	v1.AddonHandlers{Addons: bundledAddons}.Register(mux)
+	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections)}.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)
 	if spa, err := webui.Handler(); err == nil {
 		mux.Handle("/", spa)

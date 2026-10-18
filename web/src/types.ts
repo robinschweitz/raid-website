@@ -456,6 +456,19 @@ export type AwardMethod = 'MAIN' | 'SECOND' | 'ENHANCED' | 'BOE'
 
 export interface AddonInviteExport { text: string }
 
+// A bundled WoW addon offered for download (ADR 085).
+export interface AddonDownload {
+  name: string
+  title: string
+  version: string
+  interface: string
+  notes: string
+  files: string[]
+  file_name: string
+  size_bytes: number
+  download_url: string
+}
+
 export interface AddonLootPreviewRow {
   line_key: string
   line_number: number

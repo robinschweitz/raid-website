@@ -2854,6 +2854,16 @@ test('character profile shows the wishlist to its owner and staff only', async (
   }
 })
 
+// Node 20 has no global navigator, so the stub replaces the whole global and restores it afterwards.
+function stubClipboard(writeText) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, writable: true, value: { clipboard: { writeText } } })
+  return () => {
+    if (previous) Object.defineProperty(globalThis, 'navigator', previous)
+    else delete globalThis.navigator
+  }
+}
+
 test('character wishlist saves the roll choice and exports it for the addon', async () => {
   const s = setup({ id: 1, role: 'MEMBER' })
   const view = s.mount(s.load('components/CharacterWishlist.tsx').CharacterWishlist, { characterID: 10, canEdit: true })
@@ -2881,7 +2891,7 @@ test('character wishlist saves the roll choice and exports it for the addon', as
   // The export box explains the three steps and copies in one click.
   assert.match(text(view.tree), /Ins Wunschlisten-Addon übernehmen.*Export kopieren.*\/wish import.*Strg\+V/)
   let clipboard = ''
-  Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => { clipboard = value } } })
+  const restoreNavigator = stubClipboard(async (value) => { clipboard = value })
   const copying = button(view, 'Export kopieren').props.onClick()
   const exportRequest = s.requests.find((r) => r.url === '/api/v1/characters/10/wishlist/addon-export')
   exportRequest.resolve({ text: 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;' })
@@ -2890,7 +2900,7 @@ test('character wishlist saves the roll choice and exports it for the addon', as
   assert.equal(clipboard, 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;')
   assert.match(text(view.tree), /Kopiert – jetzt im Spiel \/wish import/)
   assert.equal(nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Wunschlisten-Export')[0].props.value, 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;')
-  delete globalThis.navigator.clipboard
+  restoreNavigator()
 })
 
 test('wishlist export falls back to manual copy when the clipboard is blocked', async () => {
@@ -2898,14 +2908,14 @@ test('wishlist export falls back to manual copy when the clipboard is blocked', 
   const view = s.mount(s.load('components/CharacterWishlist.tsx').CharacterWishlist, { characterID: 10, canEdit: true })
   resolveIf(s, '/api/v1/characters/10/wishlist', [{ id: 1, player_id: 1, character_id: 10, item_id: '50001', item_name: 'Item 1', priority: 0, notes: '', spec: 'MAIN', is_enhanced: false, created_at: '', updated_at: '' }])
   await flush(view)
-  Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied') } } })
+  const restoreNavigator = stubClipboard(async () => { throw new Error('denied') })
   const copying = button(view, 'Export kopieren').props.onClick()
   s.requests.find((r) => r.url === '/api/v1/characters/10/wishlist/addon-export').resolve({ text: 'WL2;Char;1;0' })
   await copying
   await flush(view)
   assert.match(text(view.tree), /markieren und mit Strg\+C kopieren/)
   assert.equal(nodes(view.tree, (n) => n.type === 'textarea')[0].props.value, 'WL2;Char;1;0')
-  delete globalThis.navigator.clipboard
+  restoreNavigator()
 })
 
 test('empty wishlist points to the loot catalog', async () => {

@@ -21,6 +21,10 @@ var (
 	ErrScheduleRange          = errors.New("schedule exceeds representable calendar range")
 )
 
+// MaxPlanWeeks bounds how far ahead raids are created (ten years); it only
+// guards against runaway input, it is not a business limit (ADR 078).
+const MaxPlanWeeks = 520
+
 // Validate rejects incomplete configuration; there are no guild defaults.
 func Validate(s *Series) error {
 	if strings.TrimSpace(s.Name) == "" || s.RaidLeaderID <= 0 || len(s.Weekdays) == 0 || s.IntervalWeeks <= 0 {
@@ -39,6 +43,9 @@ func Validate(s *Series) error {
 	if _, err := time.Parse("15:04", s.StartTime); err != nil {
 		return ErrInvalid
 	}
+	if s.PlanWeeksAhead < 0 || s.PlanWeeksAhead > MaxPlanWeeks {
+		return ErrInvalid
+	}
 	if s.Timezone == "" || s.Timezone == "Local" {
 		return ErrInvalid
 	}
@@ -53,7 +60,7 @@ type Service struct{ repo *Repo }
 
 func NewService(repo *Repo) *Service { return &Service{repo: repo} }
 func (s *Service) Save(ctx context.Context, series *Series) error {
-	result, err := s.Configure(ctx, series.ID, Changes{Name: &series.Name, RaidLeaderID: &series.RaidLeaderID, Weekdays: &series.Weekdays, IntervalWeeks: &series.IntervalWeeks, StartTime: &series.StartTime, Timezone: &series.Timezone, CatalogInstanceID: series.CatalogInstanceID, RaidSize: series.RaidSize})
+	result, err := s.Configure(ctx, series.ID, Changes{Name: &series.Name, RaidLeaderID: &series.RaidLeaderID, Weekdays: &series.Weekdays, IntervalWeeks: &series.IntervalWeeks, StartTime: &series.StartTime, Timezone: &series.Timezone, PlanWeeksAhead: &series.PlanWeeksAhead, CatalogInstanceID: series.CatalogInstanceID, RaidSize: series.RaidSize})
 	if err == nil {
 		*series = *result
 	}
@@ -74,6 +81,7 @@ type Changes struct {
 	IntervalWeeks     *int64
 	StartTime         *string
 	Timezone          *string
+	PlanWeeksAhead    *int
 }
 
 // Configure creates or patches configuration under the same writer reservation as archival.
@@ -114,6 +122,9 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		}
 		if changes.Timezone != nil {
 			series.Timezone = *changes.Timezone
+		}
+		if changes.PlanWeeksAhead != nil {
+			series.PlanWeeksAhead = *changes.PlanWeeksAhead
 		}
 		if err := Validate(series); err != nil {
 			return err

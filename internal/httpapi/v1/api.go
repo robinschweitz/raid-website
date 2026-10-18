@@ -123,6 +123,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/raid-series", RequireAuth(a.listRaidSeries))
 	mux.HandleFunc("POST /api/v1/raid-series", RequireRole(validation.RoleAdmin, a.createRaidSeries))
 	mux.HandleFunc("PATCH /api/v1/raid-series/{id}", RequireRole(validation.RoleAdmin, a.updateRaidSeries))
+	mux.HandleFunc("POST /api/v1/raid-series/{id}/plan", RequireRole(validation.RoleRaidassistent, a.planRaidSeries))
 
 	mux.HandleFunc("GET /api/v1/raids/{id}/attendance", a.listAttendance)
 	mux.HandleFunc("GET /api/v1/raids/{id}/recruitment-template", RequireRole(validation.RoleRaidassistent, a.getRecruitmentTemplate))

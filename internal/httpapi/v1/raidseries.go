@@ -3,6 +3,7 @@ package v1
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/raid"
@@ -20,6 +21,7 @@ type seriesRequest struct {
 	IntervalWeeks     *int64  `json:"interval_weeks"`
 	StartTime         *string `json:"start_time"`
 	Timezone          *string `json:"timezone"`
+	PlanWeeksAhead    *int    `json:"plan_weeks_ahead"`
 }
 
 func (a *API) listRaidSeries(w http.ResponseWriter, r *http.Request) {
@@ -48,18 +50,65 @@ func (a *API) saveRaidSeries(w http.ResponseWriter, r *http.Request, update bool
 		BadRequest(w, "malformed json body")
 		return
 	}
-	series, err := raidseries.NewService(a.RaidSeries).Configure(r.Context(), id, raidseries.Changes{ActorID: actor, Name: req.Name, NameTemplate: req.NameTemplate, NextRaidNumber: req.NextRaidNumber, RaidLeaderID: req.RaidLeaderID, Weekdays: req.Weekdays, IntervalWeeks: req.IntervalWeeks, StartTime: req.StartTime, Timezone: req.Timezone, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize})
+	series, err := raidseries.NewService(a.RaidSeries).Configure(r.Context(), id, raidseries.Changes{ActorID: actor, Name: req.Name, NameTemplate: req.NameTemplate, NextRaidNumber: req.NextRaidNumber, RaidLeaderID: req.RaidLeaderID, Weekdays: req.Weekdays, IntervalWeeks: req.IntervalWeeks, StartTime: req.StartTime, Timezone: req.Timezone, PlanWeeksAhead: req.PlanWeeksAhead, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize})
 	if err != nil {
 		if !writeSeriesError(w, err) {
 			WriteError(w, http.StatusInternalServerError, "internal", "could not save series")
 		}
 		return
 	}
+	// Saving the series also tops up its automatic planning window (ADR 078).
+	planned, err := raid.NewService(a.Raids).PlanAhead(r.Context(), series.ID, actor)
+	if err != nil {
+		if !writeSeriesError(w, err) {
+			WriteError(w, http.StatusInternalServerError, "internal", "series saved, but future raids could not be planned")
+		}
+		return
+	}
+	if len(planned) > 0 {
+		// Planning advanced the name counter; return the series as stored now.
+		if series, err = a.RaidSeries.Get(r.Context(), series.ID); err != nil {
+			WriteError(w, http.StatusInternalServerError, "internal", "could not load series")
+			return
+		}
+	}
 	status := http.StatusCreated
 	if update {
 		status = http.StatusOK
 	}
 	WriteJSON(w, status, map[string]any{"data": series})
+}
+
+type planSeriesRequest struct {
+	Until string `json:"until"`
+}
+
+// planRaidSeries creates the series' raids up to a chosen day (ADR 078).
+func (a *API) planRaidSeries(w http.ResponseWriter, r *http.Request) {
+	actor, _ := ActorID(r)
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid series id")
+		return
+	}
+	var req planSeriesRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	until, err := time.Parse("2006-01-02", req.Until)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_until", "until must be a date (YYYY-MM-DD)")
+		return
+	}
+	created, err := raid.NewService(a.Raids).PlanSeriesUntil(r.Context(), id, actor, until)
+	if err != nil {
+		if !writeSeriesError(w, err) {
+			WriteError(w, http.StatusInternalServerError, "internal", "could not plan raids")
+		}
+		return
+	}
+	writeListJSON(w, created)
 }
 
 func writeSeriesError(w http.ResponseWriter, err error) bool {
@@ -91,6 +140,12 @@ func writeSeriesError(w http.ResponseWriter, err error) bool {
 	case errors.Is(err, raidseries.ErrLocalTimeAmbiguous):
 		code = "local_time_ambiguous"
 		status = http.StatusConflict
+	case errors.Is(err, raid.ErrPlanUntilPast):
+		code = "plan_until_past"
+		status = http.StatusBadRequest
+	case errors.Is(err, raid.ErrPlanTooFar):
+		code = "plan_too_far"
+		status = http.StatusBadRequest
 	case errors.Is(err, raidseries.ErrScheduleRange):
 		code = "schedule_range"
 		status = http.StatusConflict

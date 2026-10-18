@@ -59,3 +59,9 @@ logs/
 *.db
 *.db-shm
 *.db-wal
+
+# End-to-end tests (Playwright)
+web/.e2e/
+web/test-results/
+web/playwright-report/
+web/e2e-screenshots/

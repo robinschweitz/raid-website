@@ -59,6 +59,7 @@ func TestSeriesMigrationPreservesLegacyHistoryWithoutDefaults(t *testing.T) {
 		apply("004_raid_series.up.sql")
 		apply("007_loot_catalog.up.sql")
 		apply("014_raid_series_naming.up.sql")
+		apply("070_raid_series_plan_ahead.up.sql")
 		series, err := raidseries.NewRepo(database.DB).List(ctx)
 		if err != nil || len(series) != 0 {
 			t.Fatalf("migration seeded guild defaults: %+v %v", series, err)

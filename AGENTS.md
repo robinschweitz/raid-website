@@ -128,13 +128,18 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Recurrence weeks are anchored to the current raid's local Monday week. Archiving chooses the
   next future occurrence, skipping elapsed dates, and preserves local wall time across DST.
   Ambiguous/nonexistent local times fail explicitly rather than silently shifting the schedule.
-- A preplanned eligible next occurrence is reused without replacing its data. A conflicting
-  finalized/cancelled occurrence or another predecessor is reported, not overwritten.
+- A preplanned eligible next occurrence is reused without replacing its data. A cancelled
+  occurrence is skipped and the next one in the rhythm is used; a conflicting finalized
+  occurrence or another predecessor is reported, not overwritten (ADR 078).
+- Raids of a series can be planned ahead: RAIDASSISTENT and up plan up to a chosen day, and an
+  Admin-set per-series window (`plan_weeks_ahead`, 0 = off) is topped up on series save and on
+  every archive. Existing raids are never changed (ADR 078).
 - Existing stored completed raids are historical: archival never recreates their EP or starts
   a new recurrence chain. Existing active raids can be assigned a series and scheduled start.
 
 #### Future raid signups (ADR 033)
 - RAIDASSISTENT and higher explicitly open/close signups independently of raid lifecycle.
+  Raids the site creates from a series (planned ahead or archive successor) start open (ADR 078).
 - MEMBER and higher may submit multiple own characters, each with any valid class spec.
 - Pending choices can be edited/withdrawn while open; accepted choices are staff-managed.
 - Only one character per player is accepted, automatically creating the roster snapshot.
@@ -332,6 +337,7 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 | Go gates | `gofmt -w cmd internal`, `go vet ./...`, `go test ./...` |
 | Frontend gates | `npm run build`, `npm run lint` |
 | Frontend regression tests | `cd web && npm test` |
+| End-to-end tests (real server + Chromium) | `cd web && npx playwright install chromium && npm run e2e` |
 
 Environment variables: `PORT` (default `8080`), `DATABASE_URL` (default
 `file:raid.db?_pragma=journal_mode(WAL)`), `ENV`, `COOKIE_SECURE`, `ADMIN_USERNAME`,

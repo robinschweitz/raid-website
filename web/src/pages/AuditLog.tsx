@@ -24,7 +24,7 @@ const fieldLabels: Record<string, string> = {
   poll_type: 'Umfrageart', priority: 'Priorität', is_enhanced: 'Enhanced', scheduled_start: 'Geplanter Start',
   scheduled_end: 'Geplantes Ende', raid_size: 'Raidgröße', cancelled_at: 'Abgesagt am', archived_at: 'Archiviert am',
   completed_at: 'Abgeschlossen am', started_at: 'Gestartet am', name_template: 'Namensvorlage', next_raid_number: 'Nächste Raidnummer',
-  weekdays: 'Wochentage', interval_weeks: 'Intervall (Wochen)', start_time: 'Startzeit', timezone: 'Zeitzone',
+  weekdays: 'Wochentage', interval_weeks: 'Intervall (Wochen)', start_time: 'Startzeit', timezone: 'Zeitzone', plan_weeks_ahead: 'Wochen im Voraus geplant',
   sort_order: 'Reihenfolge', color: 'Farbe', username: 'Benutzername', password_changed: 'Passwort geändert',
   security_key: 'Sicherheitsschlüssel', purpose: 'Zweck', locked_at: 'Gesperrt am', used_at: 'Verwendet am',
   expired_at: 'Abgelaufen am', sent_at: 'Versendet am', revoked_at: 'Widerrufen am', expires_at: 'Gültig bis',
@@ -107,7 +107,7 @@ function actionLabel(entry: AuditLogEntry, before: AuditSnapshot): string {
   if (entry.action === 'create' && entry.entity_type === 'wishlist_item') return 'Auf die Wunschliste gesetzt'
   if (entry.action === 'delete' && entry.entity_type === 'wishlist_item') return 'Von der Wunschliste entfernt'
   const labels: Record<string, string> = {
-    create: 'Angelegt', cancel: 'Abgesagt', archive: 'Archiviert', create_successor: 'Folgeraid angelegt', delete: 'Gelöscht',
+    create: 'Angelegt', plan: 'Vorausgeplant', cancel: 'Abgesagt', archive: 'Archiviert', create_successor: 'Folgeraid angelegt', delete: 'Gelöscht',
     close: 'Geschlossen', vote: 'Abgestimmt', set_account: 'Zugang geändert', password_change: 'Passwort geändert',
     totp_enable: 'Authenticator aktiviert', totp_disable: 'Authenticator entfernt', security_key_add: 'Sicherheitsschlüssel hinzugefügt',
     security_key_remove: 'Sicherheitsschlüssel entfernt', create_code: 'Code erstellt', reject: 'Abgelehnt', revoke: 'Widerrufen',

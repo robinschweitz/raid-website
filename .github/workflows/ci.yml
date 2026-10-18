@@ -51,3 +51,35 @@ jobs:
         run: go build ./...
       - name: Test Go
         run: go test ./...
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.26.x
+          cache: true
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+      - name: Install Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Run end-to-end tests
+        working-directory: web
+        run: npm run e2e
+      - name: Upload report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            web/playwright-report
+            web/e2e-screenshots
+          retention-days: 14

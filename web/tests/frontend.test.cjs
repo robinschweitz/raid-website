@@ -896,7 +896,7 @@ test('player list sorts names naturally and filters by the search text', async (
   const s = setup()
   const view = s.mount(s.load('pages/Players.tsx').PlayersPage)
   const row = (id, name) => ({ id, name, guild_rank_id: null, active: true })
-  s.requests.forEach((r) => r.resolve([row(1, 'Spieler10'), row(2, 'Spieler2'), row(3, 'admin'), row(4, 'Spieler1')]))
+  s.requests.forEach((r) => r.resolve(r.url === '/api/v1/players' ? [row(1, 'Spieler10'), row(2, 'Spieler2'), row(3, 'admin'), row(4, 'Spieler1')] : []))
   await flush(view)
   const names = () => nodes(view.tree, (n) => n.type === 'td').map((n) => text(n)).filter((t) => t && t !== 'aktiv')
   assert.deepEqual(names(), ['admin', 'Spieler1', 'Spieler2', 'Spieler10'])
@@ -907,7 +907,58 @@ test('player list sorts names naturally and filters by the search text', async (
   assert.match(text(view.tree), /2\s+von\s+4\s+Spielern/)
   input(view, 'Name').props.onChange(change('zzz'))
   view.render()
-  assert.match(text(view.tree), /Kein Spieler mit diesem Namen/)
+  assert.match(text(view.tree), /Kein Spieler passt zu Suche und Filter/)
+})
+
+test('admins see who has an account, through which registration, and can filter by it', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/Players.tsx').PlayersPage)
+  const row = (id, name) => ({ id, name, guild_rank_id: null, active: true })
+  const character = (id, name, isMain) => ({ id, name, class: 'Magier', is_main: isMain, active: true })
+  const account = (id, name, origin, extra = {}) => ({ player_id: id, player_name: name, active: true, role: 'MEMBER', username: null, origin, registered_at: null, registered_character: '', request_id: null, characters: [], ...extra })
+  assert.ok(s.requests.some((r) => r.url === '/api/v1/player-accounts'), 'admins load the account overview')
+  s.requests.forEach((r) => r.resolve(r.url === '/api/v1/players'
+    ? [row(1, 'Legacy owner'), row(2, 'Still unclaimed'), row(3, 'admin')]
+    : [
+        account(1, 'Legacy owner', 'REGISTERED', { username: 'importedhero', registered_at: '2026-10-18T08:00:00Z', registered_character: 'ImportedHero', request_id: 7, characters: [character(10, 'ImportedHero', true), character(11, 'Twinkhero', false)] }),
+        account(2, 'Still unclaimed', 'NONE', { role: 'GUEST', characters: [character(12, 'Altchar', true)] }),
+        account(3, 'admin', 'ADMIN', { role: 'ADMIN', username: 'admin' }),
+      ]))
+  await flush(view)
+  const page = () => text(view.tree)
+  assert.match(page(), /2\s+von\s+3\s*Spielern haben ein Konto/)
+  assert.match(page(), /@\s*importedhero/)
+  assert.match(page(), /registriert am 18\.10\.2026 über ImportedHero/)
+  assert.match(page(), /ImportedHero\s+\(Main\)/)
+  assert.match(page(), /Kein Konto/)
+  assert.match(page(), /Login vom Admin angelegt/)
+
+  const rows = () => nodes(view.tree, (n) => n.type === 'tr').slice(1).map((n) => text(n))
+  select(view, 'Konto').props.onChange(change('without'))
+  view.render()
+  assert.equal(rows().length, 1)
+  assert.match(rows()[0], /Still unclaimed/)
+  select(view, 'Konto').props.onChange(change('with'))
+  view.render()
+  assert.equal(rows().length, 2)
+
+  select(view, 'Konto').props.onChange(change('all'))
+  input(view, 'Name, Charakter oder Login').props.onChange(change('twink'))
+  view.render()
+  assert.equal(rows().length, 1)
+  assert.match(rows()[0], /Legacy owner/)
+  input(view, 'Name, Charakter oder Login').props.onChange(change('importedhero'))
+  view.render()
+  assert.match(rows()[0], /Legacy owner/)
+})
+
+test('members do not request the admin account overview', async () => {
+  const s = setup({ id: 5, role: 'MEMBER' })
+  const view = s.mount(s.load('pages/Players.tsx').PlayersPage)
+  assert.equal(s.requests.some((r) => r.url === '/api/v1/player-accounts'), false)
+  s.requests.forEach((r) => r.resolve([{ id: 1, name: 'Somebody', guild_rank_id: null, active: true }]))
+  await flush(view)
+  assert.doesNotMatch(text(view.tree), /Konto/)
 })
 
 test('auth distinguishes network failure from anonymous and supports retry', async () => {
@@ -1762,6 +1813,20 @@ test('registration requests tell non-admins the area is admin-only and load noth
   await flush(view)
   assert.match(text(view.tree), /nur für Admins/)
   assert.equal(s.requests.some((r) => r.url.includes('registration-requests')), false)
+})
+
+test('registration history names the player a redeemed code was linked to', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RegistrationRequests.tsx').RegistrationRequestsPage)
+  const request = { id: 7, requester_player_id: null, status: 'CONSUMED', purpose: 'NEW_ACCOUNT', external_source: 'rising-gods', external_profile_id: '1', external_profile_url: '', character_name: 'Mirabelle', class: 'Paladin', main_spec: 'Heilig', second_spec: '', level: 80, race: '', faction: '', created_at: '2026-10-12T10:00:00Z', updated_at: '2026-10-12T10:00:00Z', linked_player: { player_id: 3, player_name: 'Mira', username: 'mira', used_at: '2026-10-12T11:00:00Z' } }
+  s.requests.forEach((r) => r.resolve([request]))
+  await flush(view)
+  const page = text(view.tree)
+  assert.match(page, /Verknüpfter Spieler/)
+  assert.match(page, /Mira/)
+  assert.match(page, /@mira ·\s+12\.10\.2026/)
+  assert.match(page, /Eingelöst/)
+  assert.ok(nodes(view.tree, (n) => n.props && n.props.to === '/players/3').length > 0, 'links to the player')
 })
 
 test('guests get no wishlist controls and no wishlist reads in the catalog', async () => {

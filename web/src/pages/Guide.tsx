@@ -354,16 +354,28 @@ export function GuidePage() {
         <li>Die Person fordert auf der Login-Seite einen Code an.</li>
         <li>Unter <strong>Registrierung</strong> erscheint die Anfrage. Erstelle einen Code. Er wird nur einmal angezeigt.</li>
         <li>Schick den Code ingame an genau diesen Charakter und markiere ihn als gesendet.</li>
-        <li>Die Person registriert sich und ist dann <strong>Gast</strong>.</li>
-        <li>Mach sie zum <strong>Mitglied</strong> (nächster Schritt).</li>
+        <li>Die Person registriert sich. Gibt es den Charakter schon (z. B. aus der alten Liste), bekommt <strong>der Spieler, dem der Charakter gehört</strong>, den Login. Sonst entsteht ein neuer Spieler als <strong>Gast</strong>.</li>
+        <li>Mach die Person zum <strong>Mitglied</strong>, falls sie es noch nicht ist (nächster Schritt).</li>
       </ol>
-      <Shot name="53-registrierung" caption="Registrierungsanfragen" />
+      <p>Im Reiter <strong>Verlauf</strong> zeigt die Spalte <strong>Verknüpfter Spieler</strong>, für welchen Spieler ein Code eingelöst wurde, mit Login-Namen und Datum.</p>
+      <p><strong>Beispiel:</strong> Die Anfrage für den Charakter <em>Mirabelle</em> ist eingelöst und mit dem Spieler <em>Mira</em> (Login <code>@mira</code>) verknüpft.</p>
+      <Shot name="53-registrierung" caption="Verlauf: welcher Code welchem Spieler zugeordnet wurde" />
+      <h3>Wer hat schon ein Konto?</h3>
+      <p>Unter <strong>Spieler</strong> sehen Admins zu jedem Spieler seine <strong>Charaktere</strong>, das <strong>Konto</strong> und die <strong>Rolle</strong>. Oben steht, wie viele Spieler schon ein Konto haben.</p>
+      <ul>
+        <li><strong>@login</strong> mit „registriert am … über ‹Charakter›“: Die Person hat einen Code eingelöst.</li>
+        <li><strong>@login</strong> mit „Login vom Admin angelegt“: Ein Admin hat Benutzername und Passwort gesetzt.</li>
+        <li><span className="badge warn">Kein Konto</span>: Diesen Spieler hat noch niemand übernommen.</li>
+      </ul>
+      <p>Mit dem Filter <strong>Konto</strong> zeigst du nur Spieler <em>mit</em> oder <em>ohne</em> Konto. Die Suche findet auch Charakter- und Login-Namen.</p>
+      <Shot name="51-spieler" caption="Spielerliste für Admins: Charaktere, Konto und Rolle" />
+      <p><strong>Beispiel:</strong> Mit „Ohne Konto“ siehst du, dass <em>Altes Eisen</em> (Charaktere Klingensturm und Funkelbart) und <em>Grimmbart</em> sich noch nicht registriert haben. So weißt du, wen du ansprechen musst.</p>
+      <Shot name="51b-spieler-ohne-konto" caption="Nur Spieler ohne Konto" />
       <h3>Rolle ändern, Passwort zurücksetzen</h3>
       <p>Unter <strong>Spieler</strong> auf den Namen klicken, Reiter <strong>Konto</strong>. Dort Rolle wählen (z. B. <code>MEMBER</code>), bei Bedarf ein neues Passwort setzen, <strong>Speichern</strong>.</p>
-      <p><strong>Beispiel:</strong> Funkenflug ist nach der Registrierung <code>GUEST</code>. Du stellst <code>MEMBER</code> ein und speicherst. Ab sofort kann er sich anmelden.</p>
+      <p><strong>Beispiel:</strong> Ein frisch registrierter Spieler ist <code>GUEST</code>. Du stellst <code>MEMBER</code> ein und speicherst. Ab sofort kann er sich für Raids anmelden.</p>
       <Shot name="52-spieler-konto-admin" caption="Spielerkonto als Admin" />
       <p>Hat jemand zwei Accounts, nutze <strong>Konto zusammenführen</strong> mit einem Grund. Unter <strong>Spieler</strong> → <strong>Neuer Spieler</strong> legst du jemanden ohne Login an.</p>
-      <Shot name="51-spieler" caption="Spielerliste" />
       <h3>Raidserien</h3>
       <p>Eine Raidserie ist ein fester Raid wie <em>ICC25 Donnerstag</em>: Wochentag, Uhrzeit, Rhythmus, Namensvorlage (<code>{'ICC25-{number}'}</code>), Raidleitung, Instanz und Größe. Dort stellst du auch ein, wie viele Wochen automatisch im Voraus geplant werden.</p>
       <Shot name="50-raidserien" caption="Raidserien" />

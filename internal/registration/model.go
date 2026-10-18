@@ -39,6 +39,57 @@ type Request struct {
 	RawProfileJSON     string    `bun:"raw_profile_json,notnull" json:"raw_profile_json"`
 	CreatedAt          time.Time `bun:"created_at,notnull" json:"created_at"`
 	UpdatedAt          time.Time `bun:"updated_at,notnull" json:"updated_at"`
+
+	// Linked is filled for redeemed requests in admin lists: the player the code
+	// was used for (ADR 084). It is not stored on the request.
+	Linked *LinkedPlayer `bun:"-" json:"linked_player,omitempty"`
+}
+
+// LinkedPlayer names the player a redeemed code was used for.
+type LinkedPlayer struct {
+	PlayerID   int64     `json:"player_id"`
+	PlayerName string    `json:"player_name"`
+	Username   *string   `json:"username"`
+	UsedAt     time.Time `json:"used_at"`
+}
+
+// Redemption is one used registration code with its request (read model).
+type Redemption struct {
+	RequestID      int64     `bun:"request_id"`
+	Purpose        string    `bun:"purpose"`
+	CharacterName  string    `bun:"character_name"`
+	UsedByPlayerID int64     `bun:"used_by_player_id"`
+	UsedAt         time.Time `bun:"used_at"`
+}
+
+// Account origins (ADR 084).
+const (
+	AccountRegistered = "REGISTERED" // a registration code was redeemed for this player
+	AccountByAdmin    = "ADMIN"      // has a login, but no redeemed code (bootstrap or set by an Admin)
+	AccountNone       = "NONE"       // cannot log in yet
+)
+
+// Account tells an Admin whether a player can log in and how that came about.
+type Account struct {
+	PlayerID            int64              `json:"player_id"`
+	PlayerName          string             `json:"player_name"`
+	Active              bool               `json:"active"`
+	Role                string             `json:"role"`
+	Username            *string            `json:"username"`
+	Origin              string             `json:"origin"`
+	RegisteredAt        *time.Time         `json:"registered_at"`
+	RegisteredCharacter string             `json:"registered_character"`
+	RequestID           *int64             `json:"request_id"`
+	Characters          []AccountCharacter `json:"characters"`
+}
+
+// AccountCharacter is a character shown next to its owner in the account overview.
+type AccountCharacter struct {
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	Class  string `json:"class"`
+	IsMain bool   `json:"is_main"`
+	Active bool   `json:"active"`
 }
 
 type Code struct {

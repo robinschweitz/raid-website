@@ -1,8 +1,18 @@
-export const appVersion = '1.0.20'
+export const appVersion = '1.0.21'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Wer hat schon ein Konto?',
+    changes: [
+      'Admins sehen unter „Spieler“ zu jedem Spieler seine Charaktere, sein Konto und seine Rolle, dazu oben, wie viele Spieler schon ein Konto haben.',
+      'Beim Konto steht der Login-Name und ob die Person sich mit einem Code registriert hat (mit Datum und Charakter) oder ob ein Admin den Login angelegt hat. Mit dem Filter „Ohne Konto“ siehst du, wer sich noch registrieren muss.',
+      'Die Suche findet für Admins auch Charakter- und Login-Namen.',
+      'Unter „Registrierung“ → „Verlauf“ zeigt die neue Spalte „Verknüpfter Spieler“, für welchen Spieler ein Code eingelöst wurde. Die Status stehen jetzt auf Deutsch.',
+    ],
+  },
+  {
+    version: '1.0.20',
     title: 'Anleitung auf der Website',
     changes: [
       'Neu im Menü: „Anleitung“. Sie erklärt Schritt für Schritt mit Bildern und Beispielen, wie alles funktioniert: Konto bekommen, anmelden und absagen, Wunschliste und Addon-Export, EP und Item-Locks, für die Raidleitung Raids planen, Aufstellung, Gesuchtext und Loot, für Admins die Verwaltung.',

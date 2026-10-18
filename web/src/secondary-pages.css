@@ -430,3 +430,11 @@
   .mobile-nav::-webkit-scrollbar { display: none; }
   .mobile-nav a { flex: 1 0 auto; white-space: nowrap; }
 }
+
+/* Account overview for Admins (ADR 084) */
+.player-account { display: flex; flex-direction: column; gap: 2px; }
+.player-account small { color: var(--muted); font-size: 12px; }
+.player-characters { line-height: 1.7; }
+.player-characters span { display: inline-block; margin-right: 10px; white-space: nowrap; }
+.player-account-summary { margin: 0 0 12px; padding: 10px 14px; border: 1px solid #34556b; border-radius: 8px; background: rgba(134, 217, 242, 0.06); }
+.player-account-summary strong { color: var(--accent); }

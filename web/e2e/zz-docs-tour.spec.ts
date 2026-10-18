@@ -93,9 +93,31 @@ test.beforeAll(async ({ request }) => {
   }
   const twink = db.prepare("INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, 'Morgentau', 'Schamane', 'Wiederherstellung', 'Elementar', 0, 1, ?, ?)").run(ids.Sternfall, now, now)
   chars.Morgentau = Number(twink.lastInsertRowid)
+  // ADR 084: some players registered with a code from the game, others never claimed their player.
+  const registered = (name: Person, daysAgo: number) => {
+    const at = new Date(Date.now() - daysAgo * 86_400_000).toISOString().replace('T', ' ').replace('Z', '+00:00')
+    const [charName, cls, main, second] = people[name].char
+    const request = db.prepare("INSERT INTO registration_requests (status, purpose, external_source, external_profile_id, external_profile_url, character_name, class, main_spec, second_spec, level, race, faction, created_at, updated_at) VALUES ('CONSUMED', 'NEW_ACCOUNT', 'rising-gods', ?, ?, ?, ?, ?, ?, 80, 'Mensch', 'Allianz', ?, ?)")
+      .run(`tour-${charName}`, `https://db.rising-gods.de/?profile=load&id=${charName}`, charName, cls, main, second, at, at)
+    db.prepare('INSERT INTO registration_codes (request_id, code_hash, created_by_player_id, created_at, expires_at, sent_at, used_at, used_by_player_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(Number(request.lastInsertRowid), `tour-${charName}`, ids.admin, at, at, at, at, ids[name])
+  }
+  registered('Mira', 6)
+  registered('Sternfall', 5)
+  registered('Funkenflug', 3)
+  registered('Lichtwind', 1)
   db.prepare("INSERT INTO enhance_point_transactions (player_id, amount, type, reason, actor_id, created_at) VALUES (?, 150, 'adjustment', 'Startguthaben aus der alten Liste', ?, ?)").run(ids.Sternfall, ids.admin, now)
   db.prepare("INSERT INTO enhance_point_transactions (player_id, amount, type, reason, actor_id, created_at) VALUES (?, 40, 'adjustment', 'Startguthaben aus der alten Liste', ?, ?)").run(ids.Funkenflug, ids.admin, now)
   db.close()
+  // Imported players nobody has claimed yet; one has a different name than their character.
+  for (const [name, characters] of [['Grimmbart', [['Grimmbart', 'Krieger', 'Waffen', 'Schutz (Tank)', 1]]], ['Altes Eisen', [['Klingensturm', 'Schurke', 'Kampf', 'Meucheln', 1], ['Funkelbart', 'Magier', 'Frost', 'Arkan', 0]]]] as const) {
+    const created = await api.post('/api/v1/players', { name })
+    const write = new DatabaseSync(databasePath)
+    for (const [charName, cls, main, second, isMain] of characters) {
+      write.prepare('INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)').run(created.id, charName, cls, main, second, isMain, now, now)
+    }
+    write.close()
+  }
 
   const catalog = (await (await request.get('/api/v1/loot-catalog')).json()).data
   const icc = catalog.instances.find((row: { name: string }) => /Eiskrone/.test(row.name))
@@ -273,13 +295,16 @@ test('Admin', async ({ page }, testInfo) => {
   await shot(page, testInfo, '50-raidserien')
   await page.goto('/#/players')
   await page.waitForTimeout(600)
-  await page.getByText('Neuer Spieler').click()
   await shot(page, testInfo, '51-spieler')
+  await page.getByLabel('Konto').selectOption('without')
+  await shot(page, testInfo, '51b-spieler-ohne-konto')
   await page.goto(`/#/players/${ids.Funkenflug}`)
   await page.getByRole('button', { name: 'Konto' }).click()
   await page.waitForTimeout(400)
   await shot(page, testInfo, '52-spieler-konto-admin')
   await page.goto('/#/registration-requests')
+  await page.waitForTimeout(400)
+  await page.getByRole('button', { name: 'Verlauf' }).click()
   await page.waitForTimeout(600)
   await shot(page, testInfo, '53-registrierung')
   await page.goto('/#/roster')

@@ -285,7 +285,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
     `GET /api/v1/polls`, and `GET /api/v1/raids/{id}/attendance` without a session. All other
     reads require authentication; every mutation retains its existing authorization check (ADR 067).
   - **Config (`ADMIN`)** — create player; set account/credentials; create or update characters;
-    guild ranks; raid groups; recurring raid series; list/import legacy data.
+    guild ranks; raid groups; recurring raid series; list/import legacy data; account overview
+    (ADR 084).
   - **Raid operations (`RAIDASSISTENT` and up, i.e. RA + RL)** — create raid; configure its
     series/start; cancel; archive/finalize; attendance; loot; create and close polls; create
     character and optional player together with attendance through raid quick-add (ADR 037).
@@ -399,3 +400,5 @@ A change is done when:
 - `internal/export` is an empty directory; general data export is not implemented. The RaidSync
   addon exchange lives in `internal/addonsync` (ADR 045).
 - Admins can view the read-only audit log at `GET /api/v1/audit-log`; no non-Admin read endpoint exists.
+- Admins can see which player has a login and through which registration at
+  `GET /api/v1/player-accounts` (ADR 084); login names never appear in the public player list.

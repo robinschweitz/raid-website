@@ -81,6 +81,24 @@ export interface RegistrationRequest {
   faction: string
   created_at: string
   updated_at: string
+  // Redeemed requests: the player the code was used for (ADR 084).
+  linked_player?: { player_id: number, player_name: string, username: string | null, used_at: string }
+}
+
+// Admin-only account overview (ADR 084).
+export type AccountOrigin = 'REGISTERED' | 'ADMIN' | 'NONE'
+
+export interface PlayerAccount {
+  player_id: number
+  player_name: string
+  active: boolean
+  role: Role
+  username: string | null
+  origin: AccountOrigin
+  registered_at: string | null
+  registered_character: string
+  request_id: number | null
+  characters: { id: number, name: string, class: string, is_main: boolean, active: boolean }[]
 }
 
 export interface RegistrationCode {

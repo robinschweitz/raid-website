@@ -7,6 +7,18 @@ import { useSubmission } from '../useSubmission'
 
 const pageSize = 20
 
+const statusLabels: Record<string, string> = { PENDING: 'Offen', APPROVED: 'Code erstellt', REJECTED: 'Abgelehnt', CONSUMED: 'Eingelöst' }
+
+// Which player a redeemed code was used for (ADR 084).
+function linkedPlayerCell(request: RegistrationRequest) {
+  const linked = request.linked_player
+  if (!linked) return <span className="muted">—</span>
+  return <span className="player-account">
+    <Link to={`/players/${linked.player_id}`}>{linked.player_name}</Link>
+    <small>{linked.username ? `@${linked.username} · ` : ''}{new Date(linked.used_at).toLocaleDateString('de-DE')}</small>
+  </span>
+}
+
 export function RegistrationRequestsPage() {
   const { pending, submit, isActive } = useSubmission()
   const { player: me } = useAuth()
@@ -162,19 +174,20 @@ export function RegistrationRequestsPage() {
     </div>
     <p className="muted" role="status">{requests.length} {view === 'active' ? 'aktive' : 'historische'} Anfragen</p>
     {visibleRequests.length > 0 && <div className="registration-table-wrap"><table className="table registration-table">
-      <thead><tr><th>Charakter</th><th>Anfrage</th><th>Status</th><th aria-label="Details" /><th>Aktionen</th></tr></thead>
+      <thead><tr><th>Charakter</th><th>Anfrage</th><th>Status</th><th>Verknüpfter Spieler</th><th aria-label="Details" /><th>Aktionen</th></tr></thead>
       <tbody>{visibleRequests.map((request) => <Fragment key={request.id}>
         <tr>
           <td><strong>{request.character_name}</strong><small>{request.class} · {request.main_spec}{request.second_spec ? ` / ${request.second_spec}` : ''} · Stufe {request.level || '—'}</small></td>
           <td><small>{request.purpose === 'CLAIM_CHARACTER' ? 'Charakter beanspruchen' : 'Neues Konto'}<br />{new Date(request.created_at).toLocaleDateString('de-DE')}</small></td>
-          <td><span className={`registration-status ${request.status.toLowerCase()}`}>{request.status}</span></td>
+          <td><span className={`registration-status ${request.status.toLowerCase()}`}>{statusLabels[request.status] ?? request.status}</span></td>
+          <td>{linkedPlayerCell(request)}</td>
           <td><button type="button" className="registration-details" aria-expanded={openRequestID === request.id} onClick={() => toggleDetails(request)}>{openRequestID === request.id ? 'Schließen' : 'Details'}</button></td>
           <td className="actions">
             <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void createCode(request)}>Code erstellen</button>
             <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void reject(request)}>Ablehnen</button>
           </td>
         </tr>
-        {openRequestID === request.id && <tr className="registration-details-row"><td colSpan={5}>
+        {openRequestID === request.id && <tr className="registration-details-row"><td colSpan={6}>
           <div className="registration-details-content">
             <p><a href={request.external_profile_url} target="_blank" rel="noreferrer">Rising-Gods-Profil öffnen</a></p>
             {generated[request.id] && <p role="status"><strong>Neuer Code: {generated[request.id].code}</strong></p>}

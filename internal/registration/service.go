@@ -325,8 +325,99 @@ func (s *Service) CreateRequest(ctx context.Context, requesterID *int64, profile
 	return req, nil
 }
 
+// ListRequests returns requests; redeemed ones name the player they were used for (ADR 084).
 func (s *Service) ListRequests(ctx context.Context, statuses []string) ([]Request, error) {
-	return s.repo.ListRequests(ctx, statuses)
+	rows, err := s.repo.ListRequests(ctx, statuses)
+	if err != nil {
+		return nil, err
+	}
+	redemptions, err := s.repo.ListRedemptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byRequest := make(map[int64]Redemption, len(redemptions))
+	for _, redemption := range redemptions {
+		byRequest[redemption.RequestID] = redemption
+	}
+	players, err := s.playersByID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		redemption, ok := byRequest[rows[i].ID]
+		if !ok {
+			continue
+		}
+		p, ok := players[redemption.UsedByPlayerID]
+		if !ok {
+			continue
+		}
+		rows[i].Linked = &LinkedPlayer{PlayerID: p.ID, PlayerName: p.Name, Username: p.Username, UsedAt: redemption.UsedAt}
+	}
+	return rows, nil
+}
+
+// ListAccounts returns every player with their login state, how it came about
+// and their characters, so an Admin sees who has claimed which player (ADR 084).
+func (s *Service) ListAccounts(ctx context.Context) ([]Account, error) {
+	players, err := s.players.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	characters, err := s.characters.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	redemptions, err := s.repo.ListRedemptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	charactersByPlayer := make(map[int64][]AccountCharacter, len(players))
+	for _, c := range characters {
+		charactersByPlayer[c.PlayerID] = append(charactersByPlayer[c.PlayerID], AccountCharacter{ID: c.ID, Name: c.Name, Class: c.Class, IsMain: c.IsMain, Active: c.Active})
+	}
+	// The first redeemed new-account code is when the player got their login.
+	firstRegistration := make(map[int64]Redemption, len(redemptions))
+	for _, redemption := range redemptions {
+		if redemption.Purpose != PurposeNewAccount {
+			continue
+		}
+		if _, seen := firstRegistration[redemption.UsedByPlayerID]; !seen {
+			firstRegistration[redemption.UsedByPlayerID] = redemption
+		}
+	}
+	accounts := make([]Account, 0, len(players))
+	for _, p := range players {
+		account := Account{PlayerID: p.ID, PlayerName: p.Name, Active: p.Active, Role: string(p.Role), Username: p.Username, Origin: AccountNone, Characters: charactersByPlayer[p.ID]}
+		if account.Characters == nil {
+			account.Characters = []AccountCharacter{}
+		}
+		hasLogin := p.Username != nil && p.PasswordHash != ""
+		if redemption, ok := firstRegistration[p.ID]; ok && hasLogin {
+			usedAt := redemption.UsedAt
+			requestID := redemption.RequestID
+			account.Origin = AccountRegistered
+			account.RegisteredAt = &usedAt
+			account.RegisteredCharacter = redemption.CharacterName
+			account.RequestID = &requestID
+		} else if hasLogin {
+			account.Origin = AccountByAdmin
+		}
+		accounts = append(accounts, account)
+	}
+	return accounts, nil
+}
+
+func (s *Service) playersByID(ctx context.Context) (map[int64]player.Player, error) {
+	players, err := s.players.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[int64]player.Player, len(players))
+	for _, p := range players {
+		byID[p.ID] = p
+	}
+	return byID, nil
 }
 
 func (s *Service) ListCodesByRequest(ctx context.Context, requestID int64) ([]Code, error) {

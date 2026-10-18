@@ -60,7 +60,7 @@ const contents: { id: string, title: string, audience: Audience }[] = [
   { id: 'anmelden', title: 'Anmelden, absagen, unsicher', audience: 'mitglieder' },
   { id: 'wunschliste', title: 'Wunschliste und Addon-Export', audience: 'mitglieder' },
   { id: 'ep', title: 'EP, Item-Locks, Konto und Umfragen', audience: 'mitglieder' },
-  { id: 'schattengram', title: 'Schattengram: Splitter-Reihenfolge', audience: 'alle' },
+  { id: 'schattengram', title: 'Schattengram: Questreihe und Reihenfolge', audience: 'alle' },
   { id: 'raids-anlegen', title: 'Raids anlegen und vorausplanen', audience: 'raidleitung' },
   { id: 'aufstellung', title: 'Anmeldungen, Aufstellung und Gesuchtext', audience: 'raidleitung' },
   { id: 'loot', title: 'Loot eintragen und archivieren', audience: 'raidleitung' },
@@ -106,7 +106,7 @@ export function GuidePage() {
             <tr><td><strong>Besucher</strong></td><td>Nicht eingeloggt</td><td>Nächsten Raid, Raidhistorie, aktive Umfrage und diese Anleitung ansehen</td></tr>
             <tr><td><strong>Gast</strong> <code>GUEST</code></td><td>Frisch registriert</td><td>Alles ansehen, auch die Schattengram-Reihenfolge. Anmelden geht erst, wenn ein Admin dich zum Mitglied macht.</td></tr>
             <tr><td><strong>Mitglied</strong> <code>MEMBER</code></td><td>Normale Raider</td><td>Für Raids anmelden, absagen oder „unsicher“ melden, Wunschliste, Item-Locks, abstimmen</td></tr>
-            <tr><td><strong>Raidassistent</strong> <code>RAIDASSISTENT</code></td><td>Helfer der Raidleitung</td><td>Dazu: Raids anlegen und vorausplanen, Anmeldungen übernehmen, Aufstellung, Gesuchtext, Loot, archivieren, Umfragen erstellen, Schattengram-Liste pflegen</td></tr>
+            <tr><td><strong>Raidassistent</strong> <code>RAIDASSISTENT</code></td><td>Helfer der Raidleitung</td><td>Dazu: Raids anlegen und vorausplanen, Anmeldungen übernehmen, Aufstellung, Gesuchtext, Loot, archivieren, Umfragen erstellen, Schattengram-Liste pflegen und pro Raid einteilen</td></tr>
             <tr><td><strong>Raidleitung</strong> <code>RAIDLEADER</code></td><td>Leitet die Raids</td><td>Alles vom Raidassistenten</td></tr>
             <tr><td><strong>Admin</strong> <code>ADMIN</code></td><td>Gildenverwaltung</td><td>Dazu: Spieler und Rollen, Registrierungscodes, Raidserien, Gildenkonfiguration, Audit-Protokoll</td></tr>
           </tbody>
@@ -152,7 +152,7 @@ export function GuidePage() {
             <tr><td><strong>Statistiken</strong></td><td>Auswertungen über Raids und Loot</td></tr>
             <tr><td><strong>Umfragen</strong></td><td>Abstimmen, z. B. über einen neuen Raidtag</td></tr>
             <tr><td><strong>Beute</strong></td><td>Item-Katalog. Hier fügst du Items zur Wunschliste hinzu.</td></tr>
-            <tr><td><strong>Schattengram</strong></td><td>Wer gerade Splitter sammelt, wer danach dran ist und wer schon fertig ist.</td></tr>
+            <tr><td><strong>Schattengram</strong></td><td>Wer an Schattengram arbeitet, bei welchem Schritt, in welcher Reihenfolge, und wer schon fertig ist.</td></tr>
             <tr><td><strong>Meine Wunschliste</strong></td><td>Wunschliste ordnen und fürs Addon exportieren</td></tr>
             <tr><td><strong>Addons</strong></td><td>RaidLedger und RaidWishlist herunterladen, Installation und Anleitung</td></tr>
             <tr><td><strong>Anleitung</strong></td><td>Diese Seite</td></tr>
@@ -261,11 +261,13 @@ export function GuidePage() {
       <Shot name="22-umfragen" caption="Eine Umfrage" />
     </Section>
 
-    <Section id="schattengram" audience="alle" title="Schattengram: Splitter-Reihenfolge">
-      <p>Unter <Link to="/schattengram">Schattengram</Link> steht für alle eingeloggten Gildenmitglieder transparent, welcher Charakter gerade Schattengram sammelt und wer danach dran ist.</p>
-      <p>Der obere Kasten zeigt den aktiven Sammler mit dem Splitterstand, zum Beispiel <strong>18 von 50 Splittern</strong>. Darunter steht die Reihenfolge der wartenden Charaktere. Die Historie bewahrt, wer Schattengram bereits abgeschlossen hat.</p>
-      <Shot name="39-schattengram" caption="Schattengram: aktueller Sammler, Reihenfolge und Abschluss-Historie" />
-      <p><strong>Für die Raidleitung:</strong> Raidassistenten und höhere Rollen reihen Charaktere ein, passen den Splitterstand und das Ziel an und verschieben wartende Charaktere mit <em>Früher</em> oder <em>Später</em>. Erst wenn der Stand das Ziel erreicht, wird <strong>Abgeschlossen</strong> aktiv. Danach sammelt automatisch der nächste Listenplatz.</p>
+    <Section id="schattengram" audience="alle" title="Schattengram: Questreihe und Reihenfolge">
+      <p>Unter <Link to="/schattengram">Schattengram</Link> steht für alle eingeloggten Gildenmitglieder, wer an Schattengram arbeitet, in welcher Reihenfolge und bei welchem Schritt der Questreihe: <strong>Vorquest, Seelen, Seuche, Blut, Frost, Splitter, Abschluss</strong>.</p>
+      <p>Mehrere Leute können gleichzeitig dran sein. Seuche (Seuchenmord), Blut (Blutkönigin), Frost (Sindragosa) und die Splitter kann aber pro Raid nur eine Person machen. Dann hat der höhere Listenplatz Vorrang. Wer fertig ist, wandert in die Historie.</p>
+      <Shot name="39-schattengram" caption="Schattengram: Liste mit Schritt und Splitterstand, darunter die Historie" />
+      <p>Wer im einzelnen Raid welchen Schritt macht, steht im Raid unter <strong>Aufstellung</strong> im Kasten <strong>„Schattengram im Raid“</strong>. Vorgeschlagen wird der höchste Listenplatz aus der Aufstellung, der gerade bei diesem Schritt ist; die Raidleitung kann das pro Raid ändern.</p>
+      <Shot name="35b-schattengram-im-raid" caption="Schattengram im Raid: wer Seuche, Blut, Frost und Splitter macht" />
+      <p><strong>Für die Raidleitung:</strong> Unter „Charakter eintragen“ kommen Krieger, Paladine und Todesritter auf die Liste, wahlweise direkt auf einen bestimmten Platz. Das Splitterziel ist 50 und lässt sich ändern, schon gesammelte Splitter trägst du gleich mit ein. Beim Schritt „Splitter“ zählst du mit <strong>+1 / −1</strong>, mit <strong>↑ / ↓</strong> oder „Bearbeiten“ änderst du Platz, Schritt und Stand. „Fertig“ geht, sobald alle Splitter gesammelt sind; „Entfernen“ nimmt einen falschen Eintrag wieder von der Liste.</p>
     </Section>
 
     <Section id="raids-anlegen" audience="raidleitung" title="Raids anlegen und vorausplanen">

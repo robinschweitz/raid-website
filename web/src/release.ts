@@ -1,8 +1,17 @@
-export const appVersion = '1.0.22'
+export const appVersion = '1.0.23'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Schattengram: Questreihe und Einteilung im Raid',
+    changes: [
+      'Neu im Menü: „Schattengram“. Die Liste zeigt, wer an Schattengram arbeitet, in welcher Reihenfolge und bei welchem Schritt (Vorquest, Seelen, Seuche, Blut, Frost, Splitter, Abschluss). Mehrere Leute können gleichzeitig dran sein.',
+      'Im Raid unter „Aufstellung“ steht jetzt „Schattengram im Raid“: wer Seuche, Blut, Frost und die Splitter macht. Vorgeschlagen wird der höchste Listenplatz aus der Aufstellung; die Raidleitung kann das pro Raid ändern.',
+      'Für die Raidleitung: Splitter mit +1 / −1 zählen, das Ziel ist 50 und bleibt änderbar, Charaktere auf einen bestimmten Platz setzen, falsche Einträge entfernen. Nur Krieger, Paladine und Todesritter können eingetragen werden.',
+    ],
+  },
+  {
+    version: '1.0.22',
     title: 'Addons zum Herunterladen',
     changes: [
       'Neu im Menü: „Addons“. RaidLedger (für Raidleitung und Plündermeister) und RaidWishlist (für jeden Raider) gibt es dort direkt als ZIP, mit Installation, Bildern aus dem Spiel, allen Befehlen und wie sie mit der Website zusammenarbeiten.',

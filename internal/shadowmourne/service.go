@@ -10,12 +10,22 @@ import (
 )
 
 var (
-	ErrInvalidProgress    = errors.New("invalid shard progress")
-	ErrNotCurrent         = errors.New("entry is not the current collector")
-	ErrNotQueued          = errors.New("entry is not queued")
-	ErrQueueBoundary      = errors.New("entry cannot move further")
+	ErrInvalidProgress    = errors.New("invalid shadowmourne progress")
+	ErrInvalidPosition    = errors.New("invalid list position")
+	ErrNotActive          = errors.New("entry is not active")
 	ErrCharacterMissing   = errors.New("character not found")
+	ErrClassNotEligible   = errors.New("character class cannot use shadowmourne")
+	ErrAlreadyListed      = errors.New("character is already on the list")
 	ErrProgressIncomplete = errors.New("shard progress is incomplete")
+	ErrRaidMissing        = errors.New("raid not found")
+	ErrRaidLocked         = errors.New("raid is cancelled or archived")
+	ErrInvalidTask        = errors.New("invalid raid task")
+	ErrNotInRoster        = errors.New("character is not in the raid roster")
+)
+
+const (
+	entryAuditType      = "shadowmourne_entry"
+	assignmentAuditType = "shadowmourne_raid_task"
 )
 
 type Service struct {
@@ -33,43 +43,60 @@ func (s *Service) List(ctx context.Context) ([]Entry, error) {
 }
 
 func validProgress(progress ProgressInput) bool {
-	return progress.ShardsCollected >= 0 && progress.ShardTarget > 0 && progress.ShardsCollected <= progress.ShardTarget
+	return validStage(progress.Stage) && progress.ShardsCollected >= 0 && progress.ShardTarget > 0 && progress.ShardsCollected <= progress.ShardTarget
 }
 
 func (s *Service) Create(ctx context.Context, actorID int64, input CreateInput) (*Entry, error) {
-	if input.CharacterID <= 0 || !validProgress(ProgressInput{ShardsCollected: input.ShardsCollected, ShardTarget: input.ShardTarget}) {
+	if input.Stage == "" {
+		input.Stage = StagePrequest
+	}
+	if input.ShardTarget == 0 {
+		input.ShardTarget = DefaultShardTarget
+	}
+	if input.CharacterID <= 0 || !validProgress(ProgressInput{Stage: input.Stage, ShardsCollected: input.ShardsCollected, ShardTarget: input.ShardTarget}) {
 		return nil, ErrInvalidProgress
 	}
-	if _, err := s.characters.Get(ctx, input.CharacterID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrCharacterMissing
-		}
+	if input.Position < 0 {
+		return nil, ErrInvalidPosition
+	}
+	char, err := s.characters.Get(ctx, input.CharacterID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrCharacterMissing
+	}
+	if err != nil {
 		return nil, err
 	}
+	if !eligibleClass(char.Class) {
+		return nil, ErrClassNotEligible
+	}
 	var created *Entry
-	err := s.entries.InTransaction(ctx, func(tx *Repo) error {
-		position, err := tx.NextPosition(ctx)
+	err = s.entries.InTransaction(ctx, func(tx *Repo) error {
+		listed, err := tx.HasActiveCharacter(ctx, input.CharacterID)
 		if err != nil {
 			return err
 		}
-		active, err := tx.Active(ctx)
+		if listed {
+			return ErrAlreadyListed
+		}
+		active, err := tx.ListActive(ctx)
 		if err != nil {
 			return err
-		}
-		status := StatusQueued
-		if active == nil {
-			status = StatusCollecting
 		}
 		now := s.now()
-		created = &Entry{CharacterID: input.CharacterID, QueuePosition: position, Status: status, ShardsCollected: input.ShardsCollected, ShardTarget: input.ShardTarget, CreatedAt: now, UpdatedAt: now}
+		created = &Entry{CharacterID: input.CharacterID, Priority: len(active) + 1, Stage: input.Stage, ShardsCollected: input.ShardsCollected, ShardTarget: input.ShardTarget, CreatedAt: now, UpdatedAt: now}
 		if err := tx.Create(ctx, created); err != nil {
 			return err
+		}
+		if input.Position > 0 && input.Position <= len(active) {
+			if err := s.reorder(ctx, tx, append(active, *created), created.ID, input.Position, now); err != nil {
+				return err
+			}
 		}
 		created, err = tx.Get(ctx, created.ID)
 		if err != nil {
 			return err
 		}
-		return tx.Record(ctx, actorID, created.ID, "create", nil, created)
+		return tx.Record(ctx, actorID, entryAuditType, created.ID, "create", nil, created)
 	})
 	return created, err
 }
@@ -84,26 +111,27 @@ func (s *Service) UpdateProgress(ctx context.Context, actorID, entryID int64, in
 		if err != nil {
 			return err
 		}
-		if before.Status != StatusCollecting {
-			return ErrNotCurrent
+		if before.Status != StatusActive {
+			return ErrNotActive
 		}
-		copy := *before
-		updated = &copy
-		updated.ShardsCollected = input.ShardsCollected
-		updated.ShardTarget = input.ShardTarget
-		updated.UpdatedAt = s.now()
-		if err := tx.SaveProgress(ctx, updated); err != nil {
+		changed := *before
+		changed.Stage = input.Stage
+		changed.ShardsCollected = input.ShardsCollected
+		changed.ShardTarget = input.ShardTarget
+		changed.UpdatedAt = s.now()
+		if err := tx.SaveProgress(ctx, &changed); err != nil {
 			return err
 		}
 		updated, err = tx.Get(ctx, entryID)
 		if err != nil {
 			return err
 		}
-		return tx.Record(ctx, actorID, entryID, "update_progress", before, updated)
+		return tx.Record(ctx, actorID, entryAuditType, entryID, "update_progress", before, updated)
 	})
 	return updated, err
 }
 
+// Complete moves a finished character into the history. It requires the shard target.
 func (s *Service) Complete(ctx context.Context, actorID, entryID int64) (*Entry, error) {
 	var completed *Entry
 	err := s.entries.InTransaction(ctx, func(tx *Repo) error {
@@ -111,91 +139,209 @@ func (s *Service) Complete(ctx context.Context, actorID, entryID int64) (*Entry,
 		if err != nil {
 			return err
 		}
-		if before.Status != StatusCollecting {
-			return ErrNotCurrent
+		if before.Status != StatusActive {
+			return ErrNotActive
 		}
-		if before.ShardsCollected != before.ShardTarget {
+		if before.ShardsCollected < before.ShardTarget {
 			return ErrProgressIncomplete
 		}
 		now := s.now()
-		copy := *before
-		completed = &copy
-		completed.Status = StatusCompleted
-		completed.CompletedAt = &now
-		completed.UpdatedAt = now
-		if err := tx.Complete(ctx, completed); err != nil {
+		if err := tx.Complete(ctx, entryID, now); err != nil {
 			return err
 		}
-		next, err := tx.NextQueued(ctx)
-		if err != nil {
+		if err := s.renumber(ctx, tx, now); err != nil {
 			return err
-		}
-		if next != nil {
-			next.Status = StatusCollecting
-			next.UpdatedAt = now
-			if err := tx.Activate(ctx, next); err != nil {
-				return err
-			}
-			next, err = tx.Get(ctx, next.ID)
-			if err != nil {
-				return err
-			}
 		}
 		completed, err = tx.Get(ctx, entryID)
 		if err != nil {
 			return err
 		}
-		return tx.Record(ctx, actorID, entryID, "complete", before, struct {
-			*Entry
-			NextCollector *Entry `json:"next_collector"`
-		}{Entry: completed, NextCollector: next})
+		return tx.Record(ctx, actorID, entryAuditType, entryID, "complete", before, completed)
 	})
 	return completed, err
 }
 
-func (s *Service) Move(ctx context.Context, actorID, entryID int64, direction Direction) ([]Entry, error) {
-	if direction != MoveUp && direction != MoveDown {
-		return nil, ErrNotQueued
+// Remove takes a wrong or abandoned entry off the list. The row is kept and audited (ADR 007).
+func (s *Service) Remove(ctx context.Context, actorID, entryID int64) error {
+	return s.entries.InTransaction(ctx, func(tx *Repo) error {
+		before, err := tx.Get(ctx, entryID)
+		if err != nil {
+			return err
+		}
+		if before.Status != StatusActive {
+			return ErrNotActive
+		}
+		now := s.now()
+		if err := tx.Remove(ctx, entryID, now); err != nil {
+			return err
+		}
+		if err := s.renumber(ctx, tx, now); err != nil {
+			return err
+		}
+		return tx.Record(ctx, actorID, entryAuditType, entryID, "remove", before, nil)
+	})
+}
+
+// Move puts an active entry at the 1-based position and shifts the others.
+func (s *Service) Move(ctx context.Context, actorID, entryID int64, position int) ([]Entry, error) {
+	if position < 1 {
+		return nil, ErrInvalidPosition
 	}
 	var entries []Entry
 	err := s.entries.InTransaction(ctx, func(tx *Repo) error {
-		entry, err := tx.Get(ctx, entryID)
+		before, err := tx.Get(ctx, entryID)
 		if err != nil {
 			return err
 		}
-		if entry.Status != StatusQueued {
-			return ErrNotQueued
+		if before.Status != StatusActive {
+			return ErrNotActive
 		}
-		neighbor, err := tx.Neighbor(ctx, entry, direction)
+		active, err := tx.ListActive(ctx)
 		if err != nil {
 			return err
 		}
-		if neighbor == nil {
-			return ErrQueueBoundary
+		if position > len(active) {
+			return ErrInvalidPosition
 		}
-		before := struct {
-			Entry    *Entry `json:"entry"`
-			Neighbor *Entry `json:"neighbor"`
-		}{Entry: entry, Neighbor: neighbor}
-		if err := tx.SwapQueuePositions(ctx, entry, neighbor, s.now()); err != nil {
+		if err := s.reorder(ctx, tx, active, entryID, position, s.now()); err != nil {
+			return err
+		}
+		after, err := tx.Get(ctx, entryID)
+		if err != nil {
+			return err
+		}
+		if err := tx.Record(ctx, actorID, entryAuditType, entryID, "move", before, after); err != nil {
 			return err
 		}
 		entries, err = tx.List(ctx)
-		if err != nil {
-			return err
-		}
-		moved, err := tx.Get(ctx, entryID)
-		if err != nil {
-			return err
-		}
-		movedNeighbor, err := tx.Get(ctx, neighbor.ID)
-		if err != nil {
-			return err
-		}
-		return tx.Record(ctx, actorID, entryID, "move", before, struct {
-			*Entry
-			Neighbor *Entry `json:"neighbor"`
-		}{Entry: moved, Neighbor: movedNeighbor})
+		return err
 	})
 	return entries, err
+}
+
+// reorder places entryID at position within active and stores priorities 1..n.
+func (s *Service) reorder(ctx context.Context, tx *Repo, active []Entry, entryID int64, position int, at time.Time) error {
+	var moved Entry
+	others := make([]Entry, 0, len(active))
+	for _, entry := range active {
+		if entry.ID == entryID {
+			moved = entry
+			continue
+		}
+		others = append(others, entry)
+	}
+	ordered := make([]Entry, 0, len(active))
+	ordered = append(ordered, others[:position-1]...)
+	ordered = append(ordered, moved)
+	ordered = append(ordered, others[position-1:]...)
+	return storePriorities(ctx, tx, ordered, at)
+}
+
+// renumber closes gaps after an entry left the active list.
+func (s *Service) renumber(ctx context.Context, tx *Repo, at time.Time) error {
+	active, err := tx.ListActive(ctx)
+	if err != nil {
+		return err
+	}
+	return storePriorities(ctx, tx, active, at)
+}
+
+func storePriorities(ctx context.Context, tx *Repo, ordered []Entry, at time.Time) error {
+	for index, entry := range ordered {
+		if entry.Priority == index+1 {
+			continue
+		}
+		if err := tx.SetPriority(ctx, entry.ID, index+1, at); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RaidPlan shows who does each single-person questline step in a raid.
+func (s *Service) RaidPlan(ctx context.Context, raidID int64) (*RaidPlan, error) {
+	state, err := s.entries.RaidState(ctx, raidID)
+	if err != nil {
+		return nil, err
+	}
+	candidates, err := s.entries.ListActiveInRaid(ctx, raidID)
+	if err != nil {
+		return nil, err
+	}
+	assigned, err := s.entries.Assignments(ctx, raidID)
+	if err != nil {
+		return nil, err
+	}
+	plan := &RaidPlan{RaidID: raidID, Editable: !state.Cancelled && !state.Archived, Tasks: make([]RaidTask, 0, len(RaidTasks)), Candidates: candidates}
+	for _, task := range RaidTasks {
+		item := RaidTask{Task: task}
+		for i := range candidates {
+			if candidates[i].Stage == task {
+				item.Suggested = &candidates[i]
+				break
+			}
+		}
+		if entryID, ok := assigned[task]; ok {
+			// A stored choice stays visible even after the entry finished or left the roster.
+			entry, err := s.entries.Get(ctx, entryID)
+			if err != nil && !errors.Is(err, ErrNotFound) {
+				return nil, err
+			}
+			item.Assigned = entry
+		}
+		plan.Tasks = append(plan.Tasks, item)
+	}
+	return plan, nil
+}
+
+// AssignRaidTask stores the staff choice for one step; a nil entry returns to the suggestion.
+func (s *Service) AssignRaidTask(ctx context.Context, actorID, raidID int64, task Stage, entryID *int64) (*RaidPlan, error) {
+	if !validRaidTask(task) {
+		return nil, ErrInvalidTask
+	}
+	err := s.entries.InTransaction(ctx, func(tx *Repo) error {
+		state, err := tx.RaidState(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		if state.Cancelled || state.Archived {
+			return ErrRaidLocked
+		}
+		if entryID != nil {
+			entry, err := tx.Get(ctx, *entryID)
+			if err != nil {
+				return err
+			}
+			if entry.Status != StatusActive {
+				return ErrNotActive
+			}
+			inRoster, err := tx.InRaidRoster(ctx, raidID, entry.CharacterID)
+			if err != nil {
+				return err
+			}
+			if !inRoster {
+				return ErrNotInRoster
+			}
+		}
+		before, err := tx.Assignments(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		if err := tx.SaveAssignment(ctx, raidID, task, entryID, s.now()); err != nil {
+			return err
+		}
+		type snapshot struct {
+			Task    Stage  `json:"task"`
+			EntryID *int64 `json:"entry_id"`
+		}
+		var previous *int64
+		if id, ok := before[task]; ok {
+			previous = &id
+		}
+		return tx.Record(ctx, actorID, assignmentAuditType, raidID, "assign", snapshot{Task: task, EntryID: previous}, snapshot{Task: task, EntryID: entryID})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.RaidPlan(ctx, raidID)
 }

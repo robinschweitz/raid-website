@@ -366,21 +366,40 @@ export interface ItemLock {
   updated_at: string
 }
 
-export type ShadowmourneStatus = 'QUEUED' | 'COLLECTING' | 'COMPLETED'
+export type ShadowmourneStatus = 'ACTIVE' | 'COMPLETED'
 
-export interface ShadowmourneQueueEntry {
+export type ShadowmourneStage = 'PREQUEST' | 'SOULS' | 'UNHOLY' | 'BLOOD' | 'FROST' | 'SHARDS' | 'FINAL'
+
+export type ShadowmourneRaidTaskName = 'UNHOLY' | 'BLOOD' | 'FROST' | 'SHARDS'
+
+export interface ShadowmourneEntry {
   id: number
   character_id: number
   character_name: string
+  character_class: string
   player_id: number
   player_name: string
-  queue_position: number
+  priority: number
   status: ShadowmourneStatus
+  stage: ShadowmourneStage
   shards_collected: number
   shard_target: number
   completed_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface ShadowmourneRaidTask {
+  task: ShadowmourneRaidTaskName
+  assigned: ShadowmourneEntry | null
+  suggested: ShadowmourneEntry | null
+}
+
+export interface ShadowmourneRaidPlan {
+  raid_id: number
+  editable: boolean
+  tasks: ShadowmourneRaidTask[]
+  candidates: ShadowmourneEntry[]
 }
 
 export interface GuildRank {

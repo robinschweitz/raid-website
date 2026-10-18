@@ -414,6 +414,7 @@ function resolveRaid(s, id, options = {}) {
       : r.url.endsWith('/attendance') ? options.attendance ?? []
       : r.url.endsWith('/loot') ? options.loot ?? []
       : r.url.endsWith('/signups') ? { absences: options.absences ?? [] }
+      : r.url.endsWith('/shadowmourne') ? options.shadowmourne ?? { raid_id: id, editable: true, tasks: [], candidates: [] }
       : r.url === '/api/v1/loot-catalog' ? options.catalog ?? emptyCatalog() : [])
   }
 }
@@ -961,33 +962,80 @@ test('members do not request the admin account overview', async () => {
   assert.doesNotMatch(text(view.tree), /Konto/)
 })
 
-test('shadowmourne queue shows the collector and only raid staff can manage order and progress', async () => {
+test('shadowmourne list shows stages and lets raid staff count shards, reorder, finish and remove', async () => {
   const s = setup({ id: 1, role: 'RAIDASSISTENT' })
   const { ShadowmournePage } = s.load('pages/Shadowmourne.tsx')
   const view = s.mount(ShadowmournePage)
-  resolveIf(s, '/api/v1/shadowmourne-queue', [
-    { id: 1, character_id: 10, character_name: 'Erster', player_name: 'Spieler 1', status: 'COLLECTING', shards_collected: 12, shard_target: 50 },
-    { id: 2, character_id: 11, character_name: 'Zweiter', player_name: 'Spieler 2', status: 'QUEUED', queue_position: 2, shards_collected: 0, shard_target: 50 },
-    { id: 3, character_id: 12, character_name: 'Fertig', player_name: 'Spieler 3', status: 'COMPLETED', shards_collected: 50, shard_target: 50, completed_at: '2026-10-18T18:00:00Z' },
+  const entry = (id, name, extra) => ({ id, character_id: id + 9, character_name: name, character_class: 'Krieger', player_name: `Spieler ${id}`, status: 'ACTIVE', stage: 'PREQUEST', priority: id, shards_collected: 0, shard_target: 50, completed_at: null, ...extra })
+  resolveIf(s, '/api/v1/shadowmourne', [
+    entry(1, 'Erster', { stage: 'SHARDS', shards_collected: 12 }),
+    entry(2, 'Zweiter', { stage: 'BLOOD' }),
+    entry(3, 'Fertig', { status: 'COMPLETED', shards_collected: 50, completed_at: '2026-10-18T18:00:00Z' }),
   ])
-  resolveIf(s, '/api/v1/characters', [{ id: 10, name: 'Erster', class: 'Krieger', active: true }])
+  resolveIf(s, '/api/v1/characters', [
+    { id: 10, name: 'Erster', class: 'Krieger', active: true },
+    { id: 30, name: 'Neuer Ritter', class: 'Todesritter', active: true },
+    { id: 31, name: 'Magierin', class: 'Magier', active: true },
+  ])
   await flush(view)
-  assert.match(text(view.tree), /12\s+von\s+50\s+Splittern.*Zweiter.*Fertig/)
-  assert.equal(button(view, 'Abgeschlossen').props.disabled, true)
-  labelled(view, 'Gesammelte Splitter').props.onChange(change('50'))
-  view.render()
-  const submitting = form(view).props.onSubmit(event)
-  assert.equal(writes(s)[0].url, '/api/v1/shadowmourne-queue/1')
-  assert.deepEqual(writes(s)[0].body, { shards_collected: 50, shard_target: 50 })
+  assert.match(text(view.tree), /Erster.*12\s*\/\s*50.*Zweiter.*Fertig/)
+  const options = nodes(select(view, 'Schattengram-Charakter'), (n) => n.type === 'option').map((n) => text(n))
+  assert.deepEqual(options, ['Bitte wählen', 'Neuer Ritter  ( Todesritter )'], 'only eligible, unlisted characters can be added')
+  assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Fertig')[0].props.disabled, true)
+
+  const counting = nodes(view.tree, (n) => n.type === 'button' && n.props['aria-label'] === 'Ein Splitter mehr für Erster')[0].props.onClick()
+  assert.equal(writes(s)[0].url, '/api/v1/shadowmourne/1')
+  assert.deepEqual(writes(s)[0].body, { stage: 'SHARDS', shards_collected: 13, shard_target: 50 })
   writes(s)[0].resolve({})
-  await submitting
+  await counting
+  await flush(view)
+
+  const moving = nodes(view.tree, (n) => n.type === 'button' && n.props['aria-label'] === 'Zweiter nach oben')[0].props.onClick()
+  assert.equal(writes(s)[1].url, '/api/v1/shadowmourne/2/move')
+  assert.deepEqual(writes(s)[1].body, { position: 1 })
+  writes(s)[1].resolve([])
+  await moving
 
   const member = setup({ id: 2, role: 'MEMBER' })
   const memberView = member.mount(member.load('pages/Shadowmourne.tsx').ShadowmournePage)
-  resolveIf(member, '/api/v1/shadowmourne-queue', [])
+  resolveIf(member, '/api/v1/shadowmourne', [entry(1, 'Erster', { stage: 'SHARDS', shards_collected: 12 })])
   await flush(memberView)
-  assert.equal(button(memberView, 'Stand speichern'), undefined)
-  assert.equal(button(memberView, 'Einreihen'), undefined)
+  assert.match(text(memberView.tree), /Erster/)
+  assert.equal(button(memberView, 'Bearbeiten'), undefined)
+  assert.equal(button(memberView, 'Eintragen'), undefined)
+  assert.equal(member.requests.some((r) => r.url === '/api/v1/characters'), false)
+})
+
+test('raid shadowmourne card shows suggestions and staff can assign a roster character', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const { ShadowmourneRaidCard } = s.load('components/ShadowmourneRaidCard.tsx')
+  const view = s.mount(ShadowmourneRaidCard, { raidID: 7, rosterKey: '10,11' })
+  const entry = (id, name, stage) => ({ id, character_id: id + 9, character_name: name, character_class: 'Paladin', player_name: `Spieler ${id}`, status: 'ACTIVE', stage, priority: id, shards_collected: 5, shard_target: 50, completed_at: null })
+  const blood = entry(1, 'Blutsauger', 'BLOOD')
+  const other = entry(2, 'Zweitblut', 'BLOOD')
+  const plan = (assigned) => ({ raid_id: 7, editable: true, candidates: [blood, other], tasks: [
+    { task: 'UNHOLY', assigned: null, suggested: null },
+    { task: 'BLOOD', assigned, suggested: blood },
+    { task: 'FROST', assigned: null, suggested: null },
+    { task: 'SHARDS', assigned: null, suggested: null },
+  ] })
+  resolveIf(s, '/api/v1/raids/7/shadowmourne', plan(null))
+  await flush(view)
+  assert.match(text(view.tree), /Blut.*Blutsauger.*Vorschlag aus der Liste/)
+  const assigning = select(view, 'Einteilung Blut').props.onChange(change('2'))
+  assert.equal(writes(s)[0].method, 'put')
+  assert.equal(writes(s)[0].url, '/api/v1/raids/7/shadowmourne/BLOOD')
+  assert.deepEqual(writes(s)[0].body, { entry_id: 2 })
+  writes(s)[0].resolve(plan(other))
+  await assigning
+  view.render()
+  assert.match(text(view.tree), /Zweitblut.*Von der Raidleitung eingeteilt/)
+
+  const empty = setup({ id: 2, role: 'MEMBER' })
+  const emptyView = empty.mount(empty.load('components/ShadowmourneRaidCard.tsx').ShadowmourneRaidCard, { raidID: 7, rosterKey: '' })
+  resolveIf(empty, '/api/v1/raids/7/shadowmourne', { raid_id: 7, editable: true, candidates: [], tasks: [] })
+  await flush(emptyView)
+  assert.equal(emptyView.tree, null, 'the card stays hidden when nobody in the roster is on the list')
 })
 
 test('auth distinguishes network failure from anonymous and supports retry', async () => {

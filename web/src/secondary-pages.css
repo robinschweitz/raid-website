@@ -481,3 +481,137 @@
   .addon-hero { padding: 20px; }
   .addon-commands td:first-child { white-space: normal; }
 }
+
+/* Schattengram list and raid card (ADR 086) */
+.shadowmourne-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.shadowmourne-entry {
+  display: grid;
+  gap: 10px;
+}
+
+.shadowmourne-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shadowmourne-entry-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.shadowmourne-rank {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.stage-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.stage-steps li {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stage-steps li.done {
+  border-color: rgba(134, 217, 242, 0.4);
+  color: var(--accent);
+}
+
+.stage-steps li.current {
+  border-color: var(--accent);
+  background: rgba(134, 217, 242, 0.2);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.shadowmourne-shards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.shard-bar {
+  position: relative;
+  flex: 1 1 220px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.shard-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, rgba(134, 217, 242, 0.35), rgba(134, 217, 242, 0.7));
+}
+
+.shard-bar-text {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.shadowmourne-edit label {
+  display: grid;
+  gap: 4px;
+}
+
+.shadowmourne-edit input[type='number'] {
+  width: 90px;
+}
+
+.shadowmourne-task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.shadowmourne-raid {
+  margin-top: 16px;
+}
+
+.shadowmourne-task {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.shadowmourne-task p {
+  margin: 4px 0;
+}
+
+.shadowmourne-task label {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}

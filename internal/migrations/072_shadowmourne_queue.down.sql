@@ -1,4 +1,0 @@
-DROP INDEX idx_shadowmourne_character;
-DROP INDEX idx_shadowmourne_queue_position;
-DROP INDEX idx_shadowmourne_single_collector;
-DROP TABLE shadowmourne_queue_entries;

@@ -148,7 +148,8 @@ function entityDescription(entry: AuditLogEntry, before: AuditSnapshot, after: A
     case 'registration_code': return `Registrierungscode #${entry.entity_id}`
     case 'raid_signup': return `Raid-Anmeldung für Raid #${entry.entity_id}`
     case 'raid_recruitment_template': return 'Raid-Gesuchtext'
-    case 'shadowmourne_queue_entry': return `Schattengram: ${name || `#${entry.entity_id}`}`
+    case 'shadowmourne_entry': return `Schattengram: ${textValue(snapshot, 'character_name') || `#${entry.entity_id}`}`
+    case 'shadowmourne_raid_task': return `Schattengram-Einteilung für Raid #${entry.entity_id}`
     default: return `${entry.entity_type} #${entry.entity_id}`
   }
 }
@@ -163,7 +164,8 @@ function entityTarget(entry: AuditLogEntry, before: AuditSnapshot, after: AuditS
   }
   if (entry.entity_type === 'poll') return '/polls'
   if (entry.entity_type === 'raid_series') return '/raid-series'
-  if (entry.entity_type === 'shadowmourne_queue_entry') return '/schattengram'
+  if (entry.entity_type === 'shadowmourne_entry') return '/schattengram'
+  if (entry.entity_type === 'shadowmourne_raid_task') return `/raids/${entry.entity_id}`
   if (entry.entity_type === 'guild_rank' || entry.entity_type === 'raid_group') return '/roster'
   if (entry.entity_type === 'registration_request' || entry.entity_type === 'registration_code') return '/registration-requests'
   const raidID = (after ?? before)?.raid_id

@@ -1,15 +1,17 @@
 import { expect, test, type APIRequestContext, type Page, type TestInfo } from '@playwright/test'
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { admin, apiAs } from './fixtures'
 
-// Screenshots for the user guide. Runs only with DOCS_TOUR=1:
+// Screenshots for the user guide (Anleitung page). Runs only with DOCS_TOUR=1:
 //   DOCS_TOUR=1 npx playwright test e2e/zz-docs-tour.spec.ts
 test.skip(!process.env.DOCS_TOUR, 'only for the user guide screenshots')
 test.describe.configure({ mode: 'serial' })
 
 const out = path.join(import.meta.dirname, '..', 'docs-screenshots')
+// The in-app guide (src/pages/Guide.tsx) serves compressed copies from here.
+const published = path.join(import.meta.dirname, '..', 'public', 'anleitung')
 const databasePath = path.join(import.meta.dirname, '..', '.e2e', 'raid.db')
 const pw = (name: string) => `${name.toLowerCase()}-passwort-123`
 const people = {
@@ -36,8 +38,25 @@ async function shot(page: Page, testInfo: TestInfo, name: string, focus?: string
   if (focus) await page.mouse.wheel(0, -90)
   await page.waitForTimeout(400)
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await page.screenshot({ path: path.join(out, `${name}.png`) })
+  const png = await page.screenshot({ path: path.join(out, `${name}.png`) })
   await testInfo.attach(name, { path: path.join(out, `${name}.png`), contentType: 'image/png' })
+  mkdirSync(published, { recursive: true })
+  writeFileSync(path.join(published, `${name}.webp`), await toWebP(page, png))
+}
+
+// Chromium encodes WebP itself, so the guide images need no extra dependency.
+async function toWebP(page: Page, png: Buffer): Promise<Buffer> {
+  const dataURL = await page.evaluate(async (source) => {
+    const image = new Image()
+    image.src = source
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = image.naturalWidth
+    canvas.height = image.naturalHeight
+    canvas.getContext('2d')?.drawImage(image, 0, 0)
+    return canvas.toDataURL('image/webp', 0.8)
+  }, `data:image/png;base64,${png.toString('base64')}`)
+  return Buffer.from(dataURL.split(',')[1], 'base64')
 }
 
 async function signIn(page: Page, name: string, password: string) {

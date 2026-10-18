@@ -21,6 +21,7 @@ import { RegistrationRequestsPage } from './pages/RegistrationRequests'
 import { ChangelogPage } from './pages/Changelog'
 import { AuditLogPage } from './pages/AuditLog'
 import { WishlistPage } from './pages/Wishlist'
+import { GuidePage } from './pages/Guide'
 import { appVersion } from './release'
 
 // After signing in from the login link the address is still /login.
@@ -62,6 +63,7 @@ function Routes() {
   if (parts[0] === 'registration-requests') return <RegistrationRequestsPage />
   if (parts[0] === 'audit-log') return <AuditLogPage />
   if (parts[0] === 'changelog') return <ChangelogPage />
+  if (parts[0] === 'anleitung') return <GuidePage />
   return <p className="muted">Seite nicht gefunden.</p>
 }
 
@@ -95,6 +97,7 @@ function Layout() {
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
           <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
           {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'nav-link active' : 'nav-link'} to="/wishlist"><NavIcon name="heart" />Meine Wunschliste</Link>}
+          <Link className={path === '/anleitung' ? 'nav-link active' : 'nav-link'} to="/anleitung"><NavIcon name="info" />Anleitung</Link>
           {player && atLeast(player.role, 'ADMIN') && <>
             <p className="sidebar-caption">Administration</p>
             <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
@@ -127,6 +130,7 @@ function Layout() {
         <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>
         <Link className={path === '/loot-catalog' ? 'active' : ''} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
         {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'active' : ''} to="/wishlist"><NavIcon name="heart" />Wunschliste</Link>}
+        <Link className={path === '/anleitung' ? 'active' : ''} to="/anleitung"><NavIcon name="info" />Hilfe</Link>
       </nav>
     </div>
   )
@@ -152,7 +156,8 @@ function Gate() {
       </div>
     )
   }
-  if (!player && path !== '/') {
+  // The guide must be readable before an account exists (ADR 083).
+  if (!player && path !== '/' && path !== '/anleitung') {
     return <LoginPage />
   }
   return <Layout />

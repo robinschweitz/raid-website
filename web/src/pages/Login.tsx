@@ -3,6 +3,7 @@ import { useAuth, type MFAFactors } from '../auth'
 import { api, ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
 import { GuildCrest } from '../components/GuildCrest'
+import { Link } from '../router'
 import type { ExternalCharacter, Player, RegistrationRequest } from '../types'
 import { browserSupportsWebAuthn } from '../webauthn'
 
@@ -198,6 +199,7 @@ export function LoginPage() {
         </form>}
         {error && <p className="error">{error}</p>}
         {requestStatus && <p className="muted" role="status">{requestStatus}</p>}
+        <p className="login-help">Neu hier? <Link to="/anleitung">Anleitung mit Bildern lesen</Link></p>
       </section>
     </div>
   )

@@ -150,6 +150,11 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   (`TENTATIVE`). Only declined players are offered for "keine EP" at archive; unsure players keep
   the normal EP rule (ADR 082).
 
+### User guide (ADR 083)
+- `/anleitung` is the in-app guide for every role and is readable without login. When a change
+  alters a screen the guide describes, update `web/src/pages/Guide.tsx` and regenerate the screenshots
+  with `DOCS_TOUR=1 npx playwright test e2e/zz-docs-tour.spec.ts` (after `npm run build`).
+
 ### Enhance Points (EP) — the core rule
 - **+10 EP** for a player who received **no main-spec loot** in that raid.
 - Awarded **only by final archiving**, which moves the raid to `COMPLETED` (ADR 021).

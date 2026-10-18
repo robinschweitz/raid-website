@@ -1,8 +1,17 @@
-export const appVersion = '1.0.19'
+export const appVersion = '1.0.20'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Anleitung auf der Website',
+    changes: [
+      'Neu im Menü: „Anleitung“. Sie erklärt Schritt für Schritt mit Bildern und Beispielen, wie alles funktioniert: Konto bekommen, anmelden und absagen, Wunschliste und Addon-Export, EP und Item-Locks, für die Raidleitung Raids planen, Aufstellung, Gesuchtext und Loot, für Admins die Verwaltung.',
+      'Oben wählst du deinen Bereich, dein eigener ist markiert. Am Ende stehen häufige Fragen.',
+      'Die Anleitung ist auch ohne Login erreichbar, damit neue Leute schon vor der Registrierung nachlesen können. Auf der Login-Seite führt „Neu hier?“ direkt dorthin.',
+    ],
+  },
+  {
+    version: '1.0.19',
     title: 'Unsicher als Rückmeldung',
     changes: [
       'Neben „Kann nicht kommen“ gibt es jetzt „Unsicher“, optional mit Hinweis wie „komme evtl. später“. Mit „Sicher dabei“ nimmst du es zurück.',

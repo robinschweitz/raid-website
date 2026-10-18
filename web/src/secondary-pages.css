@@ -390,3 +390,43 @@
 
 .secondary-page label.check input[type='checkbox'] { width: auto; flex: 0 0 auto; }
 .secondary-page .subcard > label.check { font-weight: 700; }
+
+/* Anleitung (ADR 083) */
+.guide-page { max-width: 1040px; }
+.guide-lead { font-size: 15px; line-height: 1.6; color: var(--text); margin: 0 0 16px; }
+.guide-jump h2 { margin-top: 0; }
+.guide-jump-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.guide-jump-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px 16px; text-align: left; border: 1px solid #34556b; border-radius: 8px; background: #0d2032; color: var(--text); cursor: pointer; }
+.guide-jump-card strong { font-size: 15px; color: var(--accent); }
+.guide-jump-card span { color: var(--muted); font-size: 13px; line-height: 1.4; }
+.guide-jump-card em { margin-top: 4px; font-style: normal; font-size: 12px; font-weight: 700; color: var(--ok); }
+.guide-jump-card:hover, .guide-jump-card:focus-visible { border-color: var(--accent); background: #12304a; }
+.guide-jump-card.mine { border-color: var(--ok); box-shadow: 0 0 0 1px rgba(139, 212, 176, 0.35) inset; }
+.guide-contents { margin-top: 14px; }
+.guide-contents summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.guide-contents ol { margin: 10px 0 0; padding-left: 22px; line-height: 1.9; }
+.guide-page .link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; text-align: left; }
+.guide-page .link-button:hover { text-decoration: underline; }
+.guide-section { scroll-margin-top: 16px; line-height: 1.6; }
+.guide-section h3 { margin: 22px 0 8px; font-size: 16px; color: var(--accent); }
+.guide-section ol, .guide-section ul { padding-left: 22px; }
+.guide-section li { margin-bottom: 4px; }
+.guide-section .table-scroll { margin: 12px 0; }
+.guide-shot { margin: 14px 0 18px; }
+.guide-shot img { display: block; width: 100%; height: auto; border: 1px solid #34556b; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35); }
+.guide-shot figcaption { margin-top: 6px; color: var(--muted); font-size: 13px; }
+.guide-tip { margin: 14px 0; padding: 12px 14px; border-left: 3px solid var(--accent); border-radius: 6px; background: rgba(134, 217, 242, 0.08); }
+.guide-top { margin-top: 8px; }
+.guide-faq dt { margin-top: 14px; font-weight: 700; }
+.guide-faq dd { margin: 4px 0 0; color: var(--muted); }
+.guide-page kbd { padding: 1px 6px; border: 1px solid #4a6a82; border-bottom-width: 2px; border-radius: 4px; background: #0d2032; font-family: inherit; font-size: 12px; }
+.login-help { margin: 18px 0 0; text-align: center; color: var(--muted); }
+.login-help a { color: var(--accent); }
+
+/* With "Hilfe" the mobile bar can hold more items than a phone is wide:
+   items share the width and the bar scrolls sideways instead of clipping. */
+@media (max-width: 850px) {
+  .mobile-nav { justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
+  .mobile-nav::-webkit-scrollbar { display: none; }
+  .mobile-nav a { flex: 1 0 auto; white-space: nowrap; }
+}

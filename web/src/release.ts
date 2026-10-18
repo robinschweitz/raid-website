@@ -1,8 +1,16 @@
-export const appVersion = '1.0.16'
+export const appVersion = '1.0.17'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Kurzer Gesuchtext',
+    changes: [
+      'Neuer Platzhalter {{SETUP_KURZ}} im Gesuchtext: fasst die offenen Plätze kurz zusammen, z. B. „2 Heal (Baum, Diszi), 2 MDD (beliebig), 2 RDD (Mage, SP)“.',
+      'Mit {{TANK_SPECS}}, {{HEAL_SPECS}}, {{MDD_SPECS}} und {{RDD_SPECS}} lassen sich die gesuchten Specs einer Rolle in eigene Sätze einbauen. {{SETUP}} bleibt unverändert.',
+    ],
+  },
+  {
+    version: '1.0.16',
     title: 'Raids im Voraus planen',
     changes: [
       'Auf der Raidseite legt „Termine im Voraus anlegen“ alle Raids einer Serie bis zu einem gewählten Tag an. Die Anmeldung ist sofort offen, sodass sich alle schon Wochen vorher anmelden können.',

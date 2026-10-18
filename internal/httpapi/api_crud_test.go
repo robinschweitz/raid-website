@@ -636,8 +636,68 @@ func TestRegistrationClaimsImportedCharacterOwner(t *testing.T) {
 	if claimedOwner.Username == nil || *claimedOwner.Username != "importedhero" || claimedOwner.PasswordHash == "" {
 		t.Fatalf("imported owner did not receive credentials: %#v", claimedOwner)
 	}
-	if token := login(t, client, srv, "importedhero", "valid-secret"); token == "" {
+	ownerToken := login(t, client, srv, "importedhero", "valid-secret")
+	if ownerToken == "" {
 		t.Fatal("claimed imported owner cannot log in")
+	}
+
+	// ADR 084: an Admin sees which player the registration was linked to.
+	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/registration-requests?status=CONSUMED", adminToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("list consumed requests: status %d body %s", status, body)
+	}
+	var consumedOut struct {
+		Data []registration.Request `json:"data"`
+	}
+	if err := json.Unmarshal(body, &consumedOut); err != nil {
+		t.Fatalf("decode consumed requests: %v", err)
+	}
+	if len(consumedOut.Data) != 1 || consumedOut.Data[0].Linked == nil {
+		t.Fatalf("consumed request does not name its player: %s", body)
+	}
+	if linked := consumedOut.Data[0].Linked; linked.PlayerID != importedOwner.ID || linked.PlayerName != "Legacy owner" || linked.Username == nil || *linked.Username != "importedhero" {
+		t.Fatalf("consumed request linked to the wrong player: %#v", linked)
+	}
+
+	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/player-accounts", adminToken, nil)
+	if status != http.StatusOK {
+		t.Fatalf("list player accounts: status %d body %s", status, body)
+	}
+	var accountsOut struct {
+		Data []registration.Account `json:"data"`
+	}
+	if err := json.Unmarshal(body, &accountsOut); err != nil {
+		t.Fatalf("decode player accounts: %v", err)
+	}
+	origins := map[string]registration.Account{}
+	for _, account := range accountsOut.Data {
+		origins[account.PlayerName] = account
+	}
+	owner := origins["Legacy owner"]
+	if owner.Origin != registration.AccountRegistered || owner.Username == nil || *owner.Username != "importedhero" || owner.RegisteredAt == nil || owner.RegisteredCharacter != "ImportedHero" || owner.RequestID == nil || *owner.RequestID != requestOut.Data.ID {
+		t.Fatalf("registered owner not reported as registered: %#v", owner)
+	}
+	if len(owner.Characters) != 1 || owner.Characters[0].Name != "ImportedHero" {
+		t.Fatalf("registered owner characters: %#v", owner.Characters)
+	}
+	if origins["admin"].Origin != registration.AccountByAdmin {
+		t.Fatalf("seeded admin should be an admin-made login: %#v", origins["admin"])
+	}
+
+	now = time.Now().UTC()
+	unclaimed := &player.Player{Name: "Still unclaimed", Role: validation.RoleGuest, Active: true, CreatedAt: now, UpdatedAt: now}
+	if _, err := bdb.NewInsert().Model(unclaimed).Exec(t.Context()); err != nil {
+		t.Fatalf("create unclaimed player: %v", err)
+	}
+	status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/player-accounts", adminToken, nil)
+	if status != http.StatusOK || !strings.Contains(string(body), `"player_name":"Still unclaimed"`) || !strings.Contains(string(body), `"origin":"NONE"`) || !strings.Contains(string(body), `"characters":[]`) {
+		t.Fatalf("unclaimed player not listed without login: status %d body %s", status, body)
+	}
+
+	for _, token := range []string{ownerToken, ""} {
+		if status, body = do(t, client, http.MethodGet, srv.URL+"/api/v1/player-accounts", token, nil); status != http.StatusForbidden && status != http.StatusUnauthorized {
+			t.Fatalf("player accounts must be admin-only, got %d body %s", status, body)
+		}
 	}
 }
 

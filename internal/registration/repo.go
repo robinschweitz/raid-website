@@ -65,6 +65,20 @@ func (r *Repo) ListRequests(ctx context.Context, statuses []string) ([]Request, 
 	return rows, err
 }
 
+// ListRedemptions returns every used code with its request, oldest first.
+func (r *Repo) ListRedemptions(ctx context.Context) ([]Redemption, error) {
+	var rows []Redemption
+	err := r.db.NewSelect().
+		TableExpr("registration_codes AS c").
+		Join("JOIN registration_requests AS r ON r.id = c.request_id").
+		ColumnExpr("c.request_id, r.purpose, r.character_name, c.used_by_player_id, c.used_at").
+		Where("c.used_at IS NOT NULL").
+		Where("c.used_by_player_id IS NOT NULL").
+		OrderExpr("c.used_at ASC, c.id ASC").
+		Scan(ctx, &rows)
+	return rows, err
+}
+
 func (r *Repo) CreateCode(ctx context.Context, code *Code) error {
 	_, err := r.db.NewInsert().Model(code).Exec(ctx)
 	return err

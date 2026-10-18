@@ -81,6 +81,24 @@ export interface RegistrationRequest {
   faction: string
   created_at: string
   updated_at: string
+  // Redeemed requests: the player the code was used for (ADR 084).
+  linked_player?: { player_id: number, player_name: string, username: string | null, used_at: string }
+}
+
+// Admin-only account overview (ADR 084).
+export type AccountOrigin = 'REGISTERED' | 'ADMIN' | 'NONE'
+
+export interface PlayerAccount {
+  player_id: number
+  player_name: string
+  active: boolean
+  role: Role
+  username: string | null
+  origin: AccountOrigin
+  registered_at: string | null
+  registered_character: string
+  request_id: number | null
+  characters: { id: number, name: string, class: string, is_main: boolean, active: boolean }[]
 }
 
 export interface RegistrationCode {
@@ -454,6 +472,19 @@ export interface Vote {
 export type AwardMethod = 'MAIN' | 'SECOND' | 'ENHANCED' | 'BOE'
 
 export interface AddonInviteExport { text: string }
+
+// A bundled WoW addon offered for download (ADR 085).
+export interface AddonDownload {
+  name: string
+  title: string
+  version: string
+  interface: string
+  notes: string
+  files: string[]
+  file_name: string
+  size_bytes: number
+  download_url: string
+}
 
 export interface AddonLootPreviewRow {
   line_key: string

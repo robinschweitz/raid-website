@@ -23,6 +23,7 @@ import { AuditLogPage } from './pages/AuditLog'
 import { WishlistPage } from './pages/Wishlist'
 import { GuidePage } from './pages/Guide'
 import { ShadowmournePage } from './pages/Shadowmourne'
+import { AddonsPage } from './pages/Addons'
 import { appVersion } from './release'
 
 // After signing in from the login link the address is still /login.
@@ -66,6 +67,7 @@ function Routes() {
   if (parts[0] === 'changelog') return <ChangelogPage />
   if (parts[0] === 'anleitung') return <GuidePage />
   if (parts[0] === 'schattengram') return <ShadowmournePage />
+  if (parts[0] === 'addons') return <AddonsPage addonID={parts[1]} />
   return <p className="muted">Seite nicht gefunden.</p>
 }
 
@@ -100,6 +102,7 @@ function Layout() {
           <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
           <Link className={path === '/schattengram' ? 'nav-link active' : 'nav-link'} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>
           {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'nav-link active' : 'nav-link'} to="/wishlist"><NavIcon name="heart" />Meine Wunschliste</Link>}
+          <Link className={path.startsWith('/addons') ? 'nav-link active' : 'nav-link'} to="/addons"><NavIcon name="download" />Addons</Link>
           <Link className={path === '/anleitung' ? 'nav-link active' : 'nav-link'} to="/anleitung"><NavIcon name="info" />Anleitung</Link>
           {player && atLeast(player.role, 'ADMIN') && <>
             <p className="sidebar-caption">Administration</p>
@@ -160,8 +163,8 @@ function Gate() {
       </div>
     )
   }
-  // The guide must be readable before an account exists (ADR 083).
-  if (!player && path !== '/' && path !== '/anleitung') {
+  // The guide and the addons pages must be readable before an account exists (ADR 083, ADR 085).
+  if (!player && path !== '/' && path !== '/anleitung' && path !== '/addons' && !path.startsWith('/addons/')) {
     return <LoginPage />
   }
   return <Layout />

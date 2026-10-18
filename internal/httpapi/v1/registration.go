@@ -116,6 +116,16 @@ func (a *API) listRegistrationRequests(w http.ResponseWriter, r *http.Request) {
 	writeListJSON(w, rows)
 }
 
+// listPlayerAccounts is Admin-only: which player has a login and how it came about (ADR 084).
+func (a *API) listPlayerAccounts(w http.ResponseWriter, r *http.Request) {
+	rows, err := a.Registration.ListAccounts(r.Context())
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not list player accounts")
+		return
+	}
+	writeListJSON(w, rows)
+}
+
 func (a *API) createRegistrationCode(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {

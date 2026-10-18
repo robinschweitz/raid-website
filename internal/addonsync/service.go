@@ -17,6 +17,7 @@ import (
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcorrection"
+	"raid-website/internal/raidseries"
 	"raid-website/internal/validation"
 )
 
@@ -44,6 +45,7 @@ var encounterNPCs = map[string]string{
 // Service builds invite exports and imports recorded loot.
 type Service struct {
 	raids       *raid.Repo
+	series      *raidseries.Repo
 	attendance  *attendance.Repo
 	characters  *character.Repo
 	players     *player.Repo
@@ -55,8 +57,8 @@ type Service struct {
 
 // NewService wires the repositories the addon exchange reads and the
 // correction service that performs the actual loot writes.
-func NewService(raids *raid.Repo, attendanceRepo *attendance.Repo, characters *character.Repo, players *player.Repo, catalog *lootcatalog.Service, lootRepo *loot.Repo, points *enhancepoints.Repo, corrections *raidcorrection.Service) *Service {
-	return &Service{raids: raids, attendance: attendanceRepo, characters: characters, players: players, catalog: catalog, loot: lootRepo, points: points, corrections: corrections}
+func NewService(raids *raid.Repo, series *raidseries.Repo, attendanceRepo *attendance.Repo, characters *character.Repo, players *player.Repo, catalog *lootcatalog.Service, lootRepo *loot.Repo, points *enhancepoints.Repo, corrections *raidcorrection.Service) *Service {
+	return &Service{raids: raids, series: series, attendance: attendanceRepo, characters: characters, players: players, catalog: catalog, loot: lootRepo, points: points, corrections: corrections}
 }
 
 // InviteExport renders the raid roster for the addon. Invites use the live
@@ -82,7 +84,30 @@ func (s *Service) InviteExport(ctx context.Context, raidID int64, includeBench b
 		}
 		members = append(members, InviteMember{Name: name, Role: row.Role, Class: row.Class, IsBench: row.IsBench})
 	}
-	return BuildInviteExport(rd.ID, rd.Name, rd.RaidSize, members), nil
+	realmStart, err := s.realmStart(ctx, rd)
+	if err != nil {
+		return "", err
+	}
+	return BuildInviteExport(rd.ID, rd.Name, rd.RaidSize, realmStart, members), nil
+}
+
+// realmStart is the raid's scheduled start in its series' timezone, the time
+// the raid is announced in and the realm runs on. A raid without a series or
+// without a scheduled start has no known realm time and returns nil.
+func (s *Service) realmStart(ctx context.Context, rd *raid.Raid) (*time.Time, error) {
+	if rd.SeriesID == nil || rd.ScheduledStart == nil {
+		return nil, nil
+	}
+	series, err := s.series.Get(ctx, *rd.SeriesID)
+	if err != nil {
+		return nil, fmt.Errorf("load series %d of raid %d: %w", *rd.SeriesID, rd.ID, err)
+	}
+	location, err := time.LoadLocation(series.Timezone)
+	if err != nil {
+		return nil, fmt.Errorf("timezone of series %d: %w", series.ID, err)
+	}
+	start := rd.ScheduledStart.In(location)
+	return &start, nil
 }
 
 // LootPreview is the dry run of a loot import. It never writes.

@@ -430,3 +430,54 @@
   .mobile-nav::-webkit-scrollbar { display: none; }
   .mobile-nav a { flex: 1 0 auto; white-space: nowrap; }
 }
+
+/* Account overview for Admins (ADR 084) */
+.player-account { display: flex; flex-direction: column; gap: 2px; }
+.player-account small { color: var(--muted); font-size: 12px; }
+.player-characters { line-height: 1.7; }
+.player-characters span { display: inline-block; margin-right: 10px; white-space: nowrap; }
+.player-account-summary { margin: 0 0 12px; padding: 10px 14px; border: 1px solid #34556b; border-radius: 8px; background: rgba(134, 217, 242, 0.06); }
+.player-account-summary strong { color: var(--accent); }
+
+/* Addons pages (ADR 085): showcase, downloads, feature walkthroughs. */
+.addon-page { max-width: 1100px; }
+.addon-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 28px; align-items: center; padding: 26px 28px; background: radial-gradient(circle at 85% 20%, rgba(134, 217, 242, 0.12), transparent 55%), var(--card-bg); }
+.addon-hero h1 { margin: 2px 0 10px; font-size: 34px; letter-spacing: 0.01em; color: #e9f6ff; text-shadow: 0 0 18px rgba(134, 217, 242, 0.25); }
+.addon-pitch { margin: 0 0 14px; font-size: 15px; line-height: 1.6; }
+.addon-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; }
+.addon-hero-note { margin: 12px 0 0; font-size: 13px; }
+.addon-hero-shot .addon-shot { margin: 0; }
+.addon-download { gap: 8px; font-weight: 600; text-decoration: none; }
+.addon-download small { font-weight: 400; color: var(--muted); }
+.addon-download svg { width: 16px; height: 16px; }
+.addon-download.disabled { opacity: 0.6; cursor: default; }
+.addon-contents { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 4px 2px 16px; }
+.addon-shot { margin: 0 0 14px; }
+.addon-shot img { display: block; max-width: 100%; height: auto; margin: 0 auto; border: 1px solid #34556b; border-radius: 6px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); image-rendering: auto; }
+.addon-shot figcaption { margin-top: 6px; color: var(--muted); font-size: 13px; text-align: center; }
+.addon-feature { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 560px); gap: 26px; align-items: start; padding: 20px 0; border-top: 1px solid var(--card-border); }
+.addon-feature:first-of-type { border-top: 0; }
+.addon-feature.no-shot { grid-template-columns: minmax(0, 1fr); }
+.addon-feature h3 { margin-top: 0; }
+.addon-feature-text > :last-child { margin-bottom: 0; }
+.addon-code { margin: 10px 0; padding: 12px 14px; overflow-x: auto; border: 1px solid #2c4a61; border-radius: 6px; background: #07111d; color: #cfe9f6; font-size: 13px; line-height: 1.5; }
+.addon-commands td:first-child { white-space: nowrap; }
+.addon-steps li { margin-bottom: 6px; }
+.addon-flow { counter-reset: none; }
+.addon-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+.addon-cards > .addon-card { display: flex; flex-direction: column; margin: 0; padding: 0; overflow: hidden; }
+.addon-card-shot { display: flex; align-items: center; justify-content: center; height: 280px; padding: 18px; border-bottom: 1px solid #34556b; background: radial-gradient(circle at 50% 40%, rgba(134, 217, 242, 0.10), transparent 70%), #07111d; }
+.addon-card-shot img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; border-radius: 4px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+.addon-card.wishlist .addon-card-shot { background: radial-gradient(circle at 50% 40%, rgba(127, 212, 154, 0.10), transparent 70%), #07111d; }
+.addon-card.ledger { border-top: 2px solid var(--accent); }
+.addon-card.wishlist { border-top: 2px solid #7fd49a; }
+.addon-card.wishlist .eyebrow { color: #9fe0b4; }
+.addon-card-body { display: flex; flex: 1; flex-direction: column; padding: 18px 20px 20px; }
+.addon-card-body h2 { margin: 2px 0 8px; font-size: 24px; }
+.addon-card-body p { line-height: 1.6; }
+.addon-card-body .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; padding-top: 6px; }
+@media (max-width: 900px) {
+  .addon-hero, .addon-feature, .addon-cards { grid-template-columns: minmax(0, 1fr); }
+  .addon-hero { padding: 20px; }
+  .addon-commands td:first-child { white-space: normal; }
+}

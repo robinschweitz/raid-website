@@ -1,13 +1,23 @@
-export const appVersion = '1.0.21'
+export const appVersion = '1.0.22'
 
 export const changelog = [
   {
     version: appVersion,
-    title: 'Schattengram-Splitterliste',
+    title: 'Addons zum Herunterladen',
     changes: [
-      'Neu im Menü: „Schattengram“. Dort steht transparent, welcher Charakter gerade Splitter sammelt und wer danach an der Reihe ist.',
-      'Die aktuelle Sammlung zeigt einen Stand mit Ziel. Sobald das Ziel erreicht ist, schließt die Raidleitung den Charakter ab; der nächste Listenplatz wird automatisch zum Sammler.',
-      'Abgeschlossene Charaktere bleiben mit Datum und Splitterstand in der Historie sichtbar. Raidassistenten und höhere Rollen pflegen die Liste und ihre Reihenfolge.',
+      'Neu im Menü: „Addons“. RaidLedger (für Raidleitung und Plündermeister) und RaidWishlist (für jeden Raider) gibt es dort direkt als ZIP, mit Installation, Bildern aus dem Spiel, allen Befehlen und wie sie mit der Website zusammenarbeiten.',
+      'Die Seiten sind auch ohne Login erreichbar.',
+      'Die „Einladungen für Addon“ enthalten bei Raids aus einer Raidserie jetzt Datum und Startzeit. Damit legt RaidLedger mit „KALENDER-TERMIN“ den Raid im Spielkalender an und lädt alle ein.',
+    ],
+  },
+  {
+    version: '1.0.21',
+    title: 'Wer hat schon ein Konto?',
+    changes: [
+      'Admins sehen unter „Spieler“ zu jedem Spieler seine Charaktere, sein Konto und seine Rolle, dazu oben, wie viele Spieler schon ein Konto haben.',
+      'Beim Konto steht der Login-Name und ob die Person sich mit einem Code registriert hat (mit Datum und Charakter) oder ob ein Admin den Login angelegt hat. Mit dem Filter „Ohne Konto“ siehst du, wer sich noch registrieren muss.',
+      'Die Suche findet für Admins auch Charakter- und Login-Namen.',
+      'Unter „Registrierung“ → „Verlauf“ zeigt die neue Spalte „Verknüpfter Spieler“, für welchen Spieler ein Code eingelöst wurde. Die Status stehen jetzt auf Deutsch.',
     ],
   },
   {

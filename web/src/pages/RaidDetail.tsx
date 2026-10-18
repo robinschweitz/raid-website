@@ -19,6 +19,8 @@ import { RaidRecruitment } from './Recruitment'
 
 interface Props {
   raidID: number
+  /** Opens a specific tab, e.g. from the "Meine nächsten Raids" links. */
+  initialView?: 'signups'
 }
 
 type AwardMethod = 'MAIN' | 'SECOND' | 'ENHANCED' | 'BOE'
@@ -85,11 +87,11 @@ function raidError(err: unknown, fallback: string): string {
   return err.message
 }
 
-export function RaidDetailPage({ raidID }: Props) {
-  return <RaidDetail key={raidID} raidID={raidID} />
+export function RaidDetailPage({ raidID, initialView }: Props) {
+  return <RaidDetail key={`${raidID}:${initialView ?? ''}`} raidID={raidID} initialView={initialView} />
 }
 
-function RaidDetail({ raidID }: Props) {
+function RaidDetail({ raidID, initialView }: Props) {
   const { pending, submit, isActive, isPending } = useSubmission()
   const loadVersion = useRef(0)
   const characterVersion = useRef(0)
@@ -104,7 +106,8 @@ function RaidDetail({ raidID }: Props) {
   const catalogVersion = useRef(0)
   const associationVersion = useRef(0)
   const persistedCatalogContext = useRef('')
-  const [view, setView] = useState<'roster' | 'loot' | 'planning' | 'signups' | 'recruitment'>('roster')
+  const [view, setView] = useState<'roster' | 'loot' | 'planning' | 'signups' | 'recruitment'>(initialView ?? 'roster')
+  const viewDefaulted = useRef(!!initialView)
   const { player: me } = useAuth()
   const [raid, setRaid] = useState<Raid | null>(null)
   const [attendance, setAttendance] = useState<Attendance[]>([])
@@ -162,6 +165,12 @@ function RaidDetail({ raidID }: Props) {
   const [catalogStatus, setCatalogStatus] = useState('')
 
   const canManage = me ? atLeast(me.role, 'RAIDASSISTENT') : false
+  // Members come to a raid to sign up, so their first tab is "Anmeldungen" (ADR 081).
+  useEffect(() => {
+    if (viewDefaulted.current || !raid) return
+    viewDefaulted.current = true
+    if (!canManage && !raid.archived_at && (raid.status === 'PLANNED' || raid.status === 'OPEN')) setView('signups')
+  }, [raid, canManage])
   const isActiveRaid = !!raid && !raid.archived_at && (raid.status === 'PLANNED' || raid.status === 'OPEN')
   const canWrite = canManage && !!raid && (isActiveRaid || raid.status === 'COMPLETED')
   const attNeedsReason = !!raid?.archived_at

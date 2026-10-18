@@ -36,7 +36,7 @@ test.describe('Raids im Voraus planen', () => {
   test('Admin stellt eine automatische Vorausplanung für die Serie ein', async ({ page }, testInfo) => {
     await signIn(page, admin)
     await page.goto('/#/raid-series')
-    await page.getByRole('button', { name: 'Serie bearbeiten' }).click()
+    await page.getByRole('listitem').filter({ hasText: 'Donnerstagsraid' }).getByRole('button', { name: 'Serie bearbeiten' }).click()
     await page.getByLabel('Wochen im Voraus').fill('6')
     await snapshot(page, testInfo, '03-raidserie-automatisch-planen')
     await page.getByRole('button', { name: 'Serie speichern' }).click()
@@ -56,7 +56,7 @@ test.describe('Raids im Voraus planen', () => {
     await signIn(page, member)
     await page.goto('/#/raids')
     await page.getByRole('region', { name: 'Raidübersicht' }).getByRole('link', { name: 'ICC-4' }).click()
-    await page.getByRole('button', { name: 'Anmeldungen' }).click()
+    await page.getByRole('button', { name: 'Anmeldungen', exact: true }).click()
     await expect(page.getByText('Anmeldung offen')).toBeVisible()
     await page.getByRole('checkbox', { name: /Funkenflug/ }).check()
     await page.getByRole('button', { name: 'Ausgewählte Charaktere anmelden' }).click()

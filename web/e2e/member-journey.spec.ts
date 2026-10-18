@@ -27,12 +27,12 @@ test.describe('Mitglied: Anmelden, Absagen, Wunschliste', () => {
     await expect(first.getByText('Angemeldet', { exact: true })).toBeVisible()
     await expect(first.getByText('mit Sternfall (Schatten)')).toBeVisible()
 
-    await second.getByRole('button', { name: 'Kann nicht kommen' }).click()
+    await second.getByRole('button', { name: 'Kann nicht', exact: true }).click()
     await second.getByLabel('Grund (optional)').fill('Urlaub')
     await snapshot(page, testInfo, 'nachher-2-absage-mit-grund', page.getByRole('heading', { name: 'Meine nächsten Raids' }))
     await second.getByRole('button', { name: 'Absage senden' }).click()
     await expect(second.getByText('Abgesagt', { exact: true })).toBeVisible()
-    await expect(second.getByText('· Urlaub')).toBeVisible()
+    await expect(second.getByText('„Urlaub“')).toBeVisible()
     await snapshot(page, testInfo, 'nachher-3-angemeldet-und-abgesagt', page.getByRole('heading', { name: 'Meine nächsten Raids' }))
 
     await second.getByRole('button', { name: 'Doch dabei' }).click()
@@ -44,7 +44,7 @@ test.describe('Mitglied: Anmelden, Absagen, Wunschliste', () => {
     await third.getByLabel('Was ist unsicher? (optional)').fill('komme evtl. später')
     await third.getByRole('button', { name: 'Als unsicher melden' }).click()
     await expect(third.getByText('Unsicher', { exact: true })).toBeVisible()
-    await expect(third.getByText('· komme evtl. später')).toBeVisible()
+    await expect(third.getByText('„komme evtl. später“')).toBeVisible()
     await expect(third.getByRole('button', { name: 'Sicher dabei' })).toBeVisible()
     await snapshot(page, testInfo, 'nachher-8-unsicher', page.getByRole('heading', { name: 'Meine nächsten Raids' }))
   })

@@ -63,34 +63,43 @@ export function MyRaidsPanel({ playerID, raids, characters }: Props) {
       const quick = overview ? quickSignupChoice(characters, overview.class_specs) : null
       const when = new Date(raid.scheduled_start!).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
       const signupLink = `/raids/${raid.id}/anmeldungen`
-      return <li className="my-raid" key={raid.id} aria-label={raid.name}>
+      const remove = (success: string) => run(() => api.del(`/api/v1/raids/${raid.id}/absences/${playerID}`), success)
+      const ask = (absenceStatus: AbsenceStatus) => { setDeclining({ raidID: raid.id, status: absenceStatus }); setReason(''); setMessage('') }
+      const cannot = <button type="button" disabled={pending} onClick={() => ask('DECLINED')}>Kann nicht</button>
+      const unsure = <button type="button" disabled={pending} onClick={() => ask('TENTATIVE')}>Unsicher</button>
+      return <li className={`my-raid my-raid-${status?.state ?? 'loading'}`} key={raid.id} aria-label={raid.name}>
         <div className="my-raid-head">
           <Link to={signupLink}><strong>{raid.name}</strong></Link>
           <time className="muted" dateTime={raid.scheduled_start!}>{when} Uhr</time>
         </div>
         {!status ? <p className="muted">Wird geladen…</p> : <>
-          <p className="my-raid-status"><span className={badgeClass[status.state]}>{status.label}</span>
-            {status.detail && <span> {status.state === 'absent' ? 'Angemeldet war: ' : 'mit '}{status.detail}</span>}
-            {status.reason && <span className="muted"> · {status.reason}</span>}</p>
+          <div className="my-raid-status">
+            <span className={badgeClass[status.state]}>{status.label}</span>
+            {status.detail && <span className="my-raid-detail">{status.state === 'absent' ? 'Angemeldet war ' : 'mit '}{status.detail}</span>}
+            {status.reason && <span className="my-raid-detail muted">„{status.reason}“</span>}
+          </div>
           {declining?.raidID === raid.id ? <div className="my-raid-decline">
             <label>{declining.status === 'TENTATIVE' ? 'Was ist unsicher? (optional)' : 'Grund (optional)'}<input autoFocus value={reason} maxLength={200} disabled={pending} placeholder={declining.status === 'TENTATIVE' ? 'z. B. komme evtl. später' : 'z. B. krank oder Urlaub'} onChange={(event) => setReason(event.target.value)} /></label>
-            <div className="actions">
-              <button type="button" className="primary-action" disabled={pending} onClick={() => void run(() => api.put(`/api/v1/raids/${raid.id}/absences/${playerID}`, { reason, status: declining.status }), declining.status === 'TENTATIVE' ? `Für ${raid.name} als unsicher gemeldet.` : `Absage für ${raid.name} gesendet.`)}>{declining.status === 'TENTATIVE' ? 'Als unsicher melden' : 'Absage senden'}</button>
-              <button type="button" disabled={pending} onClick={() => { setDeclining(null); setReason('') }}>Abbrechen</button>
+            <button type="button" className="primary-action my-raid-main" disabled={pending} onClick={() => void run(() => api.put(`/api/v1/raids/${raid.id}/absences/${playerID}`, { reason, status: declining.status }), declining.status === 'TENTATIVE' ? `Für ${raid.name} als unsicher gemeldet.` : `Absage für ${raid.name} gesendet.`)}>{declining.status === 'TENTATIVE' ? 'Als unsicher melden' : 'Absage senden'}</button>
+            <div className="my-raid-secondary"><button type="button" disabled={pending} onClick={() => { setDeclining(null); setReason('') }}>Abbrechen</button></div>
+          </div> : <>
+            <div className="my-raid-primary">
+              {status.state === 'open' && quick && <>
+                <button type="button" className="primary-action my-raid-main" disabled={pending}
+                  onClick={() => void run(() => api.put(`/api/v1/raids/${raid.id}/signups`, { choices: [{ character_id: quick.character.id, spec: quick.spec }] }), `Für ${raid.name} mit ${quick.character.name} angemeldet.`)}>
+                  Mit {quick.character.name} ({quick.spec}) anmelden</button>
+                <Link className="my-raid-link" to={signupLink}>Anderer Charakter oder Spec</Link>
+              </>}
+              {status.state === 'open' && !quick && <Link className="button-link my-raid-main" to={signupLink}>Anmelden</Link>}
+              {(status.state === 'signed' || status.state === 'accepted' || status.state === 'closed') && <Link className="button-link my-raid-main" to={signupLink}>{status.state === 'closed' ? 'Raid ansehen' : 'Anmeldung ansehen'}</Link>}
+              {status.state === 'absent' && <button type="button" className="my-raid-main" disabled={pending} onClick={() => void remove(`Du bist bei ${raid.name} wieder dabei.`)}>Doch dabei</button>}
+              {status.state === 'tentative' && <button type="button" className="my-raid-main" disabled={pending} onClick={() => void remove(`Du bist bei ${raid.name} sicher dabei.`)}>Sicher dabei</button>}
             </div>
-          </div> : <div className="actions">
-            {status.state === 'open' && quick && <button type="button" className="primary-action" disabled={pending}
-              onClick={() => void run(() => api.put(`/api/v1/raids/${raid.id}/signups`, { choices: [{ character_id: quick.character.id, spec: quick.spec }] }), `Für ${raid.name} mit ${quick.character.name} angemeldet.`)}>
-              Mit {quick.character.name} ({quick.spec}) anmelden</button>}
-            {status.state === 'open' && <Link className="button-link" to={signupLink}>{quick ? 'Anderer Charakter oder Spec' : 'Anmelden'}</Link>}
-            {(status.state === 'signed' || status.state === 'accepted') && <Link className="button-link" to={signupLink}>Anmeldung ansehen</Link>}
-            {status.state === 'absent' && <button type="button" disabled={pending} onClick={() => void run(() => api.del(`/api/v1/raids/${raid.id}/absences/${playerID}`), `Du bist bei ${raid.name} wieder dabei.`)}>Doch dabei</button>}
-            {status.state === 'tentative' && <button type="button" disabled={pending} onClick={() => void run(() => api.del(`/api/v1/raids/${raid.id}/absences/${playerID}`), `Du bist bei ${raid.name} sicher dabei.`)}>Sicher dabei</button>}
-            {status.state !== 'absent' && <div className="my-raid-secondary">
-              <button type="button" disabled={pending} onClick={() => { setDeclining({ raidID: raid.id, status: 'DECLINED' }); setReason(''); setMessage('') }}>Kann nicht kommen</button>
-              {status.state !== 'tentative' && <button type="button" disabled={pending} onClick={() => { setDeclining({ raidID: raid.id, status: 'TENTATIVE' }); setReason(''); setMessage('') }}>Unsicher</button>}
-            </div>}
-          </div>}
+            <div className="my-raid-secondary">
+              {status.state !== 'tentative' && unsure}
+              {status.state !== 'absent' && cannot}
+            </div>
+          </>}
         </>}
       </li>
     })}</ul>

@@ -96,18 +96,31 @@ type ProgressInput struct {
 	ShardTarget     int
 }
 
+// RaidCharacter is a character from a raid roster. Entry is set when the
+// character is active on the Shadowmourne list.
+type RaidCharacter struct {
+	CharacterID    int64  `json:"character_id"`
+	CharacterName  string `json:"character_name"`
+	CharacterClass string `json:"character_class"`
+	PlayerID       int64  `json:"player_id"`
+	PlayerName     string `json:"player_name"`
+	Entry          *Entry `json:"entry"`
+}
+
 // RaidTask says who does one single-person questline step in a raid.
 // Assigned is the staff choice; Suggested is the first character on the list
-// who is in the roster and on that stage.
+// who is in the roster and on that stage. Options are the roster characters
+// staff may choose: list entries on that stage and eligible characters that
+// are not on the list (ADR 087).
 type RaidTask struct {
-	Task      Stage  `json:"task"`
-	Assigned  *Entry `json:"assigned"`
-	Suggested *Entry `json:"suggested"`
+	Task      Stage           `json:"task"`
+	Assigned  *RaidCharacter  `json:"assigned"`
+	Suggested *RaidCharacter  `json:"suggested"`
+	Options   []RaidCharacter `json:"options"`
 }
 
 type RaidPlan struct {
-	RaidID     int64      `json:"raid_id"`
-	Editable   bool       `json:"editable"`
-	Tasks      []RaidTask `json:"tasks"`
-	Candidates []Entry    `json:"candidates"`
+	RaidID   int64      `json:"raid_id"`
+	Editable bool       `json:"editable"`
+	Tasks    []RaidTask `json:"tasks"`
 }

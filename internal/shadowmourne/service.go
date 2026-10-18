@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"sort"
 	"time"
 
 	"raid-website/internal/character"
@@ -21,6 +22,7 @@ var (
 	ErrRaidLocked         = errors.New("raid is cancelled or archived")
 	ErrInvalidTask        = errors.New("invalid raid task")
 	ErrNotInRoster        = errors.New("character is not in the raid roster")
+	ErrNotTaskOption      = errors.New("character cannot do this raid task")
 )
 
 const (
@@ -258,13 +260,50 @@ func storePriorities(ctx context.Context, tx *Repo, ordered []Entry, at time.Tim
 	return nil
 }
 
+// taskOptions lists who staff may choose for a task: list entries on that
+// stage in priority order, then eligible roster characters not on the list.
+func taskOptions(roster []RaidCharacter, task Stage) []RaidCharacter {
+	listed := make([]RaidCharacter, 0, len(roster))
+	unlisted := make([]RaidCharacter, 0, len(roster))
+	for _, character := range roster {
+		switch {
+		case character.Entry != nil && character.Entry.Stage == task:
+			listed = append(listed, character)
+		case character.Entry == nil && eligibleClass(character.CharacterClass):
+			unlisted = append(unlisted, character)
+		}
+	}
+	sort.SliceStable(listed, func(i, j int) bool { return listed[i].Entry.Priority < listed[j].Entry.Priority })
+	return append(listed, unlisted...)
+}
+
+// raidRoster returns the roster characters with their active list entries.
+func raidRoster(ctx context.Context, repo *Repo, raidID int64) ([]RaidCharacter, error) {
+	roster, err := repo.RosterCharacters(ctx, raidID)
+	if err != nil {
+		return nil, err
+	}
+	active, err := repo.ListActive(ctx)
+	if err != nil {
+		return nil, err
+	}
+	entries := map[int64]*Entry{}
+	for i := range active {
+		entries[active[i].CharacterID] = &active[i]
+	}
+	for i := range roster {
+		roster[i].Entry = entries[roster[i].CharacterID]
+	}
+	return roster, nil
+}
+
 // RaidPlan shows who does each single-person questline step in a raid.
 func (s *Service) RaidPlan(ctx context.Context, raidID int64) (*RaidPlan, error) {
 	state, err := s.entries.RaidState(ctx, raidID)
 	if err != nil {
 		return nil, err
 	}
-	candidates, err := s.entries.ListActiveInRaid(ctx, raidID)
+	roster, err := raidRoster(ctx, s.entries, raidID)
 	if err != nil {
 		return nil, err
 	}
@@ -272,30 +311,28 @@ func (s *Service) RaidPlan(ctx context.Context, raidID int64) (*RaidPlan, error)
 	if err != nil {
 		return nil, err
 	}
-	plan := &RaidPlan{RaidID: raidID, Editable: !state.Cancelled && !state.Archived, Tasks: make([]RaidTask, 0, len(RaidTasks)), Candidates: candidates}
+	plan := &RaidPlan{RaidID: raidID, Editable: !state.Cancelled && !state.Archived, Tasks: make([]RaidTask, 0, len(RaidTasks))}
 	for _, task := range RaidTasks {
-		item := RaidTask{Task: task}
-		for i := range candidates {
-			if candidates[i].Stage == task {
-				item.Suggested = &candidates[i]
-				break
-			}
+		item := RaidTask{Task: task, Options: taskOptions(roster, task)}
+		if len(item.Options) > 0 && item.Options[0].Entry != nil {
+			item.Suggested = &item.Options[0]
 		}
-		if entryID, ok := assigned[task]; ok {
-			// A stored choice stays visible even after the entry finished or left the roster.
-			entry, err := s.entries.Get(ctx, entryID)
-			if err != nil && !errors.Is(err, ErrNotFound) {
-				return nil, err
+		// A choice only counts while the character is still in the roster.
+		if characterID, ok := assigned[task]; ok {
+			for i := range roster {
+				if roster[i].CharacterID == characterID {
+					item.Assigned = &roster[i]
+					break
+				}
 			}
-			item.Assigned = entry
 		}
 		plan.Tasks = append(plan.Tasks, item)
 	}
 	return plan, nil
 }
 
-// AssignRaidTask stores the staff choice for one step; a nil entry returns to the suggestion.
-func (s *Service) AssignRaidTask(ctx context.Context, actorID, raidID int64, task Stage, entryID *int64) (*RaidPlan, error) {
+// AssignRaidTask stores the staff choice for one step; a nil character returns to the suggestion.
+func (s *Service) AssignRaidTask(ctx context.Context, actorID, raidID int64, task Stage, characterID *int64) (*RaidPlan, error) {
 	if !validRaidTask(task) {
 		return nil, ErrInvalidTask
 	}
@@ -307,38 +344,45 @@ func (s *Service) AssignRaidTask(ctx context.Context, actorID, raidID int64, tas
 		if state.Cancelled || state.Archived {
 			return ErrRaidLocked
 		}
-		if entryID != nil {
-			entry, err := tx.Get(ctx, *entryID)
+		if characterID != nil {
+			roster, err := raidRoster(ctx, tx, raidID)
 			if err != nil {
 				return err
 			}
-			if entry.Status != StatusActive {
-				return ErrNotActive
+			inRoster, isOption := false, false
+			for _, character := range roster {
+				if character.CharacterID == *characterID {
+					inRoster = true
+				}
 			}
-			inRoster, err := tx.InRaidRoster(ctx, raidID, entry.CharacterID)
-			if err != nil {
-				return err
+			for _, option := range taskOptions(roster, task) {
+				if option.CharacterID == *characterID {
+					isOption = true
+				}
 			}
 			if !inRoster {
 				return ErrNotInRoster
+			}
+			if !isOption {
+				return ErrNotTaskOption
 			}
 		}
 		before, err := tx.Assignments(ctx, raidID)
 		if err != nil {
 			return err
 		}
-		if err := tx.SaveAssignment(ctx, raidID, task, entryID, s.now()); err != nil {
+		if err := tx.SaveAssignment(ctx, raidID, task, characterID, s.now()); err != nil {
 			return err
 		}
 		type snapshot struct {
-			Task    Stage  `json:"task"`
-			EntryID *int64 `json:"entry_id"`
+			Task        Stage  `json:"task"`
+			CharacterID *int64 `json:"character_id"`
 		}
 		var previous *int64
 		if id, ok := before[task]; ok {
 			previous = &id
 		}
-		return tx.Record(ctx, actorID, assignmentAuditType, raidID, "assign", snapshot{Task: task, EntryID: previous}, snapshot{Task: task, EntryID: entryID})
+		return tx.Record(ctx, actorID, assignmentAuditType, raidID, "assign", snapshot{Task: task, CharacterID: previous}, snapshot{Task: task, CharacterID: characterID})
 	})
 	if err != nil {
 		return nil, err

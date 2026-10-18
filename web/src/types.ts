@@ -389,17 +389,26 @@ export interface ShadowmourneEntry {
   updated_at: string
 }
 
+export interface ShadowmourneRaidCharacter {
+  character_id: number
+  character_name: string
+  character_class: string
+  player_id: number
+  player_name: string
+  entry: ShadowmourneEntry | null
+}
+
 export interface ShadowmourneRaidTask {
   task: ShadowmourneRaidTaskName
-  assigned: ShadowmourneEntry | null
-  suggested: ShadowmourneEntry | null
+  assigned: ShadowmourneRaidCharacter | null
+  suggested: ShadowmourneRaidCharacter | null
+  options: ShadowmourneRaidCharacter[]
 }
 
 export interface ShadowmourneRaidPlan {
   raid_id: number
   editable: boolean
   tasks: ShadowmourneRaidTask[]
-  candidates: ShadowmourneEntry[]
 }
 
 export interface GuildRank {

@@ -48,9 +48,9 @@ export async function seedGuild(request: APIRequestContext) {
   }
   const db = new DatabaseSync(databasePath)
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '+00:00')
-  db.prepare("INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, 'Funkenflug', 'Magier', 'Feuer', 'Frost', 1, 1, ?, ?)").run(people.MEMBER, now, now)
+  const character = db.prepare("INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, 'Funkenflug', 'Magier', 'Feuer', 'Frost', 1, 1, ?, ?)").run(people.MEMBER, now, now)
   db.close()
-  return { seriesID: series.id as number }
+  return { seriesID: series.id as number, memberID: people.MEMBER, characterID: Number(character.lastInsertRowid) }
 }
 
 export async function signIn(page: Page, user: { username: string; password: string }) {

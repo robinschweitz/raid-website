@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import type { Attendance } from '../types'
 import { defaultRecruitmentTemplate, recruitmentRoles, recruitmentStorageKey, renderRecruitmentText } from '../recruitmentText'
-import { iccIdealSetup, matchRaidSetup, setupOptions, type RaidSetup } from '../raidSetup'
+import { iccIdealSetup, matchRaidSetup, renderSetupPlaceholders, setupOptions, type RaidSetup } from '../raidSetup'
 
 interface Props {
   raidID: number
@@ -104,7 +104,7 @@ export function RaidRecruitment({ raidID, seriesID, attendance: initialAttendanc
   }
 
   const { missingSlots, missing, matchedIndices } = matchRaidSetup(template.setup, attendance)
-  const preview = renderRecruitmentText(template.text, missing).replace(/{{SETUP}}/g, missingSlots.length ? missingSlots.map((slot) => slot.label).join(', ') : 'keine offenen Plätze')
+  const preview = renderRecruitmentText(renderSetupPlaceholders(template.text, missingSlots), missing)
   const copyText = async () => {
     try {
       await navigator.clipboard.writeText(preview)
@@ -148,7 +148,13 @@ export function RaidRecruitment({ raidID, seriesID, attendance: initialAttendanc
     </section>
     <section className="card">
       <h2>Textvorlage</h2>
-      <p className="muted">Platzhalter: {recruitmentRoles.map((role) => role.token).join(', ')} und {'{{SETUP}}'} für die konkret gesuchten Positionen. Alle anderen Wörter bleiben unverändert.</p>
+      <p className="muted">Platzhalter: {recruitmentRoles.map((role) => role.token).join(', ')} für die Anzahl je Rolle.</p>
+      <ul className="muted recruitment-placeholders">
+        <li><code>{'{{SETUP_KURZ}}'}</code> – kompakt, z. B. „2 Heal (Baum, Diszi), 2 MDD (beliebig), 2 RDD (Mage, SP)“</li>
+        <li><code>{'{{TANK_SPECS}}'}</code>, <code>{'{{HEAL_SPECS}}'}</code>, <code>{'{{MDD_SPECS}}'}</code>, <code>{'{{RDD_SPECS}}'}</code> – nur die gesuchten Specs einer Rolle, z. B. „Baum, Diszi“, für eigene Formulierungen</li>
+        <li><code>{'{{SETUP}}'}</code> – alle gesuchten Positionen ausgeschrieben</li>
+      </ul>
+      <p className="muted">Alle anderen Wörter bleiben unverändert. Beispiel: „LFM ICC25 – suchen noch {'{{SETUP_KURZ}}'}, /w me“.</p>
       <textarea aria-label="Gesuchtext-Vorlage" rows={5} value={template.text}
         onChange={(event) => updateTemplate({ ...template, text: event.target.value })} />
       <h3>Aktueller Text zum Kopieren</h3>

@@ -386,7 +386,8 @@ A change is done when:
 
 ## Known gaps — do not assume these exist
 
-- No `DELETE` endpoint is exposed. Archive/expire flows only (ADR 007 remains the intent).
+- The only hard-delete endpoints are removing a roster row from a planned/open raid (ADR 076),
+  revoking an absence and removing a wishlist item. Everything else uses archive/expire flows (ADR 007).
 - `internal/export` is an empty directory; general data export is not implemented. The RaidSync
   addon exchange lives in `internal/addonsync` (ADR 045).
 - Admins can view the read-only audit log at `GET /api/v1/audit-log`; no non-Admin read endpoint exists.

@@ -235,6 +235,14 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   time) for RaidLedger's calendar event: `RS2;INV;<id>;<name>;<size>;<YYYY-MM-DD>;<HH:MM>`. Raids
   without a series or scheduled start keep the five-field header (ADR 085).
 
+### Shadowmourne (ADR 086)
+- One shared list: each active entry is a Krieger/Paladin/Todesritter character with a priority and
+  a questline stage (`PREQUEST`, `SOULS`, `UNHOLY`, `BLOOD`, `FROST`, `SHARDS`, `FINAL`); several can
+  be active at once, each character only once. The shard target defaults to 50 and stays editable.
+- `Fertig` needs the target reached and moves the entry to history; `Entfernen` archives (`removed_at`).
+- Per raid, `UNHOLY`/`BLOOD`/`FROST`/`SHARDS` are suggested from the highest-priority roster character
+  on that stage; RAIDASSISTENT and up may override per raid, except for cancelled/archived raids.
+
 ### Loot, attendance, and character corrections
 - Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived
   raid history only; live-character changes never rewrite raid snapshots (ADR 032).

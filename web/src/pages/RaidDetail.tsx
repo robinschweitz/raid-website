@@ -16,6 +16,7 @@ import { AddonInviteExport } from '../components/AddonInviteExport'
 import { AddonLootImport } from '../components/AddonLootImport'
 import { AddonRosterImport } from '../components/AddonRosterImport'
 import { RaidRecruitment } from './Recruitment'
+import { ShadowmourneRaidCard } from '../components/ShadowmourneRaidCard'
 
 interface Props {
   raidID: number
@@ -945,6 +946,7 @@ function RaidDetail({ raidID, initialView }: Props) {
         )}
         </RaidRosterBoard>
         <p className="muted setup-caption">Gespeicherte Aufstellung dieses Raids. Die Ersatzbank folgt derselben EP-Regel.</p>
+        {raid.status !== 'CANCELLED' && <ShadowmourneRaidCard raidID={raidID} rosterKey={attendance.map((row) => row.character_id).join(',')} />}
         {canManage && attendance.length > 0 && <AddonInviteExport raidID={raidID} rosterKey={attendance.map((row) => `${row.id}:${row.character_id}:${row.is_bench}`).join(',')} />}
         {canWrite && isActiveRaid && <AddonRosterImport raidID={raidID} onImported={load} onQuickAdd={(name) => { editAttendance(null); setQuickAddName(name); setQuickAdd(true) }} />}
       </section>

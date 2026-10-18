@@ -22,6 +22,7 @@ import { ChangelogPage } from './pages/Changelog'
 import { AuditLogPage } from './pages/AuditLog'
 import { WishlistPage } from './pages/Wishlist'
 import { GuidePage } from './pages/Guide'
+import { ShadowmournePage } from './pages/Shadowmourne'
 import { AddonsPage } from './pages/Addons'
 import { appVersion } from './release'
 
@@ -65,6 +66,7 @@ function Routes() {
   if (parts[0] === 'audit-log') return <AuditLogPage />
   if (parts[0] === 'changelog') return <ChangelogPage />
   if (parts[0] === 'anleitung') return <GuidePage />
+  if (parts[0] === 'schattengram') return <ShadowmournePage />
   if (parts[0] === 'addons') return <AddonsPage addonID={parts[1]} />
   return <p className="muted">Seite nicht gefunden.</p>
 }
@@ -98,6 +100,7 @@ function Layout() {
           <Link className={path === '/statistics' ? 'nav-link active' : 'nav-link'} to="/statistics"><NavIcon name="chart" />Statistiken</Link>
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
           <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
+          <Link className={path === '/schattengram' ? 'nav-link active' : 'nav-link'} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>
           {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'nav-link active' : 'nav-link'} to="/wishlist"><NavIcon name="heart" />Meine Wunschliste</Link>}
           <Link className={path.startsWith('/addons') ? 'nav-link active' : 'nav-link'} to="/addons"><NavIcon name="download" />Addons</Link>
           <Link className={path === '/anleitung' ? 'nav-link active' : 'nav-link'} to="/anleitung"><NavIcon name="info" />Anleitung</Link>
@@ -132,6 +135,7 @@ function Layout() {
         <Link className={path === '/statistics' ? 'active' : ''} to="/statistics"><NavIcon name="chart" />Statistik</Link>
         <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>
         <Link className={path === '/loot-catalog' ? 'active' : ''} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
+        <Link className={path === '/schattengram' ? 'active' : ''} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>
         {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'active' : ''} to="/wishlist"><NavIcon name="heart" />Wunschliste</Link>}
         <Link className={path === '/anleitung' ? 'active' : ''} to="/anleitung"><NavIcon name="info" />Hilfe</Link>
       </nav>

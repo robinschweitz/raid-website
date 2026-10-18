@@ -18,7 +18,8 @@ export async function apiAs(request: APIRequestContext, user: { username: string
   const send = async (method: 'post' | 'put' | 'patch', url: string, data: unknown) => {
     const response = await request[method](url, { data, headers: { 'X-CSRF-Token': await csrf() } })
     expect(response.ok(), `${method.toUpperCase()} ${url}: ${await response.text()}`).toBeTruthy()
-    return (await response.json()).data
+    const body = await response.text()
+    return body ? JSON.parse(body).data : undefined
   }
   return {
     post: (url: string, data: unknown) => send('post', url, data),

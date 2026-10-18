@@ -150,11 +150,17 @@ func TestShadowmourneListOrderCompletionAndRemoval(t *testing.T) {
 }
 
 func TestShadowmourneRaidTasksSuggestAndAssign(t *testing.T) {
-	f, raidID := setupShadowmourne(t, "Krieger", "Paladin", "Todesritter", "Krieger")
-	blood := f.create(map[string]any{"character_id": f.characters[0].ID, "stage": "BLOOD"})
-	alsoBlood := f.create(map[string]any{"character_id": f.characters[1].ID, "stage": "BLOOD"})
-	shards := f.create(map[string]any{"character_id": f.characters[2].ID, "stage": "SHARDS", "shards_collected": 10})
-	absent := f.create(map[string]any{"character_id": f.characters[3].ID, "stage": "FROST"})
+	f, raidID := setupShadowmourne(t, "Krieger", "Paladin", "Todesritter", "Krieger", "Magier", "Krieger")
+	blood := f.characters[0]
+	alsoBlood := f.characters[1]
+	collector := f.characters[2]
+	unlisted := f.characters[3]
+	mage := f.characters[4]
+	absent := f.characters[5]
+	f.create(map[string]any{"character_id": blood.ID, "stage": "BLOOD"})
+	f.create(map[string]any{"character_id": alsoBlood.ID, "stage": "BLOOD"})
+	f.create(map[string]any{"character_id": collector.ID, "stage": "SHARDS", "shards_collected": 10})
+	f.create(map[string]any{"character_id": absent.ID, "stage": "FROST"})
 	path := fmt.Sprintf("/api/v1/raids/%d/shadowmourne", raidID)
 	plan := func() shadowmourne.RaidPlan {
 		t.Helper()
@@ -175,33 +181,52 @@ func TestShadowmourneRaidTasksSuggestAndAssign(t *testing.T) {
 		t.Fatalf("task %s missing", stage)
 		return shadowmourne.RaidTask{}
 	}
+	options := func(item shadowmourne.RaidTask) []int64 {
+		ids := make([]int64, 0, len(item.Options))
+		for _, option := range item.Options {
+			ids = append(ids, option.CharacterID)
+		}
+		return ids
+	}
 
 	current := plan()
-	if !current.Editable || len(current.Candidates) != 3 || len(current.Tasks) != 4 {
+	if !current.Editable || len(current.Tasks) != 4 {
 		t.Fatalf("unexpected plan: %#v", current)
 	}
-	if got := task(current, shadowmourne.StageBlood).Suggested; got == nil || got.ID != blood.ID {
+	// List entries on the stage come first in priority order, then eligible characters not on the list.
+	if got := options(task(current, shadowmourne.StageBlood)); fmt.Sprint(got) != fmt.Sprint([]int64{blood.ID, alsoBlood.ID, unlisted.ID}) {
+		t.Fatalf("blood options: %v", got)
+	}
+	if got := task(current, shadowmourne.StageBlood).Suggested; got == nil || got.CharacterID != blood.ID || got.Entry == nil {
 		t.Fatalf("blood suggestion should follow list priority: %#v", got)
 	}
-	if got := task(current, shadowmourne.StageShards).Suggested; got == nil || got.ID != shards.ID {
+	if got := task(current, shadowmourne.StageShards).Suggested; got == nil || got.CharacterID != collector.ID || got.Entry.ShardsCollected != 10 {
 		t.Fatalf("shard suggestion: %#v", got)
 	}
-	if got := task(current, shadowmourne.StageFrost).Suggested; got != nil {
-		t.Fatalf("a character outside the roster must not be suggested: %#v", got)
+	frost := task(current, shadowmourne.StageFrost)
+	if frost.Suggested != nil || fmt.Sprint(options(frost)) != fmt.Sprint([]int64{unlisted.ID}) {
+		t.Fatalf("a character outside the roster must not be offered: %#v", frost)
 	}
 
-	f.request(http.MethodPut, path+"/BLOOD", f.member, map[string]any{"entry_id": alsoBlood.ID}, http.StatusForbidden)
-	f.request(http.MethodPut, path+"/SOULS", f.staff, map[string]any{"entry_id": alsoBlood.ID}, http.StatusBadRequest)
-	f.request(http.MethodPut, path+"/FROST", f.staff, map[string]any{"entry_id": absent.ID}, http.StatusConflict)
-	f.request(http.MethodPut, path+"/BLOOD", f.staff, map[string]any{"entry_id": alsoBlood.ID}, http.StatusOK)
-	if got := task(plan(), shadowmourne.StageBlood).Assigned; got == nil || got.ID != alsoBlood.ID {
+	f.request(http.MethodPut, path+"/BLOOD", f.member, map[string]any{"character_id": alsoBlood.ID}, http.StatusForbidden)
+	f.request(http.MethodPut, path+"/SOULS", f.staff, map[string]any{"character_id": alsoBlood.ID}, http.StatusBadRequest)
+	f.request(http.MethodPut, path+"/FROST", f.staff, map[string]any{"character_id": absent.ID}, http.StatusConflict)
+	f.request(http.MethodPut, path+"/BLOOD", f.staff, map[string]any{"character_id": collector.ID}, http.StatusConflict)
+	f.request(http.MethodPut, path+"/BLOOD", f.staff, map[string]any{"character_id": mage.ID}, http.StatusConflict)
+	f.request(http.MethodPut, path+"/FROST", f.staff, map[string]any{"character_id": unlisted.ID}, http.StatusOK)
+	f.request(http.MethodPut, path+"/BLOOD", f.staff, map[string]any{"character_id": alsoBlood.ID}, http.StatusOK)
+	current = plan()
+	if got := task(current, shadowmourne.StageFrost).Assigned; got == nil || got.CharacterID != unlisted.ID || got.Entry != nil {
+		t.Fatalf("a roster character without list entry can be chosen: %#v", got)
+	}
+	if got := task(current, shadowmourne.StageBlood).Assigned; got == nil || got.CharacterID != alsoBlood.ID {
 		t.Fatalf("assignment not stored: %#v", got)
 	}
-	f.request(http.MethodPut, path+"/BLOOD", f.staff, map[string]any{"entry_id": nil}, http.StatusOK)
+	f.request(http.MethodPut, path+"/BLOOD", f.staff, map[string]any{"character_id": nil}, http.StatusOK)
 	if got := task(plan(), shadowmourne.StageBlood).Assigned; got != nil {
 		t.Fatalf("assignment not reset: %#v", got)
 	}
-	if got := f.audits("shadowmourne_raid_task"); got != 2 {
+	if got := f.audits("shadowmourne_raid_task"); got != 3 {
 		t.Fatalf("raid task audit records: %d", got)
 	}
 	f.request(http.MethodGet, "/api/v1/raids/999999/shadowmourne", f.member, nil, http.StatusNotFound)

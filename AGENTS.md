@@ -242,6 +242,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - `Fertig` needs the target reached and moves the entry to history; `Entfernen` archives (`removed_at`).
 - Per raid, `UNHOLY`/`BLOOD`/`FROST`/`SHARDS` are suggested from the highest-priority roster character
   on that stage; RAIDASSISTENT and up may override per raid, except for cancelled/archived raids.
+- Raid choices store a roster character: list entries on that step or Krieger/Paladin/Todesritter
+  in the roster that are not on the active list (ADR 087).
 
 ### Loot, attendance, and character corrections
 - Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived

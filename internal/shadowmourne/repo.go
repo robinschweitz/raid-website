@@ -52,12 +52,12 @@ func (r entryRow) entry() *Entry {
 type assignmentRow struct {
 	bun.BaseModel `bun:"table:shadowmourne_raid_assignments"`
 
-	ID        int64 `bun:"id,pk,autoincrement"`
-	RaidID    int64
-	Task      string
-	EntryID   *int64
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          int64 `bun:"id,pk,autoincrement"`
+	RaidID      int64
+	Task        string
+	CharacterID *int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 // RaidState is what the raid-task rules need to know about a raid.
@@ -119,20 +119,6 @@ func (r *Repo) List(ctx context.Context) ([]Entry, error) {
 func (r *Repo) ListActive(ctx context.Context) ([]Entry, error) {
 	var rows []entryRow
 	err := r.entryQuery().Where("entries.completed_at IS NULL").OrderExpr("entries.priority ASC, entries.id ASC").Scan(ctx, &rows)
-	if err != nil {
-		return nil, err
-	}
-	return scanEntries(rows), nil
-}
-
-// ListActiveInRaid returns active entries whose character is in the raid roster, in priority order.
-func (r *Repo) ListActiveInRaid(ctx context.Context, raidID int64) ([]Entry, error) {
-	var rows []entryRow
-	err := r.entryQuery().
-		Where("entries.completed_at IS NULL").
-		Where("entries.character_id IN (SELECT character_id FROM raid_attendance WHERE raid_id = ?)", raidID).
-		OrderExpr("entries.priority ASC, entries.id ASC").
-		Scan(ctx, &rows)
 	if err != nil {
 		return nil, err
 	}
@@ -221,11 +207,37 @@ func (r *Repo) RaidState(ctx context.Context, raidID int64) (*RaidState, error) 
 	return &RaidState{Cancelled: state.Status == "CANCELLED", Archived: state.ArchivedAt != nil}, nil
 }
 
-func (r *Repo) InRaidRoster(ctx context.Context, raidID, characterID int64) (bool, error) {
-	return r.db.NewSelect().TableExpr("raid_attendance").Where("raid_id = ? AND character_id = ?", raidID, characterID).Exists(ctx)
+// RosterCharacters returns each character of the raid roster once, with the
+// name and class it has in that raid (ADR 022), ordered by name.
+func (r *Repo) RosterCharacters(ctx context.Context, raidID int64) ([]RaidCharacter, error) {
+	var rows []struct {
+		CharacterID    int64
+		CharacterName  string
+		CharacterClass string
+		PlayerID       int64
+		PlayerName     string
+	}
+	err := r.db.NewSelect().
+		TableExpr("raid_attendance AS attendance").
+		ColumnExpr("attendance.character_id, MIN(COALESCE(NULLIF(attendance.character_name, ''), characters.name)) AS character_name").
+		ColumnExpr("MIN(COALESCE(NULLIF(attendance.class, ''), characters.class)) AS character_class, MIN(players.id) AS player_id, MIN(players.name) AS player_name").
+		Join("JOIN characters ON characters.id = attendance.character_id").
+		Join("JOIN players ON players.id = attendance.player_id").
+		Where("attendance.raid_id = ?", raidID).
+		GroupExpr("attendance.character_id").
+		OrderExpr("character_name ASC, attendance.character_id ASC").
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+	characters := make([]RaidCharacter, 0, len(rows))
+	for _, item := range rows {
+		characters = append(characters, RaidCharacter{CharacterID: item.CharacterID, CharacterName: item.CharacterName, CharacterClass: item.CharacterClass, PlayerID: item.PlayerID, PlayerName: item.PlayerName})
+	}
+	return characters, nil
 }
 
-// Assignments maps task to the assigned entry ID for one raid.
+// Assignments maps task to the chosen character ID for one raid.
 func (r *Repo) Assignments(ctx context.Context, raidID int64) (map[Stage]int64, error) {
 	var rows []assignmentRow
 	if err := r.db.NewSelect().Model(&rows).Where("raid_id = ?", raidID).Scan(ctx); err != nil {
@@ -233,18 +245,18 @@ func (r *Repo) Assignments(ctx context.Context, raidID int64) (map[Stage]int64, 
 	}
 	assigned := map[Stage]int64{}
 	for _, item := range rows {
-		if item.EntryID != nil {
-			assigned[Stage(item.Task)] = *item.EntryID
+		if item.CharacterID != nil {
+			assigned[Stage(item.Task)] = *item.CharacterID
 		}
 	}
 	return assigned, nil
 }
 
-func (r *Repo) SaveAssignment(ctx context.Context, raidID int64, task Stage, entryID *int64, at time.Time) error {
-	record := &assignmentRow{RaidID: raidID, Task: string(task), EntryID: entryID, CreatedAt: at, UpdatedAt: at}
+func (r *Repo) SaveAssignment(ctx context.Context, raidID int64, task Stage, characterID *int64, at time.Time) error {
+	record := &assignmentRow{RaidID: raidID, Task: string(task), CharacterID: characterID, CreatedAt: at, UpdatedAt: at}
 	_, err := r.db.NewInsert().Model(record).
 		On("CONFLICT (raid_id, task) DO UPDATE").
-		Set("entry_id = EXCLUDED.entry_id").
+		Set("character_id = EXCLUDED.character_id").
 		Set("updated_at = EXCLUDED.updated_at").
 		Exec(ctx)
 	return err

@@ -3,20 +3,20 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
 import { shadowmourneRaidTasks, shadowmourneStageLabels, shadowmourneTaskHints } from '../shadowmourne'
-import { atLeast, type ShadowmourneEntry, type ShadowmourneRaidPlan, type ShadowmourneRaidTaskName } from '../types'
+import { atLeast, type ShadowmourneRaidCharacter, type ShadowmourneRaidPlan, type ShadowmourneRaidTaskName } from '../types'
 import { useSubmission } from '../useSubmission'
 
 interface Props {
   raidID: number
-  // Changes whenever the roster changes, so candidates are reloaded.
+  // Changes whenever the roster changes, so the options are reloaded.
   rosterKey: string
 }
 
-function entryName(entry: ShadowmourneEntry): string {
-  return `${entry.character_name} (${entry.player_name})`
+function characterLabel(character: ShadowmourneRaidCharacter): string {
+  return `${character.character_name} (${character.player_name})`
 }
 
-// Shows who does the Shadowmourne steps that only one raid member can do per raid (ADR 086).
+// Shows who does the Shadowmourne steps that only one raid member can do per raid (ADR 086, ADR 087).
 export function ShadowmourneRaidCard({ raidID, rosterKey }: Props) {
   const { player: me } = useAuth()
   const { pending, submit, isActive } = useSubmission()
@@ -30,13 +30,17 @@ export function ShadowmourneRaidCard({ raidID, rosterKey }: Props) {
       .catch(() => { if (isActive()) setPlan(null) })
   }, [raidID, rosterKey, isActive])
 
-  if (!plan || (plan.candidates.length === 0 && plan.tasks.every((task) => !task.assigned))) return null
+  if (!plan) return null
+  const editable = canManage && plan.editable
+  const hasChoice = plan.tasks.some((task) => task.assigned || task.suggested)
+  const hasOptions = plan.tasks.some((task) => task.options.length > 0)
+  if (!hasChoice && !(editable && hasOptions)) return null
 
   const assign = async (task: ShadowmourneRaidTaskName, value: string) => {
     await submit(async () => {
       setError('')
       try {
-        const updated = await api.put<ShadowmourneRaidPlan>(`/api/v1/raids/${raidID}/shadowmourne/${task}`, { entry_id: value ? Number(value) : null })
+        const updated = await api.put<ShadowmourneRaidPlan>(`/api/v1/raids/${raidID}/shadowmourne/${task}`, { character_id: value ? Number(value) : null })
         if (isActive()) setPlan(updated)
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Die Einteilung konnte nicht gespeichert werden.')
@@ -44,22 +48,24 @@ export function ShadowmourneRaidCard({ raidID, rosterKey }: Props) {
     })
   }
 
-  const editable = canManage && plan.editable
   return <section className="subcard shadowmourne-raid" aria-label="Schattengram im Raid">
     <div className="section-heading"><h2>Schattengram im Raid</h2><Link to="/schattengram">Zur Liste</Link></div>
-    <p className="muted">Diese Schritte kann pro Raid nur eine Person machen. Vorschlag: der höchste Listenplatz in der Aufstellung, der gerade bei diesem Schritt ist.</p>
+    <p className="muted">Diese Schritte kann pro Raid nur eine Person machen. Vorschlag: der höchste Listenplatz in der Aufstellung, der gerade bei diesem Schritt ist. Die Raidleitung kann auch Krieger, Paladine und Todesritter aus der Aufstellung wählen, die nicht auf der Liste stehen.</p>
     {error && <p className="error" role="alert">{error}</p>}
     <div className="shadowmourne-task-grid">
       {shadowmourneRaidTasks.map((name) => {
         const task = plan.tasks.find((item) => item.task === name)
         const chosen = task?.assigned ?? task?.suggested ?? null
+        const listed = task?.options.filter((option) => option.entry) ?? []
+        const unlisted = task?.options.filter((option) => !option.entry) ?? []
         return <div key={name} className="shadowmourne-task">
           <p className="eyebrow">{shadowmourneStageLabels[name]} · {shadowmourneTaskHints[name]}</p>
-          {chosen ? <p><strong>{chosen.character_name}</strong> <span className="muted">{chosen.player_name}</span>{name === 'SHARDS' && <span className="muted"> · {chosen.shards_collected} / {chosen.shard_target}</span>}</p> : <p className="muted">Niemand</p>}
+          {chosen ? <p><strong>{chosen.character_name}</strong> <span className="muted">{chosen.player_name}</span>{name === 'SHARDS' && chosen.entry && <span className="muted"> · {chosen.entry.shards_collected} / {chosen.entry.shard_target}</span>}</p> : <p className="muted">Niemand</p>}
           {chosen && <p className="muted">{task?.assigned ? 'Von der Raidleitung eingeteilt' : 'Vorschlag aus der Liste'}</p>}
-          {editable && <label>Einteilung<select aria-label={`Einteilung ${shadowmourneStageLabels[name]}`} value={task?.assigned ? String(task.assigned.id) : ''} disabled={pending} onChange={(event) => void assign(name, event.target.value)}>
+          {editable && <label>Einteilung<select aria-label={`Einteilung ${shadowmourneStageLabels[name]}`} value={task?.assigned ? String(task.assigned.character_id) : ''} disabled={pending} onChange={(event) => void assign(name, event.target.value)}>
             <option value="">{task?.suggested ? `Vorschlag: ${task.suggested.character_name}` : 'Vorschlag (niemand)'}</option>
-            {plan.candidates.map((entry) => <option key={entry.id} value={entry.id}>{entryName(entry)} · {shadowmourneStageLabels[entry.stage]}</option>)}
+            {listed.length > 0 && <optgroup label={`Liste: bei ${shadowmourneStageLabels[name]}`}>{listed.map((option) => <option key={option.character_id} value={option.character_id}>{characterLabel(option)}</option>)}</optgroup>}
+            {unlisted.length > 0 && <optgroup label="Nicht auf der Liste">{unlisted.map((option) => <option key={option.character_id} value={option.character_id}>{characterLabel(option)} · {option.character_class}</option>)}</optgroup>}
           </select></label>}
         </div>
       })}

@@ -1,8 +1,16 @@
-export const appVersion = '1.0.23'
+export const appVersion = '1.0.24'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Schattengram im Raid: freie Auswahl aus der Aufstellung',
+    changes: [
+      'Bei „Schattengram im Raid“ kann die Raidleitung jetzt auch Krieger, Paladine und Todesritter aus der Aufstellung einteilen, die nicht auf der Schattengram-Liste stehen.',
+      'Von der Liste werden pro Schritt nur noch Charaktere angeboten, die gerade bei diesem Schritt sind. Wer schon Splitter sammelt, taucht zum Beispiel nicht mehr bei Blut auf.',
+    ],
+  },
+  {
+    version: '1.0.23',
     title: 'Schattengram: Questreihe und Einteilung im Raid',
     changes: [
       'Neu im Menü: „Schattengram“. Die Liste zeigt, wer an Schattengram arbeitet, in welcher Reihenfolge und bei welchem Schritt (Vorquest, Seelen, Seuche, Blut, Frost, Splitter, Abschluss). Mehrere Leute können gleichzeitig dran sein.',

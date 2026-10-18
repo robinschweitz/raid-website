@@ -31,6 +31,8 @@ func writeShadowmourneError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusConflict, "raid_locked", "Bei abgesagten oder archivierten Raids kann nichts mehr eingeteilt werden.")
 	case errors.Is(err, shadowmourne.ErrNotInRoster):
 		WriteError(w, http.StatusConflict, "not_in_roster", "Dieser Charakter ist nicht in der Aufstellung des Raids.")
+	case errors.Is(err, shadowmourne.ErrNotTaskOption):
+		WriteError(w, http.StatusConflict, "not_task_option", "Dieser Charakter passt nicht zu diesem Schritt: Er steht auf der Liste bei einem anderen Schritt oder kann Schattengram nicht tragen.")
 	default:
 		WriteError(w, http.StatusInternalServerError, "internal", "Die Schattengram-Liste konnte nicht verarbeitet werden.")
 	}
@@ -162,14 +164,14 @@ func (a *API) assignRaidShadowmourneTask(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var req struct {
-		EntryID *int64 `json:"entry_id"`
+		CharacterID *int64 `json:"character_id"`
 	}
 	if err := DecodeJSON(r, &req); err != nil {
 		BadRequest(w, "malformed json body")
 		return
 	}
 	actor, _ := ActorID(r)
-	plan, err := a.Shadowmourne.AssignRaidTask(r.Context(), actor, id, shadowmourne.Stage(r.PathValue("task")), req.EntryID)
+	plan, err := a.Shadowmourne.AssignRaidTask(r.Context(), actor, id, shadowmourne.Stage(r.PathValue("task")), req.CharacterID)
 	if err != nil {
 		writeShadowmourneError(w, err)
 		return

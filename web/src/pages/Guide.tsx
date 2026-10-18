@@ -152,6 +152,7 @@ export function GuidePage() {
             <tr><td><strong>Umfragen</strong></td><td>Abstimmen, z. B. über einen neuen Raidtag</td></tr>
             <tr><td><strong>Beute</strong></td><td>Item-Katalog. Hier fügst du Items zur Wunschliste hinzu.</td></tr>
             <tr><td><strong>Meine Wunschliste</strong></td><td>Wunschliste ordnen und fürs Addon exportieren</td></tr>
+            <tr><td><strong>Addons</strong></td><td>RaidLedger und RaidWishlist herunterladen, Installation und Anleitung</td></tr>
             <tr><td><strong>Anleitung</strong></td><td>Diese Seite</td></tr>
           </tbody>
         </table>
@@ -227,6 +228,7 @@ export function GuidePage() {
         <li>Füge mit <kbd>Strg</kbd>+<kbd>V</kbd> ein und bestätige.</li>
       </ol>
       <Shot name="18-wunschliste-export" caption="Der kopierte Text steht unter der Tabelle" />
+      <Tip><strong>Noch kein Addon?</strong> Unter <Link to="/addons/raidwishlist">Addons → RaidWishlist</Link> kannst du es herunterladen. Dort steht auch, wie es installiert wird und was es kann.</Tip>
       <Tip><strong>Wichtig:</strong> Der Export enthält deinen aktuellen EP-Stand. Nach neuen EP oder Änderungen einfach neu kopieren und im Spiel neu importieren.</Tip>
     </Section>
 
@@ -333,7 +335,7 @@ export function GuidePage() {
         </table>
       </div>
       <Shot name="37-loot" caption="Loot erfassen" />
-      <p><strong>Schneller mit dem Addon:</strong> In RaidLedger auf <strong>EXPORT</strong> klicken, den Text unter <em>Loot aus Addon importieren</em> einfügen, <strong>Vorschau</strong>, jede Zeile prüfen und übernehmen.</p>
+      <p><strong>Schneller mit dem Addon:</strong> In RaidLedger auf <strong>EXPORT</strong> klicken, den Text unter <em>Loot aus Addon importieren</em> einfügen, <strong>Vorschau</strong>, jede Zeile prüfen und übernehmen. Download und alle Funktionen stehen unter <Link to="/addons/raidledger">Addons → RaidLedger</Link>.</p>
       <h3>Archivieren nach dem Raid</h3>
       <p>Archivieren beendet den Raid endgültig. Teilnehmer ohne Main-Spec-Loot bekommen +10 EP, ungenutzte Locks verfallen, und der nächste Serientermin entsteht.</p>
       <ol>

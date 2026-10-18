@@ -155,6 +155,15 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   alters a screen the guide describes, update `web/src/pages/Guide.tsx` and regenerate the screenshots
   with `DOCS_TOUR=1 npx playwright test e2e/zz-docs-tour.spec.ts` (after `npm run build`).
 
+### Addon downloads and pages (ADR 085)
+- The site serves RaidLedger and RaidWishlist itself: `internal/addons/bundle/<Name>/` (the `.toc`
+  and exactly its files) is embedded, zipped at startup and offered at `/addons`. The source of the
+  shipped versions is the `wow-addons` repository; update with
+  `go run ./cmd/sync-addons <wow-addons checkout>`, then update `web/src/pages/Addons.tsx` and the
+  screenshots in `web/public/addons/` (crops of live test-run screenshots, never account names,
+  passwords or the login screen) in the same change.
+- `/addons`, `/addons/raidledger`, `/addons/raidwishlist` and the download API are public.
+
 ### Enhance Points (EP) — the core rule
 - **+10 EP** for a player who received **no main-spec loot** in that raid.
 - Awarded **only by final archiving**, which moves the raid to `COMPLETED` (ADR 021).
@@ -222,6 +231,9 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   suggest the winner; `parked` and `deleted` lines are shown but never imported.
 - Wishes carry `spec` (MAIN/SECOND) and `is_enhanced` (MAIN only). The owner edits them; owner and
   staff can export WL2 with the owner's EP balance for RaidWishlist (ADR 070).
+- The invite export header carries the raid's date and start time in the series timezone (realm
+  time) for RaidLedger's calendar event: `RS2;INV;<id>;<name>;<size>;<YYYY-MM-DD>;<HH:MM>`. Raids
+  without a series or scheduled start keep the five-field header (ADR 085).
 
 ### Loot, attendance, and character corrections
 - Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived
@@ -284,6 +296,8 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
   - **Public dashboard** — visitors may call `GET /api/v1/raids`, `GET /api/v1/players`,
     `GET /api/v1/polls`, and `GET /api/v1/raids/{id}/attendance` without a session. All other
     reads require authentication; every mutation retains its existing authorization check (ADR 067).
+  - **Public addon downloads** — `GET /api/v1/addons` and `GET /api/v1/addons/{name}/download`
+    need no session (ADR 085).
   - **Config (`ADMIN`)** — create player; set account/credentials; create or update characters;
     guild ranks; raid groups; recurring raid series; list/import legacy data; account overview
     (ADR 084).

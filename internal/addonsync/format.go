@@ -38,14 +38,22 @@ type InviteMember struct {
 
 // BuildInviteExport renders the invite list for RaidLedger:
 //
-//	RS2;INV;<raidID>;<raidName>;<raidSize>
+//	RS2;INV;<raidID>;<raidName>;<raidSize>[;<YYYY-MM-DD>;<HH:MM>]
 //	<name>;<role>;<class>;<bench 0/1>
-func BuildInviteExport(raidID int64, raidName string, raidSize *int, members []InviteMember) string {
+//
+// realmStart is the scheduled start already converted to realm time; RaidLedger
+// uses date and time for its calendar event. Without it the header ends after
+// the size, which RaidLedger reads as well.
+func BuildInviteExport(raidID int64, raidName string, raidSize *int, realmStart *time.Time, members []InviteMember) string {
 	size := ""
 	if raidSize != nil {
 		size = strconv.Itoa(*raidSize)
 	}
-	lines := []string{strings.Join([]string{formatV2, "INV", strconv.FormatInt(raidID, 10), field(raidName), size}, ";")}
+	header := []string{formatV2, "INV", strconv.FormatInt(raidID, 10), field(raidName), size}
+	if realmStart != nil {
+		header = append(header, realmStart.Format("2006-01-02"), realmStart.Format("15:04"))
+	}
+	lines := []string{strings.Join(header, ";")}
 	for _, member := range members {
 		bench := "0"
 		if member.IsBench {

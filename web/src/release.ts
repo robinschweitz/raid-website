@@ -1,8 +1,17 @@
-export const appVersion = '1.0.21'
+export const appVersion = '1.0.22'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Addons zum Herunterladen',
+    changes: [
+      'Neu im Menü: „Addons“. RaidLedger (für Raidleitung und Plündermeister) und RaidWishlist (für jeden Raider) gibt es dort direkt als ZIP, mit Installation, Bildern aus dem Spiel, allen Befehlen und wie sie mit der Website zusammenarbeiten.',
+      'Die Seiten sind auch ohne Login erreichbar.',
+      'Die „Einladungen für Addon“ enthalten bei Raids aus einer Raidserie jetzt Datum und Startzeit. Damit legt RaidLedger mit „KALENDER-TERMIN“ den Raid im Spielkalender an und lädt alle ein.',
+    ],
+  },
+  {
+    version: '1.0.21',
     title: 'Wer hat schon ein Konto?',
     changes: [
       'Admins sehen unter „Spieler“ zu jedem Spieler seine Charaktere, sein Konto und seine Rolle, dazu oben, wie viele Spieler schon ein Konto haben.',

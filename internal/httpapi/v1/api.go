@@ -25,6 +25,7 @@ import (
 	"raid-website/internal/recruitment"
 	"raid-website/internal/registration"
 	"raid-website/internal/roster"
+	"raid-website/internal/shadowmourne"
 	"raid-website/internal/validation"
 	"raid-website/internal/wishlist"
 )
@@ -51,6 +52,7 @@ type Deps struct {
 	Corrections       *raidcorrection.Service
 	Signups           *raidsignup.Service
 	Recruitment       *recruitment.Service
+	Shadowmourne      *shadowmourne.Service
 	Registration      *registration.Service
 	AccountMerge      *accountmerge.Service
 }
@@ -92,6 +94,11 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/registration-codes/{id}/sent", RequireRole(validation.RoleAdmin, a.markRegistrationCodeSent))
 	mux.HandleFunc("POST /api/v1/registration-codes/{id}/revoke", RequireRole(validation.RoleAdmin, a.revokeRegistrationCode))
 	mux.HandleFunc("GET /api/v1/audit-log", RequireRole(validation.RoleAdmin, a.listAuditLog))
+	mux.HandleFunc("GET /api/v1/shadowmourne-queue", RequireAuth(a.listShadowmourneQueue))
+	mux.HandleFunc("POST /api/v1/shadowmourne-queue", RequireRole(validation.RoleRaidassistent, a.createShadowmourneQueueEntry))
+	mux.HandleFunc("PATCH /api/v1/shadowmourne-queue/{id}", RequireRole(validation.RoleRaidassistent, a.updateShadowmourneProgress))
+	mux.HandleFunc("POST /api/v1/shadowmourne-queue/{id}/complete", RequireRole(validation.RoleRaidassistent, a.completeShadowmourneEntry))
+	mux.HandleFunc("POST /api/v1/shadowmourne-queue/{id}/move", RequireRole(validation.RoleRaidassistent, a.moveShadowmourneEntry))
 	mux.HandleFunc("POST /api/v1/characters/claim-requests", RequireAuth(a.createCharacterClaimRequest))
 	mux.HandleFunc("POST /api/v1/characters/claim-with-code", RequireAuth(a.claimCharacterWithCode))
 

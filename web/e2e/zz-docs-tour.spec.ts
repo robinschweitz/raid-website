@@ -129,6 +129,10 @@ test.beforeAll(async ({ request }) => {
       ['Paladin Heilig', 'Schamane Wiederherstellung', 'Druide Wiederherstellung', 'Priester Disziplin', 'Irgendein Heiler'],
     ],
   })
+  const completedShadowmourne = await api.post('/api/v1/shadowmourne-queue', { character_id: chars.Thorgrim, shards_collected: 50, shard_target: 50 })
+  await api.post(`/api/v1/shadowmourne-queue/${completedShadowmourne.id}/complete`, {})
+  await api.post('/api/v1/shadowmourne-queue', { character_id: chars.Mira, shards_collected: 18, shard_target: 50 })
+  await api.post('/api/v1/shadowmourne-queue', { character_id: chars.Sternfall, shards_collected: 0, shard_target: 50 })
 
   const poll = await api.post('/api/v1/polls', { title: 'Zusätzlicher Raidtag?', description: 'Welcher Tag passt euch für einen zweiten ICC-Raid?', poll_type: 'CHOICE', options: ['Mittwoch', 'Freitag', 'Sonntag'] })
   const signup = async (name: Person, characterID: number, spec: string) => (await login(request, name)).put(`/api/v1/raids/${futureRaid}/signups`, { choices: [{ character_id: characterID, spec }] })
@@ -258,8 +262,12 @@ test('Raidleitung', async ({ page }, testInfo) => {
   await shot(page, testInfo, '38-planung-details')
   await page.getByRole('button', { name: 'Archivieren' }).click()
   await expect(page.getByRole('heading', { name: 'EP-Übersicht vor dem Archivieren' })).toBeVisible()
+
   await shot(page, testInfo, '38b-archivieren-pruefen', 'EP-Übersicht vor dem Archivieren')
   await page.getByRole('button', { name: 'Zurück' }).click()
+  await page.goto('/#/schattengram')
+  await page.waitForTimeout(600)
+  await shot(page, testInfo, '39-schattengram')
   await page.goto(`/#/raids/${pastRaid}`)
   await page.getByRole('button', { name: /^Loot/ }).click()
   await page.waitForTimeout(600)

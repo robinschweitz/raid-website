@@ -1,8 +1,17 @@
-export const appVersion = '1.0.20'
+export const appVersion = '1.0.21'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Schattengram-Splitterliste',
+    changes: [
+      'Neu im Menü: „Schattengram“. Dort steht transparent, welcher Charakter gerade Splitter sammelt und wer danach an der Reihe ist.',
+      'Die aktuelle Sammlung zeigt einen Stand mit Ziel. Sobald das Ziel erreicht ist, schließt die Raidleitung den Charakter ab; der nächste Listenplatz wird automatisch zum Sammler.',
+      'Abgeschlossene Charaktere bleiben mit Datum und Splitterstand in der Historie sichtbar. Raidassistenten und höhere Rollen pflegen die Liste und ihre Reihenfolge.',
+    ],
+  },
+  {
+    version: '1.0.20',
     title: 'Anleitung auf der Website',
     changes: [
       'Neu im Menü: „Anleitung“. Sie erklärt Schritt für Schritt mit Bildern und Beispielen, wie alles funktioniert: Konto bekommen, anmelden und absagen, Wunschliste und Addon-Export, EP und Item-Locks, für die Raidleitung Raids planen, Aufstellung, Gesuchtext und Loot, für Admins die Verwaltung.',

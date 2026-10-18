@@ -348,6 +348,23 @@ export interface ItemLock {
   updated_at: string
 }
 
+export type ShadowmourneStatus = 'QUEUED' | 'COLLECTING' | 'COMPLETED'
+
+export interface ShadowmourneQueueEntry {
+  id: number
+  character_id: number
+  character_name: string
+  player_id: number
+  player_name: string
+  queue_position: number
+  status: ShadowmourneStatus
+  shards_collected: number
+  shard_target: number
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface GuildRank {
   id: number
   name: string

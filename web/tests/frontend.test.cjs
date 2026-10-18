@@ -910,6 +910,35 @@ test('player list sorts names naturally and filters by the search text', async (
   assert.match(text(view.tree), /Kein Spieler mit diesem Namen/)
 })
 
+test('shadowmourne queue shows the collector and only raid staff can manage order and progress', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const { ShadowmournePage } = s.load('pages/Shadowmourne.tsx')
+  const view = s.mount(ShadowmournePage)
+  resolveIf(s, '/api/v1/shadowmourne-queue', [
+    { id: 1, character_id: 10, character_name: 'Erster', player_name: 'Spieler 1', status: 'COLLECTING', shards_collected: 12, shard_target: 50 },
+    { id: 2, character_id: 11, character_name: 'Zweiter', player_name: 'Spieler 2', status: 'QUEUED', queue_position: 2, shards_collected: 0, shard_target: 50 },
+    { id: 3, character_id: 12, character_name: 'Fertig', player_name: 'Spieler 3', status: 'COMPLETED', shards_collected: 50, shard_target: 50, completed_at: '2026-10-18T18:00:00Z' },
+  ])
+  resolveIf(s, '/api/v1/characters', [{ id: 10, name: 'Erster', class: 'Krieger', active: true }])
+  await flush(view)
+  assert.match(text(view.tree), /12\s+von\s+50\s+Splittern.*Zweiter.*Fertig/)
+  assert.equal(button(view, 'Abgeschlossen').props.disabled, true)
+  labelled(view, 'Gesammelte Splitter').props.onChange(change('50'))
+  view.render()
+  const submitting = form(view).props.onSubmit(event)
+  assert.equal(writes(s)[0].url, '/api/v1/shadowmourne-queue/1')
+  assert.deepEqual(writes(s)[0].body, { shards_collected: 50, shard_target: 50 })
+  writes(s)[0].resolve({})
+  await submitting
+
+  const member = setup({ id: 2, role: 'MEMBER' })
+  const memberView = member.mount(member.load('pages/Shadowmourne.tsx').ShadowmournePage)
+  resolveIf(member, '/api/v1/shadowmourne-queue', [])
+  await flush(memberView)
+  assert.equal(button(memberView, 'Stand speichern'), undefined)
+  assert.equal(button(memberView, 'Einreihen'), undefined)
+})
+
 test('auth distinguishes network failure from anonymous and supports retry', async () => {
   const s = setup()
   const view = s.mount(s.load('auth.tsx').AuthProvider, { children: null })

@@ -25,7 +25,7 @@ const fieldLabels: Record<string, string> = {
   scheduled_end: 'Geplantes Ende', raid_size: 'Raidgröße', cancelled_at: 'Abgesagt am', archived_at: 'Archiviert am',
   completed_at: 'Abgeschlossen am', started_at: 'Gestartet am', name_template: 'Namensvorlage', next_raid_number: 'Nächste Raidnummer',
   weekdays: 'Wochentage', interval_weeks: 'Intervall (Wochen)', start_time: 'Startzeit', timezone: 'Zeitzone', plan_weeks_ahead: 'Wochen im Voraus geplant',
-  sort_order: 'Reihenfolge', color: 'Farbe', username: 'Benutzername', password_changed: 'Passwort geändert',
+  sort_order: 'Reihenfolge', queue_position: 'Listenplatz', shards_collected: 'Gesammelte Splitter', shard_target: 'Splitterziel', next_collector: 'Nächster Sammler', neighbor: 'Getauschter Listenplatz', color: 'Farbe', username: 'Benutzername', password_changed: 'Passwort geändert',
   security_key: 'Sicherheitsschlüssel', purpose: 'Zweck', locked_at: 'Gesperrt am', used_at: 'Verwendet am',
   expired_at: 'Abgelaufen am', sent_at: 'Versendet am', revoked_at: 'Widerrufen am', expires_at: 'Gültig bis',
 }
@@ -43,7 +43,7 @@ const valueLabels: Record<string, string> = {
   PLANNED: 'Geplant', OPEN: 'Offen', COMPLETED: 'Abgeschlossen', CANCELLED: 'Abgesagt', CLOSED: 'Geschlossen',
   ARCHIVED: 'Archiviert', ACTIVE: 'Aktiv', USED: 'Verwendet', EXPIRED: 'Abgelaufen', ADMIN: 'Admin',
   RAIDASSISTENT: 'Raidassistent', MEMBER: 'Mitglied', GUEST: 'Gast', pending: 'Offen', approved: 'Freigegeben',
-  rejected: 'Abgelehnt', consumed: 'Eingelöst', DECLINED: 'Abgesagt', TENTATIVE: 'Unsicher', new_account: 'Neues Konto', claim: 'Charakter übernehmen',
+  rejected: 'Abgelehnt', consumed: 'Eingelöst', DECLINED: 'Abgesagt', TENTATIVE: 'Unsicher', QUEUED: 'Wartet', COLLECTING: 'Sammelt', new_account: 'Neues Konto', claim: 'Charakter übernehmen',
 }
 
 const isoTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
@@ -117,7 +117,7 @@ function actionLabel(entry: AuditLogEntry, before: AuditSnapshot): string {
     create_linked_character: 'Charakter angelegt', link_rising_gods_profile: 'Rising-Gods-Profil verknüpft',
     merge_duplicate_source: 'Duplikat zusammengeführt', merge_duplicate_target: 'Duplikat übernommen',
     reload_rising_gods_profile: 'Rising-Gods-Profil aktualisiert', rename: 'Umbenannt', remove: 'Aus dem Raid entfernt', save: 'Gespeichert',
-    submit: 'Angemeldet', update: 'Aktualisiert', withdraw: 'Zurückgezogen', claim_character: 'Charakter übernommen',
+    submit: 'Angemeldet', update: 'Aktualisiert', update_progress: 'Splitterstand geändert', complete: 'Schattengram abgeschlossen', move: 'Reihenfolge geändert', withdraw: 'Zurückgezogen', claim_character: 'Charakter übernommen',
   }
   return labels[entry.action] ?? entry.action.replace(/_/g, ' ')
 }
@@ -148,6 +148,7 @@ function entityDescription(entry: AuditLogEntry, before: AuditSnapshot, after: A
     case 'registration_code': return `Registrierungscode #${entry.entity_id}`
     case 'raid_signup': return `Raid-Anmeldung für Raid #${entry.entity_id}`
     case 'raid_recruitment_template': return 'Raid-Gesuchtext'
+    case 'shadowmourne_queue_entry': return `Schattengram: ${name || `#${entry.entity_id}`}`
     default: return `${entry.entity_type} #${entry.entity_id}`
   }
 }
@@ -162,6 +163,7 @@ function entityTarget(entry: AuditLogEntry, before: AuditSnapshot, after: AuditS
   }
   if (entry.entity_type === 'poll') return '/polls'
   if (entry.entity_type === 'raid_series') return '/raid-series'
+  if (entry.entity_type === 'shadowmourne_queue_entry') return '/schattengram'
   if (entry.entity_type === 'guild_rank' || entry.entity_type === 'raid_group') return '/roster'
   if (entry.entity_type === 'registration_request' || entry.entity_type === 'registration_code') return '/registration-requests'
   const raidID = (after ?? before)?.raid_id

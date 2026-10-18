@@ -1846,7 +1846,7 @@ input[type='checkbox'] {
 }
 .my-raids { margin-bottom: 18px; }
 .my-raids .success-message { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; padding: 8px 8px 8px 14px; border: 1px solid #3f7f9c; border-left: 3px solid #7ad7ff; border-radius: 4px; background: #0c2a3c; color: #c7efff; }
-.my-raid-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; align-items: start; }
+.my-raid-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .my-raid { border: 1px solid var(--border); border-radius: 4px; padding: 12px 14px; background: rgba(12, 24, 40, 0.6); display: flex; flex-direction: column; gap: 8px; }
 .my-raid-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .my-raid-head strong { font-size: 16px; }

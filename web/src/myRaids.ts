@@ -1,7 +1,7 @@
 import { canonicalClass } from './characterOptions'
 import type { Character, Raid, SignupOverview } from './types'
 
-export type MyRaidState = 'absent' | 'accepted' | 'signed' | 'open' | 'closed'
+export type MyRaidState = 'absent' | 'tentative' | 'accepted' | 'signed' | 'open' | 'closed'
 
 export interface MyRaidStatus {
   state: MyRaidState
@@ -18,7 +18,8 @@ export function myRaidStatus(overview: SignupOverview, playerID: number): MyRaid
   const own = (overview.entries ?? []).filter((row) => row.player_id === playerID && !row.is_withdrawn)
   const accepted = own.filter((row) => row.is_accepted)
   const describe = (rows: typeof own) => rows.map((row) => `${row.character_name} (${row.spec})`).join(', ')
-  if (absence) return { state: 'absent', label: 'Abgesagt', detail: describe(own), reason: absence.reason }
+  if (absence && (absence.status ?? 'DECLINED') === 'DECLINED') return { state: 'absent', label: 'Abgesagt', detail: describe(own), reason: absence.reason }
+  if (absence) return { state: 'tentative', label: 'Unsicher', detail: describe(own), reason: absence.reason }
   if (accepted.length) return { state: 'accepted', label: 'Bestätigt', detail: describe(accepted), reason: '' }
   if (own.length) return { state: 'signed', label: 'Angemeldet', detail: describe(own), reason: '' }
   if (overview.is_open) return { state: 'open', label: 'Noch nicht angemeldet', detail: '', reason: '' }

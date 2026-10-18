@@ -1868,3 +1868,4 @@ input[type='checkbox'] {
 }
 .my-raids .primary-action { color: #06111c; background: linear-gradient(135deg, #7ad7ff, #d7f4ff); border-color: #d7f4ff; font-weight: 700; }
 .my-raids .primary-action:hover:not(:disabled) { border-color: #fff; box-shadow: 0 0 14px #7ad7ff55; }
+.my-raid-secondary { display: flex; gap: 0.5rem; flex-wrap: wrap; }

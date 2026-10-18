@@ -7,7 +7,7 @@ import { RaidLootList } from '../components/RaidLootList'
 import { RaidBanner } from '../components/RaidBanner'
 import { RaidRosterBoard } from '../components/RaidRosterBoard'
 import { RaidSignups } from '../components/RaidSignups'
-import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Absence, type Attendance, type AttendanceRole, type SignupOverview, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
+import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Absence, type Attendance, type AttendanceRole, type SignupOverview, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries, isDeclined } from '../types'
 import { matchesCatalogItem } from '../catalog'
 import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
@@ -205,7 +205,10 @@ function RaidDetail({ raidID, initialView }: Props) {
   }
   const visibleCatalogItems = modeCatalogItems.filter((item) => dropKey(item) === catalogItem || matchesCatalogItem(item, catalogSearch))
 
-  const absenceReasons = new Map(absences.map((row) => [row.player_id, row.reason]))
+  // Only declined players count as absent for the bench button and the archive EP choice;
+  // unsure players keep the normal EP rule (ADR 082).
+  const absenceReasons = new Map(absences.filter(isDeclined).map((row) => [row.player_id, row.reason]))
+  const tentativeReasons = new Map(absences.filter((row) => !isDeclined(row)).map((row) => [row.player_id, row.reason]))
   const declinedPlayers = [...new Set(attendance.filter((row) => absenceReasons.has(row.player_id)).map((row) => row.player_id))]
 
   const load = useCallback(async () => {
@@ -893,7 +896,7 @@ function RaidDetail({ raidID, initialView }: Props) {
 
         </div>
         {rosterFiltered && <div className="roster-filter-result"><span className="muted" role="status">{visibleAttendance.length} von {attendance.length} Teilnehmern angezeigt.</span><button type="button" onClick={() => { setRosterSearch(''); setRosterRole(''); setRosterClass(''); setRosterBench('ALL'); setRosterIncomplete(false) }}>Filter zurücksetzen</button></div>}
-        <RaidRosterBoard onBench={canWrite && isActiveRaid ? benchAttendance : undefined} absences={absenceReasons} attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
+        <RaidRosterBoard onBench={canWrite && isActiveRaid ? benchAttendance : undefined} absences={absenceReasons} tentative={tentativeReasons} attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
         {canWrite && (
           <div>
             {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}

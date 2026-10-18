@@ -89,6 +89,7 @@ type absenceRow struct {
 	RaidID        int64
 	PlayerID      int64
 	Reason        string
+	Status        string
 	CreatedAt     time.Time
 }
 

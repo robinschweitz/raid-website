@@ -1,8 +1,17 @@
-export const appVersion = '1.0.18'
+export const appVersion = '1.0.19'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Unsicher als Rückmeldung',
+    changes: [
+      'Neben „Kann nicht kommen“ gibt es jetzt „Unsicher“, optional mit Hinweis wie „komme evtl. später“. Mit „Sicher dabei“ nimmst du es zurück.',
+      'Die Raidleitung sieht Unsichere unter „Absagen & Unsicher“ und in der Aufstellung und kann Spieler selbst als unsicher markieren.',
+      'Unsicher hat keinen Einfluss auf EP: Nur Abgesagte können beim Archivieren von den EP ausgenommen werden.',
+    ],
+  },
+  {
+    version: '1.0.18',
     title: 'Einfacher anmelden, absagen und Wunschliste exportieren',
     changes: [
       'Auf der Übersicht zeigt „Meine nächsten Raids“, ob du angemeldet bist. Mit einem Klick meldest du dich mit deinem Main an, sagst mit „Kann nicht kommen“ (optional mit Grund) ab oder nimmst die Absage mit „Doch dabei“ zurück.',

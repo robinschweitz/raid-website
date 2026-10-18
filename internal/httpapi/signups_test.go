@@ -9,6 +9,7 @@ import (
 	"raid-website/internal/raid"
 	"raid-website/internal/raidsignup"
 	"raid-website/internal/validation"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -156,5 +157,27 @@ func TestAbsenceDeclareRevokeAndPermissions(t *testing.T) {
 	check(http.MethodDelete, url(started, member), memberToken, nil, 409)
 	check(http.MethodDelete, url(started, member), staffToken, nil, 200)
 	check(http.MethodPut, url(open, 99999), staffToken, map[string]any{}, 404)
-	_ = other
+
+	// ADR 082: "unsicher" is a second status; players and staff can set it and
+	// switch between the statuses without creating a second row.
+	check(http.MethodPut, url(open, member), memberToken, map[string]any{"status": "MAYBE"}, 400)
+	check(http.MethodPut, url(open, member), memberToken, map[string]any{"reason": "Spätschicht", "status": "TENTATIVE"}, 200)
+	if got := absences(memberToken, open); len(got) != 1 || got[0].Status != raidsignup.AbsenceTentative || got[0].Reason != "Spätschicht" {
+		t.Fatalf("tentative = %+v", got)
+	}
+	check(http.MethodPut, url(open, member), memberToken, map[string]any{}, 200)
+	if got := absences(memberToken, open); len(got) != 1 || got[0].Status != raidsignup.AbsenceDeclined {
+		t.Fatalf("an absence without status is declined: %+v", got)
+	}
+	check(http.MethodPut, url(open, other), staffToken, map[string]any{"status": "TENTATIVE"}, 200)
+	if got := absences(memberToken, open); len(got) != 2 || got[1].PlayerID != other || got[1].Status != raidsignup.AbsenceTentative {
+		t.Fatalf("staff marks unsure: %+v", got)
+	}
+	var actions []string
+	if err := database.NewSelect().TableExpr("audit_log").Column("action").Where("entity_type = 'raid_signup'").OrderExpr("id ASC").Scan(ctx, &actions); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(actions, "absence_tentative") {
+		t.Fatalf("tentative audit missing: %v", actions)
+	}
 }

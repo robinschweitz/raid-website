@@ -146,6 +146,9 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Alternatives remain visible; staff can explicitly switch the roster slot.
 - Signups close at the scheduled start (server-enforced) or manually earlier. Staff may
   continue accepting choices in active raids after closing. All changes are audited.
+- Players (and staff for anyone) can mark a raid as "kann nicht" (`DECLINED`) or "unsicher"
+  (`TENTATIVE`). Only declined players are offered for "keine EP" at archive; unsure players keep
+  the normal EP rule (ADR 082).
 
 ### Enhance Points (EP) — the core rule
 - **+10 EP** for a player who received **no main-spec loot** in that raid.

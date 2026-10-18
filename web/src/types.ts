@@ -160,11 +160,17 @@ export interface RaidSignup {
   attendance_id: number
 }
 
+export type AbsenceStatus = 'DECLINED' | 'TENTATIVE'
+
 export interface Absence {
   player_id: number
   reason: string
+  /** DECLINED = kann nicht, TENTATIVE = unsicher (ADR 082). Older servers omit it. */
+  status?: AbsenceStatus
   created_at: string
 }
+
+export const isDeclined = (absence: Absence) => (absence.status ?? 'DECLINED') === 'DECLINED'
 
 export interface SignupOverview {
   absences: Absence[]

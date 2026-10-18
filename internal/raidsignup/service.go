@@ -45,12 +45,20 @@ type Entry struct {
 	AttendanceID  int64  `json:"attendance_id"`
 }
 
-// Absence marks a player who announced not to attend. It never changes the roster.
+// Absence marks a player who announced not to attend (DECLINED) or who is not
+// sure yet (TENTATIVE, ADR 082). It never changes the roster.
 type Absence struct {
 	PlayerID  int64     `json:"player_id"`
 	Reason    string    `json:"reason"`
+	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// Absence statuses. Only DECLINED affects EP at archive (ADR 082).
+const (
+	AbsenceDeclined  = "DECLINED"
+	AbsenceTentative = "TENTATIVE"
+)
 
 // MaxAbsenceReason limits the optional free-text reason in characters.
 const MaxAbsenceReason = 200
@@ -152,7 +160,7 @@ func (s *Service) Overview(ctx context.Context, raidID int64) (*Overview, error)
 			return err
 		}
 		for _, a := range abs {
-			result.Absences = append(result.Absences, Absence{PlayerID: a.PlayerID, Reason: a.Reason, CreatedAt: a.CreatedAt})
+			result.Absences = append(result.Absences, Absence{PlayerID: a.PlayerID, Reason: a.Reason, Status: a.Status, CreatedAt: a.CreatedAt})
 		}
 		return nil
 	})
@@ -413,11 +421,22 @@ func (s *Service) absenceTarget(ctx context.Context, r *Repo, raidID, actor, tar
 	return nil
 }
 
-// Decline records or updates an absence with an optional reason.
-func (s *Service) Decline(ctx context.Context, raidID, actor, target int64, reason string) error {
+// Decline records or updates an absence with an optional reason. status is
+// AbsenceDeclined ("kann nicht") or AbsenceTentative ("unsicher"); empty means declined.
+func (s *Service) Decline(ctx context.Context, raidID, actor, target int64, reason, status string) error {
 	reason = strings.TrimSpace(reason)
 	if len([]rune(reason)) > MaxAbsenceReason {
 		return ErrInvalid
+	}
+	if status == "" {
+		status = AbsenceDeclined
+	}
+	if status != AbsenceDeclined && status != AbsenceTentative {
+		return ErrInvalid
+	}
+	action := "absence_declare"
+	if status == AbsenceTentative {
+		action = "absence_tentative"
 	}
 	if target == 0 {
 		target = actor
@@ -426,7 +445,7 @@ func (s *Service) Decline(ctx context.Context, raidID, actor, target int64, reas
 		if err := s.absenceTarget(ctx, r, raidID, actor, target); err != nil {
 			return err
 		}
-		row := &absenceRow{RaidID: raidID, PlayerID: target, Reason: reason, CreatedAt: s.now()}
+		row := &absenceRow{RaidID: raidID, PlayerID: target, Reason: reason, Status: status, CreatedAt: s.now()}
 		var before any
 		if existing, err := r.absence(ctx, raidID, target); err == nil {
 			before = existing
@@ -438,7 +457,7 @@ func (s *Service) Decline(ctx context.Context, raidID, actor, target int64, reas
 		if err := r.saveAbsence(ctx, row); err != nil {
 			return err
 		}
-		return s.log(ctx, r, raidID, actor, "absence_declare", before, row)
+		return s.log(ctx, r, raidID, actor, action, before, row)
 	})
 }
 

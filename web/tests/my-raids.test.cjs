@@ -30,6 +30,9 @@ test('status follows absence, then acceptance, then signup', () => {
   assert.equal(myRaidStatus(overview({ entries: [entry({ is_accepted: true })] }), 7).label, 'Bestätigt')
   const absent = myRaidStatus(overview({ entries: [entry({ is_accepted: true })], absences: [{ player_id: 7, reason: 'Urlaub', created_at: '' }] }), 7)
   assert.deepEqual([absent.state, absent.reason], ['absent', 'Urlaub'])
+  const unsure = myRaidStatus(overview({ entries: [entry()], absences: [{ player_id: 7, reason: 'Spätschicht', status: 'TENTATIVE', created_at: '' }] }), 7)
+  assert.deepEqual([unsure.state, unsure.label, unsure.detail, unsure.reason], ['tentative', 'Unsicher', 'Funkenflug (Feuer)', 'Spätschicht'])
+  assert.equal(myRaidStatus(overview({ absences: [{ player_id: 7, reason: '', created_at: '' }] }), 7).state, 'absent', 'absences without status are declines')
 })
 
 test('quick signup offers the main character with its main spec', () => {

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { createMember, createPlannedSeries, signIn, snapshot } from './fixtures'
+import { admin, createMember, createPlannedSeries, signIn, snapshot } from './fixtures'
 
 // ADR 081: what a regular member does every week — sign up, say they can't
 // come, fill the wishlist and copy it into the addon — without hunting for it.
@@ -37,6 +37,30 @@ test.describe('Mitglied: Anmelden, Absagen, Wunschliste', () => {
 
     await second.getByRole('button', { name: 'Doch dabei' }).click()
     await expect(second.getByText('Noch nicht angemeldet')).toBeVisible()
+
+    // ADR 082: not sure yet.
+    const third = page.getByRole('listitem', { name: 'MW-3' })
+    await third.getByRole('button', { name: 'Unsicher' }).click()
+    await third.getByLabel('Was ist unsicher? (optional)').fill('komme evtl. später')
+    await third.getByRole('button', { name: 'Als unsicher melden' }).click()
+    await expect(third.getByText('Unsicher', { exact: true })).toBeVisible()
+    await expect(third.getByText('· komme evtl. später')).toBeVisible()
+    await expect(third.getByRole('button', { name: 'Sicher dabei' })).toBeVisible()
+    await snapshot(page, testInfo, 'nachher-8-unsicher', page.getByRole('heading', { name: 'Meine nächsten Raids' }))
+  })
+
+  test('die Raidleitung sieht „Unsicher“ und kann Spieler selbst so markieren', async ({ page }, testInfo) => {
+    await signIn(page, admin)
+    await page.goto('/#/raids')
+    await page.getByRole('region', { name: 'Raidübersicht' }).getByRole('link', { name: 'MW-3' }).click()
+    await page.getByRole('button', { name: 'Anmeldungen', exact: true }).click()
+    const list = page.getByRole('region', { name: 'Absagen und Unsicher' })
+    await expect(list).toContainText('Sternfall')
+    await expect(list.getByText('Unsicher', { exact: true })).toBeVisible()
+    await list.getByLabel('Spieler markieren').selectOption({ label: 'e2e-admin' })
+    await list.getByRole('button', { name: 'Als unsicher markieren' }).click()
+    await expect(list.getByText('Unsicher', { exact: true })).toHaveCount(2)
+    await snapshot(page, testInfo, 'nachher-9-raidleitung-unsicher', list)
   })
 
   test('ein Raid öffnet für Mitglieder direkt bei den Anmeldungen', async ({ page }, testInfo) => {

@@ -473,8 +473,11 @@ func TestArchiveWithoutPointsForDeclinedPlayers(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		// Only "other" declined.
+		// Only "other" declined; "actor" was merely unsure, which is not a decline (ADR 082).
 		if _, err := db.ExecContext(ctx, "INSERT INTO raid_absences (raid_id, player_id, reason, created_at) VALUES (?, ?, '', ?)", rd.ID, other, now); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(ctx, "INSERT INTO raid_absences (raid_id, player_id, reason, status, created_at) VALUES (?, ?, 'Spätschicht', 'TENTATIVE', ?)", rd.ID, actor, now); err != nil {
 			t.Fatal(err)
 		}
 		translate := func(ids []int64) []int64 {
@@ -501,7 +504,7 @@ func TestArchiveWithoutPointsForDeclinedPlayers(t *testing.T) {
 		t.Fatalf("declined player excluded: %v %v", b, err)
 	}
 	if _, err := archive(t, []int64{1}); !errors.Is(err, ErrInvalidExclusion) {
-		t.Fatalf("player who did not decline must be rejected: %v", err)
+		t.Fatalf("a player who was only unsure must not be excluded: %v", err)
 	}
 }
 

@@ -19,7 +19,7 @@ const fieldLabels: Record<string, string> = {
   early_leave: 'Früher Ausstieg', main_spec: 'Hauptspezialisierung', name: 'Name', notes: 'Notiz',
   role: 'Rolle', second_spec: 'Zweitspezialisierung', setup: 'Soll-Aufstellung', status: 'Status',
   text: 'Gesuchtext', without_points: 'Keine EP', is_enabled: 'Anmeldungen aktiviert', item_name: 'Gegenstand',
-  withdrawn_at: 'Zurückgezogen', withdrawn_reason: 'Grund für Rücknahme', spec: 'Spezialisierung',
+  withdrawn_at: 'Zurückgezogen', withdrawn_reason: 'Grund für Rücknahme', spec: 'Spezialisierung', reason: 'Grund',
   title: 'Titel', description: 'Beschreibung', choices: 'Auswahl', allow_multiple: 'Mehrfachauswahl', closes_at: 'Endet am',
   poll_type: 'Umfrageart', priority: 'Priorität', is_enhanced: 'Enhanced', scheduled_start: 'Geplanter Start',
   scheduled_end: 'Geplantes Ende', raid_size: 'Raidgröße', cancelled_at: 'Abgesagt am', archived_at: 'Archiviert am',
@@ -43,7 +43,7 @@ const valueLabels: Record<string, string> = {
   PLANNED: 'Geplant', OPEN: 'Offen', COMPLETED: 'Abgeschlossen', CANCELLED: 'Abgesagt', CLOSED: 'Geschlossen',
   ARCHIVED: 'Archiviert', ACTIVE: 'Aktiv', USED: 'Verwendet', EXPIRED: 'Abgelaufen', ADMIN: 'Admin',
   RAIDASSISTENT: 'Raidassistent', MEMBER: 'Mitglied', GUEST: 'Gast', pending: 'Offen', approved: 'Freigegeben',
-  rejected: 'Abgelehnt', consumed: 'Eingelöst', new_account: 'Neues Konto', claim: 'Charakter übernehmen',
+  rejected: 'Abgelehnt', consumed: 'Eingelöst', DECLINED: 'Abgesagt', TENTATIVE: 'Unsicher', new_account: 'Neues Konto', claim: 'Charakter übernehmen',
 }
 
 const isoTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
@@ -112,7 +112,7 @@ function actionLabel(entry: AuditLogEntry, before: AuditSnapshot): string {
     totp_enable: 'Authenticator aktiviert', totp_disable: 'Authenticator entfernt', security_key_add: 'Sicherheitsschlüssel hinzugefügt',
     security_key_remove: 'Sicherheitsschlüssel entfernt', create_code: 'Code erstellt', reject: 'Abgelehnt', revoke: 'Widerrufen',
     mark_sent: 'Als versendet markiert', redeem: 'Code eingelöst',
-    accept: 'Bestätigt', absence_declare: 'Abgesagt', absence_revoke: 'Absage zurückgenommen',
+    accept: 'Bestätigt', absence_declare: 'Abgesagt', absence_tentative: 'Als unsicher gemeldet', absence_revoke: 'Absage zurückgenommen',
     archive_without_points: 'EP-Ausnahme festgelegt', availability: 'Anmeldungen geändert', award: 'Beute vergeben',
     create_linked_character: 'Charakter angelegt', link_rising_gods_profile: 'Rising-Gods-Profil verknüpft',
     merge_duplicate_source: 'Duplikat zusammengeführt', merge_duplicate_target: 'Duplikat übernommen',

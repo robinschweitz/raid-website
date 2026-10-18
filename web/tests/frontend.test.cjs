@@ -2878,12 +2878,43 @@ test('character wishlist saves the roll choice and exports it for the addon', as
   writes(s)[2].resolve(wish(2, { priority: 3 }))
   await flush(view)
   assert.match(text(view.tree), /Item 2.*Item 1/)
-  button(view, 'Für Addon exportieren').props.onClick()
+  // The export box explains the three steps and copies in one click.
+  assert.match(text(view.tree), /Ins Wunschlisten-Addon übernehmen.*Export kopieren.*\/wish import.*Strg\+V/)
+  let clipboard = ''
+  Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => { clipboard = value } } })
+  const copying = button(view, 'Export kopieren').props.onClick()
   const exportRequest = s.requests.find((r) => r.url === '/api/v1/characters/10/wishlist/addon-export')
   exportRequest.resolve({ text: 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;' })
+  await copying
   await flush(view)
+  assert.equal(clipboard, 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;')
+  assert.match(text(view.tree), /Kopiert – jetzt im Spiel \/wish import/)
   assert.equal(nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Wunschlisten-Export')[0].props.value, 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;')
-  assert.match(text(view.tree), /\/wish import/)
+  delete globalThis.navigator.clipboard
+})
+
+test('wishlist export falls back to manual copy when the clipboard is blocked', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const view = s.mount(s.load('components/CharacterWishlist.tsx').CharacterWishlist, { characterID: 10, canEdit: true })
+  resolveIf(s, '/api/v1/characters/10/wishlist', [{ id: 1, player_id: 1, character_id: 10, item_id: '50001', item_name: 'Item 1', priority: 0, notes: '', spec: 'MAIN', is_enhanced: false, created_at: '', updated_at: '' }])
+  await flush(view)
+  Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied') } } })
+  const copying = button(view, 'Export kopieren').props.onClick()
+  s.requests.find((r) => r.url === '/api/v1/characters/10/wishlist/addon-export').resolve({ text: 'WL2;Char;1;0' })
+  await copying
+  await flush(view)
+  assert.match(text(view.tree), /markieren und mit Strg\+C kopieren/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'textarea')[0].props.value, 'WL2;Char;1;0')
+  delete globalThis.navigator.clipboard
+})
+
+test('empty wishlist points to the loot catalog', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const view = s.mount(s.load('components/CharacterWishlist.tsx').CharacterWishlist, { characterID: 10, canEdit: true })
+  resolveIf(s, '/api/v1/characters/10/wishlist', [])
+  await flush(view)
+  assert.match(text(view.tree), /Noch keine Wünsche\.\s+Im\s+Beute-Katalog\s+bei einem Item auf deinen Charakter klicken/)
+  assert.equal(button(view, 'Export kopieren'), undefined)
 })
 
 test('character wishlist is read-only for staff', async () => {
@@ -2894,7 +2925,7 @@ test('character wishlist is read-only for staff', async () => {
   assert.equal(nodes(view.tree, (n) => n.type === 'select').length, 0)
   assert.equal(button(view, 'Entfernen'), undefined)
   assert.match(text(view.tree), /Second-Spec/)
-  assert.ok(button(view, 'Für Addon exportieren'))
+  assert.ok(button(view, 'Export kopieren'))
 })
 
 test('addon loot import lets staff pick the winner and leaves held drops unselected', async () => {
@@ -3025,7 +3056,49 @@ test('a member can announce an absence with a reason and take it back before the
   button(view, 'Ich kann nicht kommen').props.onClick()
   assert.equal(writes(s)[0].method, 'put')
   assert.equal(writes(s)[0].url, '/api/v1/raids/8/absences/2')
-  assert.deepEqual(writes(s)[0].body, { reason: 'Krank' })
+  assert.deepEqual(writes(s)[0].body, { reason: 'Krank', status: 'DECLINED' })
+})
+
+test('a member can say they are unsure and later confirm with "Sicher dabei"', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { RaidSignups } = s.load('components/RaidSignups.tsx')
+  const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [{ id: 2, name: 'Ich' }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [], absences: [] })
+  resolveIf(s, '/api/v1/players/2/characters', [])
+  await flush(view)
+  nodes(view.tree, (n) => n.type === 'input' && n.props.placeholder?.startsWith('z. B.'))[0].props.onChange(change('komme evtl. später'))
+  view.render()
+  button(view, 'Ich bin unsicher').props.onClick()
+  assert.deepEqual(writes(s)[0].body, { reason: 'komme evtl. später', status: 'TENTATIVE' })
+
+  const unsure = setup({ id: 2, role: 'MEMBER' })
+  const second = unsure.mount(unsure.load('components/RaidSignups.tsx').RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [{ id: 2, name: 'Ich' }], onRosterChange: async () => {} })
+  resolveIf(unsure, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [], absences: [{ player_id: 2, reason: 'Spätschicht', status: 'TENTATIVE', created_at: '2030-01-01T00:00:00Z' }] })
+  resolveIf(unsure, '/api/v1/players/2/characters', [])
+  await flush(second)
+  assert.match(text(second.tree), /Du bist unsicher.*Spätschicht/s)
+  assert.doesNotMatch(text(second.tree), /Du hast abgesagt/)
+  assert.equal(nodes(second.tree, (n) => n.type === 'button' && text(n) === 'Ich bin unsicher').length, 0)
+  nodes(second.tree, (n) => n.type === 'button' && text(n) === 'Ich kann nicht kommen')[0].props.onClick()
+  assert.deepEqual(writes(unsure)[0].body, { reason: '', status: 'DECLINED' })
+  writes(unsure)[0].reject(new Error('offline'))
+  await flush(second)
+  nodes(second.tree, (n) => n.type === 'button' && text(n) === 'Sicher dabei')[0].props.onClick()
+  assert.equal(writes(unsure)[1].method, 'del')
+})
+
+test('staff can mark a player as unsure; unsure is listed apart from declined', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const view = s.mount(s.load('components/RaidSignups.tsx').RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [{ id: 1, name: 'Leitung', active: true }, { id: 2, name: 'Wackler', active: true }, { id: 3, name: 'Krank', active: true }], onRosterChange: async () => {} })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [], absences: [{ player_id: 3, reason: '', status: 'DECLINED', created_at: '2030-01-01T00:00:00Z' }] })
+  resolveIf(s, '/api/v1/players/1/characters', [])
+  await flush(view)
+  assert.match(text(view.tree), /Absagen & Unsicher \(\s*1\s*\).*Krank.*Hat abgesagt/s)
+  select(view, 'Spieler markieren').props.onChange(change('2'))
+  view.render()
+  button(view, 'Als unsicher markieren').props.onClick()
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/absences/2')
+  assert.deepEqual(writes(s)[0].body, { reason: '', status: 'TENTATIVE' })
 })
 
 test('an announced absence shows the reason and can be revoked with "Doch dabei"', async () => {

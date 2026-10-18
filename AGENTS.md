@@ -146,6 +146,9 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Alternatives remain visible; staff can explicitly switch the roster slot.
 - Signups close at the scheduled start (server-enforced) or manually earlier. Staff may
   continue accepting choices in active raids after closing. All changes are audited.
+- Players (and staff for anyone) can mark a raid as "kann nicht" (`DECLINED`) or "unsicher"
+  (`TENTATIVE`). Only declined players are offered for "keine EP" at archive; unsure players keep
+  the normal EP rule (ADR 082).
 
 ### Enhance Points (EP) — the core rule
 - **+10 EP** for a player who received **no main-spec loot** in that raid.
@@ -386,7 +389,8 @@ A change is done when:
 
 ## Known gaps — do not assume these exist
 
-- No `DELETE` endpoint is exposed. Archive/expire flows only (ADR 007 remains the intent).
+- The only hard-delete endpoints are removing a roster row from a planned/open raid (ADR 076),
+  revoking an absence and removing a wishlist item. Everything else uses archive/expire flows (ADR 007).
 - `internal/export` is an empty directory; general data export is not implemented. The RaidSync
   addon exchange lives in `internal/addonsync` (ADR 045).
 - Admins can view the read-only audit log at `GET /api/v1/audit-log`; no non-Admin read endpoint exists.

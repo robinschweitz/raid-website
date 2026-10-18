@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../api'
+import { Link } from '../router'
 import { atLeast, catalogModeLabels, type CatalogItemDrop, type LootCatalog, type Character, type WishlistWish } from '../types'
 import { matchesCatalogItem } from '../catalog'
 import { useSubmission } from '../useSubmission'
@@ -177,6 +178,9 @@ export function LootCatalogPage() {
     })
   }, [isActive, me])
 
+  const [wishNotice, setWishNotice] = useState('')
+  const wishCount = Object.values(charWishes).reduce((total, set) => total + set.size, 0)
+
   async function toggleWish(char: Character, item: CatalogItemDrop) {
     const key = char.id
     const pendingKey = `${char.id}:${item.item_id}`
@@ -189,14 +193,20 @@ export function LootCatalogPage() {
         const next = new Set(set)
         next.delete(item.item_id)
         setCharWishes((s) => ({ ...s, [key]: next }))
-      } catch { /* ignore */ }
+        setWishNotice(`„${item.name}“ von der Wunschliste von ${char.name} entfernt.`)
+      } catch (err) {
+        setWishNotice(err instanceof ApiError ? err.message : 'Wunschliste konnte nicht geändert werden.')
+      }
     } else {
       try {
         await api.post(`/api/v1/characters/${char.id}/wishlist/items`, { item_id: item.item_id, item_name: item.name, priority: 0, notes: '' })
         const next = new Set(set)
         next.add(item.item_id)
         setCharWishes((s) => ({ ...s, [key]: next }))
-      } catch { /* ignore */ }
+        setWishNotice(`„${item.name}“ steht jetzt auf der Wunschliste von ${char.name}.`)
+      } catch (err) {
+        setWishNotice(err instanceof ApiError ? err.message : 'Wunschliste konnte nicht geändert werden.')
+      }
     }
     setPendingWish('')
   }
@@ -213,6 +223,10 @@ export function LootCatalogPage() {
 
   return <div>
     <div className="page-heading"><div><p className="eyebrow">Bosse · Begegnungen · Truhen</p><h1>Beute</h1></div></div>
+    {me && atLeast(me.role, 'MEMBER') && ownChars.length > 0 && <div className="catalog-wishlist-banner" role="status">
+      <span>{wishNotice || <>Klick bei einem Item auf deinen Charakter, um es auf die Wunschliste zu setzen. {wishCount > 0 && <>Aktuell <strong>{wishCount === 1 ? '1 Item' : `${wishCount} Items`}</strong> auf deiner Wunschliste.</>}</>}</span>
+      <Link className="button-link" to="/wishlist">Meine Wunschliste &amp; Addon-Export &rarr;</Link>
+    </div>}
     <section className="card"><h2>Beute finden</h2>
       <p className="muted">Truhenbeute ist direkt der Begegnung zugeordnet, etwa dem Luftschiffkampf oder Valithria. Suche nach Gegenstand oder Item-ID.</p>
       {error && <p className="error" role="alert">{error}</p>}

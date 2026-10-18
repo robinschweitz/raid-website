@@ -143,13 +143,14 @@ func (a *API) declineAbsence(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Reason string `json:"reason"`
+		Status string `json:"status"`
 	}
 	if err := DecodeJSON(r, &req); err != nil {
 		BadRequest(w, "malformed json body")
 		return
 	}
 	actor, _ := ActorID(r)
-	if err := a.Signups.Decline(r.Context(), id, actor, target, req.Reason); err != nil {
+	if err := a.Signups.Decline(r.Context(), id, actor, target, req.Reason, req.Status); err != nil {
 		writeSignupError(w, err)
 		return
 	}

@@ -48,9 +48,32 @@ export async function seedGuild(request: APIRequestContext) {
   }
   const db = new DatabaseSync(databasePath)
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '+00:00')
-  db.prepare("INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, 'Funkenflug', 'Magier', 'Feuer', 'Frost', 1, 1, ?, ?)").run(people.MEMBER, now, now)
+  const character = db.prepare("INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, 'Funkenflug', 'Magier', 'Feuer', 'Frost', 1, 1, ?, ?)").run(people.MEMBER, now, now)
   db.close()
-  return { seriesID: series.id as number }
+  return { seriesID: series.id as number, memberID: people.MEMBER, characterID: Number(character.lastInsertRowid) }
+}
+
+export interface MemberSetup { username: string; password: string; name: string; character: string; characterClass: string; mainSpec: string; secondSpec: string }
+
+/** Creates a member account with one main character, as an admin would. */
+export async function createMember(request: APIRequestContext, setup: MemberSetup) {
+  const api = await apiAs(request, admin)
+  const created = await api.post('/api/v1/players', { name: setup.name })
+  await api.put(`/api/v1/players/${created.id}/account`, { username: setup.username, password: setup.password, role: 'MEMBER' })
+  const db = new DatabaseSync(databasePath)
+  const now = new Date().toISOString().replace('T', ' ').replace('Z', '+00:00')
+  const character = db.prepare('INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)').run(created.id, setup.character, setup.characterClass, setup.mainSpec, setup.secondSpec, now, now)
+  db.close()
+  return { playerID: created.id as number, characterID: Number(character.lastInsertRowid) }
+}
+
+/** Creates a weekly series and plans its raids for the next weeks. */
+export async function createPlannedSeries(request: APIRequestContext, name: string, template: string, weekday: number, weeks: number) {
+  const api = await apiAs(request, admin)
+  const me = (await (await request.get('/api/v1/auth/me')).json()).data
+  const series = await api.post('/api/v1/raid-series', { name, name_template: template, next_raid_number: 1, raid_leader_id: me.id, weekdays: [weekday], interval_weeks: 1, start_time: '20:00', timezone: 'Europe/Berlin' })
+  await api.post(`/api/v1/raid-series/${series.id}/plan`, { until: berlinDate(7 * weeks) })
+  return series.id as number
 }
 
 export async function signIn(page: Page, user: { username: string; password: string }) {

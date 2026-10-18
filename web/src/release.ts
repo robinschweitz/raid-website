@@ -1,8 +1,36 @@
-export const appVersion = '1.0.16'
+export const appVersion = '1.0.19'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Unsicher als Rückmeldung',
+    changes: [
+      'Neben „Kann nicht kommen“ gibt es jetzt „Unsicher“, optional mit Hinweis wie „komme evtl. später“. Mit „Sicher dabei“ nimmst du es zurück.',
+      'Die Raidleitung sieht Unsichere unter „Absagen & Unsicher“ und in der Aufstellung und kann Spieler selbst als unsicher markieren.',
+      'Unsicher hat keinen Einfluss auf EP: Nur Abgesagte können beim Archivieren von den EP ausgenommen werden.',
+    ],
+  },
+  {
+    version: '1.0.18',
+    title: 'Einfacher anmelden, absagen und Wunschliste exportieren',
+    changes: [
+      'Auf der Übersicht zeigt „Meine nächsten Raids“, ob du angemeldet bist. Mit einem Klick meldest du dich mit deinem Main an, sagst mit „Kann nicht kommen“ (optional mit Grund) ab oder nimmst die Absage mit „Doch dabei“ zurück.',
+      'Raids öffnen sich für Mitglieder direkt bei den Anmeldungen und zeigen deinen Status.',
+      'Neu im Menü: „Meine Wunschliste“. Oben steht, wie die Liste ins Addon kommt, und „Export kopieren“ kopiert sie mit einem Klick.',
+      'Im Beute-Katalog bestätigt ein Hinweis jedes hinzugefügte Item und führt direkt zur Wunschliste.',
+      'Nach der Anmeldung über „Anmelden“ landest du auf der Übersicht statt auf „Seite nicht gefunden“.',
+    ],
+  },
+  {
+    version: '1.0.17',
+    title: 'Kurzer Gesuchtext',
+    changes: [
+      'Neuer Platzhalter {{SETUP_KURZ}} im Gesuchtext: fasst die offenen Plätze kurz zusammen, z. B. „2 Heal (Baum, Diszi), 2 MDD (beliebig), 2 RDD (Mage, SP)“.',
+      'Mit {{TANK_SPECS}}, {{HEAL_SPECS}}, {{MDD_SPECS}} und {{RDD_SPECS}} lassen sich die gesuchten Specs einer Rolle in eigene Sätze einbauen. {{SETUP}} bleibt unverändert.',
+    ],
+  },
+  {
+    version: '1.0.16',
     title: 'Raids im Voraus planen',
     changes: [
       'Auf der Raidseite legt „Termine im Voraus anlegen“ alle Raids einer Serie bis zu einem gewählten Tag an. Die Anmeldung ist sofort offen, sodass sich alle schon Wochen vorher anmelden können.',

@@ -10,6 +10,8 @@ import { BossProgression } from '../components/BossProgression'
 import { RaidCompositionCard } from '../components/RaidCompositionCard'
 import { GuildNotifications } from '../components/GuildNotifications'
 import { PlayerProfilePanel } from '../components/PlayerProfilePanel'
+import { MyRaidsPanel } from '../components/MyRaidsPanel'
+import { atLeast } from '../types'
 // import { StatisticsCharts } from '../components/StatisticsCharts'
 
 
@@ -92,6 +94,8 @@ export function DashboardPage() {
       <Link to="/raids">Alle Raids ansehen &rarr;</Link>
     </div>
     {error && <p className="error" role="alert">{error}</p>}
+
+    {player && atLeast(player.role, 'MEMBER') && !loading && <MyRaidsPanel playerID={player.id} raids={raids} characters={characters} />}
 
     <RaidBanner catalogInstanceId={nextRaid?.catalog_instance_id}>
       <div className="raid-banner-content">
@@ -189,6 +193,7 @@ export function DashboardPage() {
       {player && <section className="card widget-profile">
         <div className="section-heading"><h2>Mein Profil</h2></div>
         {player && <PlayerProfilePanel player={player} characters={characters} points={points} />}
+        {player && atLeast(player.role, 'MEMBER') && <p className="profile-link"><Link to="/wishlist">Meine Wunschliste &amp; Addon-Export &rarr;</Link></p>}
         {pointsError && <p className="error" role="alert">{pointsError}</p>}
       </section>}
 

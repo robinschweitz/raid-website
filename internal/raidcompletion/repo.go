@@ -40,10 +40,11 @@ func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
 	})
 }
 
-// declinedPlayers returns the players who announced an absence for the raid.
+// declinedPlayers returns the players who declined the raid. Players who were
+// only unsure (TENTATIVE) are not declined and keep the normal EP rule (ADR 082).
 func (r *Repo) declinedPlayers(ctx context.Context, raidID int64) (map[int64]bool, error) {
 	var ids []int64
-	if err := r.db.NewSelect().TableExpr("raid_absences").Column("player_id").Where("raid_id = ?", raidID).Scan(ctx, &ids); err != nil {
+	if err := r.db.NewSelect().TableExpr("raid_absences").Column("player_id").Where("raid_id = ?", raidID).Where("status = 'DECLINED'").Scan(ctx, &ids); err != nil {
 		return nil, err
 	}
 	out := make(map[int64]bool, len(ids))

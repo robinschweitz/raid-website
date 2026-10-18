@@ -7,7 +7,7 @@ import { RaidLootList } from '../components/RaidLootList'
 import { RaidBanner } from '../components/RaidBanner'
 import { RaidRosterBoard } from '../components/RaidRosterBoard'
 import { RaidSignups } from '../components/RaidSignups'
-import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Absence, type Attendance, type AttendanceRole, type SignupOverview, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
+import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Absence, type Attendance, type AttendanceRole, type SignupOverview, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries, isDeclined } from '../types'
 import { matchesCatalogItem } from '../catalog'
 import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
@@ -19,6 +19,8 @@ import { RaidRecruitment } from './Recruitment'
 
 interface Props {
   raidID: number
+  /** Opens a specific tab, e.g. from the "Meine nächsten Raids" links. */
+  initialView?: 'signups'
 }
 
 type AwardMethod = 'MAIN' | 'SECOND' | 'ENHANCED' | 'BOE'
@@ -85,11 +87,11 @@ function raidError(err: unknown, fallback: string): string {
   return err.message
 }
 
-export function RaidDetailPage({ raidID }: Props) {
-  return <RaidDetail key={raidID} raidID={raidID} />
+export function RaidDetailPage({ raidID, initialView }: Props) {
+  return <RaidDetail key={`${raidID}:${initialView ?? ''}`} raidID={raidID} initialView={initialView} />
 }
 
-function RaidDetail({ raidID }: Props) {
+function RaidDetail({ raidID, initialView }: Props) {
   const { pending, submit, isActive, isPending } = useSubmission()
   const loadVersion = useRef(0)
   const characterVersion = useRef(0)
@@ -104,7 +106,8 @@ function RaidDetail({ raidID }: Props) {
   const catalogVersion = useRef(0)
   const associationVersion = useRef(0)
   const persistedCatalogContext = useRef('')
-  const [view, setView] = useState<'roster' | 'loot' | 'planning' | 'signups' | 'recruitment'>('roster')
+  const [view, setView] = useState<'roster' | 'loot' | 'planning' | 'signups' | 'recruitment'>(initialView ?? 'roster')
+  const viewDefaulted = useRef(!!initialView)
   const { player: me } = useAuth()
   const [raid, setRaid] = useState<Raid | null>(null)
   const [attendance, setAttendance] = useState<Attendance[]>([])
@@ -162,6 +165,12 @@ function RaidDetail({ raidID }: Props) {
   const [catalogStatus, setCatalogStatus] = useState('')
 
   const canManage = me ? atLeast(me.role, 'RAIDASSISTENT') : false
+  // Members come to a raid to sign up, so their first tab is "Anmeldungen" (ADR 081).
+  useEffect(() => {
+    if (viewDefaulted.current || !raid) return
+    viewDefaulted.current = true
+    if (!canManage && !raid.archived_at && (raid.status === 'PLANNED' || raid.status === 'OPEN')) setView('signups')
+  }, [raid, canManage])
   const isActiveRaid = !!raid && !raid.archived_at && (raid.status === 'PLANNED' || raid.status === 'OPEN')
   const canWrite = canManage && !!raid && (isActiveRaid || raid.status === 'COMPLETED')
   const attNeedsReason = !!raid?.archived_at
@@ -196,7 +205,10 @@ function RaidDetail({ raidID }: Props) {
   }
   const visibleCatalogItems = modeCatalogItems.filter((item) => dropKey(item) === catalogItem || matchesCatalogItem(item, catalogSearch))
 
-  const absenceReasons = new Map(absences.map((row) => [row.player_id, row.reason]))
+  // Only declined players count as absent for the bench button and the archive EP choice;
+  // unsure players keep the normal EP rule (ADR 082).
+  const absenceReasons = new Map(absences.filter(isDeclined).map((row) => [row.player_id, row.reason]))
+  const tentativeReasons = new Map(absences.filter((row) => !isDeclined(row)).map((row) => [row.player_id, row.reason]))
   const declinedPlayers = [...new Set(attendance.filter((row) => absenceReasons.has(row.player_id)).map((row) => row.player_id))]
 
   const load = useCallback(async () => {
@@ -884,7 +896,7 @@ function RaidDetail({ raidID }: Props) {
 
         </div>
         {rosterFiltered && <div className="roster-filter-result"><span className="muted" role="status">{visibleAttendance.length} von {attendance.length} Teilnehmern angezeigt.</span><button type="button" onClick={() => { setRosterSearch(''); setRosterRole(''); setRosterClass(''); setRosterBench('ALL'); setRosterIncomplete(false) }}>Filter zurücksetzen</button></div>}
-        <RaidRosterBoard onBench={canWrite && isActiveRaid ? benchAttendance : undefined} absences={absenceReasons} attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
+        <RaidRosterBoard onBench={canWrite && isActiveRaid ? benchAttendance : undefined} absences={absenceReasons} tentative={tentativeReasons} attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
         {canWrite && (
           <div>
             {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}

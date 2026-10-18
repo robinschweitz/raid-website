@@ -15,11 +15,13 @@ interface Props {
   isAddOpen?: boolean
   filtered?: boolean
   absences?: Map<number, string>
+  /** Players who are unsure whether they can come (ADR 082). */
+  tentative?: Map<number, string>
   onBench?: (row: Attendance) => void
   children?: ReactNode
 }
 
-export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, isAddOpen, filtered, absences, onBench, children }: Props) {
+export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onEdit, editingID, isAddOpen, filtered, absences, tentative, onBench, children }: Props) {
   const member = (row: Attendance) => (
     <li key={row.id} className={`setup-member ${characterClassName(row.class?.trim() ?? '')}${editingID === row.id ? ' is-editing' : ''}`}>
       {editingID === row.id ? <div className="in-place-editor"><h3>{row.character_name || 'Teilnahme'} bearbeiten</h3>{children}</div> : <>
@@ -31,10 +33,12 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
         <div className="setup-flags">
           {row.is_bench && <span className="badge">{rosterGroups.find((group) => group.role === rosterGroup(row))?.label}</span>}
           {absences?.has(row.player_id) && <span className="badge bad" title={absences.get(row.player_id) || undefined}>Hat abgesagt</span>}
+          {tentative?.has(row.player_id) && <span className="badge warn" title={tentative.get(row.player_id) || undefined}>Unsicher</span>}
           {row.late_join && <span className="badge">Später dabei</span>}
           {row.early_leave && <span className="badge">Früher gegangen</span>}
         </div>
         {absences?.get(row.player_id) && <p className="setup-note">Grund: {absences.get(row.player_id)}</p>}
+        {tentative?.get(row.player_id) && <p className="setup-note">Unsicher: {tentative.get(row.player_id)}</p>}
         {onBench && absences?.has(row.player_id) && !row.is_bench && <button type="button" className="setup-bench-action" disabled={pending} onClick={() => onBench(row)}>Auf die Bank setzen</button>}
         {row.notes && <p className="setup-note">{row.notes}</p>}
         {canWrite && (!row.character_name?.trim() || !row.class?.trim() || !row.spec?.trim()) && <small className="error">Teilnahme #{row.id}: {[

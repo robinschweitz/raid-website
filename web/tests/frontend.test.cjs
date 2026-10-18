@@ -2878,12 +2878,43 @@ test('character wishlist saves the roll choice and exports it for the addon', as
   writes(s)[2].resolve(wish(2, { priority: 3 }))
   await flush(view)
   assert.match(text(view.tree), /Item 2.*Item 1/)
-  button(view, 'Für Addon exportieren').props.onClick()
+  // The export box explains the three steps and copies in one click.
+  assert.match(text(view.tree), /Ins Wunschlisten-Addon übernehmen.*Export kopieren.*\/wish import.*Strg\+V/)
+  let clipboard = ''
+  Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => { clipboard = value } } })
+  const copying = button(view, 'Export kopieren').props.onClick()
   const exportRequest = s.requests.find((r) => r.url === '/api/v1/characters/10/wishlist/addon-export')
   exportRequest.resolve({ text: 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;' })
+  await copying
   await flush(view)
+  assert.equal(clipboard, 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;')
+  assert.match(text(view.tree), /Kopiert – jetzt im Spiel \/wish import/)
   assert.equal(nodes(view.tree, (n) => n.type === 'textarea' && n.props['aria-label'] === 'Wunschlisten-Export')[0].props.value, 'WL2;Char;1;70\n50002;ms;0;1;\n50001;os;0;2;')
-  assert.match(text(view.tree), /\/wish import/)
+  delete globalThis.navigator.clipboard
+})
+
+test('wishlist export falls back to manual copy when the clipboard is blocked', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const view = s.mount(s.load('components/CharacterWishlist.tsx').CharacterWishlist, { characterID: 10, canEdit: true })
+  resolveIf(s, '/api/v1/characters/10/wishlist', [{ id: 1, player_id: 1, character_id: 10, item_id: '50001', item_name: 'Item 1', priority: 0, notes: '', spec: 'MAIN', is_enhanced: false, created_at: '', updated_at: '' }])
+  await flush(view)
+  Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied') } } })
+  const copying = button(view, 'Export kopieren').props.onClick()
+  s.requests.find((r) => r.url === '/api/v1/characters/10/wishlist/addon-export').resolve({ text: 'WL2;Char;1;0' })
+  await copying
+  await flush(view)
+  assert.match(text(view.tree), /markieren und mit Strg\+C kopieren/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'textarea')[0].props.value, 'WL2;Char;1;0')
+  delete globalThis.navigator.clipboard
+})
+
+test('empty wishlist points to the loot catalog', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const view = s.mount(s.load('components/CharacterWishlist.tsx').CharacterWishlist, { characterID: 10, canEdit: true })
+  resolveIf(s, '/api/v1/characters/10/wishlist', [])
+  await flush(view)
+  assert.match(text(view.tree), /Noch keine Wünsche\.\s+Im\s+Beute-Katalog\s+bei einem Item auf deinen Charakter klicken/)
+  assert.equal(button(view, 'Export kopieren'), undefined)
 })
 
 test('character wishlist is read-only for staff', async () => {
@@ -2894,7 +2925,7 @@ test('character wishlist is read-only for staff', async () => {
   assert.equal(nodes(view.tree, (n) => n.type === 'select').length, 0)
   assert.equal(button(view, 'Entfernen'), undefined)
   assert.match(text(view.tree), /Second-Spec/)
-  assert.ok(button(view, 'Für Addon exportieren'))
+  assert.ok(button(view, 'Export kopieren'))
 })
 
 test('addon loot import lets staff pick the winner and leaves held drops unselected', async () => {

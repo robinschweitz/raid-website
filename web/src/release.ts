@@ -1,8 +1,19 @@
-export const appVersion = '1.0.17'
+export const appVersion = '1.0.18'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Einfacher anmelden, absagen und Wunschliste exportieren',
+    changes: [
+      'Auf der Übersicht zeigt „Meine nächsten Raids“, ob du angemeldet bist. Mit einem Klick meldest du dich mit deinem Main an, sagst mit „Kann nicht kommen“ (optional mit Grund) ab oder nimmst die Absage mit „Doch dabei“ zurück.',
+      'Raids öffnen sich für Mitglieder direkt bei den Anmeldungen und zeigen deinen Status.',
+      'Neu im Menü: „Meine Wunschliste“. Oben steht, wie die Liste ins Addon kommt, und „Export kopieren“ kopiert sie mit einem Klick.',
+      'Im Beute-Katalog bestätigt ein Hinweis jedes hinzugefügte Item und führt direkt zur Wunschliste.',
+      'Nach der Anmeldung über „Anmelden“ landest du auf der Übersicht statt auf „Seite nicht gefunden“.',
+    ],
+  },
+  {
+    version: '1.0.17',
     title: 'Kurzer Gesuchtext',
     changes: [
       'Neuer Platzhalter {{SETUP_KURZ}} im Gesuchtext: fasst die offenen Plätze kurz zusammen, z. B. „2 Heal (Baum, Diszi), 2 MDD (beliebig), 2 RDD (Mage, SP)“.',

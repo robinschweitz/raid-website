@@ -6,6 +6,7 @@ import { useSubmission } from '../useSubmission'
 import { atLeast, type Attendance, type Character, type Player, type Raid, type RaidSignup, type SignupOverview } from '../types'
 
 import { canonicalClass } from '../characterOptions'
+import { myRaidStatus } from '../myRaids'
 
 interface Props {
   raid: Raid
@@ -37,6 +38,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
   const absences = overview?.absences ?? []
   const ownAbsence = absences.find((row) => row.player_id === player?.id)
   const canDeclineOwn = canSignup && isActiveRaid && isFuture
+  const myStatus = overview && player ? myRaidStatus(overview, player.id) : null
   const playerLabel = (id: number) => players.find((row) => row.id === id)?.name ?? `Spieler #${id}`
 
   const load = useCallback(async () => {
@@ -127,6 +129,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
     }) }}>Anmeldungen aktualisieren</button>
     {!overview ? <p className="muted">Anmeldungen werden geladen…</p> : <>
       <p><span className="badge info">{isOpen ? 'Anmeldung offen' : 'Anmeldung geschlossen'}</span></p>
+      {myStatus && canSignup && <p className="my-raid-status" aria-label="Dein Status">Dein Status: <span className={myStatus.state === 'absent' ? 'badge bad' : myStatus.state === 'accepted' ? 'badge ok' : 'badge info'}>{myStatus.label}</span>{myStatus.detail && <> mit {myStatus.detail}</>}</p>}
       {raid.scheduled_start && <p className="muted">Anmeldeschluss: {new Date(raid.scheduled_start).toLocaleString('de-DE')} · Die Raidleitung kann früher schließen.</p>}
       {!raid.scheduled_start && <p className="muted">Vor dem Öffnen bitte unter „Planung & Details“ einen zukünftigen Start speichern.</p>}
       {canManage && isActiveRaid && <div className="actions">
@@ -134,20 +137,6 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
           void mutate(() => api.put(`${base}/availability`, { is_enabled: !overview.is_enabled }), overview.is_enabled ? 'Anmeldungen geschlossen.' : 'Anmeldungen geöffnet.')
         }}>{overview.is_enabled ? 'Anmeldungen schließen' : 'Anmeldungen öffnen'}</button>
       </div>}
-      {canDeclineOwn && <section className="subcard absence-panel" aria-label="Absage">
-        <h3>Kannst du nicht kommen?</h3>
-        {ownAbsence ? <>
-          <p><span className="badge bad">Du hast abgesagt</span>{ownAbsence.reason && <> · {ownAbsence.reason}</>}</p>
-          <p className="muted">Die Raidleitung sieht deine Absage. Bis zum Raidstart kannst du sie zurücknehmen.</p>
-          <button type="button" disabled={pending} onClick={() => { void mutate(() => api.del(`${absenceBase}/${player!.id}`), 'Absage zurückgenommen. Du bist wieder dabei.', true) }}>Doch dabei</button>
-        </> : <>
-          <p className="muted">Sag der Raidleitung Bescheid, damit sie planen kann. Deine Anmeldung bleibt bestehen, die Raidleitung entscheidet über die Aufstellung.</p>
-          <label>Grund (optional)
-            <input value={absenceReason} maxLength={200} disabled={pending} onChange={(event) => setAbsenceReason(event.target.value)} placeholder="z. B. krank oder Urlaub" />
-          </label>
-          <button type="button" disabled={pending} onClick={() => { void mutate(() => api.put(`${absenceBase}/${player!.id}`, { reason: absenceReason }), 'Absage gesendet. Die Raidleitung sieht sie jetzt.', true) }}>Ich kann nicht kommen</button>
-        </>}
-      </section>}
       {(absences.length > 0 || (canManage && isActiveRaid)) && <section className="subcard absence-list" aria-label="Absagen">
         <h3>Absagen ({absences.length})</h3>
         {absences.length === 0 && <p className="muted">Keine Absagen.</p>}
@@ -198,6 +187,20 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
           <button className="primary-action" disabled={pending || !Object.keys(choices).length}>Ausgewählte Charaktere anmelden</button>
         </>}
       </form>}
+      {canDeclineOwn && <section className="subcard absence-panel" aria-label="Absage">
+        <h3>Kannst du nicht kommen?</h3>
+        {ownAbsence ? <>
+          <p><span className="badge bad">Du hast abgesagt</span>{ownAbsence.reason && <> · {ownAbsence.reason}</>}</p>
+          <p className="muted">Die Raidleitung sieht deine Absage. Bis zum Raidstart kannst du sie zurücknehmen.</p>
+          <button type="button" disabled={pending} onClick={() => { void mutate(() => api.del(`${absenceBase}/${player!.id}`), 'Absage zurückgenommen. Du bist wieder dabei.', true) }}>Doch dabei</button>
+        </> : <>
+          <p className="muted">Sag der Raidleitung Bescheid, damit sie planen kann. Deine Anmeldung bleibt bestehen, die Raidleitung entscheidet über die Aufstellung.</p>
+          <label>Grund (optional)
+            <input value={absenceReason} maxLength={200} disabled={pending} onChange={(event) => setAbsenceReason(event.target.value)} placeholder="z. B. krank oder Urlaub" />
+          </label>
+          <button type="button" disabled={pending} onClick={() => { void mutate(() => api.put(`${absenceBase}/${player!.id}`, { reason: absenceReason }), 'Absage gesendet. Die Raidleitung sieht sie jetzt.', true) }}>Ich kann nicht kommen</button>
+        </>}
+      </section>}
       <h3>Charakteroptionen nach Spieler</h3>
       {!overview.entries.some((entry) => !entry.is_withdrawn) && <p className="muted">Noch keine Anmeldungen.</p>}
       {[...new Set(overview.entries.filter((entry) => !entry.is_withdrawn).map((entry) => entry.player_id))].map((playerID) => <section className="subcard" key={playerID}>

@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSubmission } from './useSubmission'
 import { AuthProvider, useAuth } from './auth'
-import { Link, useRoute } from './router'
+import { Link, navigate, useRoute } from './router'
 import { atLeast } from './types'
 import { LoginPage } from './pages/Login'
 import { DashboardPage } from './pages/Dashboard'
@@ -20,7 +20,14 @@ import { LootCatalogPage } from './pages/LootCatalog'
 import { RegistrationRequestsPage } from './pages/RegistrationRequests'
 import { ChangelogPage } from './pages/Changelog'
 import { AuditLogPage } from './pages/AuditLog'
+import { WishlistPage } from './pages/Wishlist'
 import { appVersion } from './release'
+
+// After signing in from the login link the address is still /login.
+function RedirectHome() {
+  useEffect(() => { navigate('/') }, [])
+  return null
+}
 
 function Routes() {
   const path = useRoute()
@@ -28,8 +35,10 @@ function Routes() {
   if (parts.length === 0) {
     return <DashboardPage />
   }
+  if (parts[0] === 'login') return <RedirectHome />
+  if (parts[0] === 'wishlist') return <WishlistPage />
   if (parts[0] === 'raids' && parts[1]) {
-    return <RaidDetailPage raidID={Number(parts[1])} />
+    return <RaidDetailPage raidID={Number(parts[1])} initialView={parts[2] === 'anmeldungen' ? 'signups' : undefined} />
   }
   if (parts[0] === 'raids') return <RaidsPage />
   if (parts[0] === 'players' && parts[1]) {
@@ -85,6 +94,7 @@ function Layout() {
           <Link className={path === '/statistics' ? 'nav-link active' : 'nav-link'} to="/statistics"><NavIcon name="chart" />Statistiken</Link>
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
           <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
+          {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'nav-link active' : 'nav-link'} to="/wishlist"><NavIcon name="heart" />Meine Wunschliste</Link>}
           {player && atLeast(player.role, 'ADMIN') && <>
             <p className="sidebar-caption">Administration</p>
             <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
@@ -116,6 +126,7 @@ function Layout() {
         <Link className={path === '/statistics' ? 'active' : ''} to="/statistics"><NavIcon name="chart" />Statistik</Link>
         <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>
         <Link className={path === '/loot-catalog' ? 'active' : ''} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
+        {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'active' : ''} to="/wishlist"><NavIcon name="heart" />Wunschliste</Link>}
       </nav>
     </div>
   )

@@ -3506,3 +3506,25 @@ test('audit log describes roster additions, wishlist, polls, locks and account c
   assert.ok(links.includes('/polls'))
   assert.ok(links.includes('/roster'))
 })
+
+test('loot that went to nobody: listed for everyone, staff record more (ADR 089)', async () => {
+  const s = setup()
+  const bosses = [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }]
+  const view = s.mount(s.load('components/UnclaimedLoot.tsx').UnclaimedLoot, { raidID: 1, canWrite: true, needsReason: false, bosses, version: 0 })
+  assert.equal(resolveIf(s, '/api/v1/raids/1/unclaimed-loot', [{ id: 1, boss: 'Saurfang', item_id: '50667', item_name: 'Gürtelbund des gerechten Zorns', outcome: 'DISENCHANTED', holder_name: 'Shanna', notes: '', source: 'addon' }]), true)
+  await flush(view)
+  assert.match(text(view.tree), /Gürtelbund des gerechten Zorns/)
+  assert.match(text(view.tree), /Entzaubert/)
+  assert.match(text(view.tree), /\(Addon\)/)
+  input(view, 'Name des Gegenstands').props.onChange(change('Bryntroll'))
+  view.render()
+  nodes(view.tree, (n) => n.type === 'form')[0].props.onSubmit({ preventDefault() {} })
+  assert.equal(writes(s)[0].url, '/api/v1/raids/1/unclaimed-loot')
+  assert.deepEqual(writes(s)[0].body, { catalog_boss_id: '', item_name: 'Bryntroll', outcome: 'NOBODY', holder_name: '', notes: '', reason: '' })
+
+  const reader = setup({ id: 2, role: 'MEMBER' })
+  const empty = reader.mount(reader.load('components/UnclaimedLoot.tsx').UnclaimedLoot, { raidID: 1, canWrite: false, needsReason: false, bosses: [], version: 0 })
+  assert.equal(resolveIf(reader, '/api/v1/raids/1/unclaimed-loot', []), true)
+  await flush(empty)
+  assert.doesNotMatch(text(empty.tree) || '', /Beute ohne Empfänger/)
+})

@@ -22,6 +22,8 @@ var (
 	ErrReasonRequired = errors.New("reason is required")
 	ErrInvalidName    = errors.New("name cannot be empty")
 	ErrInvalidClass   = errors.New("unknown class")
+	ErrPlayerNotFound = errors.New("target player not found")
+	ErrSameOwner      = errors.New("character already belongs to this player")
 )
 
 // Patch contains only fields that a character correction may change.
@@ -38,6 +40,11 @@ type Patch struct {
 // Service applies audited character corrections.
 type Service struct {
 	repo *Repo
+}
+
+type ownerSnapshot struct {
+	*Character
+	OwnerName string `json:"owner_name"`
 }
 
 // NewService constructs a correction service using the existing repository.
@@ -129,4 +136,68 @@ func (s *Service) Correct(ctx context.Context, actorID, characterID int64, patch
 		return nil, fmt.Errorf("correct character %d: %w", characterID, err)
 	}
 	return corrected, nil
+}
+
+// Transfer moves a live character to another player. Raid records stay as the
+// historical snapshots they were when recorded; wishlist ownership follows it.
+func (s *Service) Transfer(ctx context.Context, actorID, characterID, targetPlayerID int64) (*Character, error) {
+	if targetPlayerID <= 0 {
+		return nil, ErrPlayerNotFound
+	}
+	var transferred *Character
+	err := s.repo.correctInTransaction(ctx, func(chars *Repo, players *player.Repo, audits *audit.Repo) error {
+		actor, err := players.Get(ctx, actorID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrInvalidActor
+		}
+		if err != nil {
+			return fmt.Errorf("load transfer actor: %w", err)
+		}
+		if !actor.Role.AtLeast(validation.RoleAdmin) {
+			return ErrForbidden
+		}
+		c, err := chars.Get(ctx, characterID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("load character for transfer: %w", err)
+		}
+		if c.PlayerID == targetPlayerID {
+			return ErrSameOwner
+		}
+		source, err := players.Get(ctx, c.PlayerID)
+		if err != nil {
+			return fmt.Errorf("load current character owner: %w", err)
+		}
+		target, err := players.Get(ctx, targetPlayerID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrPlayerNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("load target character owner: %w", err)
+		}
+
+		now := time.Now().UTC()
+		before := ownerSnapshot{Character: c, OwnerName: source.Name}
+		updated := *c
+		updated.PlayerID = target.ID
+		updated.UpdatedAt = now
+		after := ownerSnapshot{Character: &updated, OwnerName: target.Name}
+		if err := chars.Update(ctx, &updated); err != nil {
+			return fmt.Errorf("update character owner: %w", err)
+		}
+		if err := chars.UpdateWishlistOwner(ctx, updated.ID, target.ID, now); err != nil {
+			return fmt.Errorf("update wishlist owner: %w", err)
+		}
+		if err := audits.Record(ctx, actorID, "character", updated.ID, "transfer_owner", before, after, ""); err != nil {
+			return fmt.Errorf("audit character transfer: %w", err)
+		}
+		transferred = &updated
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("transfer character %d: %w", characterID, err)
+	}
+	return transferred, nil
 }

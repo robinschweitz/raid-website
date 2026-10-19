@@ -24,6 +24,7 @@ import { WishlistPage } from './pages/Wishlist'
 import { GuidePage } from './pages/Guide'
 import { ShadowmournePage } from './pages/Shadowmourne'
 import { AddonsPage } from './pages/Addons'
+import { CurrentRaidPage } from './pages/CurrentRaid'
 import { appVersion } from './release'
 
 // After signing in from the login link the address is still /login.
@@ -40,6 +41,7 @@ function Routes() {
   }
   if (parts[0] === 'login') return <RedirectHome />
   if (parts[0] === 'wishlist') return <WishlistPage />
+  if (parts[0] === 'raids' && parts[1] === 'current') return <CurrentRaidPage />
   if (parts[0] === 'raids' && parts[1]) {
     return <RaidDetailPage raidID={Number(parts[1])} initialView={parts[2] === 'anmeldungen' ? 'signups' : undefined} />
   }
@@ -95,7 +97,8 @@ function Layout() {
         <p className="sidebar-caption">Gildenverwaltung</p>
         <nav aria-label="Hauptnavigation">
           <Link className={path === '/' ? 'nav-link active' : 'nav-link'} to="/"><NavIcon name="home" />&Uuml;bersicht</Link>
-          <Link className={path.startsWith('/raids') ? 'nav-link active' : 'nav-link'} to="/raids"><NavIcon name="raids" />Raids</Link>
+          <Link className={path.startsWith('/raids') && path !== '/raids/current' ? 'nav-link active' : 'nav-link'} to="/raids"><NavIcon name="raids" />Raids</Link>
+          <Link className={path === '/raids/current' ? 'nav-link active' : 'nav-link'} to="/raids/current"><NavIcon name="zap" />Aktueller Raid</Link>
           <Link className={path.startsWith('/players') ? 'nav-link active' : 'nav-link'} to="/players"><NavIcon name="players" />Spieler</Link>
           <Link className={path === '/statistics' ? 'nav-link active' : 'nav-link'} to="/statistics"><NavIcon name="chart" />Statistiken</Link>
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
@@ -130,7 +133,8 @@ function Layout() {
       </div>
       <nav className="mobile-nav" aria-label="Mobile Hauptnavigation">
         <Link className={path === '/' ? 'active' : ''} to="/"><NavIcon name="home" />&Uuml;bersicht</Link>
-        <Link className={path.startsWith('/raids') ? 'active' : ''} to="/raids"><NavIcon name="raids" />Raids</Link>
+        <Link className={path.startsWith('/raids') && path !== '/raids/current' ? 'active' : ''} to="/raids"><NavIcon name="raids" />Raids</Link>
+        <Link className={path === '/raids/current' ? 'active' : ''} to="/raids/current"><NavIcon name="zap" />Aktuell</Link>
         <Link className={path.startsWith('/players') ? 'active' : ''} to="/players"><NavIcon name="players" />Spieler</Link>
         <Link className={path === '/statistics' ? 'active' : ''} to="/statistics"><NavIcon name="chart" />Statistik</Link>
         <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>

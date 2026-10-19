@@ -14,6 +14,10 @@ type createCharacterRequest struct {
 	IsMain    *bool  `json:"is_main"`
 }
 
+type transferCharacterRequest struct {
+	TargetPlayerID int64 `json:"target_player_id"`
+}
+
 func (a *API) listPlayerCharacters(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r, "id")
 	if !ok {
@@ -119,6 +123,41 @@ func (a *API) updateCharacter(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusBadRequest, "invalid_class", "unknown class")
 		default:
 			WriteError(w, http.StatusInternalServerError, "internal", "could not correct character")
+		}
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": c})
+}
+
+func (a *API) transferCharacter(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "authentication required")
+		return
+	}
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid character id")
+		return
+	}
+	var req transferCharacterRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	c, err := character.NewService(a.Characters).Transfer(r.Context(), actor, id, req.TargetPlayerID)
+	if err != nil {
+		switch {
+		case errors.Is(err, character.ErrNotFound), errors.Is(err, character.ErrPlayerNotFound):
+			WriteError(w, http.StatusNotFound, "not_found", err.Error())
+		case errors.Is(err, character.ErrInvalidActor):
+			WriteError(w, http.StatusUnauthorized, "invalid_actor", "actor does not exist")
+		case errors.Is(err, character.ErrForbidden):
+			WriteError(w, http.StatusForbidden, "forbidden", "character transfer requires admin")
+		case errors.Is(err, character.ErrSameOwner):
+			WriteError(w, http.StatusConflict, "already_owned", err.Error())
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "could not transfer character")
 		}
 		return
 	}

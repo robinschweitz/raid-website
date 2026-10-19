@@ -76,6 +76,9 @@ function PlayerDetail({ playerID }: Props) {
   const [characterDraft, setCharacterDraft] = useState({ name: '', class: '', main_spec: '', second_spec: '', is_main: false, active: true })
   const characterEditVersion = useRef(0)
   const renderedCharacterEditVersion = characterEditVersion.current
+  const [transferCharacter, setTransferCharacter] = useState<Character | null>(null)
+  const [transferPlayerID, setTransferPlayerID] = useState('')
+  const [transferStatus, setTransferStatus] = useState('')
 
   const [lockRaid, setLockRaid] = useState('')
   const [lockItem, setLockItem] = useState('')
@@ -245,6 +248,7 @@ function PlayerDetail({ playerID }: Props) {
   const editCharacter = (c: Character | null) => {
     if (!isAdmin || !isActive() || isPending() || (c && c.player_id !== playerID)) return
     ++characterEditVersion.current
+    setTransferCharacter(null)
     setEditingCharacter(c)
     if (c) setCharacterDraft({ name: c.name, class: c.class, main_spec: c.main_spec, second_spec: c.second_spec, is_main: c.is_main, active: c.active })
   }
@@ -269,6 +273,35 @@ function PlayerDetail({ playerID }: Props) {
   const changeCharacter = (patch: Partial<typeof characterDraft>) => {
     if (!isActive() || isPending() || renderedCharacterEditVersion !== characterEditVersion.current) return
     setCharacterDraft((previous) => ({ ...previous, ...patch }))
+  }
+
+  const startCharacterTransfer = (c: Character) => {
+    if (!isAdmin || !isActive() || isPending() || c.player_id !== playerID) return
+    setEditingCharacter(null)
+    setTransferStatus('')
+    setTransferPlayerID('')
+    setTransferCharacter(c)
+  }
+
+  const transferCharacterOwner = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isAdmin || !transferCharacter || !transferPlayerID || transferCharacter.player_id !== playerID) return
+    const target = mergePlayers.find((candidate) => candidate.id === Number(transferPlayerID))
+    if (!target || !window.confirm(`${transferCharacter.name} wirklich zu ${target.name} verschieben? Raid-Historie und EP bleiben unverändert.`)) return
+    await submit(async () => {
+      setError('')
+      setTransferStatus('')
+      try {
+        await api.post<Character>(`/api/v1/characters/${transferCharacter.id}/transfer`, { target_player_id: target.id })
+        if (!isActive()) return
+        setTransferCharacter(null)
+        setTransferPlayerID('')
+        setTransferStatus(`${transferCharacter.name} gehört jetzt zu ${target.name}.`)
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Charakter verschieben fehlgeschlagen')
+      }
+    })
   }
 
   const createLock = async (event: FormEvent) => {
@@ -607,6 +640,7 @@ function PlayerDetail({ playerID }: Props) {
 
       <section id="profile-characters" hidden={view !== 'characters'} className="card">
         <h2>Charaktere</h2>
+        {transferStatus && <p className="muted" role="status">{transferStatus}</p>}
 
         {isAdmin && (
           <details className="editor-disclosure"><summary>Charakter hinzufügen</summary>
@@ -686,6 +720,15 @@ function PlayerDetail({ playerID }: Props) {
                   <button type="submit" disabled={pending || !characterDraft.name.trim()}>Charakter speichern</button>
                   <button type="button" disabled={pending} onClick={() => editCharacter(null)}>Bearbeitung abbrechen</button>
                   {error && <p className="error" role="alert">{error}</p>}
+                </form></td> : transferCharacter?.id === c.id ? <td colSpan={7}><form className="inline-form in-place-editor" onSubmit={transferCharacterOwner}>
+                  <p className="muted"><strong>{c.name}</strong> gehört danach zum ausgewählten Spieler. Raid-Historie und EP bleiben unverändert.</p>
+                  <label>Neuer Spieler<select autoFocus required disabled={pending} value={transferPlayerID} onChange={(e) => setTransferPlayerID(e.target.value)}>
+                    <option value="">Auswählen</option>
+                    {mergePlayers.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                  </select></label>
+                  <button type="submit" disabled={pending || !transferPlayerID}>Charakter verschieben</button>
+                  <button type="button" disabled={pending} onClick={() => setTransferCharacter(null)}>Abbrechen</button>
+                  {error && <p className="error" role="alert">{error}</p>}
                 </form></td> : <>
                 <td><Link className="character-name" to={`/characters/${c.id}`}>{c.name}</Link></td>
                 <td>{c.class}</td>
@@ -698,6 +741,7 @@ function PlayerDetail({ playerID }: Props) {
                     <>
                       <button disabled={pending} onClick={() => toggleMain(c)}>Main umschalten</button>
                       <button disabled={pending} onClick={() => editCharacter(c)}>Bearbeiten</button>
+                      <button disabled={pending} onClick={() => startCharacterTransfer(c)}>Verschieben</button>
                     </>
                   )}
                 </td>

@@ -14,6 +14,7 @@ import { SpecSelect } from '../components/SpecSelect'
 import { RaidQuickAdd } from '../components/RaidQuickAdd'
 import { AddonInviteExport } from '../components/AddonInviteExport'
 import { AddonLootImport } from '../components/AddonLootImport'
+import { UnclaimedLoot } from '../components/UnclaimedLoot'
 import { AddonRosterImport } from '../components/AddonRosterImport'
 import { RaidRecruitment } from './Recruitment'
 import { ShadowmourneRaidCard } from '../components/ShadowmourneRaidCard'
@@ -160,6 +161,7 @@ function RaidDetail({ raidID, initialView }: Props) {
   const [associationInstance, setAssociationInstance] = useState('')
   const [associationSize, setAssociationSize] = useState('')
   const [catalogBoss, setCatalogBoss] = useState('')
+  const [unclaimedVersion, setUnclaimedVersion] = useState(0)
   const [catalogItem, setCatalogItem] = useState('')
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogDifficulty, setCatalogDifficulty] = useState('')
@@ -1025,7 +1027,8 @@ function RaidDetail({ raidID, initialView }: Props) {
           </div>
         )}
         </RaidLootList>
-        {canManage && isActiveRaid && associated && <AddonLootImport raidID={raidID} onImported={load} />}
+        <UnclaimedLoot raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} bosses={catalogBosses} version={unclaimedVersion} />
+        {canManage && isActiveRaid && associated && <AddonLootImport raidID={raidID} onImported={async () => { await load(); setUnclaimedVersion((value) => value + 1) }} />}
       </section>
     </div>
   )

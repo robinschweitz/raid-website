@@ -13,7 +13,7 @@ interface AuditChange {
 }
 
 const fieldLabels: Record<string, string> = {
-  active: 'Aktiv', award_method: 'Vergabemethode', awarded_to_character_name: 'Empfänger', boss: 'Boss',
+  active: 'Aktiv', award_method: 'Vergabemethode', awarded_to_character_name: 'Empfänger', boss: 'Boss', owner_name: 'Spieler',
   character_name: 'Charakter', class: 'Klasse', enhanced_cost: 'Enhance-Kosten', gear_score: 'Gegenstandswert',
   is_bench: 'Ersatzbank', is_main: 'Hauptcharakter', is_substitute: 'Ersatzspieler', late_join: 'Später Einstieg',
   early_leave: 'Früher Ausstieg', main_spec: 'Hauptspezialisierung', name: 'Name', notes: 'Notiz',
@@ -116,7 +116,7 @@ function actionLabel(entry: AuditLogEntry, before: AuditSnapshot): string {
     archive_without_points: 'EP-Ausnahme festgelegt', availability: 'Anmeldungen geändert', award: 'Beute vergeben',
     create_linked_character: 'Charakter angelegt', link_rising_gods_profile: 'Rising-Gods-Profil verknüpft',
     merge_duplicate_source: 'Duplikat zusammengeführt', merge_duplicate_target: 'Duplikat übernommen',
-    reload_rising_gods_profile: 'Rising-Gods-Profil aktualisiert', rename: 'Umbenannt', remove: 'Aus dem Raid entfernt', save: 'Gespeichert',
+    reload_rising_gods_profile: 'Rising-Gods-Profil aktualisiert', rename: 'Umbenannt', transfer_owner: 'Spielerzuordnung geändert', remove: 'Aus dem Raid entfernt', save: 'Gespeichert',
     submit: 'Angemeldet', update: 'Aktualisiert', update_progress: 'Splitterstand geändert', complete: 'Schattengram abgeschlossen', move: 'Reihenfolge geändert', withdraw: 'Zurückgezogen', claim_character: 'Charakter übernommen',
   }
   return labels[entry.action] ?? entry.action.replace(/_/g, ' ')
@@ -148,6 +148,8 @@ function entityDescription(entry: AuditLogEntry, before: AuditSnapshot, after: A
     case 'registration_code': return `Registrierungscode #${entry.entity_id}`
     case 'raid_signup': return `Raid-Anmeldung für Raid #${entry.entity_id}`
     case 'raid_recruitment_template': return 'Raid-Gesuchtext'
+    case 'unclaimed_loot': return `Beute ohne Empfänger: ${textValue(snapshot, 'item_name') || 'Unbekannter Gegenstand'}${raid}`
+    case 'boss_order': return `Boss-Reihenfolge: Instanz ${textValue(snapshot, 'instance_id') || '?'}`
     case 'shadowmourne_entry': return `Schattengram: ${textValue(snapshot, 'character_name') || `#${entry.entity_id}`}`
     case 'shadowmourne_raid_task': return `Schattengram-Einteilung für Raid #${entry.entity_id}`
     default: return `${entry.entity_type} #${entry.entity_id}`
@@ -163,6 +165,7 @@ function entityTarget(entry: AuditLogEntry, before: AuditSnapshot, after: AuditS
     return typeof characterID === 'number' ? `/characters/${characterID}` : null
   }
   if (entry.entity_type === 'poll') return '/polls'
+  if (entry.entity_type === 'boss_order') return '/loot-catalog'
   if (entry.entity_type === 'raid_series') return '/raid-series'
   if (entry.entity_type === 'shadowmourne_entry') return '/schattengram'
   if (entry.entity_type === 'shadowmourne_raid_task') return `/raids/${entry.entity_id}`

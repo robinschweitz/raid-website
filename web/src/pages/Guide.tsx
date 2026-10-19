@@ -148,6 +148,7 @@ export function GuidePage() {
           <tbody>
             <tr><td><strong>Übersicht</strong></td><td>Deine nächsten Raids mit Anmelde-Knöpfen, der nächste Raid, Umfrage, Neuigkeiten</td></tr>
             <tr><td><strong>Raids</strong></td><td>Alle geplanten und vergangenen Raids. Hier öffnest du einen Raid im Detail.</td></tr>
+            <tr><td><strong>Aktueller Raid</strong></td><td>Direkt zum Raid von heute Abend: der neueste Raid, der schon begonnen hat (sonst der nächste). Auf dem Handy heißt er <strong>Aktuell</strong>.</td></tr>
             <tr><td><strong>Spieler</strong></td><td>Alle Spieler. Über deinen Namen (auch oben rechts) kommst du zu deinem Profil.</td></tr>
             <tr><td><strong>Statistiken</strong></td><td>Auswertungen über Raids und Loot</td></tr>
             <tr><td><strong>Umfragen</strong></td><td>Abstimmen, z. B. über einen neuen Raidtag</td></tr>
@@ -347,6 +348,8 @@ export function GuidePage() {
       </div>
       <Shot name="37-loot" caption="Loot erfassen" />
       <p><strong>Schneller mit dem Addon:</strong> In RaidLedger auf <strong>EXPORT</strong> klicken, den Text unter <em>Loot aus Addon importieren</em> einfügen, <strong>Vorschau</strong>, jede Zeile prüfen und übernehmen. Download und alle Funktionen stehen unter <Link to="/addons/raidledger">Addons → RaidLedger</Link>.</p>
+      <h3>Beute ohne Empfänger</h3>
+      <p>Items, die entzaubert wurden, in die Gildenbank gehen oder die niemand wollte, gehören keinem Spieler. Sie stehen im Reiter <strong>Loot</strong> unter <strong>Beute ohne Empfänger</strong>: aufklappen, Boss (optional), Item, Verbleib und bei wem es liegt eintragen. Sie zählen für niemanden und kosten keine EP. Der Addon-Import übernimmt Zeilen, die RaidLedger als <em>DE</em> oder <em>BANK</em> vergeben hat, automatisch dorthin.</p>
       <h3>Archivieren nach dem Raid</h3>
       <p>Archivieren beendet den Raid endgültig. Teilnehmer ohne Main-Spec-Loot bekommen +10 EP, ungenutzte Locks verfallen, und der nächste Serientermin entsteht.</p>
       <ol>
@@ -374,7 +377,8 @@ export function GuidePage() {
       <p><strong>Beispiel:</strong> Die Anfrage für den Charakter <em>Mirabelle</em> ist eingelöst und mit dem Spieler <em>Mira</em> (Login <code>@mira</code>) verknüpft.</p>
       <Shot name="53-registrierung" caption="Verlauf: welcher Code welchem Spieler zugeordnet wurde" />
       <h3>Wer hat schon ein Konto?</h3>
-      <p>Unter <strong>Spieler</strong> sehen Admins zu jedem Spieler seine <strong>Charaktere</strong>, das <strong>Konto</strong> und die <strong>Rolle</strong>. Oben steht, wie viele Spieler schon ein Konto haben.</p>
+      <p>Unter <strong>Spieler</strong> sehen Admins zu jedem Spieler seine <strong>Charaktere</strong>, das <strong>Konto</strong> und die <strong>Rolle</strong>. Oben steht, wie viele Spieler schon ein Konto haben. Wurde ein Charakter versehentlich dem falschen Spieler zugeordnet, öffne beim bisherigen Spieler den Reiter „Charaktere“, klicke beim Charakter auf <strong>Verschieben</strong> und wähle den richtigen Spieler. Raid-Historie und EP bleiben unverändert.</p>
+      <Shot name="52b-charakter-verschieben" caption="Charakter dem richtigen Spieler zuordnen" />
       <ul>
         <li><strong>@login</strong> mit „registriert am … über ‹Charakter›“: Die Person hat einen Code eingelöst.</li>
         <li><strong>@login</strong> mit „Login vom Admin angelegt“: Ein Admin hat Benutzername und Passwort gesetzt.</li>
@@ -392,6 +396,8 @@ export function GuidePage() {
       <h3>Raidserien</h3>
       <p>Eine Raidserie ist ein fester Raid wie <em>ICC25 Donnerstag</em>: Wochentag, Uhrzeit, Rhythmus, Namensvorlage (<code>{'ICC25-{number}'}</code>), Raidleitung, Instanz und Größe. Dort stellst du auch ein, wie viele Wochen automatisch im Voraus geplant werden.</p>
       <Shot name="50-raidserien" caption="Raidserien" />
+      <h3>Boss-Reihenfolge</h3>
+      <p>Unten auf der Seite <strong>Beute</strong> stellst du pro Instanz die Reihenfolge der Bosse ein: mit <strong>↑ / ↓</strong> verschieben, dann <strong>Reihenfolge speichern</strong>. Sie gilt für die Boss-Auswahl beim Loot-Eintragen und für die Boss-Gruppen in der Beuteliste eines Raids.</p>
       <h3>Gildenkonfiguration</h3>
       <p>Gildenränge und Raidgruppen pflegen. <em>deaktivieren</em> blendet aus, ohne zu löschen.</p>
       <Shot name="54-gildenkonfiguration" caption="Gildenkonfiguration" />

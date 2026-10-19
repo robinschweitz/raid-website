@@ -1,8 +1,17 @@
-export const appVersion = '1.0.24'
+export const appVersion = '1.0.25'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Hinweis zur Kontosicherheit',
+    changes: [
+      'Wer noch keinen zweiten Faktor (Authenticator-App oder Sicherheitsschlüssel) eingerichtet hat, sieht oben einen schmalen Hinweis. Er verschwindet, sobald einer eingerichtet ist, und lässt sich für die laufende Sitzung ausblenden.',
+      'Ein Klick führt zur neuen Seite „Kontosicherheit“: Sie erklärt mit Zahlen von Microsoft, Google, Verizon und dem BSI, warum ein zweiter Faktor so viel bringt, und wie du ihn in zwei Minuten einrichtest. Alle Quellen sind verlinkt.',
+      'Von dort führt „Jetzt einrichten“ direkt in den Reiter „Konto“ deines Profils.',
+    ],
+  },
+  {
+    version: '1.0.24',
     title: 'Schattengram im Raid: freie Auswahl aus der Aufstellung',
     changes: [
       'Bei „Schattengram im Raid“ kann die Raidleitung jetzt auch Krieger, Paladine und Todesritter aus der Aufstellung einteilen, die nicht auf der Schattengram-Liste stehen.',

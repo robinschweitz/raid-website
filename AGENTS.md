@@ -319,6 +319,9 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - The first admin is bootstrapped from `ADMIN_USERNAME` / `ADMIN_PASSWORD` at startup.
 - Login MFA options are server-reported per challenge. The frontend shows only configured factors;
   WebAuthn/FIDO2 security keys are the default option when available and supported (ADR 047).
+- MFA stays optional. Signed-in players without TOTP or a security key see a thin reminder that
+  links to the public explainer `/kontosicherheit`; every figure there cites a published source
+  (ADR 088).
 - A Rising-Gods profile has at most one pending, approved, or consumed registration request. Rejected
   requests may be submitted again; existing duplicate history is retained (ADR 055).
 

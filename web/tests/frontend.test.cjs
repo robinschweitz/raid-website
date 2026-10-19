@@ -3506,3 +3506,76 @@ test('audit log describes roster additions, wishlist, polls, locks and account c
   assert.ok(links.includes('/polls'))
   assert.ok(links.includes('/roster'))
 })
+
+test('MFA reminder shows only for signed-in players without a second factor (ADR 088)', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { MFAReminderBanner } = s.load('components/MFAReminderBanner.tsx')
+  const view = s.mount(MFAReminderBanner, { isSignedIn: true })
+  assert.equal(view.tree, null, 'nothing while loading')
+  const lookup = s.requests.find((r) => r.url === '/api/v1/auth/mfa')
+  assert.ok(lookup)
+  lookup.resolve({ totp_enabled: false, recovery_codes: true, security_keys: [] })
+  await flush(view)
+  assert.match(text(view.tree), /nur mit einem Passwort geschützt/)
+  const link = nodes(view.tree, (n) => n.type === 'a')[0]
+  assert.equal(link.props.to, '/kontosicherheit')
+
+  for (const status of [{ totp_enabled: true, security_keys: [] }, { totp_enabled: false, security_keys: [{ id: 1, name: 'Key', created_at: '2026-01-01T00:00:00Z' }] }]) {
+    const other = setup({ id: 3, role: 'MEMBER' })
+    const protectedView = other.mount(other.load('components/MFAReminderBanner.tsx').MFAReminderBanner, { isSignedIn: true })
+    other.requests[0].resolve(status)
+    await flush(protectedView)
+    assert.equal(protectedView.tree, null)
+  }
+
+  const failing = setup({ id: 4, role: 'MEMBER' })
+  const failedView = failing.mount(failing.load('components/MFAReminderBanner.tsx').MFAReminderBanner, { isSignedIn: true })
+  failing.requests[0].reject(new Error('offline'))
+  await flush(failedView)
+  assert.equal(failedView.tree, null, 'a failed lookup shows no warning')
+
+  const anonymous = setup(null)
+  const anonymousView = anonymous.mount(anonymous.load('components/MFAReminderBanner.tsx').MFAReminderBanner, { isSignedIn: false })
+  await flush(anonymousView)
+  assert.equal(anonymousView.tree, null)
+  assert.equal(anonymous.requests.length, 0, 'visitors cause no MFA lookup')
+})
+
+test('MFA reminder can be hidden and follows MFA changes from the profile (ADR 088)', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { announceMFAChange } = s.load('accountSecurity.ts')
+  const view = s.mount(s.load('components/MFAReminderBanner.tsx').MFAReminderBanner, { isSignedIn: true })
+  s.requests[0].resolve({ totp_enabled: false, security_keys: [] })
+  await flush(view)
+  assert.ok(view.tree)
+
+  announceMFAChange()
+  const refreshed = s.requests.filter((r) => r.url === '/api/v1/auth/mfa')
+  assert.equal(refreshed.length, 2)
+  refreshed[1].resolve({ totp_enabled: true, security_keys: [] })
+  await flush(view)
+  assert.equal(view.tree, null, 'disappears after a factor is set up')
+
+  const hide = setup({ id: 5, role: 'MEMBER' })
+  const hideView = hide.mount(hide.load('components/MFAReminderBanner.tsx').MFAReminderBanner, { isSignedIn: true })
+  hide.requests[0].resolve({ totp_enabled: false, security_keys: [] })
+  await flush(hideView)
+  nodes(hideView.tree, (n) => n.type === 'button' && n.props['aria-label'] === 'Hinweis für diese Sitzung ausblenden')[0].props.onClick()
+  hideView.render()
+  assert.equal(hideView.tree, null)
+})
+
+test('the account-security deep link opens the profile account tab (ADR 088)', async () => {
+  const s = setup({ id: 2, role: 'MEMBER' })
+  const { PlayerDetailPage } = s.load('pages/PlayerDetail.tsx')
+  const view = s.mount(PlayerDetailPage, { playerID: 2, initialView: 'account' })
+  resolvePlayer(s, 2)
+  await flush(view)
+  const account = nodes(view.tree, (n) => n.type === 'section' && n.props.id === 'profile-account')[0]
+  assert.ok(account)
+  assert.equal(account.props.hidden, false)
+  const plain = s.mount(PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(s, 2)
+  await flush(plain)
+  assert.equal(nodes(plain.tree, (n) => n.type === 'section' && n.props.id === 'profile-account')[0].props.hidden, true)
+})

@@ -615,3 +615,19 @@
   gap: 4px;
   margin-top: 8px;
 }
+
+/* Account-security explainer (ADR 088). */
+.security-status { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.security-status p { flex: 1; min-width: 220px; margin: 0; }
+.security-status.warn { border-color: rgba(240, 200, 120, 0.45); }
+.security-status.warn > svg { color: #f0c878; }
+.security-status.ok { border-color: rgba(139, 212, 176, 0.45); }
+.security-status.ok > svg { color: var(--ok); }
+.security-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 14px 0; }
+.security-stat { padding: 14px 16px; border: 1px solid #34556b; border-radius: 8px; background: #0d2032; }
+.security-stat strong { display: block; font-size: 28px; line-height: 1.1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.security-stat p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.security-cite { font-size: 11px; line-height: 0; }
+.security-cite a { padding: 0 1px; }
+.security-sources li { scroll-margin-top: 80px; word-break: break-word; }
+.security-sources li:target, .security-sources li:focus-within { color: var(--accent); }

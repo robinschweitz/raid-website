@@ -10,20 +10,22 @@ import (
 	"strings"
 	"time"
 
+	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
 	"raid-website/internal/player"
 	"raid-website/internal/validation"
 )
 
 var (
-	ErrNotFound       = errors.New("character not found")
-	ErrInvalidActor   = errors.New("actor does not exist")
-	ErrForbidden      = errors.New("character correction requires admin")
-	ErrReasonRequired = errors.New("reason is required")
-	ErrInvalidName    = errors.New("name cannot be empty")
-	ErrInvalidClass   = errors.New("unknown class")
-	ErrPlayerNotFound = errors.New("target player not found")
-	ErrSameOwner      = errors.New("character already belongs to this player")
+	ErrNotFound           = errors.New("character not found")
+	ErrInvalidActor       = errors.New("actor does not exist")
+	ErrForbidden          = errors.New("character correction requires admin")
+	ErrReasonRequired     = errors.New("reason is required")
+	ErrInvalidName        = errors.New("name cannot be empty")
+	ErrInvalidClass       = errors.New("unknown class")
+	ErrPlayerNotFound     = errors.New("target player not found")
+	ErrSameOwner          = errors.New("character already belongs to this player")
+	ErrAttendanceConflict = errors.New("target player already has this character in a raid roster")
 )
 
 // Patch contains only fields that a character correction may change.
@@ -47,6 +49,11 @@ type ownerSnapshot struct {
 	OwnerName string `json:"owner_name"`
 }
 
+type attendanceOwnerSnapshot struct {
+	*attendance.Attendance
+	OwnerName string `json:"owner_name"`
+}
+
 // NewService constructs a correction service using the existing repository.
 func NewService(repo *Repo) *Service {
 	return &Service{repo: repo}
@@ -66,7 +73,7 @@ func (s *Service) Correct(ctx context.Context, actorID, characterID int64, patch
 		patch.Class = &class
 	}
 	var corrected *Character
-	err := s.repo.correctInTransaction(ctx, func(chars *Repo, players *player.Repo, audits *audit.Repo) error {
+	err := s.repo.correctInTransaction(ctx, func(chars *Repo, players *player.Repo, _ *attendance.Repo, audits *audit.Repo) error {
 		actor, err := players.Get(ctx, actorID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrInvalidActor
@@ -138,14 +145,14 @@ func (s *Service) Correct(ctx context.Context, actorID, characterID int64, patch
 	return corrected, nil
 }
 
-// Transfer moves a live character to another player. Raid records stay as the
-// historical snapshots they were when recorded; wishlist ownership follows it.
+// Transfer moves a character to another player, correcting all matching roster
+// rows. Wishlist ownership follows it; loot and Enhance Points remain intact.
 func (s *Service) Transfer(ctx context.Context, actorID, characterID, targetPlayerID int64) (*Character, error) {
 	if targetPlayerID <= 0 {
 		return nil, ErrPlayerNotFound
 	}
 	var transferred *Character
-	err := s.repo.correctInTransaction(ctx, func(chars *Repo, players *player.Repo, audits *audit.Repo) error {
+	err := s.repo.correctInTransaction(ctx, func(chars *Repo, players *player.Repo, attendances *attendance.Repo, audits *audit.Repo) error {
 		actor, err := players.Get(ctx, actorID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrInvalidActor
@@ -189,6 +196,32 @@ func (s *Service) Transfer(ctx context.Context, actorID, characterID, targetPlay
 		}
 		if err := chars.UpdateWishlistOwner(ctx, updated.ID, target.ID, now); err != nil {
 			return fmt.Errorf("update wishlist owner: %w", err)
+		}
+		rows, err := attendances.ListByCharacter(ctx, updated.ID)
+		if err != nil {
+			return fmt.Errorf("list character attendance: %w", err)
+		}
+		for _, row := range rows {
+			conflicts, err := attendances.Exists(ctx, row.RaidID, target.ID, updated.ID)
+			if err != nil {
+				return fmt.Errorf("check roster transfer conflict: %w", err)
+			}
+			if conflicts {
+				return ErrAttendanceConflict
+			}
+		}
+		for _, row := range rows {
+			beforeAttendance := row
+			beforeAttendanceSnapshot := attendanceOwnerSnapshot{Attendance: &beforeAttendance, OwnerName: source.Name}
+			row.PlayerID = target.ID
+			row.UpdatedAt = now
+			if err := attendances.Update(ctx, &row); err != nil {
+				return fmt.Errorf("update attendance owner: %w", err)
+			}
+			afterAttendanceSnapshot := attendanceOwnerSnapshot{Attendance: &row, OwnerName: target.Name}
+			if err := audits.Record(ctx, actorID, "attendance", row.ID, "character_owner_transfer", beforeAttendanceSnapshot, afterAttendanceSnapshot, ""); err != nil {
+				return fmt.Errorf("audit attendance transfer: %w", err)
+			}
 		}
 		if err := audits.Record(ctx, actorID, "character", updated.ID, "transfer_owner", before, after, ""); err != nil {
 			return fmt.Errorf("audit character transfer: %w", err)

@@ -156,6 +156,8 @@ func (a *API) transferCharacter(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusForbidden, "forbidden", "character transfer requires admin")
 		case errors.Is(err, character.ErrSameOwner):
 			WriteError(w, http.StatusConflict, "already_owned", err.Error())
+		case errors.Is(err, character.ErrAttendanceConflict):
+			WriteError(w, http.StatusConflict, "transfer_conflict", err.Error())
 		default:
 			WriteError(w, http.StatusInternalServerError, "internal", "could not transfer character")
 		}

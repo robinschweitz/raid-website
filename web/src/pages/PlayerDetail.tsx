@@ -287,7 +287,7 @@ function PlayerDetail({ playerID }: Props) {
     event.preventDefault()
     if (!isAdmin || !transferCharacter || !transferPlayerID || transferCharacter.player_id !== playerID) return
     const target = mergePlayers.find((candidate) => candidate.id === Number(transferPlayerID))
-    if (!target || !window.confirm(`${transferCharacter.name} wirklich zu ${target.name} verschieben? Raid-Historie und EP bleiben unverändert.`)) return
+    if (!target || !window.confirm(`${transferCharacter.name} wirklich zu ${target.name} verschieben? Raid-Aufstellungen werden zugeordnet; Loot und EP bleiben unverändert.`)) return
     await submit(async () => {
       setError('')
       setTransferStatus('')
@@ -721,7 +721,7 @@ function PlayerDetail({ playerID }: Props) {
                   <button type="button" disabled={pending} onClick={() => editCharacter(null)}>Bearbeitung abbrechen</button>
                   {error && <p className="error" role="alert">{error}</p>}
                 </form></td> : transferCharacter?.id === c.id ? <td colSpan={7}><form className="inline-form in-place-editor" onSubmit={transferCharacterOwner}>
-                  <p className="muted"><strong>{c.name}</strong> gehört danach zum ausgewählten Spieler. Raid-Historie und EP bleiben unverändert.</p>
+                  <p className="muted"><strong>{c.name}</strong> gehört danach zum ausgewählten Spieler. Raid-Aufstellungen werden zugeordnet; Loot und EP bleiben unverändert.</p>
                   <label>Neuer Spieler<select autoFocus required disabled={pending} value={transferPlayerID} onChange={(e) => setTransferPlayerID(e.target.value)}>
                     <option value="">Auswählen</option>
                     {mergePlayers.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}

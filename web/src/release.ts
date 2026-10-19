@@ -1,11 +1,11 @@
-export const appVersion = '1.0.26'
+export const appVersion = '1.0.27'
 
 export const changelog = [
   {
     version: appVersion,
     title: 'Charakter dem richtigen Spieler zuordnen',
     changes: [
-      'Admins können unter Spieler → Charaktere einen versehentlich falsch zugeordneten Charakter zu einem anderen Spieler verschieben. Raid-Historie und EP bleiben dabei unverändert; die Änderung steht im Audit-Protokoll.',
+      'Admins können unter Spieler → Charaktere einen versehentlich falsch zugeordneten Charakter zu einem anderen Spieler verschieben. Die Raid-Aufstellungen zeigen danach den richtigen Spieler; Loot und EP bleiben unverändert. Die Änderung steht im Audit-Protokoll.',
     ],
   },
   {

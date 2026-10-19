@@ -6,6 +6,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
 	"raid-website/internal/player"
 )
@@ -22,9 +23,9 @@ func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
 }
 
-func (r *Repo) correctInTransaction(ctx context.Context, fn func(*Repo, *player.Repo, *audit.Repo) error) error {
+func (r *Repo) correctInTransaction(ctx context.Context, fn func(*Repo, *player.Repo, *attendance.Repo, *audit.Repo) error) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		return fn(r.WithTx(tx), player.NewRepo(tx), audit.NewRepo(tx))
+		return fn(r.WithTx(tx), player.NewRepo(tx), attendance.NewRepo(tx), audit.NewRepo(tx))
 	})
 }
 

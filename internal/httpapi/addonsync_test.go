@@ -38,6 +38,7 @@ type addonPreviewRow struct {
 	RollRange         string             `json:"roll_range"`
 	WinnerName        string             `json:"winner_name"`
 	EnhancedPoints    int                `json:"enhanced_points"`
+	IsUnclaimed       bool               `json:"is_unclaimed"`
 	IsImportable      bool               `json:"is_importable"`
 	IsAlreadyImported bool               `json:"is_already_imported"`
 	Warnings          []string           `json:"warnings"`
@@ -58,6 +59,7 @@ type addonImportResult struct {
 	LineKey       string `json:"line_key"`
 	Status        string `json:"status"`
 	AwardID       *int64 `json:"award_id"`
+	UnclaimedID   *int64 `json:"unclaimed_id"`
 	CharacterName string `json:"character_name"`
 	Code          string `json:"code"`
 }
@@ -267,9 +269,15 @@ func TestAddonLootPreviewReadsRS2RollsAndStates(t *testing.T) {
 	if r := rows[2]; !r.IsImportable || r.AwardMethod != "SECOND" || *r.CharacterID != f.secondChar {
 		t.Fatalf("off-spec row: %+v", r)
 	}
-	for _, r := range append(rows[3:5:5], rows[6:8]...) {
-		if r.IsImportable || r.CharacterID != nil || len(r.Errors) != 0 || len(r.Warnings) != 1 || !strings.Contains(r.Warnings[0], "nicht übernommen") {
+	for _, r := range rows[3:5] {
+		if r.IsImportable || r.IsUnclaimed || r.CharacterID != nil || len(r.Errors) != 0 || len(r.Warnings) != 1 || !strings.Contains(r.Warnings[0], "nicht übernommen") {
 			t.Fatalf("parked and deleted rows are shown only: %+v", r)
+		}
+	}
+	// Disenchanted and banked items went to nobody: imported as unclaimed loot (ADR 089).
+	for _, r := range rows[6:8] {
+		if !r.IsImportable || !r.IsUnclaimed || r.CharacterID != nil || len(r.Errors) != 0 || len(r.Warnings) != 1 || !strings.Contains(r.Warnings[0], "Beute ohne Empfänger") {
+			t.Fatalf("disenchanted and banked rows are unclaimed loot: %+v", r)
 		}
 	}
 	if r := rows[5]; !r.IsImportable || r.EnhancedPoints != 20 || !strings.Contains(strings.Join(r.Warnings, " "), "laut Konto sind es 30") {
@@ -283,8 +291,34 @@ func TestAddonLootPreviewReadsRS2RollsAndStates(t *testing.T) {
 		{"line_key": rows[6].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
 		{"line_key": rows[7].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
 	})
-	if len(results) != 5 || results[0].Status != "created" || results[1].Code != "not_importable" || results[2].Code != "not_importable" || results[3].Code != "not_importable" || results[4].Code != "not_importable" {
+	if len(results) != 5 || results[0].Status != "created" || results[1].Code != "not_importable" || results[2].Code != "not_importable" ||
+		results[3].Status != "created" || results[3].UnclaimedID == nil || results[3].AwardID != nil ||
+		results[4].Status != "created" || results[4].UnclaimedID == nil || results[4].AwardID != nil {
 		t.Fatalf("results: %+v", results)
+	}
+	var unclaimed struct {
+		Data []struct {
+			Outcome       string  `json:"outcome"`
+			HolderName    string  `json:"holder_name"`
+			ItemName      string  `json:"item_name"`
+			CatalogBossID *string `json:"catalog_boss_id"`
+			Source        string  `json:"source"`
+		}
+	}
+	if err := json.Unmarshal(f.request(http.MethodGet, "/unclaimed-loot", nil, http.StatusOK), &unclaimed); err != nil {
+		t.Fatal(err)
+	}
+	if len(unclaimed.Data) != 2 || unclaimed.Data[0].Outcome != "DISENCHANTED" || unclaimed.Data[1].Outcome != "BANK" ||
+		unclaimed.Data[0].HolderName != second || unclaimed.Data[0].ItemName == "" || unclaimed.Data[0].Source != "addon" ||
+		unclaimed.Data[0].CatalogBossID == nil || *unclaimed.Data[0].CatalogBossID != f.ordinaryBoss {
+		t.Fatalf("unclaimed loot: %+v", unclaimed.Data)
+	}
+	again := f.addonImport(f.token, payload, []map[string]any{{"line_key": rows[6].LineKey, "catalog_boss_id": f.ordinaryBoss}})
+	if len(again) != 1 || again[0].Status != "already_imported" || again[0].UnclaimedID == nil || *again[0].UnclaimedID != *results[3].UnclaimedID {
+		t.Fatalf("a second import must not record the line again: %+v", again)
+	}
+	if r := f.addonPreview(payload).Rows[6]; r.IsImportable || !strings.Contains(strings.Join(r.Warnings, " "), "Bereits als Beute ohne Empfänger") {
+		t.Fatalf("an imported unclaimed line is marked: %+v", r)
 	}
 	f.points(f.first, 0)
 	if r := f.addonPreview(strings.Replace(payload, ";given;87;", ";deleted;87;", 1)).Rows; r[1].IsImportable || !strings.Contains(strings.Join(r[0].Warnings, " "), "Im Addon gelöscht") {

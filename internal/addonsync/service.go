@@ -18,6 +18,7 @@ import (
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidseries"
+	"raid-website/internal/unclaimedloot"
 	"raid-website/internal/validation"
 )
 
@@ -53,12 +54,13 @@ type Service struct {
 	loot        *loot.Repo
 	points      *enhancepoints.Repo
 	corrections *raidcorrection.Service
+	unclaimed   *unclaimedloot.Service
 }
 
 // NewService wires the repositories the addon exchange reads and the
 // correction service that performs the actual loot writes.
-func NewService(raids *raid.Repo, series *raidseries.Repo, attendanceRepo *attendance.Repo, characters *character.Repo, players *player.Repo, catalog *lootcatalog.Service, lootRepo *loot.Repo, points *enhancepoints.Repo, corrections *raidcorrection.Service) *Service {
-	return &Service{raids: raids, series: series, attendance: attendanceRepo, characters: characters, players: players, catalog: catalog, loot: lootRepo, points: points, corrections: corrections}
+func NewService(raids *raid.Repo, series *raidseries.Repo, attendanceRepo *attendance.Repo, characters *character.Repo, players *player.Repo, catalog *lootcatalog.Service, lootRepo *loot.Repo, points *enhancepoints.Repo, corrections *raidcorrection.Service, unclaimed *unclaimedloot.Service) *Service {
+	return &Service{raids: raids, series: series, attendance: attendanceRepo, characters: characters, players: players, catalog: catalog, loot: lootRepo, points: points, corrections: corrections, unclaimed: unclaimed}
 }
 
 // InviteExport renders the raid roster for the addon. Invites use the live
@@ -144,11 +146,14 @@ type LootPreviewRow struct {
 	BossOptions   []lootcatalog.Boss `json:"boss_options"`
 	AwardMethod   loot.Method        `json:"award_method"`
 	// Roll details of RS2 exports; empty for RS1.
-	Roll              *int     `json:"roll"`
-	Spec              string   `json:"spec"`
-	RollRange         string   `json:"roll_range"`
-	WinnerName        string   `json:"winner_name"`
-	EnhancedPoints    int      `json:"enhanced_points"`
+	Roll           *int   `json:"roll"`
+	Spec           string `json:"spec"`
+	RollRange      string `json:"roll_range"`
+	WinnerName     string `json:"winner_name"`
+	EnhancedPoints int    `json:"enhanced_points"`
+	// IsUnclaimed rows (disenchanted or guild bank) are imported as loot
+	// that went to nobody, not as an award (ADR 089): no recipient, no method.
+	IsUnclaimed       bool     `json:"is_unclaimed"`
 	IsImportable      bool     `json:"is_importable"`
 	IsAlreadyImported bool     `json:"is_already_imported"`
 	Warnings          []string `json:"warnings"`
@@ -201,6 +206,7 @@ type LootImportResult struct {
 	LineNumber    int    `json:"line_number"`
 	Status        string `json:"status"`
 	AwardID       *int64 `json:"award_id"`
+	UnclaimedID   *int64 `json:"unclaimed_id,omitempty"`
 	CharacterName string `json:"character_name"`
 	Code          string `json:"code"`
 	Message       string `json:"message"`
@@ -237,8 +243,10 @@ func (s *Service) ApplyLootImport(ctx context.Context, raidID, actorID int64, te
 			result.Status, result.Code, result.Message = ResultFailed, "unknown_line", "Zeile ist nicht im Export enthalten"
 		case line.Error != "":
 			result.Status, result.Code, result.Message = ResultFailed, "invalid_line", line.Error
+		case line.State.Unclaimed() && !hasAward(imported, selection.LineKey):
+			s.importUnclaimed(ctx, rd, actorID, selection, line, &result)
 		case !line.State.Importable():
-			result.Status, result.Code, result.Message = ResultFailed, "not_importable", "Gelöschte, verwahrte, entzauberte oder für die Gildenbank bestimmte Zeilen werden nicht übernommen"
+			result.Status, result.Code, result.Message = ResultFailed, "not_importable", "Gelöschte oder verwahrte Zeilen werden nicht übernommen"
 		case hasAward(imported, selection.LineKey):
 			award := imported[selection.LineKey]
 			result.Status, result.AwardID = ResultAlreadyImported, &award.ID
@@ -313,6 +321,27 @@ func (s *Service) importLine(ctx context.Context, rd *raid.Raid, actorID int64, 
 		return nil, err
 	}
 	return award, nil
+}
+
+// importUnclaimed records a disenchanted or banked line as loot that went to
+// nobody (ADR 089). The boss is optional; the holder is who has the item.
+func (s *Service) importUnclaimed(ctx context.Context, rd *raid.Raid, actorID int64, selection LootSelection, line LootLine, result *LootImportResult) {
+	outcome := unclaimedloot.Disenchanted
+	if line.State == LootBank {
+		outcome = unclaimedloot.Bank
+	}
+	entry, created, err := s.unclaimed.CreateFromAddon(ctx, actorID, rd.ID, selection.LineKey, unclaimedloot.Input{
+		CatalogBossID: selection.CatalogBossID, ItemID: line.ItemID, Outcome: outcome, HolderName: line.RecipientName, Notes: importNote})
+	switch {
+	case errors.Is(err, unclaimedloot.ErrBoss):
+		result.Status, result.Code, result.Message = ResultFailed, "catalog_item_invalid", "Boss passt nicht zur Raidinstanz"
+	case err != nil:
+		result.Status, result.Code, result.Message = ResultFailed, "save_failed", "Beute ohne Empfänger konnte nicht gespeichert werden"
+	case created:
+		result.Status, result.UnclaimedID = ResultCreated, &entry.ID
+	default:
+		result.Status, result.UnclaimedID = ResultAlreadyImported, &entry.ID
+	}
 }
 
 // importErrorMessage turns a failed write into a stable code and a German message.
@@ -407,6 +436,7 @@ type resolver struct {
 	bossesByItem map[string][]lootcatalog.Boss
 	locks        []enhancepoints.ItemLock
 	imported     map[string]loot.Award
+	unclaimed    map[string]int64
 	service      *Service
 	playerNames  map[int64]string
 }
@@ -433,7 +463,11 @@ func (s *Service) newResolver(ctx context.Context, rd *raid.Raid) (*resolver, er
 	if err != nil {
 		return nil, err
 	}
-	return &resolver{raid: rd, roster: roster, bossesByItem: bossesByItem, locks: locks, imported: imported, service: s, playerNames: map[int64]string{}}, nil
+	unclaimed, err := s.unclaimed.AddonLineKeys(ctx, rd.ID)
+	if err != nil {
+		return nil, fmt.Errorf("list unclaimed loot for raid %d: %w", rd.ID, err)
+	}
+	return &resolver{raid: rd, roster: roster, bossesByItem: bossesByItem, locks: locks, imported: imported, unclaimed: unclaimed, service: s, playerNames: map[int64]string{}}, nil
 }
 
 func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootPreviewRow {
@@ -456,6 +490,11 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 	if isImported {
 		row.IsAlreadyImported = true
 		row.Warnings = append(row.Warnings, "Bereits importiert")
+	}
+	row.IsUnclaimed = line.State.Unclaimed() && !isImported
+	if _, recorded := r.unclaimed[key]; recorded && row.IsUnclaimed {
+		row.IsAlreadyImported = true
+		row.Warnings = append(row.Warnings, "Bereits als Beute ohne Empfänger übernommen")
 	}
 
 	candidates := r.bossCandidates(ctx, line.ItemID)
@@ -523,10 +562,10 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 		row.Warnings = append(row.Warnings, "Im Addon gelöscht – wird nicht übernommen")
 	case (line.State == LootDisenchanted || line.State == LootBank) && isImported:
 		row.Warnings = append(row.Warnings, "Im Addon jetzt für Entzaubern oder Gildenbank – bei Bedarf über die Loot-Korrektur zurückziehen")
-	case line.State == LootDisenchanted:
-		row.Warnings = append(row.Warnings, fmt.Sprintf("Entzaubert (bei %s) – kein Loot eines Spielers, wird nicht übernommen", line.RecipientName))
-	case line.State == LootBank:
-		row.Warnings = append(row.Warnings, fmt.Sprintf("Für die Gildenbank (bei %s) – kein Loot eines Spielers, wird nicht übernommen", line.RecipientName))
+	case line.State == LootDisenchanted && !row.IsAlreadyImported:
+		row.Warnings = append(row.Warnings, fmt.Sprintf("Entzaubert (bei %s) – wird als Beute ohne Empfänger übernommen, zählt für niemanden", line.RecipientName))
+	case line.State == LootBank && !row.IsAlreadyImported:
+		row.Warnings = append(row.Warnings, fmt.Sprintf("Für die Gildenbank (bei %s) – wird als Beute ohne Empfänger übernommen, zählt für niemanden", line.RecipientName))
 	}
 	if x := line.EnhancedPoints(); x > 0 && entry != nil && !isImported {
 		if want := r.enhancedPoints(ctx, entry.attendance.PlayerID); want != x {
@@ -543,14 +582,19 @@ func (r *resolver) resolve(ctx context.Context, key string, line LootLine) LootP
 		}
 	}
 
-	row.IsImportable = len(row.Errors) == 0 && !row.IsAlreadyImported && line.State.Importable()
+	row.IsImportable = len(row.Errors) == 0 && !row.IsAlreadyImported && (line.State.Importable() || row.IsUnclaimed)
 	return row
+}
+
+// Unclaimed is true for drops that went to nobody: disenchanted or banked.
+// They are imported as unclaimed loot, never as an award (ADR 089).
+func (s LootState) Unclaimed() bool {
+	return s == LootDisenchanted || s == LootBank
 }
 
 // Importable is false for drops that are not awards (yet): parked items wait
 // for their roll, deleted ones were removed in the addon, and disenchanted or
-// banked items belong to nobody. Staff decide about those; the import never
-// changes anything for them.
+// banked items belong to nobody (imported as unclaimed loot instead, ADR 089).
 func (s LootState) Importable() bool {
 	return s != LootParked && s != LootDeleted && s != LootDisenchanted && s != LootBank
 }

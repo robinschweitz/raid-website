@@ -1,6 +1,15 @@
-export const appVersion = '1.0.24'
+export const appVersion = '1.0.25'
 
 export const changelog = [
+  {
+    version: appVersion,
+    title: 'Aktueller Raid, Boss-Reihenfolge und Beute ohne Empfänger',
+    changes: [
+      'Neu im Menü: „Aktueller Raid“ (mobil „Aktuell“) führt direkt zum Raid von heute Abend, also zum neuesten Raid, der schon begonnen hat (sonst zum nächsten).',
+      'Die Bosse stehen jetzt in einer Reihenfolge, die ein Admin unten auf der Seite „Beute“ festlegt: bei der Boss-Auswahl beim Loot-Eintragen und bei den Boss-Gruppen in der Beuteliste eines Raids.',
+      'Neu im Raid unter „Loot“: „Beute ohne Empfänger“ für Items, die entzaubert wurden, in die Gildenbank gehen oder die niemand wollte. Sie zählen für keinen Spieler. Der Addon-Import übernimmt entzauberte und Gildenbank-Items von RaidLedger jetzt dorthin.',
+    ],
+  },
   {
     version: appVersion,
     title: 'Schattengram im Raid: freie Auswahl aus der Aufstellung',

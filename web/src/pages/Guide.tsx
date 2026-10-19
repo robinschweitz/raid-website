@@ -348,6 +348,8 @@ export function GuidePage() {
       </div>
       <Shot name="37-loot" caption="Loot erfassen" />
       <p><strong>Schneller mit dem Addon:</strong> In RaidLedger auf <strong>EXPORT</strong> klicken, den Text unter <em>Loot aus Addon importieren</em> einfügen, <strong>Vorschau</strong>, jede Zeile prüfen und übernehmen. Download und alle Funktionen stehen unter <Link to="/addons/raidledger">Addons → RaidLedger</Link>.</p>
+      <h3>Beute ohne Empfänger</h3>
+      <p>Items, die entzaubert wurden, in die Gildenbank gehen oder die niemand wollte, gehören keinem Spieler. Sie stehen im Reiter <strong>Loot</strong> unter <strong>Beute ohne Empfänger</strong>: aufklappen, Boss (optional), Item, Verbleib und bei wem es liegt eintragen. Sie zählen für niemanden und kosten keine EP. Der Addon-Import übernimmt Zeilen, die RaidLedger als <em>DE</em> oder <em>BANK</em> vergeben hat, automatisch dorthin.</p>
       <h3>Archivieren nach dem Raid</h3>
       <p>Archivieren beendet den Raid endgültig. Teilnehmer ohne Main-Spec-Loot bekommen +10 EP, ungenutzte Locks verfallen, und der nächste Serientermin entsteht.</p>
       <ol>

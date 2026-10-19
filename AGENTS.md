@@ -251,6 +251,13 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - An Admin sets each instance's boss order (every boss once, audited). Boss pickers, boss lists
   and a raid's loot follow it; unordered bosses come after, in catalog order.
 
+### Loot that went to nobody (ADR 089)
+- Disenchanted, guild-bank and unwanted items are `unclaimed_loot`, never awards: no player,
+  no EP, no tallies, no locks. RAIDASSISTENT and up record and remove them (archived raids need a
+  reason); removal archives the row. Every write is audited.
+- The RS2 loot import records `disenchanted` / `bank` lines there (idempotent by line key); parked
+  and deleted lines are still shown only.
+
 ### Loot, attendance, and character corrections
 - Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived
   raid history only; live-character changes never rewrite raid snapshots (ADR 032).

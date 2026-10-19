@@ -148,6 +148,7 @@ function entityDescription(entry: AuditLogEntry, before: AuditSnapshot, after: A
     case 'registration_code': return `Registrierungscode #${entry.entity_id}`
     case 'raid_signup': return `Raid-Anmeldung für Raid #${entry.entity_id}`
     case 'raid_recruitment_template': return 'Raid-Gesuchtext'
+    case 'unclaimed_loot': return `Beute ohne Empfänger: ${textValue(snapshot, 'item_name') || 'Unbekannter Gegenstand'}${raid}`
     case 'boss_order': return `Boss-Reihenfolge: Instanz ${textValue(snapshot, 'instance_id') || '?'}`
     case 'shadowmourne_entry': return `Schattengram: ${textValue(snapshot, 'character_name') || `#${entry.entity_id}`}`
     case 'shadowmourne_raid_task': return `Schattengram-Einteilung für Raid #${entry.entity_id}`

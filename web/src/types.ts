@@ -533,6 +533,8 @@ export interface AddonLootPreviewRow {
   roll_range: string
   winner_name: string
   enhanced_points: number
+  // Disenchanted or banked: imported as loot that went to nobody (ADR 089).
+  is_unclaimed: boolean
   is_importable: boolean
   is_already_imported: boolean
   warnings: string[]

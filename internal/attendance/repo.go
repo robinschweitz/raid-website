@@ -75,3 +75,13 @@ func (r *Repo) ListByRaid(ctx context.Context, raidID int64) ([]Attendance, erro
 	}
 	return as, nil
 }
+
+// ListByCharacter returns every roster row that records a character.
+func (r *Repo) ListByCharacter(ctx context.Context, characterID int64) ([]Attendance, error) {
+	var rows []Attendance
+	err := r.db.NewSelect().Model(&rows).
+		Where("character_id = ?", characterID).
+		Order("id ASC").
+		Scan(ctx)
+	return rows, err
+}

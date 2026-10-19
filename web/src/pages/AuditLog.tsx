@@ -116,7 +116,7 @@ function actionLabel(entry: AuditLogEntry, before: AuditSnapshot): string {
     archive_without_points: 'EP-Ausnahme festgelegt', availability: 'Anmeldungen geändert', award: 'Beute vergeben',
     create_linked_character: 'Charakter angelegt', link_rising_gods_profile: 'Rising-Gods-Profil verknüpft',
     merge_duplicate_source: 'Duplikat zusammengeführt', merge_duplicate_target: 'Duplikat übernommen',
-    reload_rising_gods_profile: 'Rising-Gods-Profil aktualisiert', rename: 'Umbenannt', transfer_owner: 'Spielerzuordnung geändert', remove: 'Aus dem Raid entfernt', save: 'Gespeichert',
+    reload_rising_gods_profile: 'Rising-Gods-Profil aktualisiert', rename: 'Umbenannt', transfer_owner: 'Spielerzuordnung geändert', character_owner_transfer: 'Spielerzuordnung geändert', remove: 'Aus dem Raid entfernt', save: 'Gespeichert',
     submit: 'Angemeldet', update: 'Aktualisiert', update_progress: 'Splitterstand geändert', complete: 'Schattengram abgeschlossen', move: 'Reihenfolge geändert', withdraw: 'Zurückgezogen', claim_character: 'Charakter übernommen',
   }
   return labels[entry.action] ?? entry.action.replace(/_/g, ' ')

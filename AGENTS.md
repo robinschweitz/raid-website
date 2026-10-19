@@ -102,6 +102,9 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Character names are mutable because players rename in game. Therefore **no DB-level global
   `UNIQUE(name)`**; records are addressed by stable IDs and renames are recorded in name history
   (ADR 013).
+- ADMIN may correct a mistakenly assigned character by moving it to another player. Its wishlist
+  and all matching raid-attendance player references move with it; loot, EP, locks, and signups do
+  not (ADR 091 amends ADR 090).
 - ADMIN may merge an active source account into a distinct target with a required reason. The target
   keeps credentials, role, and MFA; source authentication is revoked, all references transfer, and
   the source account is permanently deleted (ADR 056 supersedes ADR 050).

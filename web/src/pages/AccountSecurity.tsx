@@ -112,7 +112,7 @@ export function AccountSecurityPage() {
         <h1>Warum ein zweiter Faktor?</h1>
       </div>
     </div>
-    <p className="guide-lead">Ein Passwort allein ist wie ein einziges Schloss an der Gildenbank. Ein zweiter Faktor (auch MFA oder 2FA genannt) ist das zweite Schloss: Selbst wer dein Passwort kennt, kommt ohne dein Handy oder deinen Sicherheitsschlüssel nicht hinein.</p>
+    <p className="guide-lead">Erinnerst du dich an den Blizzard Authenticator, für den es sogar ein Haustier gab? Genau das ist ein zweiter Faktor (auch MFA oder 2FA genannt): Neben dem Passwort brauchst du einen Code von deinem Handy oder einen Sicherheitsschlüssel. Blizzard hat ihn nicht ohne Grund eingeführt. Wer früher nur ein Passwort hatte, stand nach einem Hack oft ohne Gold und Ausrüstung in Dalaran. Hier gilt dasselbe: Wer nur dein Passwort kennt, kommt ohne den zweiten Faktor nicht hinein.</p>
 
     <OwnStatus />
 
@@ -122,9 +122,9 @@ export function AccountSecurityPage() {
       <div className="security-stats">
         <Stat value="99,9 %" source="microsoft-2019">der Angriffe auf Konten lassen sich laut Microsoft mit einem zweiten Faktor blockieren.</Stat>
         <Stat value="99,22 %" source="microsoft-2023">weniger Risiko einer Kontoübernahme fand eine Microsoft-Studie mit echten Konten. Selbst wenn das Passwort schon geleakt war, sank das Risiko um 98,56 %.</Stat>
-        <Stat value="100 %" source="google-2019">der automatisierten Bot-Angriffe stoppte bei Google schon ein Code als zweiter Faktor, dazu 96 % des Massen-Phishings.</Stat>
-        <Stat value="0" source="google-2019">Nutzer, die nur Sicherheitsschlüssel verwendeten, wurden in Googles Untersuchung Opfer von gezieltem Phishing.</Stat>
-        <Stat value="22 %" source="verizon-2025">aller untersuchten Einbrüche begannen laut Verizon-Report 2025 mit gestohlenen Zugangsdaten. Das war der häufigste Weg hinein.</Stat>
+        <Stat value="100 %" source="google-2019">der automatisierten Bot-Angriffe auf Konten stoppte bei Google schon ein einfacher Code als zweiter Faktor.</Stat>
+        <Stat value="96 %" source="google-2019">der Phishing-Massenmails liefen bei Google ins Leere, sobald ein Code als zweiter Faktor nötig war.</Stat>
+        <Stat value="22 %" source="verizon-2025">der untersuchten Datenlecks begannen laut Verizon-Report 2025 mit gestohlenen Zugangsdaten. Das war der häufigste Weg hinein.</Stat>
         <Stat value="73 %" source="microsoft-2019">der Passwörter sind laut Microsoft Duplikate, also an mehreren Stellen gleich.</Stat>
       </div>
       <p className="guide-tip">Microsoft zählt nach eigenen Angaben über 300 Millionen betrügerische Anmeldeversuche pro Tag allein auf seinen Cloud-Diensten <Cite id="microsoft-2019" />. Angreifer probieren nicht gezielt dich aus, sondern Passwortlisten gegen alles, was sie finden.</p>
@@ -150,7 +150,7 @@ export function AccountSecurityPage() {
         <table className="table">
           <thead><tr><th>Methode</th><th>So funktioniert es</th><th>Schutz</th></tr></thead>
           <tbody>
-            <tr><td><strong>Sicherheitsschlüssel</strong><br /><span className="muted">YubiKey, FIDO2, Passkey-fähiges Gerät</span></td><td>Beim Anmelden steckst du den Schlüssel ein oder tippst ihn an.</td><td><span className="badge ok">Am stärksten</span> Schützt auch vor gefälschten Login-Seiten, weil der Schlüssel nur mit der echten Seite spricht <Cite id="bsi-bewertung" />.</td></tr>
+            <tr><td><strong>Sicherheitsschlüssel</strong><br /><span className="muted">YubiKey, FIDO2, Passkey-fähiges Gerät</span></td><td>Beim Anmelden steckst du den Schlüssel ein oder tippst ihn an.</td><td><span className="badge ok">Am stärksten</span> Schützt auch vor gefälschten Login-Seiten, weil der Schlüssel nur mit der echten Seite spricht <Cite id="bsi-bewertung" />. In Googles Untersuchung fiel niemand, der nur Sicherheitsschlüssel nutzte, auf gezieltes Phishing herein <Cite id="google-2019" />.</td></tr>
             <tr><td><strong>Authenticator-App</strong><br /><span className="muted">z. B. Google Authenticator, Microsoft Authenticator, Aegis, 2FAS</span></td><td>Die App zeigt alle 30 Sekunden einen neuen 6-stelligen Code.</td><td><span className="badge">Sehr gut</span> Kostenlos und für fast jeden machbar. Gib den Code nur auf dieser Seite ein, nie in einem Chat oder auf einer anderen Seite <Cite id="bsi-bewertung" />.</td></tr>
           </tbody>
         </table>

@@ -3,6 +3,15 @@ export const appVersion = '1.0.27'
 export const changelog = [
   {
     version: appVersion,
+    title: 'RaidLedger 2.5.0 und RaidWishlist 2.0.0',
+    changes: [
+      'Neue Addon-Versionen zum Herunterladen unter „Addons“. RaidLedger hat jetzt fünf Reiter (Beute, Vergaben, Spieler, Raid, Einstellungen): alles geht per Klick, jeder Knopf hat einen Tooltip.',
+      'RaidLedger: Unter „Spieler“ siehst du Items und Tokens pro Spieler und korrigierst sie mit − / +. Unter „Einstellungen“ legst du fest, wer außer dem Plündermeister etwas ändern darf, und siehst, wer welches Addon hat. Gleiche Tokens einer Leiche werden in einem Wurf verteilt, Gruppenplündern wird mitgeschrieben.',
+      'RaidWishlist: drei Reiter (Wunschliste, Offen, Dieser Raid), jede Liste scrollt jetzt mit dem Mausrad bis zum letzten Eintrag.',
+    ],
+  },
+  {
+    version: '1.0.26',
     title: 'Charakter dem richtigen Spieler zuordnen',
     changes: [
       'Admins können unter Spieler → Charaktere einen versehentlich falsch zugeordneten Charakter zu einem anderen Spieler verschieben. Die Raid-Aufstellungen zeigen danach den richtigen Spieler; Loot und EP bleiben unverändert. Die Änderung steht im Audit-Protokoll.',

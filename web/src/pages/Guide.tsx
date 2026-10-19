@@ -377,7 +377,8 @@ export function GuidePage() {
       <p><strong>Beispiel:</strong> Die Anfrage für den Charakter <em>Mirabelle</em> ist eingelöst und mit dem Spieler <em>Mira</em> (Login <code>@mira</code>) verknüpft.</p>
       <Shot name="53-registrierung" caption="Verlauf: welcher Code welchem Spieler zugeordnet wurde" />
       <h3>Wer hat schon ein Konto?</h3>
-      <p>Unter <strong>Spieler</strong> sehen Admins zu jedem Spieler seine <strong>Charaktere</strong>, das <strong>Konto</strong> und die <strong>Rolle</strong>. Oben steht, wie viele Spieler schon ein Konto haben.</p>
+      <p>Unter <strong>Spieler</strong> sehen Admins zu jedem Spieler seine <strong>Charaktere</strong>, das <strong>Konto</strong> und die <strong>Rolle</strong>. Oben steht, wie viele Spieler schon ein Konto haben. Wurde ein Charakter versehentlich dem falschen Spieler zugeordnet, öffne beim bisherigen Spieler den Reiter „Charaktere“, klicke beim Charakter auf <strong>Verschieben</strong> und wähle den richtigen Spieler. Raid-Historie und EP bleiben unverändert.</p>
+      <Shot name="52b-charakter-verschieben" caption="Charakter dem richtigen Spieler zuordnen" />
       <ul>
         <li><strong>@login</strong> mit „registriert am … über ‹Charakter›“: Die Person hat einen Code eingelöst.</li>
         <li><strong>@login</strong> mit „Login vom Admin angelegt“: Ein Admin hat Benutzername und Passwort gesetzt.</li>

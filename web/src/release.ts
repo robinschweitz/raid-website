@@ -1,8 +1,15 @@
-export const appVersion = '1.0.25'
+export const appVersion = '1.0.26'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Charakter dem richtigen Spieler zuordnen',
+    changes: [
+      'Admins können unter Spieler → Charaktere einen versehentlich falsch zugeordneten Charakter zu einem anderen Spieler verschieben. Raid-Historie und EP bleiben dabei unverändert; die Änderung steht im Audit-Protokoll.',
+    ],
+  },
+  {
+    version: '1.0.25',
     title: 'Aktueller Raid, Boss-Reihenfolge und Beute ohne Empfänger',
     changes: [
       'Neu im Menü: „Aktueller Raid“ (mobil „Aktuell“) führt direkt zum Raid von heute Abend, also zum neuesten Raid, der schon begonnen hat (sonst zum nächsten).',

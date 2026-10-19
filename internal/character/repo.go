@@ -2,6 +2,7 @@ package character
 
 import (
 	"context"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -61,6 +62,16 @@ func (r *Repo) FindByExternalProfile(ctx context.Context, source, profileID stri
 
 func (r *Repo) Update(ctx context.Context, c *Character) error {
 	_, err := r.db.NewUpdate().Model(c).WherePK().Exec(ctx)
+	return err
+}
+
+// UpdateWishlistOwner keeps the wishlist's denormalized owner in sync with its character.
+func (r *Repo) UpdateWishlistOwner(ctx context.Context, characterID, playerID int64, updatedAt time.Time) error {
+	_, err := r.db.NewUpdate().Table("character_wishlist").
+		Set("player_id = ?", playerID).
+		Set("updated_at = ?", updatedAt).
+		Where("character_id = ?", characterID).
+		Exec(ctx)
 	return err
 }
 

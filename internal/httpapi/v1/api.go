@@ -126,6 +126,7 @@ func (a *API) Register(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/raids", a.listRaids)
 	mux.HandleFunc("POST /api/v1/raids", RequireRole(validation.RoleRaidassistent, a.createRaid))
+	mux.HandleFunc("GET /api/v1/raids/current", RequireAuth(a.currentRaid))
 	mux.HandleFunc("GET /api/v1/raids/{id}", RequireAuth(a.getRaid))
 	mux.HandleFunc("PATCH /api/v1/raids/{id}", RequireRole(validation.RoleRaidassistent, a.configureRaidSchedule))
 	mux.HandleFunc("POST /api/v1/raids/{id}/cancel", RequireRole(validation.RoleRaidassistent, a.cancelRaid))

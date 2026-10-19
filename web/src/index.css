@@ -1882,3 +1882,6 @@ input[type='checkbox'] {
 .my-raid-secondary { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; margin-top: auto; padding-top: 10px; border-top: 1px solid rgba(42, 64, 87, 0.6); }
 .my-raid-secondary button { width: 100%; min-height: 34px; font-size: 13px; }
 .my-raid-decline { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.boss-order-list { margin: 12px 0; padding-left: 26px; display: grid; gap: 4px; max-width: 520px; }
+.boss-order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px; border: 1px solid var(--card-border); border-radius: 4px; }
+.boss-order-list .actions { margin: 0; }

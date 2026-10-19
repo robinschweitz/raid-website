@@ -245,6 +245,12 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - Raid choices store a roster character: list entries on that step or Krieger/Paladin/Todesritter
   in the roster that are not on the active list (ADR 087).
 
+### Current raid and boss order (ADR 088)
+- "Aktueller Raid" opens the newest raid that has begun (real, else scheduled start not in the
+  future), else the next one; cancelled raids are skipped.
+- An Admin sets each instance's boss order (every boss once, audited). Boss pickers, boss lists
+  and a raid's loot follow it; unordered bosses come after, in catalog order.
+
 ### Loot, attendance, and character corrections
 - Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived
   raid history only; live-character changes never rewrite raid snapshots (ADR 032).

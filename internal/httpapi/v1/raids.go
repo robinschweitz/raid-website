@@ -42,6 +42,21 @@ func (a *API) listRaids(w http.ResponseWriter, r *http.Request) {
 	writeListJSON(w, rs)
 }
 
+// currentRaid answers which raid the "Aktueller Raid" link opens (ADR 088).
+func (a *API) currentRaid(w http.ResponseWriter, r *http.Request) {
+	rs, err := a.Raids.List(r.Context(), true)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not list raids")
+		return
+	}
+	current := raid.Current(rs, time.Now().UTC())
+	if current == nil {
+		WriteError(w, http.StatusNotFound, "no_current_raid", "no raid has begun or is planned")
+		return
+	}
+	WriteJSON(w, http.StatusOK, current)
+}
+
 func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {

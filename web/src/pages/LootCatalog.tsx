@@ -6,6 +6,7 @@ import { matchesCatalogItem } from '../catalog'
 import { useSubmission } from '../useSubmission'
 import { useAuth } from '../auth'
 import { NavIcon } from '../components/NavIcon'
+import { BossOrderEditor } from '../components/BossOrderEditor'
 
 const qualityClasses: Record<number, string> = {
   2: 'uncommon',
@@ -282,5 +283,6 @@ export function LootCatalogPage() {
       </>}
       <button type="button" disabled={loading} onClick={() => void load()}>Beute neu laden</button>
     </section>
+    {me && atLeast(me.role, 'ADMIN') && catalog && <BossOrderEditor catalog={catalog} onSaved={() => void load()} />}
   </div>
 }

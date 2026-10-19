@@ -49,7 +49,7 @@ func (r *Repo) bossPositions(ctx context.Context) (map[string]int, error) {
 func (r *Repo) replaceBossOrder(ctx context.Context, actorID int64, instanceID string, before, order []string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if len(before) > 0 {
-			if _, err := tx.NewDelete().Model((*bossPosition)(nil)).Where("boss_id IN (?)", bun.In(before)).Exec(ctx); err != nil {
+			if _, err := tx.NewDelete().Model((*bossPosition)(nil)).Where("boss_id IN (?)", bun.List(before)).Exec(ctx); err != nil {
 				return err
 			}
 		}

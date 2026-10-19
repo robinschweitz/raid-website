@@ -55,4 +55,9 @@ func TestCurrentUsesTheRealStartAndFallsBackToTheNextRaid(t *testing.T) {
 	if got := Current([]Raid{{ID: 9, Status: validation.RaidStatusOpen}}, now); got != nil {
 		t.Fatalf("a raid without any time is not current, got %+v", got)
 	}
+	// Imported history has neither start: its completion counts.
+	imported := []Raid{{ID: 10, Status: validation.RaidStatusCompleted, CompletedAt: at(now.AddDate(0, 0, -3))}, ahead[1]}
+	if got := Current(imported, now); got == nil || got.ID != 10 {
+		t.Fatalf("want the imported raid 10, got %+v", got)
+	}
 }

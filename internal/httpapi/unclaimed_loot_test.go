@@ -33,16 +33,19 @@ func TestStaffRecordLootThatWentToNobody(t *testing.T) {
 		}
 	}
 	status, body = do(t, f.srv.Client(), http.MethodPost, url, f.token, entry)
-	var created struct {
-		ID       int64
-		ItemName string `json:"item_name"`
-		Boss     string
-		Outcome  string
-		Source   string
+	var response struct {
+		Data struct {
+			ID       int64
+			ItemName string `json:"item_name"`
+			Boss     string
+			Outcome  string
+			Source   string
+		}
 	}
-	if err := json.Unmarshal(body, &created); err != nil || status != http.StatusCreated {
+	if err := json.Unmarshal(body, &response); err != nil || status != http.StatusCreated {
 		t.Fatalf("create: %d %s", status, body)
 	}
+	created := response.Data
 	if created.ItemName == "" || created.Boss == "" || created.Outcome != "NOBODY" || created.Source != "manual" {
 		t.Fatalf("the catalog fills item and boss names: %s", body)
 	}

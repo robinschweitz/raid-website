@@ -65,7 +65,7 @@ func (h UnclaimedHandlers) create(w http.ResponseWriter, r *http.Request) {
 		unclaimedError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusCreated, entry)
+	WriteJSON(w, http.StatusCreated, map[string]any{"data": entry})
 }
 
 type removeUnclaimedRequest struct {

@@ -45,11 +45,11 @@ func TestCurrentRaidOpensTheNewestBegunRaid(t *testing.T) {
 	create("Cancelled tonight", validation.RaidStatusCancelled, now.Add(-time.Minute))
 
 	status, body = do(t, srv.Client(), http.MethodGet, url, member, nil)
-	var current raid.Raid
+	var current struct{ Data raid.Raid }
 	if err := json.Unmarshal(body, &current); err != nil {
 		t.Fatal(err)
 	}
-	if status != http.StatusOK || current.ID != tonight.ID {
+	if status != http.StatusOK || current.Data.ID != tonight.ID {
 		t.Fatalf("want raid %d, got %d %s", tonight.ID, status, body)
 	}
 }

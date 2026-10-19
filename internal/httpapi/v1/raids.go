@@ -54,7 +54,7 @@ func (a *API) currentRaid(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusNotFound, "no_current_raid", "no raid has begun or is planned")
 		return
 	}
-	WriteJSON(w, http.StatusOK, current)
+	WriteJSON(w, http.StatusOK, map[string]any{"data": current})
 }
 
 func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {

@@ -16,8 +16,9 @@ used both by the boss picker and by the loot list.
   `/raids/current`, which forwards to the raid that `GET /api/v1/raids/current` names (any signed-in
   user). The server picks the **newest raid that has begun**, meaning its real start, else its scheduled
   start, is not in the future, so tonight's raid counts from its start time and stays current until
-  the next one begins. If none has begun, it picks the **next raid to come**. Cancelled raids and
-  raids without any time are skipped; with no raid at all the answer is 404 `no_current_raid`.
+  the next one begins. Imported history without either start counts from its completion. If
+  none has begun, it picks the **next raid to come**. Cancelled raids and raids without any time
+  are skipped; with no raid at all the answer is 404 `no_current_raid`.
   The forward replaces the history entry, so "back" does not return to the link.
 - **Boss order.** `loot_catalog_boss_order` (migration 074) stores a position per boss. It is guild
   configuration beside the bundled catalog (ADR 027), never part of it. `PUT

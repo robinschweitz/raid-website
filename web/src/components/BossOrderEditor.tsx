@@ -16,9 +16,9 @@ export function BossOrderEditor({ catalog, onSaved }: Props) {
   const [order, setOrder] = useState<CatalogBoss[]>([])
   const [notice, setNotice] = useState('')
 
+  // The catalog reloads after a save: keep the "saved" notice then.
   useEffect(() => {
     setOrder(catalog.bosses.filter((boss) => boss.instance_id === instanceID))
-    setNotice('')
   }, [catalog, instanceID])
 
   const move = (index: number, by: number) => {
@@ -41,7 +41,7 @@ export function BossOrderEditor({ catalog, onSaved }: Props) {
 
   return <section className="card boss-order-editor"><h2>Boss-Reihenfolge</h2>
     <p className="muted">Gilt für die Boss-Auswahl beim Beute-Eintragen und für die Boss-Gruppen in der Beuteliste eines Raids.</p>
-    <label>Instanz<select value={instanceID} onChange={(event) => setInstanceID(event.target.value)}>
+    <label>Instanz<select value={instanceID} onChange={(event) => { setInstanceID(event.target.value); setNotice('') }}>
       {catalog.instances.map((instance) => <option key={instance.id} value={instance.id}>{instance.name}</option>)}
     </select></label>
     <ol className="boss-order-list">{order.map((boss, index) => <li key={boss.id}>

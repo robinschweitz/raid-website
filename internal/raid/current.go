@@ -7,9 +7,10 @@ import (
 )
 
 // Current picks the raid the "Aktueller Raid" link opens (ADR 088): the newest
-// raid that has begun (started, or its scheduled start is not in the future),
-// else the next raid to come. Cancelled raids and raids without any time are
-// skipped. It returns nil when no raid qualifies.
+// raid that has begun (started, or its scheduled start is not in the future;
+// imported history without either counts from its completion), else the next
+// raid to come. Cancelled raids and raids without any time are skipped. It
+// returns nil when no raid qualifies.
 func Current(raids []Raid, now time.Time) *Raid {
 	var begun, next *Raid
 	for i := range raids {
@@ -37,12 +38,16 @@ func Current(raids []Raid, now time.Time) *Raid {
 	return next
 }
 
-// beginning is when a raid began: its real start, else its scheduled start.
+// beginning is when a raid began: its real start, else its scheduled start,
+// else (imported history without either) when it was completed.
 func beginning(rd *Raid) *time.Time {
 	if rd.StartedAt != nil {
 		return rd.StartedAt
 	}
-	return rd.ScheduledStart
+	if rd.ScheduledStart != nil {
+		return rd.ScheduledStart
+	}
+	return rd.CompletedAt
 }
 
 func later(a, b *Raid) bool {

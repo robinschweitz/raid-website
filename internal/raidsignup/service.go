@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
 	"raid-website/internal/raid"
@@ -505,6 +506,9 @@ func (s *Service) absenceTarget(ctx context.Context, r *Repo, raidID, actor, tar
 
 // Decline records or updates an absence with an optional reason. status is
 // AbsenceDeclined ("kann nicht") or AbsenceTentative ("unsicher"); empty means declined.
+// A refusal also removes the player's roster rows (bench included) and
+// withdraws their open signups in the same transaction (ADR 093); loot in this
+// raid rejects it with raidcorrection.ErrHasLoot. "Unsicher" changes neither.
 func (s *Service) Decline(ctx context.Context, raidID, actor, target int64, reason, status string) error {
 	reason = strings.TrimSpace(reason)
 	if len([]rune(reason)) > MaxAbsenceReason {
@@ -536,11 +540,53 @@ func (s *Service) Decline(ctx context.Context, raidID, actor, target int64, reas
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
+		if status == AbsenceDeclined {
+			if err := s.leaveRaid(ctx, r, raidID, actor, target); err != nil {
+				return err
+			}
+		}
 		if err := r.saveAbsence(ctx, row); err != nil {
 			return err
 		}
 		return s.log(ctx, r, raidID, actor, action, before, row)
 	})
+}
+
+// leaveRaid takes a declining player out of the raid (ADR 093): their roster
+// rows are removed like a staff removal (ADR 076), then their open signups are
+// withdrawn. Removing the rows first turns accepted signups into open ones.
+func (s *Service) leaveRaid(ctx context.Context, r *Repo, raidID, actor, target int64) error {
+	roster, err := r.attendance.ListByRaid(ctx, raidID)
+	if err != nil {
+		return err
+	}
+	for _, a := range roster {
+		if a.PlayerID != target {
+			continue
+		}
+		if err := r.corrections.RemoveAttendance(ctx, raidID, a.ID, actor); err != nil {
+			return fmt.Errorf("remove roster row %d of declining player %d: %w", a.ID, target, err)
+		}
+	}
+	rows, err := r.list(ctx, raidID)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if row.PlayerID != target || row.IsWithdrawn {
+			continue
+		}
+		before := row
+		row.IsWithdrawn = true
+		row.UpdatedAt = s.now()
+		if err := r.save(ctx, &row); err != nil {
+			return err
+		}
+		if err := s.log(ctx, r, raidID, actor, "withdraw", before, row); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Revoke removes an absence; it is idempotent.

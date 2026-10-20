@@ -313,7 +313,7 @@ local calendarInfo = ns.label(panel, "GameFontNormalSmall", 9, {0.55, 0.72, 0.80
 calendarInfo:SetPoint("TOPLEFT", panel, "TOPLEFT", CALENDAR_LEFT, -34)
 calendarInfo:SetWidth(CALENDAR_WIDTH)
 calendarInfo:SetJustifyH("LEFT")
-calendarInfo:SetText(L["Create the event, then SYNC sets everyone's status from the website list."])
+calendarInfo:SetText(L["Create the event, then SYNC invites the missing and SET STATUSES sets everyone's status from the website list."])
 local calendarSyncButton = ns.flatButton(panel, L["SYNC"], CALENDAR_WIDTH, "RaidLedgerCalendarSync")
 calendarSyncButton:SetHeight(20)
 calendarSyncButton:SetPoint("TOPLEFT", panel, "TOPLEFT", CALENDAR_LEFT, -96)
@@ -624,15 +624,15 @@ local function memberByName()
     return byName
 end
 
--- setListedStatuses sets the wanted status on every listed invite of the
--- open (or new) event. Returns how many changed and who refused in game.
 local function inviteIndex(name)
     for i = 1, CalendarEventGetNumInvites() or 0 do
         if ns.lower(CalendarEventGetInvite(i) or "") == ns.lower(name) then return i end
     end
 end
 
-local function setListedStatuses()
+-- planStatuses lists the status changes the website list asks for in the open
+-- (or new) event, and who refused in game.
+local function planStatuses()
     local byName, changes, refused = memberByName(), {}, {}
     for i = 1, CalendarEventGetNumInvites() or 0 do
         local name, _, _, _, current = CalendarEventGetInvite(i)
@@ -646,13 +646,29 @@ local function setListedStatuses()
             end
         end
     end
+    return changes, refused
+end
+
+-- applyStatuses sets the planned statuses. It must run from a click: the
+-- client may block calendar changes from a timer (live run 08455f4dff39 for
+-- CalendarAddEvent), and a blocked call raises no Lua error, so pcall only
+-- guards against real errors. Success is checked afterwards (verifyStatuses).
+local function applyStatuses(changes)
     -- A status change may re-sort the list: look each name up again.
-    local changed = 0
     for _, change in ipairs(changes) do
         local index = inviteIndex(change.name)
-        if index and pcall(CalendarEventSetStatus, index, change.status) then changed = changed + 1 end
+        if index then pcall(CalendarEventSetStatus, index, change.status) end
     end
-    return changed, refused
+end
+
+-- verifyStatuses counts the planned changes the event's invite list now shows.
+local function verifyStatuses(changes)
+    local done = 0
+    for _, change in ipairs(changes) do
+        local index = inviteIndex(change.name)
+        if index and select(5, CalendarEventGetInvite(index)) == change.status then done = done + 1 end
+    end
+    return done
 end
 
 -- confirmCalendarEvent looks for the added event in the calendar the server
@@ -695,7 +711,7 @@ local function finishCalendarEvent()
     calendarJob = nil
     setCalendarButton()
     local added = math.max(0, (CalendarEventGetNumInvites() or 0) - job.before)
-    setListedStatuses()     -- a new event takes the statuses with it; SYNC checks them afterwards
+    applyStatuses((planStatuses()))     -- from the click; SYNC checks them afterwards
     local before = countMatches(job)
     CalendarAddEvent()
     calendarCheck = { before = before, raid = job.raid, title = job.title, year = job.year, month = job.month, day = job.day,
@@ -787,11 +803,14 @@ end
 -- invites with their answers into the RS2;CAL export for the website's
 -- calendar import. Both run step by step: the calendar answers the server's
 -- way, a little later, and invites of an existing event go out one by one.
+-- Statuses are set only when the raid lead clicks SET STATUSES (n), then
+-- checked: the client may block calendar changes that do not come from a click.
 ---------------------------------------------------------------------------
 local SYNC_FIND = 8        -- seconds to wait for the calendar and the event
 local SYNC_READ = 1.5      -- let the opened event's invite list arrive
 local SYNC_STATUS_DELAY = 0.2
-local calendarSync         -- { mode, phase, raid, title, deadline, wait, queue, ... }
+local SYNC_VERIFY = 2      -- let the server answer the status changes
+local calendarSync         -- { mode, phase, raid, title, deadline, wait, queue, changes, ... }
 
 local function calendarInfoText(text)
     calendarInfo:SetText(text)
@@ -875,16 +894,56 @@ local function startSyncInvites(sync)
     sync.invited, sync.phase, sync.wait = table.getn(sync.queue), "invite", 0
 end
 
-local function finishSync(sync)
-    local changed, refused = setListedStatuses()
-    local message = string.format(L["Calendar synced: %d invited, %d statuses set."], sync.invited or 0, changed)
-    if table.getn(refused) > 0 then
-        message = message .. " " .. string.format(L["Declined in game: %s (export the answers for the website)."], table.concat(refused, ", "))
+-- syncNotes adds who refused in game and who did not fit into the event.
+local function syncNotes(sync, message)
+    if table.getn(sync.refused or {}) > 0 then
+        message = message .. " " .. string.format(L["Declined in game: %s (export the answers for the website)."], table.concat(sync.refused, ", "))
     end
     if (sync.left or 0) > 0 then
         message = message .. " " .. string.format(L["%d characters not invited: the calendar takes 100 per event."], sync.left)
     end
-    stopSync(message)
+    return message
+end
+
+-- planSync ends the invites: without changes SYNC is done, otherwise it
+-- waits for the raid lead's click on SET STATUSES (n).
+local function planSync(sync)
+    sync.changes, sync.refused = planStatuses()
+    local count = table.getn(sync.changes)
+    if count == 0 then
+        stopSync(syncNotes(sync, string.format(L["Calendar synced: %d invited, no status to set."], sync.invited or 0)))
+        return
+    end
+    sync.phase = "ready"
+    calendarSyncButton:SetText(string.format(L["SET STATUSES (%d)"], count))
+    local message = string.format(L["%d invited. Click SET STATUSES (%d) to set the statuses in the calendar event."], sync.invited or 0, count)
+    ns.say(message)
+    calendarInfoText(message)
+end
+
+-- setSyncStatuses runs from the click on SET STATUSES (n).
+local function setSyncStatuses(sync)
+    if CalendarGetEventInfo() ~= sync.title then
+        stopSync(L["The calendar event is no longer open: click SYNC again."])
+        return
+    end
+    -- "verify" first: the client reports a blocked call while it is made.
+    sync.blocked, sync.phase, sync.wait = false, "verify", SYNC_VERIFY
+    applyStatuses(sync.changes)
+    calendarSyncButton:SetText(L["SYNCING..."])
+    calendarInfoText(L["Checking the statuses..."])
+end
+
+local function verifySync(sync)
+    local count = table.getn(sync.changes)
+    local done = verifyStatuses(sync.changes)
+    local message = string.format(L["Calendar synced: %d invited, %d of %d statuses set."], sync.invited or 0, done, count)
+    if sync.blocked then
+        message = message .. " " .. L["The game client blocked setting statuses: set them by hand in the calendar."]
+    elseif done < count then
+        message = message .. " " .. L["Check the missing ones in the calendar and set them by hand if needed."]
+    end
+    stopSync(syncNotes(sync, message))
 end
 
 local function syncStep(elapsed)
@@ -928,12 +987,17 @@ local function syncStep(elapsed)
             sync.phase, sync.wait = "status", sync.invited > 0 and CALENDAR_SETTLE or SYNC_STATUS_DELAY
         end
     elseif sync.phase == "status" then
-        finishSync(sync)
+        planSync(sync)
+    elseif sync.phase == "verify" then
+        verifySync(sync)
     end
 end
 
 -- startCalendarSync runs SYNC (mode "sync") or the answers export ("export").
 startCalendarSync = function(mode)
+    if calendarSync and calendarSync.phase == "ready" then
+        stopSync()      -- a new run replaces statuses still waiting for the click
+    end
     if calendarSync then
         ns.say(L["The calendar is still being synced."])
         return
@@ -986,7 +1050,13 @@ end)
 attendanceButton:SetScript("OnClick", exportAttendance)
 sortButton:SetScript("OnClick", sortGroups)
 calendarButton:SetScript("OnClick", createCalendarEvent)
-calendarSyncButton:SetScript("OnClick", function() startCalendarSync("sync") end)
+calendarSyncButton:SetScript("OnClick", function()
+    if calendarSync and calendarSync.phase == "ready" then
+        setSyncStatuses(calendarSync)
+    else
+        startCalendarSync("sync")
+    end
+end)
 calendarExportButton:SetScript("OnClick", function() startCalendarSync("export") end)
 
 -- System messages tell what became of an invite.
@@ -1026,6 +1096,8 @@ events:RegisterEvent("CHAT_MSG_SYSTEM")
 events:RegisterEvent("RAID_ROSTER_UPDATE")
 events:RegisterEvent("PARTY_MEMBERS_CHANGED")
 events:RegisterEvent("CALENDAR_OPEN_EVENT")
+events:RegisterEvent("ADDON_ACTION_BLOCKED")
+events:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 events:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_LOGIN" then
         setup()
@@ -1049,6 +1121,12 @@ events:SetScript("OnEvent", function(_, event, ...)
         onSystemMessage(...)
     elseif event == "CALENDAR_OPEN_EVENT" then
         if calendarSync and calendarSync.phase == "open" then calendarSync.opened = true end
+    elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
+        -- (addon, function): the client refused a protected call (see applyStatuses).
+        local _, blockedFunction = ...
+        if calendarSync and calendarSync.phase == "verify" and tostring(blockedFunction or ""):find("CalendarEventSetStatus", 1, true) then
+            calendarSync.blocked = true
+        end
 
     else
         updateGroupStatus()

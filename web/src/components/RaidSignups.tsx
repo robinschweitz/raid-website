@@ -40,6 +40,15 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
   const canDeclineOwn = canSignup && isActiveRaid && isFuture
   const myStatus = overview && player ? myRaidStatus(overview, player.id) : null
   const playerLabel = (id: number) => players.find((row) => row.id === id)?.name ?? `Spieler #${id}`
+  // ADR 093: "kann nicht" removes the roster slot and withdraws open signups; ask first.
+  const confirmDecline = (playerID: number, own: boolean) => {
+    const inRoster = attendance.some((row) => row.player_id === playerID)
+    const signedUp = !!overview?.entries.some((row) => row.player_id === playerID && !row.is_withdrawn)
+    if (!inRoster && !signedUp) return true
+    if (own) return window.confirm(inRoster ? 'Absagen? Damit wirst du aus der Aufstellung entfernt und deine Anmeldung zurückgezogen.' : 'Absagen? Damit wird deine Anmeldung zurückgezogen.')
+    const name = playerLabel(playerID)
+    return window.confirm(inRoster ? `${name} als abgesagt markieren? ${name} wird damit aus der Aufstellung entfernt, die Anmeldung zurückgezogen.` : `${name} als abgesagt markieren? Die Anmeldung wird damit zurückgezogen.`)
+  }
 
   const load = useCallback(async () => {
     const version = ++loadVersion.current
@@ -142,7 +151,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
         {absences.length === 0 && <p className="muted">Keine Absagen und niemand unsicher.</p>}
         {absences.map((row) => <p key={row.player_id}>
           <strong>{playerLabel(row.player_id)}</strong> {isDeclined(row) ? <span className="badge bad">Hat abgesagt</span> : <span className="badge warn">Unsicher</span>}{row.reason && <> · {row.reason}</>}
-          {canManage && isActiveRaid && <> <button type="button" disabled={pending} onClick={() => { void mutate(() => api.del(`${absenceBase}/${row.player_id}`), `${playerLabel(row.player_id)} ist wieder dabei.`, true) }}>{isDeclined(row) ? 'Absage zurücknehmen' : 'Sicher dabei'}</button></>}
+          {canManage && isActiveRaid && <> <button type="button" disabled={pending} onClick={() => { void mutate(() => api.del(`${absenceBase}/${row.player_id}`), isDeclined(row) ? `Absage von ${playerLabel(row.player_id)} zurückgenommen.` : `${playerLabel(row.player_id)} ist sicher dabei.`, true) }}>{isDeclined(row) ? 'Absage zurücknehmen' : 'Sicher dabei'}</button></>}
         </p>)}
         {canManage && isActiveRaid && <div className="actions">
           <label>Spieler markieren
@@ -151,7 +160,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
               {players.filter((row) => row.active && !absences.some((a) => a.player_id === row.id && isDeclined(a))).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
             </select>
           </label>
-          <button type="button" disabled={pending || !absenceTarget} onClick={() => { void mutate(() => api.put(`${absenceBase}/${absenceTarget}`, { reason: '', status: 'DECLINED' }), 'Spieler als abgesagt markiert.', true) }}>Als abgesagt markieren</button>
+          <button type="button" disabled={pending || !absenceTarget} onClick={() => { if (!confirmDecline(Number(absenceTarget), false)) return; void mutate(() => api.put(`${absenceBase}/${absenceTarget}`, { reason: '', status: 'DECLINED' }), 'Spieler als abgesagt markiert.', true) }}>Als abgesagt markieren</button>
           <button type="button" disabled={pending || !absenceTarget} onClick={() => { void mutate(() => api.put(`${absenceBase}/${absenceTarget}`, { reason: '', status: 'TENTATIVE' }), 'Spieler als unsicher markiert.', true) }}>Als unsicher markieren</button>
         </div>}
       </section>}
@@ -192,20 +201,20 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
         <h3>Kannst du nicht kommen oder bist du unsicher?</h3>
         {ownAbsence && isDeclined(ownAbsence) ? <>
           <p><span className="badge bad">Du hast abgesagt</span>{ownAbsence.reason && <> · {ownAbsence.reason}</>}</p>
-          <p className="muted">Die Raidleitung sieht deine Absage. Bis zum Raidstart kannst du sie zurücknehmen.</p>
-          <button type="button" disabled={pending} onClick={() => { void mutate(() => api.del(`${absenceBase}/${player!.id}`), 'Absage zurückgenommen. Du bist wieder dabei.', true) }}>Doch dabei</button>
+          <p className="muted">Die Raidleitung sieht deine Absage. Bis zum Raidstart kannst du sie zurücknehmen und dich neu anmelden.</p>
+          <button type="button" disabled={pending} onClick={() => { void mutate(() => api.del(`${absenceBase}/${player!.id}`), 'Absage zurückgenommen. Melde dich wieder an, wenn du kommst.', true) }}>Doch dabei</button>
         </> : <>
           {ownAbsence && <>
             <p><span className="badge warn">Du bist unsicher</span>{ownAbsence.reason && <> · {ownAbsence.reason}</>}</p>
             <p className="muted">Die Raidleitung sieht, dass du noch nicht sicher bist. Sobald du es weißt, sag sicher zu oder ab.</p>
             <button type="button" disabled={pending} onClick={() => { void mutate(() => api.del(`${absenceBase}/${player!.id}`), 'Du bist sicher dabei.', true) }}>Sicher dabei</button>
           </>}
-          {!ownAbsence && <p className="muted">Sag der Raidleitung Bescheid, damit sie planen kann. Deine Anmeldung bleibt bestehen, die Raidleitung entscheidet über die Aufstellung.</p>}
+          {!ownAbsence && <p className="muted">Sag der Raidleitung Bescheid, damit sie planen kann. Mit „Ich kann nicht kommen“ wird deine Anmeldung zurückgezogen und ein Platz in der Aufstellung frei; „unsicher“ ändert daran nichts.</p>}
           <label>{ownAbsence ? 'Grund für die Absage (optional)' : 'Grund oder Hinweis (optional)'}
             <input value={absenceReason} maxLength={200} disabled={pending} onChange={(event) => setAbsenceReason(event.target.value)} placeholder="z. B. krank, Urlaub oder komme evtl. später" />
           </label>
           <div className="actions">
-            <button type="button" disabled={pending} onClick={() => { void mutate(() => api.put(`${absenceBase}/${player!.id}`, { reason: absenceReason, status: 'DECLINED' }), 'Absage gesendet. Die Raidleitung sieht sie jetzt.', true) }}>Ich kann nicht kommen</button>
+            <button type="button" disabled={pending} onClick={() => { if (!confirmDecline(player!.id, true)) return; void mutate(() => api.put(`${absenceBase}/${player!.id}`, { reason: absenceReason, status: 'DECLINED' }), 'Absage gesendet. Die Raidleitung sieht sie jetzt.', true) }}>Ich kann nicht kommen</button>
             {!ownAbsence && <button type="button" disabled={pending} onClick={() => { void mutate(() => api.put(`${absenceBase}/${player!.id}`, { reason: absenceReason, status: 'TENTATIVE' }), 'Als unsicher gemeldet. Die Raidleitung sieht es jetzt.', true) }}>Ich bin unsicher</button>}
           </div>
         </>}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"raid-website/internal/attendance"
 	"raid-website/internal/character"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidsignup"
@@ -259,5 +260,71 @@ func TestAddonCalendarImportOwnAcceptanceAfterStart(t *testing.T) {
 	}
 	if !signedUp {
 		t.Fatalf("no pending signup: %+v", overview.Entries)
+	}
+}
+
+// ADR 093: a refusal with loot in the raid is rejected and changes nothing.
+func TestDeclineWithLootIsRejected(t *testing.T) {
+	f := newCalendarFixture(t)
+	f.attend(f.first, f.firstChar)
+	f.request(http.MethodPost, "/loot", f.selection(map[string]any{"awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "award_method": "MAIN"}, false), http.StatusCreated)
+	body := f.request(http.MethodPut, fmt.Sprintf("/absences/%d", f.first), map[string]any{}, http.StatusConflict)
+	var out struct{ Error struct{ Code string } }
+	if err := json.Unmarshal(body, &out); err != nil || out.Error.Code != "attendance_has_loot" {
+		t.Fatalf("decline with loot: %s", body)
+	}
+	payload := fmt.Sprintf("RS2;CAL;%d;Raidleiter;1760000000\nCorrection0;declined", f.raidID)
+	result := f.request(http.MethodPost, "/addon-calendar-import", map[string]any{"payload": payload, "selections": []map[string]any{{"character_id": f.firstChar, "action": "decline"}}}, http.StatusOK)
+	var results struct {
+		Data []struct{ Status, Code string }
+	}
+	if err := json.Unmarshal(result, &results); err != nil || len(results.Data) != 1 || results.Data[0].Code != "attendance_has_loot" {
+		t.Fatalf("calendar decline with loot: %s", result)
+	}
+	rows, err := attendance.NewRepo(f.db).ListByRaid(context.Background(), f.raidID)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("roster = %+v, %v", rows, err)
+	}
+	for _, a := range f.overview().Absences {
+		if a.PlayerID == f.first {
+			t.Fatal("refusal saved although it was rejected")
+		}
+	}
+}
+
+// ADR 093: a calendar refusal removes the roster slot, withdraws the open
+// signup and keeps the website's reason.
+func TestAddonCalendarDeclineLeavesRaidAndKeepsReason(t *testing.T) {
+	f := newCalendarFixture(t)
+	f.attend(f.unsure, f.unsureChar)
+	f.request(http.MethodPut, fmt.Sprintf("/absences/%d", f.unsure), map[string]any{"status": "TENTATIVE", "reason": "Spätschicht"}, http.StatusOK)
+	payload := fmt.Sprintf("RS2;CAL;%d;Raidleiter;1760000000\nZweifler;declined\nHeilerin;out", f.raidID)
+	rows := f.calendarPreview(payload)
+	if rows[0].Action != "decline" || rows[1].Action != "decline" {
+		t.Fatalf("preview = %+v", rows)
+	}
+	selections := []map[string]any{{"character_id": f.unsureChar, "action": "decline"}, {"character_id": f.healerChar, "action": "decline"}}
+	f.request(http.MethodPost, "/addon-calendar-import", map[string]any{"payload": payload, "selections": selections}, http.StatusOK)
+	roster, err := attendance.NewRepo(f.db).ListByRaid(context.Background(), f.raidID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range roster {
+		if a.PlayerID == f.unsure {
+			t.Fatal("calendar refusal kept the roster slot")
+		}
+	}
+	overview := f.overview()
+	reasons := map[int64]string{}
+	for _, a := range overview.Absences {
+		reasons[a.PlayerID] = a.Reason
+	}
+	if reasons[f.unsure] != "Spätschicht" || reasons[f.healer] != "Im Spielkalender beantwortet" {
+		t.Fatalf("reasons = %+v", reasons)
+	}
+	for _, entry := range overview.Entries {
+		if entry.PlayerID == f.healer && !entry.IsWithdrawn {
+			t.Fatal("calendar refusal kept the open signup")
+		}
 	}
 }

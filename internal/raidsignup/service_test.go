@@ -278,3 +278,102 @@ func TestSubmitForPlayerRemovesAbsence(t *testing.T) {
 		t.Fatalf("absence removed without a signup: %+v", overview.Absences)
 	}
 }
+
+// ADR 093: "kann nicht" takes the player out of the raid: roster rows (bench
+// included) are removed and open signups withdrawn. "Unsicher" changes nothing.
+func TestDeclineRemovesRosterSlotAndWithdrawsSignups(t *testing.T) {
+	ctx := context.Background()
+	database, err := db.Open(ctx, "file:"+filepath.Join(t.TempDir(), "decline.db")+"?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	migrator, err := migrations.NewMigrator(database.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := migrator.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r := NewRepo(database.DB)
+	s := NewService(r)
+	now := time.Now().UTC()
+	staff := &player.Player{Name: "Staff", Role: validation.RoleRaidassistent, Active: true, CreatedAt: now, UpdatedAt: now}
+	member := &player.Player{Name: "Member", Role: validation.RoleMember, Active: true, CreatedAt: now, UpdatedAt: now}
+	for _, p := range []*player.Player{staff, member} {
+		if err := r.players.Create(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	main := &character.Character{PlayerID: member.ID, Name: "Hauptfigur", Class: "Paladin", MainSpec: "Vergeltung", SecondSpec: "Heilig", IsMain: true, Active: true, CreatedAt: now, UpdatedAt: now}
+	twink := &character.Character{PlayerID: member.ID, Name: "Zweitfigur", Class: "Magier", MainSpec: "Feuer", SecondSpec: "Frost", Active: true, CreatedAt: now, UpdatedAt: now}
+	for _, c := range []*character.Character{main, twink} {
+		if err := r.characters.Create(ctx, c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rd := &raid.Raid{Name: "Decline", RaidLeaderID: staff.ID, Status: validation.RaidStatusPlanned, CreatedAt: now, UpdatedAt: now}
+	if err := r.raids.Create(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SubmitForPlayer(ctx, rd.ID, staff.ID, main.ID, "Vergeltung"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SubmitForPlayer(ctx, rd.ID, staff.ID, twink.ID, "Feuer"); err != nil {
+		t.Fatal(err)
+	}
+	overview, err := s.Overview(ctx, rd.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range overview.Entries {
+		if entry.CharacterID == main.ID {
+			if err := s.Accept(ctx, rd.ID, entry.ID, staff.ID, 0, 0); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	rosterSize := func() int {
+		rows, err := r.attendance.ListByRaid(ctx, rd.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(rows)
+	}
+	if rosterSize() != 1 {
+		t.Fatal("accepted main character missing from the roster")
+	}
+	// "Unsicher" keeps roster slot and signups.
+	if err := s.Decline(ctx, rd.ID, member.ID, 0, "Spätschicht", AbsenceTentative); err != nil {
+		t.Fatal(err)
+	}
+	if rosterSize() != 1 {
+		t.Fatal("unsure answer removed the roster slot")
+	}
+	// The player's own refusal takes them out of the raid.
+	if err := s.Decline(ctx, rd.ID, member.ID, 0, "Spätschicht", AbsenceDeclined); err != nil {
+		t.Fatal(err)
+	}
+	if rosterSize() != 0 {
+		t.Fatal("refusal kept the roster slot")
+	}
+	overview, err = s.Overview(ctx, rd.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range overview.Entries {
+		if !entry.IsWithdrawn || entry.IsAccepted {
+			t.Fatalf("signup still open after the refusal: %+v", entry)
+		}
+	}
+	if len(overview.Absences) != 1 || overview.Absences[0].Status != AbsenceDeclined || overview.Absences[0].Reason != "Spätschicht" {
+		t.Fatalf("absences = %+v", overview.Absences)
+	}
+	var removals, withdrawals int
+	if err := database.DB.NewRaw("SELECT COUNT(*) FROM audit_log WHERE entity_type = 'attendance' AND action = 'remove'").Scan(ctx, &removals); err != nil || removals != 1 {
+		t.Fatalf("attendance remove audits = %d, %v", removals, err)
+	}
+	if err := database.DB.NewRaw("SELECT COUNT(*) FROM audit_log WHERE entity_type = 'raid_signup' AND action = 'withdraw'").Scan(ctx, &withdrawals); err != nil || withdrawals != 2 {
+		t.Fatalf("withdraw audits = %d, %v", withdrawals, err)
+	}
+}

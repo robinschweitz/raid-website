@@ -50,8 +50,12 @@ Owner decisions (2026-10-20):
 - RaidLedger 2.6.0 never invites answer lines into the raid group. It puts everyone on the list into
   the calendar event and sets statuses: roster `CONFIRMED`, bench `STANDBY`, `SIGNUP` → `ACCEPTED`,
   `DECLINED` → `DECLINED`. The 3.3.5 calendar has no "tentative", so unsure players stay `INVITED`.
-  **SYNC** (`/ledger calendar sync`) does the same for the existing event: it invites who is missing and
-  sets statuses; it runs automatically once a newly created event is confirmed.
+  **SYNC** (`/ledger calendar sync`) does the same for the existing event: it invites who is missing (runs
+  automatically once a newly created event is confirmed), then the button reads **SET STATUSES (n)**;
+  only that click sets the statuses, because the client may block calendar changes that do not come
+  from a click (live run 08455f4dff39 for `CalendarAddEvent`). About two seconds later RaidLedger reads
+  the invite list again and reports "n of m statuses set"; `ADDON_ACTION_BLOCKED`/`_FORBIDDEN` for
+  `CalendarEventSetStatus` is reported as "blocked, set them by hand".
 - A player's own calendar answer is never overwritten: website answers only fill in "no answer yet"
   (`INVITED`, `NOT_SIGNEDUP`), and a roster slot never replaces a refusal (`DECLINED`, `OUT`); such
   refusals are named in chat instead. Editing needs the event's creator or a moderator.
@@ -67,7 +71,8 @@ Owner decisions (2026-10-20):
 - Proposed actions: `accepted`/`signedup` → a pending signup with the character's main spec, unless the
   player already has a roster slot or that character a pending signup; an existing website absence is
   removed on apply (the preview says so). `declined`/`out` → absence `DECLINED` unless already
-  declined; the roster is not changed (absences never change it). `tentative` → absence `TENTATIVE`.
+  declined; like every refusal it removes the roster slot and withdraws open signups (ADR 093), and a
+  reason the player gave on the website is kept. `tentative` → absence `TENTATIVE`.
   `confirmed`/`standby` (set by the raid lead) and missing answers change nothing. Only one action per
   player is proposed.
 - Apply recomputes the preview and executes only selections that match a currently proposed action;
@@ -84,7 +89,7 @@ Owner decisions (2026-10-20):
 - Raid leads see website answers in the game calendar and bring calendar answers back with one
   copy-and-paste, without overwriting anyone's own answer on either side.
 - RaidLedger 2.6.0 needs a website deploy (ADR 085). The calendar sync was tested offline against a
-  simulated 3.3.5 calendar; whether the client lets an addon set invite statuses from a timer
-  (`CalendarEventSetStatus`) still needs a live run on the test realm. The calls are wrapped in `pcall`,
-  so a refusal cannot break event creation.
+  simulated 3.3.5 calendar; `CalendarEventSetStatus` still needs a live run on the test realm. Setting
+  statuses from a click and checking the result afterwards make that run self-explaining: a blocked or
+  ignored call shows up as fewer statuses set, never as a false success.
 - There are no new screenshots of the calendar column yet; the addon page describes it in prose.

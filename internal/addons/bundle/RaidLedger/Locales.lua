@@ -309,8 +309,8 @@ L["signed up"] = "angemeldet"
 L["unsure"] = "unsicher"
 L["can't come"] = "kann nicht"
 L["GAME CALENDAR"] = "SPIELKALENDER"
-L["Create the event, then SYNC sets everyone's status from the website list."] =
-    "Termin anlegen, dann setzt ABGLEICHEN alle Status nach der Liste der Webseite."
+L["Create the event, then SYNC invites the missing and SET STATUSES sets everyone's status from the website list."] =
+    "Termin anlegen, dann lädt ABGLEICHEN die Fehlenden ein und STATUS SETZEN setzt alle Status nach der Liste der Webseite."
 L["SYNC"] = "ABGLEICHEN"
 L["SYNCING..."] = "GLEICHE AB..."
 L["ANSWERS FOR THE WEBSITE"] = "ANTWORTEN FÜR WEBSEITE"
@@ -322,7 +322,18 @@ L["No calendar event for this list found: create it with CALENDAR EVENT first."]
 L["The calendar event did not open; try again."] = "Der Kalender-Termin ließ sich nicht öffnen; bitte nochmal versuchen."
 L["You may not change this calendar event: ask its creator to make you a moderator."] =
     "Du darfst diesen Kalender-Termin nicht ändern: den Ersteller bitten, dich zum Moderator zu machen."
-L["Calendar synced: %d invited, %d statuses set."] = "Kalender abgeglichen: %d eingeladen, %d Status gesetzt."
+L["Calendar synced: %d invited, no status to set."] = "Kalender abgeglichen: %d eingeladen, kein Status zu setzen."
+L["SET STATUSES (%d)"] = "STATUS SETZEN (%d)"
+L["%d invited. Click SET STATUSES (%d) to set the statuses in the calendar event."] =
+    "%d eingeladen. STATUS SETZEN (%d) klicken, um die Status im Kalender-Termin zu setzen."
+L["Checking the statuses..."] = "Prüfe die Status..."
+L["Calendar synced: %d invited, %d of %d statuses set."] = "Kalender abgeglichen: %d eingeladen, %d von %d Status gesetzt."
+L["The game client blocked setting statuses: set them by hand in the calendar."] =
+    "Der Spielclient hat das Setzen der Status blockiert: bitte im Kalender von Hand setzen."
+L["Check the missing ones in the calendar and set them by hand if needed."] =
+    "Die fehlenden im Kalender prüfen und bei Bedarf von Hand setzen."
+L["The calendar event is no longer open: click SYNC again."] =
+    "Der Kalender-Termin ist nicht mehr geöffnet: ABGLEICHEN nochmal klicken."
 L["Declined in game: %s (export the answers for the website)."] =
     "Im Spiel abgesagt: %s (Antworten für die Webseite exportieren)."
 L["%d invites, %d accepted, %d declined: Ctrl+C and paste into the website's calendar import."] =

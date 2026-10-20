@@ -192,7 +192,7 @@ export function GuidePage() {
       <h3>Noch nicht sicher: „Unsicher“</h3>
       <p>Klicke auf <strong>Unsicher</strong> und schreib einen kurzen Hinweis, z. B. <em>komme evtl. später</em>. Die Raidleitung sieht das sofort. Sobald du es weißt, klickst du auf <strong>Sicher dabei</strong> oder <strong>Kann nicht</strong>.</p>
       <Shot name="13-angemeldet-und-unsicher" caption="Links angemeldet, in der Mitte als unsicher gemeldet" />
-      <Tip><strong>Tipp:</strong> Du kannst deinen Status ändern, solange die Anmeldung offen ist. Eine Absage oder „unsicher“ löscht deine Anmeldung nicht. Die Raidleitung entscheidet, wer mitkommt.</Tip>
+      <Tip><strong>Tipp:</strong> Du kannst deinen Status ändern, solange die Anmeldung offen ist. „Unsicher“ ändert an deiner Anmeldung nichts. Eine Absage zieht deine Anmeldung zurück und gibt deinen Platz in der Aufstellung frei; nimmst du sie zurück, meldest du dich einfach neu an.</Tip>
       <h3>Mit Twink oder anderem Spec anmelden</h3>
       <ol>
         <li>Klicke auf der Karte auf <strong>Anderer Charakter oder Spec</strong>.</li>

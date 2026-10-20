@@ -5,9 +5,11 @@ export const changelog = [
     version: appVersion,
     title: 'Spielkalender abgleichen und ein Platz pro Spieler',
     changes: [
-      'RaidLedger 2.6.0: Die Einladungsliste bringt jetzt auch Anmeldungen, „unsicher“ und Absagen in den Spielkalender. „ABGLEICHEN“ setzt im Kalender-Termin alle Status nach der Website, ohne die eigenen Antworten der Spieler zu überschreiben.',
+      'RaidLedger 2.6.0: Die Einladungsliste bringt jetzt auch Anmeldungen, „unsicher“ und Absagen in den Spielkalender. „ABGLEICHEN“ lädt Fehlende in den Kalender-Termin ein, „STATUS SETZEN“ setzt danach alle Status nach der Website, ohne die eigenen Antworten der Spieler zu überschreiben, und meldet, wie viele angekommen sind.',
       'Neu im Raid unter „Aufstellung“: „Antworten aus dem Spielkalender“. Wer im Spiel zugesagt hat, wird mit seiner Main-Spec angemeldet, wer abgesagt hat, steht auf „kann nicht“. Erst kommt eine Vorschau, dann übernimmst du die Auswahl.',
       'Ein Spieler kann nicht mehr versehentlich mit zwei Charakteren in derselben Aufstellung stehen (auch nicht auf der Ersatzbank). Die Seite nennt den Charakter, der schon drin ist; den tauschst du über „Bearbeiten“ oder bei den Anmeldungen.',
+      'Wer „Kann nicht“ sagt, ist raus: Die Anmeldung wird zurückgezogen und ein Platz in der Aufstellung oder auf der Ersatzbank frei. Vorher fragt die Seite nach. Hat der Spieler in dem Raid schon Loot, geht die Absage erst, wenn der Loot zurückgezogen ist. „Unsicher“ ändert nichts an Anmeldung und Aufstellung.',
+      'Kalender-Antworten behalten den Grund, den ein Spieler auf der Website eingetragen hat, z. B. „Spätschicht“.',
     ],
   },
   {

@@ -9,6 +9,7 @@ import (
 	"raid-website/internal/attendance"
 	"raid-website/internal/character"
 	"raid-website/internal/raid"
+	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidsignup"
 )
 
@@ -186,6 +187,9 @@ type CalendarPreviewRow struct {
 	Spec            string   `json:"spec"`
 	Notes           []string `json:"notes"`
 	Errors          []string `json:"errors"`
+	// absenceReason is the reason of the player's website absence; a calendar
+	// answer keeps it instead of writing calendarDeclineReason (ADR 093).
+	absenceReason string
 }
 
 // CalendarSelection is one previewed answer staff chose to apply.
@@ -216,6 +220,7 @@ type calendarState struct {
 	rosterCharacter string
 	isBench         bool
 	absence         string
+	absenceReason   string
 	pending         map[int64]bool // character IDs with a pending signup
 }
 
@@ -267,6 +272,7 @@ func (s *Service) calendarPreview(ctx context.Context, rd *raid.Raid, export *Ca
 		state := states[c.PlayerID]
 		row.WebsiteStates, row.RosterCharacter = state.describe(c.ID), state.rosterCharacter
 		row.Action, row.Spec, row.Notes = proposeCalendarAction(invite.Answer, c, state)
+		row.absenceReason = state.absenceReason
 		if row.Action != CalendarActionNone {
 			if proposed[c.PlayerID] {
 				row.Action, row.Spec = CalendarActionNone, ""
@@ -321,18 +327,38 @@ func proposeCalendarAction(answer string, c *character.Character, state calendar
 		}
 		notes := []string{"Wird als „kann nicht“ eingetragen."}
 		if state.rosterCharacter != "" {
-			notes = append(notes, "Steht in der Aufstellung; die Aufstellung bleibt unverändert.")
+			notes = append(notes, fmt.Sprintf("Wird mit %s aus der Aufstellung entfernt.", state.rosterCharacter))
 		}
-		return CalendarActionDecline, "", notes
+		if len(state.pending) > 0 {
+			notes = append(notes, "Offene Anmeldung wird zurückgezogen.")
+		}
+		return CalendarActionDecline, "", append(notes, state.keptReasonNotes()...)
 	case CalendarTentative:
 		if state.absence == raidsignup.AbsenceTentative {
 			return CalendarActionNone, "", []string{"Ist schon als unsicher eingetragen."}
 		}
-		return CalendarActionTentative, "", []string{"Wird als „unsicher“ eingetragen."}
+		return CalendarActionTentative, "", append([]string{"Wird als „unsicher“ eingetragen."}, state.keptReasonNotes()...)
 	case CalendarConfirmed, CalendarStandby:
 		return CalendarActionNone, "", []string{"Status wurde von der Raidleitung gesetzt."}
 	}
 	return CalendarActionNone, "", []string{"Noch keine Antwort im Kalender."}
+}
+
+// keptReasonNotes tells staff that the website's reason stays (ADR 093).
+func (state calendarState) keptReasonNotes() []string {
+	if state.absenceReason == "" {
+		return nil
+	}
+	return []string{fmt.Sprintf("Grund „%s“ bleibt erhalten.", state.absenceReason)}
+}
+
+// calendarReason is the absence reason a calendar refusal or unsure answer
+// stores: the website's own reason if there is one, else calendarDeclineReason.
+func calendarReason(row CalendarPreviewRow) string {
+	if row.absenceReason != "" {
+		return row.absenceReason
+	}
+	return calendarDeclineReason
 }
 
 // calendarStates collects roster slot, absence and pending signups per player.
@@ -370,7 +396,7 @@ func (s *Service) calendarStates(ctx context.Context, raidID int64) (map[int64]c
 	}
 	for _, absence := range overview.Absences {
 		state := get(absence.PlayerID)
-		state.absence = absence.Status
+		state.absence, state.absenceReason = absence.Status, absence.Reason
 		states[absence.PlayerID] = state
 	}
 	return states, nil
@@ -426,16 +452,19 @@ func (s *Service) applyCalendarRow(ctx context.Context, raidID, actorID int64, r
 		err = s.signups.SubmitForPlayer(ctx, raidID, actorID, *row.CharacterID, row.Spec)
 		result.Status = ResultSignedUp
 	case CalendarActionDecline:
-		err = s.signups.Decline(ctx, raidID, actorID, playerID, calendarDeclineReason, raidsignup.AbsenceDeclined)
+		// Also removes the roster slot and withdraws open signups (ADR 093).
+		err = s.signups.Decline(ctx, raidID, actorID, playerID, calendarReason(row), raidsignup.AbsenceDeclined)
 		result.Status = ResultDeclined
 	case CalendarActionTentative:
-		err = s.signups.Decline(ctx, raidID, actorID, playerID, calendarDeclineReason, raidsignup.AbsenceTentative)
+		err = s.signups.Decline(ctx, raidID, actorID, playerID, calendarReason(row), raidsignup.AbsenceTentative)
 		result.Status = ResultTentative
 	}
 	switch {
 	case err == nil:
 	case errors.Is(err, raidsignup.ErrAlreadySignedUp):
 		result.Status = ResultUnchanged
+	case errors.Is(err, raidcorrection.ErrHasLoot):
+		result.Status, result.Code, result.Message = ResultFailed, "attendance_has_loot", "Spieler hat in diesem Raid schon Loot; zuerst den Loot zurückziehen"
 	case errors.Is(err, raidsignup.ErrInvalid):
 		result.Status, result.Code, result.Message = ResultFailed, "invalid_spec", "Die Main-Spec des Charakters passt nicht zu seiner Klasse; bitte am Charakter korrigieren"
 	case errors.Is(err, raidsignup.ErrRaidState), errors.Is(err, raidsignup.ErrTooLate):

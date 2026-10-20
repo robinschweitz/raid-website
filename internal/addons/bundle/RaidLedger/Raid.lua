@@ -579,7 +579,13 @@ end
 -- 08455f4dff39: ADDON_ACTION_BLOCKED from a timer).
 -- The check afterwards polls: CalendarSetAbsMonth itself fires
 -- CALENDAR_UPDATE_EVENT_LIST, so reading the list on that event recursed.
-local CALENDAR_INVITE_DELAY = 0.25
+-- The 3.3.5 client sends at most one calendar invite about every 2 seconds and
+-- refuses the others with CALENDAR_ERROR_INVITE_THROTTLED (live run on a local
+-- AzerothCore realm, website ADR 092: 0.5, 1 and 1.5 s lost the second invite,
+-- 2 s did not), so invites go out a little slower than that. A refused invite
+-- goes back into the queue (inviteThrottled).
+local CALENDAR_INVITE_DELAY = 2.2
+local CALENDAR_INVITE_RETRIES = 3
 local CALENDAR_SETTLE = 6
 local CALENDAR_CONFIRM = 20   -- seconds to wait for the event in the server's calendar
 local calendarJob    -- { names, next, before, lastAt, wait, title, when, left }
@@ -733,8 +739,10 @@ local function calendarStep(elapsed)
     job.wait = job.wait - elapsed
     if job.wait > 0 then return end
     if job.next <= table.getn(job.names) then
-        CalendarEventInvite(job.names[job.next])
+        job.lastName = job.names[job.next]
+        CalendarEventInvite(job.lastName)
         job.next, job.wait, job.lastAt = job.next + 1, CALENDAR_INVITE_DELAY, GetTime()
+        setCalendarButton(string.format(L["INVITING %d/%d..."], job.next - 1, table.getn(job.names)))
         return
     end
     if job.ready then return end
@@ -792,7 +800,8 @@ local function createCalendarEvent()
     calendarJob = { names = names, next = 1, before = CalendarEventGetNumInvites() or 0, lastAt = GetTime(), wait = 0,
         title = title, when = string.format("%02d.%02d. %02d:%02d", raid.day, raid.month, raid.hour, raid.minute), left = left,
         raid = raid.id, year = raid.year, month = raid.month, day = raid.day, hour = raid.hour, minute = raid.minute }
-    ns.say(string.format(L["Creating the calendar event: inviting %d characters..."], table.getn(names)))
+    ns.say(string.format(L["Creating the calendar event: inviting %d characters (about %d seconds)..."], table.getn(names),
+        math.ceil(table.getn(names) * CALENDAR_INVITE_DELAY)))
 end
 
 
@@ -980,6 +989,7 @@ local function syncStep(elapsed)
     elseif sync.phase == "invite" then
         local name = table.remove(sync.queue, 1)
         if name then
+            sync.lastName = name   -- before the call: a refusal may arrive while it runs
             CalendarEventInvite(name)
             sync.wait, sync.lastAt = CALENDAR_INVITE_DELAY, now
             calendarInfoText(string.format(L["Inviting %s..."], name))
@@ -1021,6 +1031,31 @@ startCalendarSync = function(mode)
         deadline = GetTime() + SYNC_FIND, wait = 0.5 }
     calendarSyncButton:SetText(L["SYNCING..."])
     calendarInfoText(L["Looking for the calendar event..."])
+end
+
+-- inviteThrottled puts an invite the client refused as too soon (see
+-- CALENDAR_INVITE_DELAY) back into its queue, at most CALENDAR_INVITE_RETRIES
+-- times per character; other calendar errors (unknown character, ...) keep
+-- their old handling.
+local function inviteThrottled(message)
+    if not CALENDAR_ERROR_INVITE_THROTTLED or message ~= CALENDAR_ERROR_INVITE_THROTTLED then return end
+    local job, sync = calendarJob, calendarSync
+    if job and not job.ready and job.lastName and job.next > 1 and job.names[job.next - 1] == job.lastName then
+        job.retries = job.retries or {}
+        local tries = (job.retries[job.lastName] or 0) + 1
+        if tries <= CALENDAR_INVITE_RETRIES then
+            job.retries[job.lastName] = tries
+            job.next, job.wait, job.lastAt = job.next - 1, CALENDAR_INVITE_DELAY, GetTime()
+        end
+    elseif sync and sync.lastName and (sync.phase == "invite" or sync.phase == "status") then
+        sync.retries = sync.retries or {}
+        local tries = (sync.retries[sync.lastName] or 0) + 1
+        if tries <= CALENDAR_INVITE_RETRIES then
+            sync.retries[sync.lastName] = tries
+            table.insert(sync.queue, 1, sync.lastName)
+            sync.phase, sync.wait, sync.lastName = "invite", CALENDAR_INVITE_DELAY, nil
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -1098,6 +1133,7 @@ events:RegisterEvent("PARTY_MEMBERS_CHANGED")
 events:RegisterEvent("CALENDAR_OPEN_EVENT")
 events:RegisterEvent("ADDON_ACTION_BLOCKED")
 events:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+events:RegisterEvent("CALENDAR_UPDATE_ERROR")
 events:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_LOGIN" then
         setup()
@@ -1127,6 +1163,8 @@ events:SetScript("OnEvent", function(_, event, ...)
         if calendarSync and calendarSync.phase == "verify" and tostring(blockedFunction or ""):find("CalendarEventSetStatus", 1, true) then
             calendarSync.blocked = true
         end
+    elseif event == "CALENDAR_UPDATE_ERROR" then
+        inviteThrottled(...)
 
     else
         updateGroupStatus()

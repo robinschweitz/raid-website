@@ -88,8 +88,12 @@ Owner decisions (2026-10-20):
 
 - Raid leads see website answers in the game calendar and bring calendar answers back with one
   copy-and-paste, without overwriting anyone's own answer on either side.
-- RaidLedger 2.6.0 needs a website deploy (ADR 085). The calendar sync was tested offline against a
-  simulated 3.3.5 calendar; `CalendarEventSetStatus` still needs a live run on the test realm. Setting
-  statuses from a click and checking the result afterwards make that run self-explaining: a blocked or
-  ignored call shows up as fewer statuses set, never as a false success.
+- RaidLedger 2.6.0 needs a website deploy (ADR 085).
+- Live run (2026-10-20, original 3.3.5a client under Wine against a local AzerothCore realm):
+  `CalendarEventSetStatus` works; roster, signup and refusal arrive on the server as CONFIRMED,
+  ACCEPTED and DECLINED, both on a new event and through SET STATUSES, and the answers export lists
+  them. The run also showed that the client sends at most one calendar invite about every 2 seconds
+  and refuses the rest with `CALENDAR_ERROR_INVITE_THROTTLED` (0.5, 1 and 1.5 s lost the second invite,
+  2 s did not): RaidLedger now invites every 2.2 seconds and puts a refused invite back into the queue
+  (up to 3 times per character). A 25-player list takes about a minute; the button shows the progress.
 - There are no new screenshots of the calendar column yet; the addon page describes it in prose.

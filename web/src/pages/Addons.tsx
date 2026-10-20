@@ -213,7 +213,7 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
       </>}>
         <p>Die Einladungsliste enthält <strong>Datum und Startzeit</strong> des Raids. Daraus legt RaidLedger einen Raid-Termin im Spielkalender an und lädt alle ein, auch die Ersatzbank.</p>
         <ol>
-          <li>Liste einlesen (siehe oben), dann <strong>KALENDER-TERMIN</strong> klicken (oder <code>/ledger calendar</code>).</li>
+          <li>Liste einlesen (siehe oben), dann <strong>KALENDER-TERMIN</strong> klicken (oder <code>/ledger calendar</code>). RaidLedger lädt etwa alle 2 Sekunden einen Charakter ein (schneller lässt das Spiel nicht zu); der Knopf zeigt <strong>LADE EIN 3/25…</strong>.</li>
           <li>Der Knopf heißt jetzt <strong>TERMIN ERSTELLEN (n)</strong>. Klicken, und der Termin entsteht mit allen Einladungen.</li>
           <li>RaidLedger liest den Kalender danach zurück und meldet im Chat, ob der Server den Termin bestätigt hat. Unbekannte Namen werden genannt.</li>
         </ol>

@@ -291,7 +291,9 @@ L["CREATE EVENT (%d)"] = "TERMIN ERSTELLEN (%d)"
 L["%d invites ready: click CREATE EVENT (or /ledger calendar again) to add the event."] =
     "%d Einladungen bereit: TERMIN ERSTELLEN klicken (oder nochmal /ledger calendar), um den Termin anzulegen."
 L["The calendar event is still being created."] = "Der Kalender-Termin wird gerade erstellt."
-L["Creating the calendar event: inviting %d characters..."] = "Erstelle den Kalender-Termin: lade %d Charaktere ein..."
+L["Creating the calendar event: inviting %d characters (about %d seconds)..."] =
+    "Erstelle den Kalender-Termin: lade %d Charaktere ein (etwa %d Sekunden)..."
+L["INVITING %d/%d..."] = "LADE EIN %d/%d..."
 L["%d characters could not be invited (not found?)."] = "%d Charaktere konnten nicht eingeladen werden (nicht gefunden?)."
 L["The calendar event is in the calendar: confirmed by the server."] =
     "Der Kalender-Termin steht im Kalender: vom Server bestätigt."

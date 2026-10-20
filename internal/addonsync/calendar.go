@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"sort"
 
 	"raid-website/internal/attendance"
@@ -423,11 +422,8 @@ func (s *Service) applyCalendarRow(ctx context.Context, raidID, actorID int64, r
 	var err error
 	switch row.Action {
 	case CalendarActionSignup:
+		// Also removes the website's refusal in the same transaction (preview note).
 		err = s.signups.SubmitForPlayer(ctx, raidID, actorID, *row.CharacterID, row.Spec)
-		if err == nil && (slices.Contains(row.WebsiteStates, WebsiteDeclined) || slices.Contains(row.WebsiteStates, WebsiteTentative)) {
-			// The calendar answer is newer than the website's refusal (preview note).
-			err = s.signups.Revoke(ctx, raidID, actorID, playerID)
-		}
 		result.Status = ResultSignedUp
 	case CalendarActionDecline:
 		err = s.signups.Decline(ctx, raidID, actorID, playerID, calendarDeclineReason, raidsignup.AbsenceDeclined)

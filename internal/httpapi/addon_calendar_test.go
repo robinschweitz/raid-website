@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"raid-website/internal/character"
+	"raid-website/internal/raid"
 	"raid-website/internal/raidsignup"
 	"raid-website/internal/validation"
 )
@@ -207,5 +208,56 @@ func TestAddonCalendarImportAppliesSelectedAnswers(t *testing.T) {
 	var audits int
 	if err := f.db.NewRaw("SELECT COUNT(*) FROM audit_log WHERE entity_type = 'raid_signup' AND action = 'submit_for_player'").Scan(context.Background(), &audits); err != nil || audits != 2 {
 		t.Fatalf("submit_for_player audits = %d, %v", audits, err)
+	}
+}
+
+// The raid lead applies their own calendar acceptance after the raid started:
+// signup and removal of the website refusal happen together or not at all.
+func TestAddonCalendarImportOwnAcceptanceAfterStart(t *testing.T) {
+	f := newCalendarFixture(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	lead := &character.Character{PlayerID: f.actor, Name: "Raidleiter", Class: "Paladin", MainSpec: "Vergeltung", SecondSpec: "Heilig", IsMain: true, Active: true, CreatedAt: now, UpdatedAt: now}
+	if err := character.NewRepo(f.db).Create(ctx, lead); err != nil {
+		t.Fatal(err)
+	}
+	f.request(http.MethodPut, fmt.Sprintf("/absences/%d", f.actor), map[string]any{}, http.StatusOK)
+	raids := raid.NewRepo(f.db)
+	rd, err := raids.Get(ctx, f.raidID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := now.Add(-time.Hour)
+	rd.ScheduledStart = &started
+	if err := raids.Update(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	payload := fmt.Sprintf("RS2;CAL;%d;Raidleiter;1760000000\nRaidleiter;accepted", f.raidID)
+	body := f.request(http.MethodPost, "/addon-calendar-import", map[string]any{"payload": payload, "selections": []map[string]any{{"character_id": lead.ID, "action": "signup"}}}, http.StatusOK)
+	var out struct {
+		Data []struct {
+			Status string `json:"status"`
+		}
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Data) != 1 || out.Data[0].Status != "signed_up" {
+		t.Fatalf("results = %s", body)
+	}
+	overview := f.overview()
+	for _, a := range overview.Absences {
+		if a.PlayerID == f.actor {
+			t.Fatal("own refusal still there after the calendar acceptance")
+		}
+	}
+	signedUp := false
+	for _, entry := range overview.Entries {
+		if entry.CharacterID == lead.ID && !entry.IsWithdrawn {
+			signedUp = true
+		}
+	}
+	if !signedUp {
+		t.Fatalf("no pending signup: %+v", overview.Entries)
 	}
 }

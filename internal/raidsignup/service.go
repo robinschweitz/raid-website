@@ -329,6 +329,8 @@ var ErrAlreadySignedUp = errors.New("character already signed up")
 // needs RAIDASSISTENT and an active raid, but not an open signup window: staff
 // may still review and accept choices after closing (ADR 033). An existing
 // pending choice is left as it is; a withdrawn one is submitted again with spec.
+// The player's absence ("kann nicht", "unsicher") is removed in the same
+// transaction, because signing up says the player comes after all.
 func (s *Service) SubmitForPlayer(ctx context.Context, raidID, actor, characterID int64, spec string) error {
 	spec = strings.TrimSpace(spec)
 	return s.repo.transaction(ctx, func(r *Repo) error {
@@ -381,7 +383,20 @@ func (s *Service) SubmitForPlayer(ctx context.Context, raidID, actor, characterI
 		if err := r.save(ctx, &row); err != nil {
 			return err
 		}
-		return s.log(ctx, r, raidID, actor, "submit_for_player", before, row)
+		if err := s.log(ctx, r, raidID, actor, "submit_for_player", before, row); err != nil {
+			return err
+		}
+		absence, err := r.absence(ctx, raidID, c.PlayerID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := r.deleteAbsence(ctx, absence.ID); err != nil {
+			return err
+		}
+		return s.log(ctx, r, raidID, actor, "absence_revoke", absence, nil)
 	})
 }
 

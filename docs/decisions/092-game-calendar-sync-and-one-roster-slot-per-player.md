@@ -75,7 +75,9 @@ Owner decisions (2026-10-20):
 - Staff signing up on behalf of a player is the new `raidsignup.SubmitForPlayer` (audit action
   `submit_for_player`): RAIDASSISTENT and up, active raid, valid spec for the class; it does not need an
   open signup window (staff may also accept after closing, ADR 033). An existing pending choice is left
-  unchanged; a withdrawn one is submitted again.
+  unchanged; a withdrawn one is submitted again. In the same transaction it removes the player's
+  absence (audit action `absence_revoke`), so a calendar acceptance never leaves a signup next to a
+  refusal; as a staff action this also works after the raid has started.
 
 ## Consequences
 

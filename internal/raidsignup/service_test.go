@@ -210,3 +210,71 @@ func TestSubmitForPlayerIsStaffOnlyAndKeepsPendingChoices(t *testing.T) {
 		t.Fatalf("entries = %+v", overview.Entries)
 	}
 }
+
+// ADR 092: a calendar acceptance removes the player's absence in the same
+// transaction as the signup, also after the raid has started.
+func TestSubmitForPlayerRemovesAbsence(t *testing.T) {
+	ctx := context.Background()
+	database, err := db.Open(ctx, "file:"+filepath.Join(t.TempDir(), "submit-absence.db")+"?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	migrator, err := migrations.NewMigrator(database.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := migrator.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r := NewRepo(database.DB)
+	s := NewService(r)
+	now := time.Now().UTC()
+	staff := &player.Player{Name: "Staff", Role: validation.RoleRaidassistent, Active: true, CreatedAt: now, UpdatedAt: now}
+	member := &player.Player{Name: "Member", Role: validation.RoleMember, Active: true, CreatedAt: now, UpdatedAt: now}
+	for _, p := range []*player.Player{staff, member} {
+		if err := r.players.Create(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := &character.Character{PlayerID: member.ID, Name: "Kalender", Class: "Paladin", MainSpec: "Vergeltung", SecondSpec: "Heilig", Active: true, CreatedAt: now, UpdatedAt: now}
+	if err := r.characters.Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	started := now.Add(-time.Hour)
+	rd := &raid.Raid{Name: "Calendar", RaidLeaderID: staff.ID, Status: validation.RaidStatusOpen, ScheduledStart: &started, CreatedAt: now, UpdatedAt: now}
+	if err := r.raids.Create(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Decline(ctx, rd.ID, staff.ID, member.ID, "Urlaub", AbsenceDeclined); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SubmitForPlayer(ctx, rd.ID, staff.ID, c.ID, "Vergeltung"); err != nil {
+		t.Fatal(err)
+	}
+	overview, err := s.Overview(ctx, rd.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(overview.Absences) != 0 || len(overview.Entries) != 1 {
+		t.Fatalf("absences = %+v, entries = %+v", overview.Absences, overview.Entries)
+	}
+	var revokes int
+	if err := database.DB.NewRaw("SELECT COUNT(*) FROM audit_log WHERE entity_type = 'raid_signup' AND action = 'absence_revoke'").Scan(ctx, &revokes); err != nil || revokes != 1 {
+		t.Fatalf("absence_revoke audits = %d, %v", revokes, err)
+	}
+	// An unchanged signup leaves a newer absence alone.
+	if err := s.Decline(ctx, rd.ID, staff.ID, member.ID, "", AbsenceTentative); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SubmitForPlayer(ctx, rd.ID, staff.ID, c.ID, "Vergeltung"); !errors.Is(err, ErrAlreadySignedUp) {
+		t.Fatalf("second submit: %v", err)
+	}
+	overview, err = s.Overview(ctx, rd.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(overview.Absences) != 1 || overview.Absences[0].Status != AbsenceTentative {
+		t.Fatalf("absence removed without a signup: %+v", overview.Absences)
+	}
+}

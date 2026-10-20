@@ -148,7 +148,8 @@ function Overview({ addons, error }: { addons: AddonDownload[], error: string })
       <h2 id="ablauf-title">Ein Raidabend mit beiden Addons</h2>
       <ol className="addon-flow">
         <li><strong>Website:</strong> Du setzt in <Link to="/wishlist">Meine Wunschliste</Link> deine Items, kopierst den Export und holst ihn mit <code>/wish import</code> ins Spiel.</li>
-        <li><strong>Website → RaidLedger:</strong> Die Raidleitung kopiert im Raid unter <em>Aufstellung</em> die „Einladungen für Addon“, liest sie ein, legt den Kalender-Termin an und lädt alle ein.</li>
+        <li><strong>Website → RaidLedger:</strong> Die Raidleitung kopiert im Raid unter <em>Aufstellung</em> die „Einladungen für Addon“, liest sie ein, legt den Kalender-Termin an und lädt alle ein. Anmeldungen, „unsicher“ und Absagen der Website stehen mit ihrem Status im Spielkalender.</li>
+        <li><strong>Spielkalender → Website:</strong> Wer im Spiel auf die Kalender-Einladung antwortet, kommt mit „ANTWORTEN FÜR WEBSEITE“ zurück auf die Website: Zusage wird zur Anmeldung, Absage zu „kann nicht“.</li>
         <li><strong>Im Raid:</strong> RaidLedger startet die Würfe. RaidWishlist meldet sich bei deinen Wunsch-Items und würfelt den richtigen Bereich, auch mit Enhanced.</li>
         <li><strong>RaidLedger → Website:</strong> Nach dem Raid kopiert die Raidleitung Teilnahme und Loot aus RaidLedger und importiert beides im Raid auf der Website.</li>
       </ol>
@@ -219,6 +220,16 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
         <Tip><strong>Gut zu wissen:</strong> Datum und Uhrzeit stehen nur bei Raids aus einer <strong>Raidserie</strong> in der Liste, in der Zeitzone der Serie (Serverzeit). Der Spielkalender nimmt nur Termine in der Zukunft und Titel bis 100 Zeichen.</Tip>
       </Feature>
 
+      <Feature title="2b. Spielkalender mit der Website abgleichen">
+        <p>Die Einladungsliste enthält nicht nur die Aufstellung: Wer auf der Website <strong>angemeldet</strong> ist, <strong>unsicher</strong> ist oder <strong>abgesagt</strong> hat und noch keinen Platz in der Aufstellung hat, steht mit dieser Antwort darunter. Diese Charaktere kommen nur in den Kalender-Termin, nie in die Raidgruppe.</p>
+        <ol>
+          <li><strong>ABGLEICHEN</strong> (rechts unter <em>SPIELKALENDER</em>, oder <code>/ledger calendar sync</code>) öffnet den bestehenden Termin, lädt Fehlende ein und setzt die Status: Aufstellung <em>Bestätigt</em>, Ersatzbank <em>Ersatzbank</em>, Anmeldung <em>Zugesagt</em>, Absage <em>Abgelehnt</em>. Nach TERMIN ERSTELLEN läuft das automatisch.</li>
+          <li>Eine Antwort, die ein Spieler selbst im Kalender gegeben hat, wird <strong>nie überschrieben</strong>. Sagt jemand aus der Aufstellung im Spiel ab, nennt RaidLedger ihn im Chat.</li>
+          <li><strong>ANTWORTEN FÜR WEBSEITE</strong> (<code>/ledger calendar export</code>) liest alle Antworten des Termins aus. Text kopieren und im Raid unter <em>Aufstellung</em> → <em>Antworten aus dem Spielkalender</em> einfügen: Die Website zeigt eine Vorschau, Zusagen werden zu offenen Anmeldungen mit der Main-Spec, Absagen zu „kann nicht“.</li>
+        </ol>
+        <Tip><strong>Gut zu wissen:</strong> Zum Ändern eines Termins muss man ihn erstellt haben oder Moderator sein. Der 3.3.5-Kalender kennt kein „Vorläufig“: Wer auf der Website unsicher ist, bleibt im Kalender „Eingeladen“.</Tip>
+      </Feature>
+
       <Feature title="3. Würfeln nach unseren Regeln" shot={<Shot name="raidledger-wurf-chat" caption="Ansagen im Gruppenchat: Wurfstart, Countdown, Gewinner mit bisherigen Items" width={380} height={116} />}>
         <p>Im Reiter <strong>BEUTE</strong> das Item auswählen und <strong>WÜRFELN</strong> klicken (oder <code>/ledger start</code>): Der Raid hat 30 Sekunden, einstellbar unter <strong>EINSTELLUNGEN</strong>. Zur Hälfte und zu einem Viertel der Zeit erinnert das Addon.</p>
         <ul>
@@ -281,18 +292,29 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
           <tbody>
             <tr><td><code>RS2;INV</code></td><td>Website → Spiel</td><td>Raid → Aufstellung → <em>Einladungen für Addon</em> → <strong>Für Addon kopieren</strong></td><td>Reiter <strong>RAID</strong> → einfügen → <strong>EINLESEN</strong></td></tr>
             <tr><td><code>RS2;ROSTER</code></td><td>Spiel → Website</td><td>Raid → Aufstellung → <em>Aufstellung aus Addon abgleichen</em> → <strong>Abgleichen</strong></td><td>Reiter <strong>RAID</strong> → <em>Teilnahme für die Webseite</em> → <strong>EXPORT</strong></td></tr>
+            <tr><td><code>RS2;CAL</code></td><td>Spiel → Website</td><td>Raid → Aufstellung → <em>Antworten aus dem Spielkalender</em> → <strong>Abgleichen</strong></td><td>Reiter <strong>RAID</strong> → <em>SPIELKALENDER</em> → <strong>ANTWORTEN FÜR WEBSEITE</strong></td></tr>
             <tr><td><code>RS2;LOOT</code></td><td>Spiel → Website</td><td>Raid → Loot → <em>Loot aus Addon importieren</em> → <strong>Vorschau</strong></td><td>Reiter <strong>VERGABEN</strong> → <strong>EXPORT</strong> (<code>/ledger export</code>)</td></tr>
           </tbody>
         </table>
       </div>
       <h3>Die Einladungsliste</h3>
       <Code>{`RS2;INV;<Raid-ID>;<Raidname>;<Größe>;<JJJJ-MM-TT>;<HH:MM>
-<Name>;<TANK|HEAL|DD>;<Klasse>;<Ersatzbank 0/1>`}</Code>
+<Name>;<TANK|HEAL|DD>;<Klasse>;<Ersatzbank 0/1>[;<SIGNUP|TENTATIVE|DECLINED>]`}</Code>
       <Code>{`RS2;INV;42;ICC25-6;25;2026-11-05;20:00
 Thorgrim;TANK;Krieger;0
 Mira;HEAL;Paladin;0
-Sternfall;DD;Priester;1`}</Code>
+Sternfall;DD;Priester;1
+Funkel;DD;Magier;0;SIGNUP
+Zaudern;HEAL;Druide;0;TENTATIVE
+Weitweg;DD;Jäger;0;DECLINED`}</Code>
+      <p>Zeilen mit fünftem Feld sind Antworten von der Website ohne Platz in der Aufstellung: angemeldet, unsicher oder abgesagt. Sie gehen nur in den Kalender-Termin. Ältere RaidLedger-Versionen überspringen sie.</p>
       <p>Datum und Startzeit sind <strong>Serverzeit</strong> (die Zeitzone der Raidserie). Ohne Raidserie fehlen die beiden Felder: Einladen geht trotzdem, nur der Kalender-Termin braucht sie. Die Raid-ID merkt sich RaidLedger auch für den Loot-Export.</p>
+      <h3>Antworten aus dem Spielkalender</h3>
+      <Code>{`RS2;CAL;42;Raidleiter;1760000000
+Funkel;accepted
+Mira;declined
+Thorgrim;confirmed`}</Code>
+      <p>Eine Zeile pro Einladung mit der Antwort im Kalender. Übernommen werden nur <code>accepted</code>/<code>signedup</code> (Anmeldung mit Main-Spec) und <code>declined</code>/<code>out</code> („kann nicht“); Status der Raidleitung und fehlende Antworten ändern nichts.</p>
       <h3>Teilnahme und Loot zurück</h3>
       <p>Die Teilnahme listet jeden, der im Raid war, mit Klasse und erster Sichtung, auch Nachzügler und wer früher ging. Der Loot-Export enthält jede Vergabe mit Item, Boss, Empfänger, Wurf, Spec und Wurfbereich. Die Website zeigt erst eine <strong>Vorschau</strong>: Enhanced-Würfe sind als Enhanced vorgewählt, geparkte und gelöschte Zeilen werden angezeigt, aber nie importiert. Ein zweiter Import legt nichts doppelt an.</p>
       <Tip><strong>Reihenfolge am Raidabend:</strong> erst <strong>EXPORT</strong>, dann <strong>NEUER RAID</strong> (beide in VERGABEN). Neuer Raid leert das Buch und die Korrekturen in SPIELER.</Tip>
@@ -307,6 +329,8 @@ Sternfall;DD;Priester;1`}</Code>
             <tr><td><code>/ledger</code></td><td>Fenster ein- und ausblenden</td></tr>
             <tr><td><code>/ledger setup</code></td><td>Raid aufstellen: Einladungen, Gruppen, Teilnahme</td></tr>
             <tr><td><code>/ledger calendar</code></td><td>Kalender-Termin aus der Einladungsliste, alle eingeladen</td></tr>
+            <tr><td><code>/ledger calendar sync</code></td><td>Bestehenden Termin abgleichen: Fehlende einladen, Status nach der Website setzen</td></tr>
+            <tr><td><code>/ledger calendar export</code></td><td>Antworten des Termins für die Website</td></tr>
             <tr><td><code>/ledger start</code></td><td>Wurf für das ausgewählte Item starten</td></tr>
             <tr><td><code>/ledger timer &lt;Sek.&gt; [Stechen]</code></td><td>Wurfzeit (10–300 s) und Stechen (5–120 s); <code>/ledger timer reset</code> = 30/15</td></tr>
             <tr><td><code>/ledger pass &lt;Name&gt;</code></td><td>Spieler passt auf das Item</td></tr>

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -73,6 +74,14 @@ func TestRaidQuickAddAtomicRetriesAndPermissions(t *testing.T) {
 	}
 	body["request_id"] = "second"
 	body["player_id"] = owner.ID
+	// The owner already raids with Newchar: a second character is refused and
+	// nothing is created (ADR 092).
+	if status, response := do(t, srv.Client(), http.MethodPost, url, token, body); status != http.StatusConflict || !strings.Contains(string(response), "player_already_in_roster") {
+		t.Fatalf("second character of a rostered owner: %d %s", status, response)
+	}
+	otherOwner := seedAccount(t, db, "other", "pw", validation.RoleMember)
+	body["request_id"] = "second-other"
+	body["player_id"] = otherOwner
 	if status, response := do(t, srv.Client(), http.MethodPost, url, token, body); status != http.StatusCreated {
 		t.Fatalf("existing owner: %d %s", status, response)
 	}
@@ -88,7 +97,7 @@ func TestRaidQuickAddAtomicRetriesAndPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(owners) != 3 {
+	if len(owners) != 4 {
 		t.Fatalf("orphan owner: %d", len(owners))
 	}
 	chars, err := character.NewRepo(db).List(ctx)

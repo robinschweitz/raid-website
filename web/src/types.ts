@@ -562,6 +562,7 @@ export interface AddonRosterPreviewRow {
   class: string
   suggested_role: AttendanceRole
   suggest_late_join: boolean
+  player_in_roster_as: string
   errors: string[]
 }
 
@@ -579,6 +580,41 @@ export interface AddonRosterImportResult {
   character_name: string
   status: 'added' | 'already_in_roster' | 'failed'
   attendance_id: number | null
+  code: string
+  message: string
+}
+
+export type AddonCalendarAction = 'none' | 'signup' | 'decline' | 'tentative'
+
+export interface AddonCalendarPreviewRow {
+  line_number: number
+  name: string
+  answer: string
+  status: 'known' | 'unknown' | 'invalid'
+  character_id: number | null
+  character_name: string
+  player_id: number | null
+  class: string
+  website_states: ('roster' | 'bench' | 'signup' | 'tentative' | 'declined')[]
+  roster_character: string
+  action: AddonCalendarAction
+  spec: string
+  notes: string[]
+  errors: string[]
+}
+
+export interface AddonCalendarPreview {
+  raid_id: number
+  header_raid_id: number
+  recorder: string
+  rows: AddonCalendarPreviewRow[]
+  warnings: string[]
+}
+
+export interface AddonCalendarImportResult {
+  character_id: number
+  character_name: string
+  status: 'signed_up' | 'declined' | 'tentative' | 'unchanged' | 'failed'
   code: string
   message: string
 }

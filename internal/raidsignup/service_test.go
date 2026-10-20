@@ -156,3 +156,57 @@ func TestSignupWorkflow(t *testing.T) {
 		wantError(s.SetEnabled(ctx, rd.ID, staff.ID, false), ErrRaidState)
 	}
 }
+
+func TestSubmitForPlayerIsStaffOnlyAndKeepsPendingChoices(t *testing.T) {
+	ctx := context.Background()
+	database, err := db.Open(ctx, "file:"+filepath.Join(t.TempDir(), "submit.db")+"?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	migrator, err := migrations.NewMigrator(database.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := migrator.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r := NewRepo(database.DB)
+	s := NewService(r)
+	now := time.Now().UTC()
+	staff := &player.Player{Name: "Staff", Role: validation.RoleRaidassistent, Active: true, CreatedAt: now, UpdatedAt: now}
+	member := &player.Player{Name: "Member", Role: validation.RoleMember, Active: true, CreatedAt: now, UpdatedAt: now}
+	for _, p := range []*player.Player{staff, member} {
+		if err := r.players.Create(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := &character.Character{PlayerID: member.ID, Name: "Kalender", Class: "Paladin", MainSpec: "Vergeltung", SecondSpec: "Heilig", Active: true, CreatedAt: now, UpdatedAt: now}
+	if err := r.characters.Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	rd := &raid.Raid{Name: "Calendar", RaidLeaderID: staff.ID, Status: validation.RaidStatusPlanned, CreatedAt: now, UpdatedAt: now}
+	if err := r.raids.Create(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SubmitForPlayer(ctx, rd.ID, member.ID, c.ID, "Vergeltung"); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("member: %v", err)
+	}
+	if err := s.SubmitForPlayer(ctx, rd.ID, staff.ID, c.ID, "Frost"); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("spec of another class: %v", err)
+	}
+	// Signups need not be open: staff signs up from the game calendar.
+	if err := s.SubmitForPlayer(ctx, rd.ID, staff.ID, c.ID, "Vergeltung"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SubmitForPlayer(ctx, rd.ID, staff.ID, c.ID, "Heilig"); !errors.Is(err, ErrAlreadySignedUp) {
+		t.Fatalf("pending choice overwritten: %v", err)
+	}
+	overview, err := s.Overview(ctx, rd.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(overview.Entries) != 1 || overview.Entries[0].Spec != "Vergeltung" || overview.Entries[0].PlayerID != member.ID {
+		t.Fatalf("entries = %+v", overview.Entries)
+	}
+}

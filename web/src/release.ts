@@ -1,8 +1,17 @@
-export const appVersion = '1.0.27'
+export const appVersion = '1.0.28'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Spielkalender abgleichen und ein Platz pro Spieler',
+    changes: [
+      'RaidLedger 2.6.0: Die Einladungsliste bringt jetzt auch Anmeldungen, „unsicher“ und Absagen in den Spielkalender. „ABGLEICHEN“ setzt im Kalender-Termin alle Status nach der Website, ohne die eigenen Antworten der Spieler zu überschreiben.',
+      'Neu im Raid unter „Aufstellung“: „Antworten aus dem Spielkalender“. Wer im Spiel zugesagt hat, wird mit seiner Main-Spec angemeldet, wer abgesagt hat, steht auf „kann nicht“. Erst kommt eine Vorschau, dann übernimmst du die Auswahl.',
+      'Ein Spieler kann nicht mehr versehentlich mit zwei Charakteren in derselben Aufstellung stehen (auch nicht auf der Ersatzbank). Die Seite nennt den Charakter, der schon drin ist; den tauschst du über „Bearbeiten“ oder bei den Anmeldungen.',
+    ],
+  },
+  {
+    version: '1.0.27',
     title: 'RaidLedger 2.5.0 und RaidWishlist 2.0.0',
     changes: [
       'Neue Addon-Versionen zum Herunterladen unter „Addons“. RaidLedger hat jetzt fünf Reiter (Beute, Vergaben, Spieler, Raid, Einstellungen): alles geht per Klick, jeder Knopf hat einen Tooltip.',

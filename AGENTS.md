@@ -146,6 +146,10 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - MEMBER and higher may submit multiple own characters, each with any valid class spec.
 - Pending choices can be edited/withdrawn while open; accepted choices are staff-managed.
 - Only one character per player is accepted, automatically creating the roster snapshot.
+- A player holds at most one roster slot per raid, bench included: every roster write path rejects a
+  second character of the same player (`409 player_already_in_roster`); switching the character in
+  the existing slot stays possible. Enforced in the service for new or re-assigned rows only, so older
+  duplicates stay correctable (ADR 092).
 - Alternatives remain visible; staff can explicitly switch the roster slot.
 - Signups close at the scheduled start (server-enforced) or manually earlier. Staff may
   continue accepting choices in active raids after closing. All changes are audited.
@@ -237,6 +241,12 @@ Every item here was explicitly decided by the owner. Do not "improve" on them.
 - The invite export header carries the raid's date and start time in the series timezone (realm
   time) for RaidLedger's calendar event: `RS2;INV;<id>;<name>;<size>;<YYYY-MM-DD>;<HH:MM>`. Raids
   without a series or scheduled start keep the five-field header (ADR 085).
+- Game calendar sync (ADR 092): after the roster lines the invite export lists players without a roster
+  slot who answered on the website, with a fifth field `SIGNUP`/`TENTATIVE`/`DECLINED`; RaidLedger puts
+  them only into the calendar event and sets statuses without overwriting players' own answers.
+  RaidLedger's `RS2;CAL` export brings calendar answers back through preview then apply (RAIDASSISTENT
+  and up, planned/open unarchived raids): acceptance → pending signup with main spec (staff
+  `SubmitForPlayer`, removes a website absence), refusal → `DECLINED` absence; nothing touches the roster.
 
 ### Shadowmourne (ADR 086)
 - One shared list: each active entry is a Krieger/Paladin/Todesritter character with a priority and

@@ -307,7 +307,8 @@ export function GuidePage() {
       <p>Unter <strong>Charakteroptionen nach Spieler</strong> steht jeder Angemeldete mit allen angebotenen Charakteren. Bei <em>Ausstehend</em> klickst du <strong>In Aufstellung übernehmen</strong>. Mit <strong>Auf diesen Charakter wechseln</strong> tauschst du den Charakter. Pro Spieler kommt nur ein Charakter in den Raid.</p>
       <Shot name="33-anmeldungen-uebernehmen" caption="Charakteroptionen nach Spieler" />
       <h3>Die Aufstellung</h3>
-      <p>Der Reiter <strong>Aufstellung</strong> sortiert nach Tanks, Heilung, Nahkampf und Fernkampf, dazu die Ersatzbank. Mit <strong>Teilnahme hinzufügen</strong> trägst du jemanden ohne Anmeldung ein. Mit dem <strong>Stift</strong> änderst du Charakter und Spec oder nimmst jemanden mit <strong>Entfernen</strong> heraus.</p>
+      <p>Der Reiter <strong>Aufstellung</strong> sortiert nach Tanks, Heilung, Nahkampf und Fernkampf, dazu die Ersatzbank. Mit <strong>Teilnahme hinzufügen</strong> trägst du jemanden ohne Anmeldung ein. Mit dem <strong>Stift</strong> änderst du Charakter und Spec oder nimmst jemanden mit <strong>Entfernen</strong> heraus. Jeder Spieler hat nur einen Platz, auch auf der Ersatzbank: Steht er schon mit einem anderen Charakter drin, nennt die Seite diesen Charakter, und du tauschst ihn mit dem Stift.</p>
+      <p>Wer im <strong>Spielkalender</strong> auf die Einladung geantwortet hat, holst du unter <strong>Antworten aus dem Spielkalender</strong> auf die Website (Text aus RaidLedger, siehe <Link to="/addons/raidledger">RaidLedger</Link>): Zusagen werden zu offenen Anmeldungen mit der Main-Spec, Absagen zu „kann nicht“.</p>
       <Shot name="34-aufstellung" caption="Raidaufstellung nach Rollen" />
       <Shot name="35-aufstellung-bearbeiten" caption="Teilnehmer bearbeiten oder entfernen" />
       <h3>Gesuchtext</h3>

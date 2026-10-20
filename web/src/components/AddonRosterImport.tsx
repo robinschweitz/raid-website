@@ -19,7 +19,8 @@ const statusLabels: Record<AddonRosterPreviewRow['status'], string> = { in_roste
 const resultLabels: Record<AddonRosterImportResult['status'], string> = { added: 'Hinzugefügt', already_in_roster: 'War schon in der Aufstellung', failed: 'Fehler' }
 
 function initialChoices(preview: AddonRosterPreview): Record<number, Choice> {
-  return Object.fromEntries(preview.rows.filter((row) => row.status === 'known' && row.character_id != null)
+  // A player raids with one character: rows whose player already has a roster slot cannot be added.
+  return Object.fromEntries(preview.rows.filter((row) => row.status === 'known' && row.character_id != null && !row.player_in_roster_as)
     .map((row) => [row.character_id, { isSelected: true, role: row.suggested_role, lateJoin: row.suggest_late_join }]))
 }
 
@@ -99,6 +100,7 @@ export function AddonRosterImport({ raidID, onImported, onQuickAdd }: Props) {
                 <td>{choice ? <input type="checkbox" aria-label={`${row.name} später dazugekommen`} disabled={pending} checked={choice.lateJoin} onChange={(e) => choose(id, { lateJoin: e.target.checked })} /> : '—'}</td>
                 <td className="addon-hints">
                   {row.errors.length > 0 ? row.errors.map((text) => <div key={text} className="addon-hint-error">{text}</div>) : <div className={row.status === 'in_roster' ? 'muted' : ''}>{statusLabels[row.status]}</div>}
+                  {row.status === 'known' && row.player_in_roster_as && <div className="addon-hint-error">Spieler steht schon mit {row.player_in_roster_as} in der Aufstellung. Bei Bedarf dort den Charakter tauschen.</div>}
                   {row.status === 'unknown' && <button type="button" disabled={pending} onClick={() => onQuickAdd(row.name)}>Per Schnellanlage hinzufügen</button>}
                 </td>
               </tr>

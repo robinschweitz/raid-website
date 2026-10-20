@@ -22,6 +22,8 @@ func (h AddonSyncHandlers) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/raids/{id}/addon-loot-import", RequireRole(validation.RoleRaidassistent, h.applyLootImport))
 	mux.HandleFunc("POST /api/v1/raids/{id}/addon-roster-import/preview", RequireRole(validation.RoleRaidassistent, h.previewRosterImport))
 	mux.HandleFunc("POST /api/v1/raids/{id}/addon-roster-import", RequireRole(validation.RoleRaidassistent, h.applyRosterImport))
+	mux.HandleFunc("POST /api/v1/raids/{id}/addon-calendar-import/preview", RequireRole(validation.RoleRaidassistent, h.previewCalendarImport))
+	mux.HandleFunc("POST /api/v1/raids/{id}/addon-calendar-import", RequireRole(validation.RoleRaidassistent, h.applyCalendarImport))
 }
 
 type addonInviteExportResponse struct {
@@ -40,6 +42,11 @@ type addonLootImportRequest struct {
 type addonRosterImportRequest struct {
 	Payload    string                      `json:"payload"`
 	Selections []addonsync.RosterSelection `json:"selections"`
+}
+
+type addonCalendarImportRequest struct {
+	Payload    string                        `json:"payload"`
+	Selections []addonsync.CalendarSelection `json:"selections"`
 }
 
 func (h AddonSyncHandlers) inviteExport(w http.ResponseWriter, r *http.Request) {
@@ -135,6 +142,49 @@ func (h AddonSyncHandlers) applyRosterImport(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	results, err := h.AddonSync.ApplyRosterImport(r.Context(), raidID, actor, req.Payload, req.Selections)
+	if err != nil {
+		writeAddonSyncError(w, err)
+		return
+	}
+	writeListJSON(w, results)
+}
+
+func (h AddonSyncHandlers) previewCalendarImport(w http.ResponseWriter, r *http.Request) {
+	raidID, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid raid id")
+		return
+	}
+	var req addonPreviewRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	preview, err := h.AddonSync.PreviewCalendarImport(r.Context(), raidID, req.Payload)
+	if err != nil {
+		writeAddonSyncError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": preview})
+}
+
+func (h AddonSyncHandlers) applyCalendarImport(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
+		return
+	}
+	raidID, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid raid id")
+		return
+	}
+	var req addonCalendarImportRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	results, err := h.AddonSync.ApplyCalendarImport(r.Context(), raidID, actor, req.Payload, req.Selections)
 	if err != nil {
 		writeAddonSyncError(w, err)
 		return

@@ -28,20 +28,35 @@ const maxEnhancedPoints = 50
 // ErrInvalidPayload marks pasted text that is not the expected addon export.
 var ErrInvalidPayload = errors.New("invalid addon export")
 
-// InviteMember is one roster entry the addon should invite.
+// Website answers of players without a roster slot, written as the fifth
+// field of an invite line (ADR 092). RaidLedger never invites these characters
+// into the raid group; it only puts them into the calendar event with the
+// matching status.
+const (
+	InviteSignup    = "SIGNUP"
+	InviteTentative = "TENTATIVE"
+	InviteDeclined  = "DECLINED"
+)
+
+// InviteMember is one character the addon should invite: a roster entry
+// (Status empty), or a player who answered on the website without a roster
+// slot (Status InviteSignup, InviteTentative or InviteDeclined).
 type InviteMember struct {
 	Name    string
 	Role    validation.AttendanceRole
 	Class   string
 	IsBench bool
+	Status  string
 }
 
 // BuildInviteExport renders the invite list for RaidLedger:
 //
 //	RS2;INV;<raidID>;<raidName>;<raidSize>[;<YYYY-MM-DD>;<HH:MM>]
-//	<name>;<role>;<class>;<bench 0/1>
+//	<name>;<role>;<class>;<bench 0/1>[;<SIGNUP|TENTATIVE|DECLINED>]
 //
-// realmStart is the scheduled start already converted to realm time; RaidLedger
+// Roster lines keep four fields, so RaidLedger versions before the calendar
+// sync still read them; they report answer lines (five fields) as unreadable
+// and skip them. realmStart is the scheduled start already converted to realm time; RaidLedger
 // uses date and time for its calendar event. Without it the header ends after
 // the size, which RaidLedger reads as well.
 func BuildInviteExport(raidID int64, raidName string, raidSize *int, realmStart *time.Time, members []InviteMember) string {
@@ -59,7 +74,11 @@ func BuildInviteExport(raidID int64, raidName string, raidSize *int, realmStart 
 		if member.IsBench {
 			bench = "1"
 		}
-		lines = append(lines, strings.Join([]string{field(member.Name), string(member.Role), field(member.Class), bench}, ";"))
+		parts := []string{field(member.Name), string(member.Role), field(member.Class), bench}
+		if member.Status != "" {
+			parts = append(parts, member.Status)
+		}
+		lines = append(lines, strings.Join(parts, ";"))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -437,4 +456,78 @@ func parseHeader(text, kind string) (exportHeader, []bodyLine, error) {
 		}
 	}
 	return exportHeader{version: version, raidID: raidID, recorder: header[3], at: time.Unix(unix, 0).UTC()}, body, nil
+}
+
+// Calendar answers written by RaidLedger, one per invite status of the WoW
+// 3.3.5 game calendar (CalendarEventGetInvite). "tentative" only exists in
+// later clients and is read for completeness.
+const (
+	CalendarInvited     = "invited"
+	CalendarAccepted    = "accepted"
+	CalendarDeclined    = "declined"
+	CalendarConfirmed   = "confirmed"
+	CalendarOut         = "out"
+	CalendarStandby     = "standby"
+	CalendarSignedUp    = "signedup"
+	CalendarNotSignedUp = "notsignedup"
+	CalendarTentative   = "tentative"
+)
+
+var calendarAnswers = map[string]bool{
+	CalendarInvited: true, CalendarAccepted: true, CalendarDeclined: true, CalendarConfirmed: true, CalendarOut: true,
+	CalendarStandby: true, CalendarSignedUp: true, CalendarNotSignedUp: true, CalendarTentative: true,
+}
+
+// CalendarExport is a parsed invite list of the raid's game calendar event.
+type CalendarExport struct {
+	RaidID     int64
+	Recorder   string
+	ExportedAt time.Time
+	Invites    []CalendarInvite
+}
+
+// CalendarInvite is one character invited to the calendar event and its answer.
+type CalendarInvite struct {
+	LineNumber int
+	Raw        string
+	Name       string
+	Answer     string
+	Error      string
+}
+
+// ParseCalendarExport reads RaidLedger's calendar export
+//
+//	RS2;CAL;<raidID>;<recorder>;<exportUnix>
+//	<name>;<invited|accepted|declined|confirmed|out|standby|signedup|notsignedup|tentative>
+//
+// A broken header rejects the whole text; a broken line is kept with Error set.
+func ParseCalendarExport(text string) (*CalendarExport, error) {
+	header, body, err := parseHeader(text, "CAL")
+	if err != nil {
+		return nil, err
+	}
+	if header.version != formatV2 {
+		return nil, fmt.Errorf("calendar export needs %s: %w", formatV2, ErrInvalidPayload)
+	}
+	export := &CalendarExport{RaidID: header.raidID, Recorder: header.recorder, ExportedAt: header.at}
+	seen := map[string]bool{}
+	for _, row := range body {
+		invite := CalendarInvite{LineNumber: row.number, Raw: row.text}
+		parts := strings.Split(row.text, ";")
+		switch {
+		case len(parts) != 2:
+			invite.Error = "Zeile hat nicht zwei Felder"
+		case strings.TrimSpace(parts[0]) == "":
+			invite.Error = "Name fehlt"
+		case !calendarAnswers[parts[1]]:
+			invite.Error = "Unbekannte Kalender-Antwort"
+		case seen[toKey(strings.TrimSpace(parts[0]))]:
+			invite.Error = "Charakter kommt doppelt vor"
+		default:
+			invite.Name, invite.Answer = strings.TrimSpace(parts[0]), parts[1]
+			seen[toKey(invite.Name)] = true
+		}
+		export.Invites = append(export.Invites, invite)
+	}
+	return export, nil
 }

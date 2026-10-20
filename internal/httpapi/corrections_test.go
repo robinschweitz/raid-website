@@ -123,6 +123,24 @@ func (f *correctionFixture) attend(playerID, charID int64) int64 {
 	return correctionID(f.t, f.request(http.MethodPost, "/attendance", map[string]any{"player_id": playerID, "character_id": charID, "role": "DD"}, http.StatusCreated))
 }
 
+// legacyDuplicateSlot stores a second roster row for a player directly, as
+// legacy imports and account merges left them before one slot per player was
+// enforced (ADR 092). The API itself refuses such a row.
+func (f *correctionFixture) legacyDuplicateSlot(playerID, charID int64) int64 {
+	f.t.Helper()
+	ctx := context.Background()
+	c, err := character.NewRepo(f.db).Get(ctx, charID)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	row := &attendance.Attendance{RaidID: f.raidID, PlayerID: playerID, CharacterID: charID, CharacterName: c.Name, Class: attendance.NormalizeClass(c.Class), Spec: c.MainSpec, Role: validation.RoleDD, CreatedAt: now, UpdatedAt: now}
+	if err := attendance.NewRepo(f.db).Create(ctx, row); err != nil {
+		f.t.Fatal(err)
+	}
+	return row.ID
+}
+
 // legacyCompleted models historical unarchived raids, not the current final archive flow.
 func (f *correctionFixture) legacyCompleted(rewardedPlayerIDs ...int64) {
 	f.t.Helper()

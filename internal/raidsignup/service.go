@@ -307,7 +307,9 @@ func (s *Service) Withdraw(ctx context.Context, raidID, id, actor int64) error {
 	})
 }
 
-func specRole(spec string) validation.AttendanceRole {
+// SpecRole is the roster role a spec plays: tank specs tank, healing specs
+// heal, everything else is DD.
+func SpecRole(spec string) validation.AttendanceRole {
 	if strings.Contains(spec, "Tank") {
 		return validation.RoleTank
 	}
@@ -316,6 +318,71 @@ func specRole(spec string) validation.AttendanceRole {
 		return validation.RoleHeal
 	}
 	return validation.RoleDD
+}
+
+// ErrAlreadySignedUp means the character already has a pending signup or a
+// roster slot in this raid; nothing was changed.
+var ErrAlreadySignedUp = errors.New("character already signed up")
+
+// SubmitForPlayer lets raid staff sign a player's character up, e.g. because
+// the player accepted the raid's invite in the game calendar (ADR 092). It
+// needs RAIDASSISTENT and an active raid, but not an open signup window: staff
+// may still review and accept choices after closing (ADR 033). An existing
+// pending choice is left as it is; a withdrawn one is submitted again with spec.
+func (s *Service) SubmitForPlayer(ctx context.Context, raidID, actor, characterID int64, spec string) error {
+	spec = strings.TrimSpace(spec)
+	return s.repo.transaction(ctx, func(r *Repo) error {
+		if err := s.authorize(ctx, r, actor, validation.RoleRaidassistent); err != nil {
+			return err
+		}
+		rd, err := r.raids.Get(ctx, raidID)
+		if err != nil {
+			return reference(err)
+		}
+		if !active(rd) {
+			return ErrRaidState
+		}
+		c, err := r.characters.Get(ctx, characterID)
+		if err != nil {
+			return reference(err)
+		}
+		if !slices.Contains(validation.ClassSpecs[attendance.NormalizeClass(c.Class)], spec) {
+			return ErrInvalid
+		}
+		roster, err := r.attendance.ListByRaid(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		for _, a := range roster {
+			if a.PlayerID == c.PlayerID && a.CharacterID == c.ID {
+				return ErrAlreadySignedUp
+			}
+		}
+		rows, err := r.list(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		now := s.now()
+		row := signupRow{RaidID: raidID, PlayerID: c.PlayerID, CharacterID: c.ID, Spec: spec, CreatedAt: now, UpdatedAt: now}
+		var before any
+		for _, existing := range rows {
+			if existing.CharacterID != c.ID {
+				continue
+			}
+			if existing.PlayerID != c.PlayerID {
+				return ErrConflict
+			}
+			if !existing.IsWithdrawn {
+				return ErrAlreadySignedUp
+			}
+			before = existing
+			row.ID, row.CreatedAt = existing.ID, existing.CreatedAt
+		}
+		if err := r.save(ctx, &row); err != nil {
+			return err
+		}
+		return s.log(ctx, r, raidID, actor, "submit_for_player", before, row)
+	})
 }
 
 // Accept creates attendance or explicitly switches an existing roster slot.
@@ -362,7 +429,7 @@ func (s *Service) Accept(ctx context.Context, raidID, id, actor, expectedAttenda
 		if current != nil && current.CharacterID == row.CharacterID {
 			return nil
 		}
-		role := specRole(row.Spec)
+		role := SpecRole(row.Spec)
 		class := attendance.NormalizeClass(c.Class)
 		snapshot := raidcorrection.SnapshotPatch{CharacterName: &c.Name, Class: &class, Spec: &row.Spec}
 		var after *attendance.Attendance

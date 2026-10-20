@@ -18,6 +18,7 @@ import (
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcorrection"
 	"raid-website/internal/raidseries"
+	"raid-website/internal/raidsignup"
 	"raid-website/internal/unclaimedloot"
 	"raid-website/internal/validation"
 )
@@ -55,17 +56,20 @@ type Service struct {
 	points      *enhancepoints.Repo
 	corrections *raidcorrection.Service
 	unclaimed   *unclaimedloot.Service
+	signups     *raidsignup.Service
 }
 
 // NewService wires the repositories the addon exchange reads and the
 // correction service that performs the actual loot writes.
-func NewService(raids *raid.Repo, series *raidseries.Repo, attendanceRepo *attendance.Repo, characters *character.Repo, players *player.Repo, catalog *lootcatalog.Service, lootRepo *loot.Repo, points *enhancepoints.Repo, corrections *raidcorrection.Service, unclaimed *unclaimedloot.Service) *Service {
-	return &Service{raids: raids, series: series, attendance: attendanceRepo, characters: characters, players: players, catalog: catalog, loot: lootRepo, points: points, corrections: corrections, unclaimed: unclaimed}
+func NewService(raids *raid.Repo, series *raidseries.Repo, attendanceRepo *attendance.Repo, characters *character.Repo, players *player.Repo, catalog *lootcatalog.Service, lootRepo *loot.Repo, points *enhancepoints.Repo, corrections *raidcorrection.Service, unclaimed *unclaimedloot.Service, signups *raidsignup.Service) *Service {
+	return &Service{raids: raids, series: series, attendance: attendanceRepo, characters: characters, players: players, catalog: catalog, loot: lootRepo, points: points, corrections: corrections, unclaimed: unclaimed, signups: signups}
 }
 
 // InviteExport renders the raid roster for the addon. Invites use the live
 // character name, because the roster snapshot keeps the name from accept time
-// and a renamed character could not be invited under it.
+// and a renamed character could not be invited under it. Players without a
+// roster slot who answered on the website (pending signup, unsure, declined)
+// follow with their answer, for the game calendar event (ADR 092).
 func (s *Service) InviteExport(ctx context.Context, raidID int64, includeBench bool) (string, error) {
 	rd, err := s.getRaid(ctx, raidID)
 	if err != nil {
@@ -86,6 +90,11 @@ func (s *Service) InviteExport(ctx context.Context, raidID int64, includeBench b
 		}
 		members = append(members, InviteMember{Name: name, Role: row.Role, Class: row.Class, IsBench: row.IsBench})
 	}
+	answers, err := s.answerMembers(ctx, raidID, rows)
+	if err != nil {
+		return "", err
+	}
+	members = append(members, answers...)
 	realmStart, err := s.realmStart(ctx, rd)
 	if err != nil {
 		return "", err

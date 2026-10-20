@@ -304,6 +304,42 @@ L["%d characters not invited: the calendar takes 100 per event."] =
 L["/ledger calendar - calendar raid event from the invite list, everyone on it invited"] =
     "/ledger calendar - Kalender-Raidtermin aus der Einladungsliste, alle darauf eingeladen"
 
+-- Calendar sync with the website (website ADR 092)
+L["signed up"] = "angemeldet"
+L["unsure"] = "unsicher"
+L["can't come"] = "kann nicht"
+L["GAME CALENDAR"] = "SPIELKALENDER"
+L["Create the event, then SYNC sets everyone's status from the website list."] =
+    "Termin anlegen, dann setzt ABGLEICHEN alle Status nach der Liste der Webseite."
+L["SYNC"] = "ABGLEICHEN"
+L["SYNCING..."] = "GLEICHE AB..."
+L["ANSWERS FOR THE WEBSITE"] = "ANTWORTEN FÜR WEBSEITE"
+L["The calendar is still being synced."] = "Der Kalender wird gerade abgeglichen."
+L["Looking for the calendar event..."] = "Suche den Kalender-Termin..."
+L["Inviting %s..."] = "Lade %s ein..."
+L["No calendar event for this list found: create it with CALENDAR EVENT first."] =
+    "Kein Kalender-Termin zu dieser Liste gefunden: zuerst mit KALENDER-TERMIN anlegen."
+L["The calendar event did not open; try again."] = "Der Kalender-Termin ließ sich nicht öffnen; bitte nochmal versuchen."
+L["You may not change this calendar event: ask its creator to make you a moderator."] =
+    "Du darfst diesen Kalender-Termin nicht ändern: den Ersteller bitten, dich zum Moderator zu machen."
+L["Calendar synced: %d invited, %d statuses set."] = "Kalender abgeglichen: %d eingeladen, %d Status gesetzt."
+L["Declined in game: %s (export the answers for the website)."] =
+    "Im Spiel abgesagt: %s (Antworten für die Webseite exportieren)."
+L["%d invites, %d accepted, %d declined: Ctrl+C and paste into the website's calendar import."] =
+    "%d Einladungen, %d Zusagen, %d Absagen: Strg+C und auf der Webseite beim Kalender-Import einfügen."
+L["Calendar answers selected: press Ctrl+C and paste them into the raid website's calendar import."] =
+    "Kalender-Antworten markiert: Strg+C drücken und im Kalender-Import der Raid-Webseite einfügen."
+L["Invite the missing and set every status in the existing calendar event from the website list"] =
+    "Im bestehenden Kalender-Termin die Fehlenden einladen und alle Status nach der Liste der Webseite setzen"
+L["Who answered what in the calendar event, for the website's calendar import"] =
+    "Wer im Kalender-Termin was geantwortet hat, für den Kalender-Import der Webseite"
+L["Ctrl+C copies the calendar answers; paste them into the website"] =
+    "Strg+C kopiert die Kalender-Antworten; auf der Webseite einfügen"
+L["/ledger calendar sync - invite the missing and set statuses in the existing calendar event"] =
+    "/ledger calendar sync - im bestehenden Kalender-Termin Fehlende einladen und Status setzen"
+L["/ledger calendar export - the calendar answers for the website"] =
+    "/ledger calendar export - die Kalender-Antworten für die Webseite"
+
 -- Raid feedback 2026-10-19: token bundles, group loot, tooltips
 L["WINNERS: %s"] = "GEWINNER: %s"
 L["[Loot] %dx %s won by %s."] = "[Loot] %dx %s gewonnen von %s."

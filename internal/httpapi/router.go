@@ -81,6 +81,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	}
 
 	corrections := raidcorrection.NewService(raidcorrection.NewRepo(db)).WithExternalClient(registrationFeed)
+	signups := raidsignup.NewService(raidsignup.NewRepo(db))
 	api := v1.NewAPI(v1.Deps{
 		DB:                db,
 		Auth:              authSvc,
@@ -100,7 +101,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Audit:             audits,
 		Completion:        raidcompletion.NewService(raidcompletion.NewRepo(db)),
 		Corrections:       corrections,
-		Signups:           raidsignup.NewService(raidsignup.NewRepo(db)),
+		Signups:           signups,
 		Recruitment:       recruitment.NewService(db),
 		Shadowmourne:      shadowmourne.NewService(shadowmourne.NewRepo(db), chars),
 		Registration:      registrationSvc,
@@ -113,7 +114,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	v1.AddonHandlers{Addons: bundledAddons}.Register(mux)
 	unclaimed := unclaimedloot.NewService(unclaimedloot.NewRepo(db), raids, catalog)
 	v1.UnclaimedHandlers{Unclaimed: unclaimed}.Register(mux)
-	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed)}.Register(mux)
+	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed, signups)}.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)
 	if spa, err := webui.Handler(); err == nil {
 		mux.Handle("/", spa)

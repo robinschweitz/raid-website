@@ -50,7 +50,10 @@ type RosterPreviewRow struct {
 	Class           string                    `json:"class"`
 	SuggestedRole   validation.AttendanceRole `json:"suggested_role"`
 	SuggestLateJoin bool                      `json:"suggest_late_join"`
-	Errors          []string                  `json:"errors"`
+	// PlayerInRosterAs names the character with which this character's player
+	// already holds a roster slot. Such a row cannot be added (ADR 092).
+	PlayerInRosterAs string   `json:"player_in_roster_as"`
+	Errors           []string `json:"errors"`
 }
 
 // RosterSelection is the staff decision for one known character.
@@ -144,6 +147,12 @@ func (s *Service) resolveRosterMember(ctx context.Context, rd *raid.Raid, roster
 	}
 	characterID, playerID := c.ID, c.PlayerID
 	row.Status, row.CharacterID, row.PlayerID = RosterKnown, &characterID, &playerID
+	for _, entry := range roster {
+		if entry.attendance.PlayerID == c.PlayerID {
+			row.PlayerInRosterAs = entry.currentName
+			break
+		}
+	}
 	row.CharacterName, row.Class, row.SuggestedRole = c.Name, c.Class, role
 	if start := raidStart(rd); start != nil && member.FirstSeen.After(start.Add(lateJoinGrace)) {
 		row.SuggestLateJoin = true
@@ -204,6 +213,12 @@ func (s *Service) addRosterCharacter(ctx context.Context, raidID, actorID int64,
 	switch {
 	case err == nil:
 		result.Status, result.AttendanceID = ResultAdded, &row.ID
+	case errors.Is(err, raidcorrection.ErrPlayerInRoster):
+		result.Status, result.Code, result.Message = ResultFailed, "player_already_in_roster", "Spieler steht schon mit einem anderen Charakter in der Aufstellung"
+		var inRoster *raidcorrection.PlayerInRosterError
+		if errors.As(err, &inRoster) {
+			result.Message = fmt.Sprintf("Spieler steht schon mit %s in der Aufstellung", inRoster.CharacterName)
+		}
 	case errors.Is(err, raidcorrection.ErrConflict):
 		result.Status = ResultAlreadyInRoster
 	case errors.Is(err, raidcorrection.ErrInvalid):

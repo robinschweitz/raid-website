@@ -2,6 +2,7 @@ package v1
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -211,6 +212,13 @@ func writeCorrectionError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusConflict, "item_lock_conflict", "Mehrere aktive Item-Locks passen auf dieses Item")
 	case errors.Is(err, raidcorrection.ErrHasLoot):
 		WriteError(w, http.StatusConflict, "attendance_has_loot", "Charakter hat in diesem Raid noch Loot; zuerst den Loot zurueckziehen")
+	case errors.Is(err, raidcorrection.ErrPlayerInRoster):
+		message := "Dieser Spieler steht schon mit einem anderen Charakter in der Aufstellung. Den vorhandenen Platz tauschen statt einen zweiten anzulegen."
+		var inRoster *raidcorrection.PlayerInRosterError
+		if errors.As(err, &inRoster) {
+			message = fmt.Sprintf("Dieser Spieler steht schon mit %s in der Aufstellung. Den vorhandenen Platz tauschen statt einen zweiten anzulegen.", inRoster.CharacterName)
+		}
+		WriteError(w, http.StatusConflict, "player_already_in_roster", message)
 	case errors.Is(err, raidcorrection.ErrConflict):
 		WriteError(w, http.StatusConflict, "attendance_conflict", "Teilnahme ist bereits vorhanden")
 	default:

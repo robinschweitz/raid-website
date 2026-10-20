@@ -1,8 +1,20 @@
-export const appVersion = '1.0.27'
+export const appVersion = '1.0.28'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Spielkalender abgleichen und ein Platz pro Spieler',
+    changes: [
+      'RaidLedger 2.6.0: Die Einladungsliste bringt jetzt auch Anmeldungen, „unsicher“ und Absagen in den Spielkalender. „ABGLEICHEN“ lädt Fehlende in den Kalender-Termin ein, „STATUS SETZEN“ setzt danach alle Status nach der Website, ohne die eigenen Antworten der Spieler zu überschreiben, und meldet, wie viele angekommen sind.',
+      'RaidLedger lädt in den Kalender-Termin etwa alle 2 Sekunden einen Charakter ein, weil das Spiel schnellere Einladungen verwirft (vorher gingen dabei Einladungen verloren). Bei 25 Spielern dauert der Termin also etwa eine Minute; der Knopf zeigt den Fortschritt.',
+      'Neu im Raid unter „Aufstellung“: „Antworten aus dem Spielkalender“. Wer im Spiel zugesagt hat, wird mit seiner Main-Spec angemeldet, wer abgesagt hat, steht auf „kann nicht“. Erst kommt eine Vorschau, dann übernimmst du die Auswahl.',
+      'Ein Spieler kann nicht mehr versehentlich mit zwei Charakteren in derselben Aufstellung stehen (auch nicht auf der Ersatzbank). Die Seite nennt den Charakter, der schon drin ist; den tauschst du über „Bearbeiten“ oder bei den Anmeldungen.',
+      'Wer „Kann nicht“ sagt, ist raus: Die Anmeldung wird zurückgezogen und ein Platz in der Aufstellung oder auf der Ersatzbank frei. Vorher fragt die Seite nach. Hat der Spieler in dem Raid schon Loot, geht die Absage erst, wenn der Loot zurückgezogen ist. „Unsicher“ ändert nichts an Anmeldung und Aufstellung.',
+      'Kalender-Antworten behalten den Grund, den ein Spieler auf der Website eingetragen hat, z. B. „Spätschicht“.',
+    ],
+  },
+  {
+    version: '1.0.27',
     title: 'RaidLedger 2.5.0 und RaidWishlist 2.0.0',
     changes: [
       'Neue Addon-Versionen zum Herunterladen unter „Addons“. RaidLedger hat jetzt fünf Reiter (Beute, Vergaben, Spieler, Raid, Einstellungen): alles geht per Klick, jeder Knopf hat einen Tooltip.',

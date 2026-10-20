@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
 	"raid-website/internal/raid"
@@ -307,7 +308,9 @@ func (s *Service) Withdraw(ctx context.Context, raidID, id, actor int64) error {
 	})
 }
 
-func specRole(spec string) validation.AttendanceRole {
+// SpecRole is the roster role a spec plays: tank specs tank, healing specs
+// heal, everything else is DD.
+func SpecRole(spec string) validation.AttendanceRole {
 	if strings.Contains(spec, "Tank") {
 		return validation.RoleTank
 	}
@@ -316,6 +319,86 @@ func specRole(spec string) validation.AttendanceRole {
 		return validation.RoleHeal
 	}
 	return validation.RoleDD
+}
+
+// ErrAlreadySignedUp means the character already has a pending signup or a
+// roster slot in this raid; nothing was changed.
+var ErrAlreadySignedUp = errors.New("character already signed up")
+
+// SubmitForPlayer lets raid staff sign a player's character up, e.g. because
+// the player accepted the raid's invite in the game calendar (ADR 092). It
+// needs RAIDASSISTENT and an active raid, but not an open signup window: staff
+// may still review and accept choices after closing (ADR 033). An existing
+// pending choice is left as it is; a withdrawn one is submitted again with spec.
+// The player's absence ("kann nicht", "unsicher") is removed in the same
+// transaction, because signing up says the player comes after all.
+func (s *Service) SubmitForPlayer(ctx context.Context, raidID, actor, characterID int64, spec string) error {
+	spec = strings.TrimSpace(spec)
+	return s.repo.transaction(ctx, func(r *Repo) error {
+		if err := s.authorize(ctx, r, actor, validation.RoleRaidassistent); err != nil {
+			return err
+		}
+		rd, err := r.raids.Get(ctx, raidID)
+		if err != nil {
+			return reference(err)
+		}
+		if !active(rd) {
+			return ErrRaidState
+		}
+		c, err := r.characters.Get(ctx, characterID)
+		if err != nil {
+			return reference(err)
+		}
+		if !slices.Contains(validation.ClassSpecs[attendance.NormalizeClass(c.Class)], spec) {
+			return ErrInvalid
+		}
+		roster, err := r.attendance.ListByRaid(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		for _, a := range roster {
+			if a.PlayerID == c.PlayerID && a.CharacterID == c.ID {
+				return ErrAlreadySignedUp
+			}
+		}
+		rows, err := r.list(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		now := s.now()
+		row := signupRow{RaidID: raidID, PlayerID: c.PlayerID, CharacterID: c.ID, Spec: spec, CreatedAt: now, UpdatedAt: now}
+		var before any
+		for _, existing := range rows {
+			if existing.CharacterID != c.ID {
+				continue
+			}
+			if existing.PlayerID != c.PlayerID {
+				return ErrConflict
+			}
+			if !existing.IsWithdrawn {
+				return ErrAlreadySignedUp
+			}
+			before = existing
+			row.ID, row.CreatedAt = existing.ID, existing.CreatedAt
+		}
+		if err := r.save(ctx, &row); err != nil {
+			return err
+		}
+		if err := s.log(ctx, r, raidID, actor, "submit_for_player", before, row); err != nil {
+			return err
+		}
+		absence, err := r.absence(ctx, raidID, c.PlayerID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := r.deleteAbsence(ctx, absence.ID); err != nil {
+			return err
+		}
+		return s.log(ctx, r, raidID, actor, "absence_revoke", absence, nil)
+	})
 }
 
 // Accept creates attendance or explicitly switches an existing roster slot.
@@ -362,7 +445,7 @@ func (s *Service) Accept(ctx context.Context, raidID, id, actor, expectedAttenda
 		if current != nil && current.CharacterID == row.CharacterID {
 			return nil
 		}
-		role := specRole(row.Spec)
+		role := SpecRole(row.Spec)
 		class := attendance.NormalizeClass(c.Class)
 		snapshot := raidcorrection.SnapshotPatch{CharacterName: &c.Name, Class: &class, Spec: &row.Spec}
 		var after *attendance.Attendance
@@ -423,6 +506,9 @@ func (s *Service) absenceTarget(ctx context.Context, r *Repo, raidID, actor, tar
 
 // Decline records or updates an absence with an optional reason. status is
 // AbsenceDeclined ("kann nicht") or AbsenceTentative ("unsicher"); empty means declined.
+// A refusal also removes the player's roster rows (bench included) and
+// withdraws their open signups in the same transaction (ADR 093); loot in this
+// raid rejects it with raidcorrection.ErrHasLoot. "Unsicher" changes neither.
 func (s *Service) Decline(ctx context.Context, raidID, actor, target int64, reason, status string) error {
 	reason = strings.TrimSpace(reason)
 	if len([]rune(reason)) > MaxAbsenceReason {
@@ -454,11 +540,53 @@ func (s *Service) Decline(ctx context.Context, raidID, actor, target int64, reas
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
+		if status == AbsenceDeclined {
+			if err := s.leaveRaid(ctx, r, raidID, actor, target); err != nil {
+				return err
+			}
+		}
 		if err := r.saveAbsence(ctx, row); err != nil {
 			return err
 		}
 		return s.log(ctx, r, raidID, actor, action, before, row)
 	})
+}
+
+// leaveRaid takes a declining player out of the raid (ADR 093): their roster
+// rows are removed like a staff removal (ADR 076), then their open signups are
+// withdrawn. Removing the rows first turns accepted signups into open ones.
+func (s *Service) leaveRaid(ctx context.Context, r *Repo, raidID, actor, target int64) error {
+	roster, err := r.attendance.ListByRaid(ctx, raidID)
+	if err != nil {
+		return err
+	}
+	for _, a := range roster {
+		if a.PlayerID != target {
+			continue
+		}
+		if err := r.corrections.RemoveAttendance(ctx, raidID, a.ID, actor); err != nil {
+			return fmt.Errorf("remove roster row %d of declining player %d: %w", a.ID, target, err)
+		}
+	}
+	rows, err := r.list(ctx, raidID)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if row.PlayerID != target || row.IsWithdrawn {
+			continue
+		}
+		before := row
+		row.IsWithdrawn = true
+		row.UpdatedAt = s.now()
+		if err := r.save(ctx, &row); err != nil {
+			return err
+		}
+		if err := s.log(ctx, r, raidID, actor, "withdraw", before, row); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Revoke removes an absence; it is idempotent.

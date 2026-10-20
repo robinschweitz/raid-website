@@ -80,7 +80,11 @@ export function MyRaidsPanel({ playerID, raids, characters }: Props) {
           </div>
           {declining?.raidID === raid.id ? <div className="my-raid-decline">
             <label>{declining.status === 'TENTATIVE' ? 'Was ist unsicher? (optional)' : 'Grund (optional)'}<input autoFocus value={reason} maxLength={200} disabled={pending} placeholder={declining.status === 'TENTATIVE' ? 'z. B. komme evtl. später' : 'z. B. krank oder Urlaub'} onChange={(event) => setReason(event.target.value)} /></label>
-            <button type="button" className="primary-action my-raid-main" disabled={pending} onClick={() => void run(() => api.put(`/api/v1/raids/${raid.id}/absences/${playerID}`, { reason, status: declining.status }), declining.status === 'TENTATIVE' ? `Für ${raid.name} als unsicher gemeldet.` : `Absage für ${raid.name} gesendet.`)}>{declining.status === 'TENTATIVE' ? 'Als unsicher melden' : 'Absage senden'}</button>
+            <button type="button" className="primary-action my-raid-main" disabled={pending} onClick={() => {
+              // ADR 093: "kann nicht" removes the roster slot and withdraws the signup; ask first.
+              if (declining.status === 'DECLINED' && status.detail && !window.confirm(status.state === 'accepted' ? 'Absagen? Damit wirst du aus der Aufstellung entfernt und deine Anmeldung zurückgezogen.' : 'Absagen? Damit wird deine Anmeldung zurückgezogen.')) return
+              void run(() => api.put(`/api/v1/raids/${raid.id}/absences/${playerID}`, { reason, status: declining.status }), declining.status === 'TENTATIVE' ? `Für ${raid.name} als unsicher gemeldet.` : `Absage für ${raid.name} gesendet.`)
+            }}>{declining.status === 'TENTATIVE' ? 'Als unsicher melden' : 'Absage senden'}</button>
             <div className="my-raid-secondary"><button type="button" disabled={pending} onClick={() => { setDeclining(null); setReason('') }}>Abbrechen</button></div>
           </div> : <>
             <div className="my-raid-primary">
@@ -92,7 +96,7 @@ export function MyRaidsPanel({ playerID, raids, characters }: Props) {
               </>}
               {status.state === 'open' && !quick && <Link className="button-link my-raid-main" to={signupLink}>Anmelden</Link>}
               {(status.state === 'signed' || status.state === 'accepted' || status.state === 'closed') && <Link className="button-link my-raid-main" to={signupLink}>{status.state === 'closed' ? 'Raid ansehen' : 'Anmeldung ansehen'}</Link>}
-              {status.state === 'absent' && <button type="button" className="my-raid-main" disabled={pending} onClick={() => void remove(`Du bist bei ${raid.name} wieder dabei.`)}>Doch dabei</button>}
+              {status.state === 'absent' && <button type="button" className="my-raid-main" disabled={pending} onClick={() => void remove(`Absage für ${raid.name} zurückgenommen. Melde dich wieder an, wenn du kommst.`)}>Doch dabei</button>}
               {status.state === 'tentative' && <button type="button" className="my-raid-main" disabled={pending} onClick={() => void remove(`Du bist bei ${raid.name} sicher dabei.`)}>Sicher dabei</button>}
             </div>
             <div className="my-raid-secondary">

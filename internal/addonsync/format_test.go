@@ -204,3 +204,41 @@ func TestEnhancedPointsFollowTheMinBalanceRule(t *testing.T) {
 		}
 	}
 }
+
+func TestParseCalendarExportReportsBrokenLines(t *testing.T) {
+	export, err := ParseCalendarExport("\nRS2;CAL;42;Raidleiter;1760000000\nThorgar;accepted\nAelira;declined\nthorgar;out\nKaputt\nFremd;maybe\n;accepted\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if export.RaidID != 42 || export.Recorder != "Raidleiter" || len(export.Invites) != 6 {
+		t.Fatalf("export = %+v", export)
+	}
+	if i := export.Invites[0]; i.Error != "" || i.Name != "Thorgar" || i.Answer != CalendarAccepted || i.LineNumber != 3 {
+		t.Fatalf("first invite = %+v", i)
+	}
+	if i := export.Invites[1]; i.Error != "" || i.Answer != CalendarDeclined {
+		t.Fatalf("second invite = %+v", i)
+	}
+	for _, broken := range export.Invites[2:] { // duplicate (case-insensitive), one field, unknown answer, no name
+		if broken.Error == "" {
+			t.Fatalf("broken line must be reported: %+v", broken)
+		}
+	}
+	for _, text := range []string{"RS1|CAL|42|A|1", "RS2;CAL;x;A;1", "RS2;INV;42;A;1"} {
+		if _, err := ParseCalendarExport(text); !errors.Is(err, ErrInvalidPayload) {
+			t.Fatalf("%q: expected ErrInvalidPayload, got %v", text, err)
+		}
+	}
+}
+
+func TestInviteExportWritesAnswersAsFifthField(t *testing.T) {
+	got := BuildInviteExport(7, "ICC", nil, nil, []InviteMember{
+		{Name: "Tank", Role: "TANK", Class: "Krieger"},
+		{Name: "Bank", Role: "DD", Class: "Magier", IsBench: true},
+		{Name: "Unsicher", Role: "HEAL", Class: "Priester", Status: InviteTentative},
+	})
+	want := "RS2;INV;7;ICC;\nTank;TANK;Krieger;0\nBank;DD;Magier;1\nUnsicher;HEAL;Priester;0;TENTATIVE"
+	if got != want {
+		t.Fatalf("export:\n%s\nwant:\n%s", got, want)
+	}
+}

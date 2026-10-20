@@ -306,7 +306,7 @@ func TestEnhancedLootCoupledCorrections(t *testing.T) {
 	if err := character.NewRepo(f.db).Create(context.Background(), alt); err != nil {
 		t.Fatal(err)
 	}
-	f.attend(f.second, alt.ID)
+	f.legacyDuplicateSlot(f.second, alt.ID)
 	f.request(http.MethodPatch, suffix, map[string]any{"awarded_to_character_id": alt.ID, "reason": "actual character"}, http.StatusOK)
 	f.points(f.second, 0)
 	if f.award(id).EnhancedCost != 30 {
@@ -479,7 +479,8 @@ func TestLockAwardsRequireUnambiguousRosterCharacter(t *testing.T) {
 	if err := character.NewRepo(f.db).Create(context.Background(), alt); err != nil {
 		t.Fatal(err)
 	}
-	f.attend(f.first, alt.ID)
+	f.request(http.MethodPost, "/attendance", map[string]any{"player_id": f.first, "character_id": alt.ID, "role": "DD"}, http.StatusConflict)
+	f.legacyDuplicateSlot(f.first, alt.ID)
 	f.request(http.MethodPost, "/loot", body, http.StatusConflict)
 	body["awarded_to_character_id"] = f.secondChar
 	f.request(http.MethodPost, "/loot", body, http.StatusBadRequest)

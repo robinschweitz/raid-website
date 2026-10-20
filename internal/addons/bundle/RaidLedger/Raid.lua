@@ -5,9 +5,13 @@
 -- treats "|" as the start of an escape sequence):
 --   invite list (website -> addon): RS2;INV;<raidID>;<raidName>;<size>[;<YYYY-MM-DD>;<HH:MM>]
 --                                   (date and start in realm time, for the calendar event)
---                                   <name>;<TANK|HEAL|DD>;<class>;<bench 0/1>
+--                                   <name>;<TANK|HEAL|DD>;<class>;<bench 0/1>[;<SIGNUP|TENTATIVE|DECLINED>]
+--                                   (the fifth field marks a player without a roster slot who
+--                                   answered on the website: only invited to the calendar event)
 --   attendance (addon -> website):  RS2;ROSTER;<raidID>;<recorder>;<exportUnix>
 --                                   <name>;<classToken or ->;<firstSeenUnix>
+--   calendar answers (addon -> website): RS2;CAL;<raidID>;<recorder>;<exportUnix>
+--                                   <name>;<invited|accepted|declined|confirmed|out|standby|signedup|notsignedup|tentative>
 local _, ns = ...
 local L = ns.L
 local FORMAT = "RS2"
@@ -19,12 +23,17 @@ local STATUS_LABELS = {
     open = L["open"], invited = L["invited"], joined = L["in raid"], declined = L["declined"],
     notfound = L["not found"], othergroup = L["in another group"], offline = L["offline"],
     noanswer = L["no answer"], bench = L["bench"],
+    signup = L["signed up"], tentative = L["unsure"], absent = L["can't come"],
 }
 local STATUS_COLORS = {
     open = {0.85, 0.85, 0.85}, invited = {1.00, 0.85, 0.30}, joined = {0.45, 0.85, 0.55},
     declined = {1.00, 0.40, 0.40}, notfound = {1.00, 0.40, 0.40}, othergroup = {1.00, 0.60, 0.25},
     offline = {0.55, 0.55, 0.55}, noanswer = {1.00, 0.60, 0.25}, bench = {0.55, 0.55, 0.55},
+    signup = {0.55, 0.78, 1.00}, tentative = {1.00, 0.75, 0.30}, absent = {0.70, 0.45, 0.45},
 }
+-- Website answers of players without a roster slot (fifth field of an invite
+-- line): their list status. They are never invited into the raid group.
+local ANSWER_STATUS = { SIGNUP = "signup", TENTATIVE = "tentative", DECLINED = "absent" }
 local ROLE_LABELS = { TANK = "Tank", HEAL = "Heal", DD = "DD" }
 local ROLE_ORDER = { TANK = 1, HEAL = 2, DD = 3 }
 
@@ -84,8 +93,12 @@ local function parseInvite(text)
     local members, bad = {}, {}
     for i = 2, table.getn(lines) do
         local f = split(lines[i], ";")
-        if table.getn(f) == 4 and f[1] ~= "" then
-            table.insert(members, { name = f[1], role = f[2], class = f[3], bench = f[4] == "1", status = "open" })
+        local count = table.getn(f)
+        if count == 4 and f[1] ~= "" then
+            table.insert(members, { name = f[1], role = f[2], class = f[3], bench = f[4] == "1", status = "open", base = "open" })
+        elseif count == 5 and f[1] ~= "" and ANSWER_STATUS[f[5]] then
+            local status = ANSWER_STATUS[f[5]]
+            table.insert(members, { name = f[1], role = f[2], class = f[3], bench = false, answer = status, status = status, base = status })
         else
             table.insert(bad, lines[i])
         end
@@ -190,10 +203,11 @@ hint:SetWidth(300)
 hint:SetJustifyH("LEFT")
 hint:SetText(L["Paste the website's invite list (Raid > Aufstellung > Einladungen für Addon):"])
 
-local function textArea(name, top, height)
+local function textArea(name, top, height, left, width)
+    left, width = left or 12, width or 300
     local back = CreateFrame("Frame", nil, panel)
-    back:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, top)
-    back:SetWidth(300)
+    back:SetPoint("TOPLEFT", panel, "TOPLEFT", left, top)
+    back:SetWidth(width)
     back:SetHeight(height)
     ns.makeBackdrop(back, 0.01, 0.02, 0.03, 0.98)
     local scroll = CreateFrame("ScrollFrame", nil, back)
@@ -204,7 +218,7 @@ local function textArea(name, top, height)
     edit:SetMultiLine(true)
     edit:SetAutoFocus(false)
     edit:SetFontObject(ChatFontNormal)
-    edit:SetWidth(286)
+    edit:SetWidth(width - 14)
     edit:SetHeight(height - 12)
     scroll:SetScrollChild(edit)
     scroll:SetScript("OnMouseWheel", function(self, delta)
@@ -289,15 +303,39 @@ end
 local sortButton = ns.flatButton(panel, L["SORT GROUPS"], 140)
 sortButton:SetPoint("TOPRIGHT", listBack, "BOTTOMRIGHT", 0, -8)
 
+-- Calendar column (ADR 092 of the website): sync the existing calendar event
+-- with the website's list and export the calendar answers for the website.
+local CALENDAR_LEFT, CALENDAR_WIDTH = 568, 154
+local calendarHeading = ns.label(panel, "GameFontNormal", 10, {1.00, 0.80, 0.32})
+calendarHeading:SetPoint("TOPLEFT", panel, "TOPLEFT", CALENDAR_LEFT, -11)
+calendarHeading:SetText(L["GAME CALENDAR"])
+local calendarInfo = ns.label(panel, "GameFontNormalSmall", 9, {0.55, 0.72, 0.80})
+calendarInfo:SetPoint("TOPLEFT", panel, "TOPLEFT", CALENDAR_LEFT, -34)
+calendarInfo:SetWidth(CALENDAR_WIDTH)
+calendarInfo:SetJustifyH("LEFT")
+calendarInfo:SetText(L["Create the event, then SYNC invites the missing and SET STATUSES sets everyone's status from the website list."])
+local calendarSyncButton = ns.flatButton(panel, L["SYNC"], CALENDAR_WIDTH, "RaidLedgerCalendarSync")
+calendarSyncButton:SetHeight(20)
+calendarSyncButton:SetPoint("TOPLEFT", panel, "TOPLEFT", CALENDAR_LEFT, -96)
+local calendarExportButton = ns.flatButton(panel, L["ANSWERS FOR THE WEBSITE"], CALENDAR_WIDTH, "RaidLedgerCalendarExport")
+calendarExportButton:SetHeight(20)
+calendarExportButton:SetPoint("TOPLEFT", panel, "TOPLEFT", CALENDAR_LEFT, -122)
+local calendarText = textArea("RaidLedgerCalendarText", -150, 170, CALENDAR_LEFT, CALENDAR_WIDTH)
+calendarText:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+calendarText:SetScript("OnTextChanged", function(self, userInput)
+    if userInput and self.generated and self:GetText() ~= self.generated then self:SetText(self.generated) end
+end)
+
 local function updatePanel()
     local data = setup()
     local members = data.members
-    local joined = 0
+    local joined, rostered = 0, 0
     for _, member in ipairs(members) do
         if member.status == "joined" then joined = joined + 1 end
+        if not member.answer then rostered = rostered + 1 end
     end
     local head = data.raid and string.format(L["Raid #%d %s: %d / %d in the raid"], data.raid.id, data.raid.name or "",
-        joined, table.getn(members)) or L["No invite list read yet."]
+        joined, rostered) or L["No invite list read yet."]
     if inviting then head = head .. L["  inviting..."] end
     listHeading:SetText(head)
     memberOffset = math.max(0, math.min(memberOffset, table.getn(members) - MEMBER_ROWS))
@@ -365,6 +403,8 @@ local function startInvites(retryMissing)
         local key = ns.lower(member.name)
         if inGroup[key] then
             member.status = "joined"
+        elseif member.answer then
+            member.status = member.answer       -- answered on the website without a roster slot: calendar only
         elseif member.bench and not data.includeBench then
             member.status = "bench"
         elseif online[key] == false then
@@ -457,7 +497,7 @@ local function updateGroupStatus()
         if inGroup[ns.lower(member.name)] then
             member.status = "joined"
         elseif member.status == "joined" then
-            member.status = "open"
+            member.status = member.base or "open"
         end
     end
     updatePanel()
@@ -539,11 +579,103 @@ end
 -- 08455f4dff39: ADDON_ACTION_BLOCKED from a timer).
 -- The check afterwards polls: CalendarSetAbsMonth itself fires
 -- CALENDAR_UPDATE_EVENT_LIST, so reading the list on that event recursed.
-local CALENDAR_INVITE_DELAY = 0.25
+-- The 3.3.5 client sends at most one calendar invite about every 2 seconds and
+-- refuses the others with CALENDAR_ERROR_INVITE_THROTTLED (live run on a local
+-- AzerothCore realm, website ADR 092: 0.5, 1 and 1.5 s lost the second invite,
+-- 2 s did not), so invites go out a little slower than that. A refused invite
+-- goes back into the queue (inviteThrottled).
+local CALENDAR_INVITE_DELAY = 2.2
+local CALENDAR_INVITE_RETRIES = 3
 local CALENDAR_SETTLE = 6
 local CALENDAR_CONFIRM = 20   -- seconds to wait for the event in the server's calendar
 local calendarJob    -- { names, next, before, lastAt, wait, title, when, left }
 local calendarCheck  -- the added event, until it shows up in the calendar
+local startCalendarSync   -- defined with the calendar sync below
+
+-- Invite statuses of the 3.3.5 calendar (CalendarEventGetInvite,
+-- CalendarEventSetStatus). "tentative" only exists in later clients.
+local CAL = {
+    invited = CALENDAR_INVITESTATUS_INVITED or 1, accepted = CALENDAR_INVITESTATUS_ACCEPTED or 2,
+    declined = CALENDAR_INVITESTATUS_DECLINED or 3, confirmed = CALENDAR_INVITESTATUS_CONFIRMED or 4,
+    out = CALENDAR_INVITESTATUS_OUT or 5, standby = CALENDAR_INVITESTATUS_STANDBY or 6,
+    signedup = CALENDAR_INVITESTATUS_SIGNEDUP or 7, notsignedup = CALENDAR_INVITESTATUS_NOT_SIGNEDUP or 8,
+    tentative = CALENDAR_INVITESTATUS_TENTATIVE,
+}
+local CAL_NAMES = {}
+for key, value in pairs(CAL) do CAL_NAMES[value] = key end
+
+-- wantedStatus is the calendar status the website list asks for: roster
+-- confirmed, bench standby, website answers as answered. nil leaves it alone
+-- (an unsure answer: the 3.3.5 calendar has no "tentative").
+local function wantedStatus(member)
+    if member.answer == "signup" then return CAL.accepted end
+    if member.answer == "absent" then return CAL.declined end
+    if member.answer == "tentative" then return CAL.tentative end
+    if member.bench then return CAL.standby end
+    return CAL.confirmed
+end
+
+-- mayOverwrite never replaces a player's own answer in the calendar: website
+-- answers only fill in "no answer yet", and a roster slot never hides a
+-- refusal. Refusals go to the website through the answers export instead.
+local function mayOverwrite(member, current)
+    if current == CAL.invited or current == CAL.notsignedup then return true end
+    if member.answer then return false end
+    return current == CAL.accepted or current == CAL.signedup or current == CAL.confirmed or current == CAL.standby
+end
+
+local function memberByName()
+    local byName = {}
+    for _, member in ipairs(setup().members) do byName[ns.lower(member.name)] = member end
+    return byName
+end
+
+local function inviteIndex(name)
+    for i = 1, CalendarEventGetNumInvites() or 0 do
+        if ns.lower(CalendarEventGetInvite(i) or "") == ns.lower(name) then return i end
+    end
+end
+
+-- planStatuses lists the status changes the website list asks for in the open
+-- (or new) event, and who refused in game.
+local function planStatuses()
+    local byName, changes, refused = memberByName(), {}, {}
+    for i = 1, CalendarEventGetNumInvites() or 0 do
+        local name, _, _, _, current = CalendarEventGetInvite(i)
+        local member = name and byName[ns.lower(name)]
+        if member then
+            local want = wantedStatus(member)
+            if want and current ~= want and mayOverwrite(member, current) then
+                table.insert(changes, { name = name, status = want })
+            elseif not member.answer and (current == CAL.declined or current == CAL.out or (CAL.tentative and current == CAL.tentative)) then
+                table.insert(refused, name)
+            end
+        end
+    end
+    return changes, refused
+end
+
+-- applyStatuses sets the planned statuses. It must run from a click: the
+-- client may block calendar changes from a timer (live run 08455f4dff39 for
+-- CalendarAddEvent), and a blocked call raises no Lua error, so pcall only
+-- guards against real errors. Success is checked afterwards (verifyStatuses).
+local function applyStatuses(changes)
+    -- A status change may re-sort the list: look each name up again.
+    for _, change in ipairs(changes) do
+        local index = inviteIndex(change.name)
+        if index then pcall(CalendarEventSetStatus, index, change.status) end
+    end
+end
+
+-- verifyStatuses counts the planned changes the event's invite list now shows.
+local function verifyStatuses(changes)
+    local done = 0
+    for _, change in ipairs(changes) do
+        local index = inviteIndex(change.name)
+        if index and select(5, CalendarEventGetInvite(index)) == change.status then done = done + 1 end
+    end
+    return done
+end
 
 -- confirmCalendarEvent looks for the added event in the calendar the server
 -- sent back, and saves the result (setup.calendar) for the raid lead.
@@ -566,6 +698,7 @@ local function confirmCalendarEvent()
         calendarCheck = nil
         setup().calendar = { raid = check.raid, title = check.title, confirmed = true, invites = check.invites }
         ns.say(L["The calendar event is in the calendar: confirmed by the server."])
+        startCalendarSync("sync")      -- make sure the server has every status
         return
     end
     if GetTime() >= check.deadline then
@@ -584,6 +717,7 @@ local function finishCalendarEvent()
     calendarJob = nil
     setCalendarButton()
     local added = math.max(0, (CalendarEventGetNumInvites() or 0) - job.before)
+    applyStatuses((planStatuses()))     -- from the click; SYNC checks them afterwards
     local before = countMatches(job)
     CalendarAddEvent()
     calendarCheck = { before = before, raid = job.raid, title = job.title, year = job.year, month = job.month, day = job.day,
@@ -605,8 +739,10 @@ local function calendarStep(elapsed)
     job.wait = job.wait - elapsed
     if job.wait > 0 then return end
     if job.next <= table.getn(job.names) then
-        CalendarEventInvite(job.names[job.next])
+        job.lastName = job.names[job.next]
+        CalendarEventInvite(job.lastName)
         job.next, job.wait, job.lastAt = job.next + 1, CALENDAR_INVITE_DELAY, GetTime()
+        setCalendarButton(string.format(L["INVITING %d/%d..."], job.next - 1, table.getn(job.names)))
         return
     end
     if job.ready then return end
@@ -664,7 +800,262 @@ local function createCalendarEvent()
     calendarJob = { names = names, next = 1, before = CalendarEventGetNumInvites() or 0, lastAt = GetTime(), wait = 0,
         title = title, when = string.format("%02d.%02d. %02d:%02d", raid.day, raid.month, raid.hour, raid.minute), left = left,
         raid = raid.id, year = raid.year, month = raid.month, day = raid.day, hour = raid.hour, minute = raid.minute }
-    ns.say(string.format(L["Creating the calendar event: inviting %d characters..."], table.getn(names)))
+    ns.say(string.format(L["Creating the calendar event: inviting %d characters (about %d seconds)..."], table.getn(names),
+        math.ceil(table.getn(names) * CALENDAR_INVITE_DELAY)))
+end
+
+
+---------------------------------------------------------------------------
+-- Calendar sync (website ADR 092). SYNC opens the list's existing event,
+-- invites whoever on the website list is missing and sets each status from the
+-- website list (mayOverwrite). ANSWERS FOR THE WEBSITE reads the event's
+-- invites with their answers into the RS2;CAL export for the website's
+-- calendar import. Both run step by step: the calendar answers the server's
+-- way, a little later, and invites of an existing event go out one by one.
+-- Statuses are set only when the raid lead clicks SET STATUSES (n), then
+-- checked: the client may block calendar changes that do not come from a click.
+---------------------------------------------------------------------------
+local SYNC_FIND = 8        -- seconds to wait for the calendar and the event
+local SYNC_READ = 1.5      -- let the opened event's invite list arrive
+local SYNC_STATUS_DELAY = 0.2
+local SYNC_VERIFY = 2      -- let the server answer the status changes
+local calendarSync         -- { mode, phase, raid, title, deadline, wait, queue, changes, ... }
+
+local function calendarInfoText(text)
+    calendarInfo:SetText(text)
+end
+
+local function stopSync(message)
+    calendarSync = nil
+    calendarSyncButton:SetText(L["SYNC"])
+    if message then
+        ns.say(message)
+        calendarInfoText(message)
+    end
+end
+
+local function findEventIndex(sync)
+    CalendarSetAbsMonth(sync.raid.month, sync.raid.year)
+    local found
+    for i = 1, CalendarGetNumDayEvents(0, sync.raid.day) or 0 do
+        local title, hour, minute = CalendarGetDayEvent(0, sync.raid.day, i)
+        if title == sync.title and hour == sync.raid.hour and minute == sync.raid.minute then found = i end
+    end
+    return found
+end
+
+local function listedInvites()
+    local listed = {}
+    for i = 1, CalendarEventGetNumInvites() or 0 do
+        local name, _, _, _, status = CalendarEventGetInvite(i)
+        if name then listed[ns.lower(name)] = { index = i, name = name, status = status } end
+    end
+    return listed
+end
+
+-- buildCalendarExport lists every invite of the open event with its answer.
+local function buildCalendarExport(raidID)
+    local lines = { table.concat({ FORMAT, "CAL", tostring(raidID), ns.field(ns.playerName()), tostring(time()) }, ";") }
+    local rows = {}
+    for _, invite in pairs(listedInvites()) do table.insert(rows, invite) end
+    table.sort(rows, function(a, b) return ns.lower(a.name) < ns.lower(b.name) end)
+    for _, invite in ipairs(rows) do
+        table.insert(lines, table.concat({ ns.field(invite.name), CAL_NAMES[invite.status] or "invited" }, ";"))
+    end
+    return table.concat(lines, "\n"), table.getn(rows)
+end
+
+local function showCalendarExport(sync)
+    local text, count = buildCalendarExport(sync.raid.id)
+    calendarText.generated = text
+    calendarText:SetText(text)
+    calendarText:SetFocus()
+    calendarText:HighlightText()
+    local answers = { accepted = 0, declined = 0 }
+    for _, invite in pairs(listedInvites()) do
+        if invite.status == CAL.accepted or invite.status == CAL.signedup then answers.accepted = answers.accepted + 1 end
+        if invite.status == CAL.declined or invite.status == CAL.out then answers.declined = answers.declined + 1 end
+    end
+    stopSync(string.format(L["%d invites, %d accepted, %d declined: Ctrl+C and paste into the website's calendar import."],
+        count, answers.accepted, answers.declined))
+    ns.setStatus(L["Calendar answers selected: press Ctrl+C and paste them into the raid website's calendar import."])
+end
+
+-- After opening: export, or queue the missing invites.
+local function startSyncInvites(sync)
+    if CalendarEventCanEdit and not CalendarEventCanEdit() then
+        stopSync(L["You may not change this calendar event: ask its creator to make you a moderator."])
+        return
+    end
+    local listed, me = listedInvites(), ns.lower(ns.playerName())
+    local total = CalendarEventGetNumInvites() or 0
+    sync.queue = {}
+    for _, member in ipairs(setup().members) do
+        local key = ns.lower(member.name)
+        if key ~= me and not listed[key] then
+            if total + table.getn(sync.queue) < CALENDAR_MAX_INVITES then
+                table.insert(sync.queue, member.name)
+            else
+                sync.left = (sync.left or 0) + 1
+            end
+        end
+    end
+    sync.invited, sync.phase, sync.wait = table.getn(sync.queue), "invite", 0
+end
+
+-- syncNotes adds who refused in game and who did not fit into the event.
+local function syncNotes(sync, message)
+    if table.getn(sync.refused or {}) > 0 then
+        message = message .. " " .. string.format(L["Declined in game: %s (export the answers for the website)."], table.concat(sync.refused, ", "))
+    end
+    if (sync.left or 0) > 0 then
+        message = message .. " " .. string.format(L["%d characters not invited: the calendar takes 100 per event."], sync.left)
+    end
+    return message
+end
+
+-- planSync ends the invites: without changes SYNC is done, otherwise it
+-- waits for the raid lead's click on SET STATUSES (n).
+local function planSync(sync)
+    sync.changes, sync.refused = planStatuses()
+    local count = table.getn(sync.changes)
+    if count == 0 then
+        stopSync(syncNotes(sync, string.format(L["Calendar synced: %d invited, no status to set."], sync.invited or 0)))
+        return
+    end
+    sync.phase = "ready"
+    calendarSyncButton:SetText(string.format(L["SET STATUSES (%d)"], count))
+    local message = string.format(L["%d invited. Click SET STATUSES (%d) to set the statuses in the calendar event."], sync.invited or 0, count)
+    ns.say(message)
+    calendarInfoText(message)
+end
+
+-- setSyncStatuses runs from the click on SET STATUSES (n).
+local function setSyncStatuses(sync)
+    if CalendarGetEventInfo() ~= sync.title then
+        stopSync(L["The calendar event is no longer open: click SYNC again."])
+        return
+    end
+    -- "verify" first: the client reports a blocked call while it is made.
+    sync.blocked, sync.phase, sync.wait = false, "verify", SYNC_VERIFY
+    applyStatuses(sync.changes)
+    calendarSyncButton:SetText(L["SYNCING..."])
+    calendarInfoText(L["Checking the statuses..."])
+end
+
+local function verifySync(sync)
+    local count = table.getn(sync.changes)
+    local done = verifyStatuses(sync.changes)
+    local message = string.format(L["Calendar synced: %d invited, %d of %d statuses set."], sync.invited or 0, done, count)
+    if sync.blocked then
+        message = message .. " " .. L["The game client blocked setting statuses: set them by hand in the calendar."]
+    elseif done < count then
+        message = message .. " " .. L["Check the missing ones in the calendar and set them by hand if needed."]
+    end
+    stopSync(syncNotes(sync, message))
+end
+
+local function syncStep(elapsed)
+    local sync = calendarSync
+    if not sync then return end
+    sync.wait = sync.wait - elapsed
+    if sync.wait > 0 then return end
+    local now = GetTime()
+    if sync.phase == "find" then
+        local index = findEventIndex(sync)
+        if index then
+            sync.opened = false
+            CalendarOpenEvent(0, sync.raid.day, index)
+            sync.phase, sync.deadline, sync.wait = "open", now + SYNC_FIND, 0.5
+        elseif now >= sync.deadline then
+            stopSync(L["No calendar event for this list found: create it with CALENDAR EVENT first."])
+        else
+            sync.wait = 0.5
+        end
+    elseif sync.phase == "open" then
+        if sync.opened or CalendarGetEventInfo() == sync.title then
+            sync.phase, sync.wait = "read", SYNC_READ
+        elseif now >= sync.deadline then
+            stopSync(L["The calendar event did not open; try again."])
+        else
+            sync.wait = 0.3
+        end
+    elseif sync.phase == "read" then
+        if sync.mode == "export" then
+            showCalendarExport(sync)
+        else
+            startSyncInvites(sync)
+        end
+    elseif sync.phase == "invite" then
+        local name = table.remove(sync.queue, 1)
+        if name then
+            sync.lastName = name   -- before the call: a refusal may arrive while it runs
+            CalendarEventInvite(name)
+            sync.wait, sync.lastAt = CALENDAR_INVITE_DELAY, now
+            calendarInfoText(string.format(L["Inviting %s..."], name))
+        else
+            sync.phase, sync.wait = "status", sync.invited > 0 and CALENDAR_SETTLE or SYNC_STATUS_DELAY
+        end
+    elseif sync.phase == "status" then
+        planSync(sync)
+    elseif sync.phase == "verify" then
+        verifySync(sync)
+    end
+end
+
+-- startCalendarSync runs SYNC (mode "sync") or the answers export ("export").
+startCalendarSync = function(mode)
+    if calendarSync and calendarSync.phase == "ready" then
+        stopSync()      -- a new run replaces statuses still waiting for the click
+    end
+    if calendarSync then
+        ns.say(L["The calendar is still being synced."])
+        return
+    end
+    if calendarJob then
+        ns.say(L["The calendar event is still being created."])
+        return
+    end
+    local data = setup()
+    local raid = data.raid
+    if not raid or table.getn(data.members) == 0 then
+        ns.say(L["Read the website's invite list first."])
+        return
+    end
+    if not raid.year then
+        ns.say(L["This invite list has no date: export it again on the website."])
+        return
+    end
+    OpenCalendar()
+    calendarSync = { mode = mode, phase = "find", raid = raid, title = calendarTitle(raid.name),
+        deadline = GetTime() + SYNC_FIND, wait = 0.5 }
+    calendarSyncButton:SetText(L["SYNCING..."])
+    calendarInfoText(L["Looking for the calendar event..."])
+end
+
+-- inviteThrottled puts an invite the client refused as too soon (see
+-- CALENDAR_INVITE_DELAY) back into its queue, at most CALENDAR_INVITE_RETRIES
+-- times per character; other calendar errors (unknown character, ...) keep
+-- their old handling.
+local function inviteThrottled(message)
+    if not CALENDAR_ERROR_INVITE_THROTTLED or message ~= CALENDAR_ERROR_INVITE_THROTTLED then return end
+    local job, sync = calendarJob, calendarSync
+    if job and not job.ready and job.lastName and job.next > 1 and job.names[job.next - 1] == job.lastName then
+        job.retries = job.retries or {}
+        local tries = (job.retries[job.lastName] or 0) + 1
+        if tries <= CALENDAR_INVITE_RETRIES then
+            job.retries[job.lastName] = tries
+            job.next, job.wait, job.lastAt = job.next - 1, CALENDAR_INVITE_DELAY, GetTime()
+        end
+    elseif sync and sync.lastName and (sync.phase == "invite" or sync.phase == "status") then
+        sync.retries = sync.retries or {}
+        local tries = (sync.retries[sync.lastName] or 0) + 1
+        if tries <= CALENDAR_INVITE_RETRIES then
+            sync.retries[sync.lastName] = tries
+            table.insert(sync.queue, 1, sync.lastName)
+            sync.phase, sync.wait, sync.lastName = "invite", CALENDAR_INVITE_DELAY, nil
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -694,6 +1085,14 @@ end)
 attendanceButton:SetScript("OnClick", exportAttendance)
 sortButton:SetScript("OnClick", sortGroups)
 calendarButton:SetScript("OnClick", createCalendarEvent)
+calendarSyncButton:SetScript("OnClick", function()
+    if calendarSync and calendarSync.phase == "ready" then
+        setSyncStatuses(calendarSync)
+    else
+        startCalendarSync("sync")
+    end
+end)
+calendarExportButton:SetScript("OnClick", function() startCalendarSync("export") end)
 
 -- System messages tell what became of an invite.
 local function buildPatterns()
@@ -731,6 +1130,10 @@ events:RegisterEvent("PLAYER_LOGIN")
 events:RegisterEvent("CHAT_MSG_SYSTEM")
 events:RegisterEvent("RAID_ROSTER_UPDATE")
 events:RegisterEvent("PARTY_MEMBERS_CHANGED")
+events:RegisterEvent("CALENDAR_OPEN_EVENT")
+events:RegisterEvent("ADDON_ACTION_BLOCKED")
+events:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+events:RegisterEvent("CALENDAR_UPDATE_ERROR")
 events:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_LOGIN" then
         setup()
@@ -742,6 +1145,9 @@ events:SetScript("OnEvent", function(_, event, ...)
             ForgeTestBridge:RegisterFrame("RaidLedgerRead", readButton)
             ForgeTestBridge:RegisterFrame("RaidLedgerInviteAll", inviteButton)
             ForgeTestBridge:RegisterFrame("RaidLedgerCalendar", calendarButton)
+            ForgeTestBridge:RegisterFrame("RaidLedgerCalendarSync", calendarSyncButton)
+            ForgeTestBridge:RegisterFrame("RaidLedgerCalendarExport", calendarExportButton)
+            ForgeTestBridge:RegisterFrame("RaidLedgerCalendarText", calendarText)
             ForgeTestBridge:RegisterFrame("RaidLedgerAttendance", attendanceButton)
             ForgeTestBridge:RegisterFrame("RaidLedgerRosterText", rosterText)
             ForgeTestBridge:RegisterFrame("RaidLedgerRaidStatus", listHeading)
@@ -749,6 +1155,16 @@ events:SetScript("OnEvent", function(_, event, ...)
         end
     elseif event == "CHAT_MSG_SYSTEM" then
         onSystemMessage(...)
+    elseif event == "CALENDAR_OPEN_EVENT" then
+        if calendarSync and calendarSync.phase == "open" then calendarSync.opened = true end
+    elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
+        -- (addon, function): the client refused a protected call (see applyStatuses).
+        local _, blockedFunction = ...
+        if calendarSync and calendarSync.phase == "verify" and tostring(blockedFunction or ""):find("CalendarEventSetStatus", 1, true) then
+            calendarSync.blocked = true
+        end
+    elseif event == "CALENDAR_UPDATE_ERROR" then
+        inviteThrottled(...)
 
     else
         updateGroupStatus()
@@ -756,6 +1172,7 @@ events:SetScript("OnEvent", function(_, event, ...)
 end)
 events:SetScript("OnUpdate", function(_, elapsed)
     calendarStep(elapsed)
+    syncStep(elapsed)
     if not inviting then return end
     inviteDelay = inviteDelay - elapsed
     if inviteDelay <= 0 then inviteStep() end
@@ -772,11 +1189,21 @@ ns.tip(calendarButton, L["Create a calendar raid event for the list's date and t
 ns.tip(attendanceButton, L["Who was in the raid, for the website's roster import"])
 ns.tip(rosterText, L["Ctrl+C copies the attendance; paste it into the website"])
 ns.tip(sortButton, L["Sort the raid groups: tanks, healers, then the rest"])
+ns.tip(calendarSyncButton, L["Invite the missing and set every status in the existing calendar event from the website list"])
+ns.tip(calendarExportButton, L["Who answered what in the calendar event, for the website's calendar import"])
+ns.tip(calendarText, L["Ctrl+C copies the calendar answers; paste them into the website"])
 
 ns.commands.setup = function() showPanel(true) end
 ns.commands.invite = function(rest) startInvites(ns.lower(rest) == "missing") end
 ns.commands.groups = sortGroups
-ns.commands.calendar = function() createCalendarEvent() end
+ns.commands.calendar = function(rest)
+    rest = ns.lower(rest or "")
+    if rest == "sync" then startCalendarSync("sync")
+    elseif rest == "export" then
+        showPanel(true)
+        startCalendarSync("export")
+    else createCalendarEvent() end
+end
 ns.commands.attendance = function()
     showPanel(true)
     exportAttendance()
@@ -785,4 +1212,6 @@ table.insert(ns.help, L["/ledger setup - invites, groups and attendance (RAID bu
 table.insert(ns.help, L["/ledger invite [missing] - invite the website's list (or retry the missing)"])
 table.insert(ns.help, L["/ledger groups - sort raid groups: tanks, healers, the rest"])
 table.insert(ns.help, L["/ledger calendar - calendar raid event from the invite list, everyone on it invited"])
+table.insert(ns.help, L["/ledger calendar sync - invite the missing and set statuses in the existing calendar event"])
+table.insert(ns.help, L["/ledger calendar export - the calendar answers for the website"])
 table.insert(ns.help, L["/ledger attendance - export who was in the raid for the website"])

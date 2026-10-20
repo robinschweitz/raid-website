@@ -52,12 +52,17 @@ func newRemoveFixture(t *testing.T, status validation.RaidStatus) removeFixture 
 	if err := f.r.raids.Create(ctx, f.raid); err != nil {
 		t.Fatal(err)
 	}
+	// Each character belongs to its own player: one roster slot per player (ADR 092).
 	for _, name := range []string{"Keeper", "Leaver"} {
-		c := &character.Character{PlayerID: f.actor.ID, Name: name, Class: "Magier", MainSpec: "Feuer", Active: true, CreatedAt: now, UpdatedAt: now}
+		owner := &player.Player{Name: name, Role: validation.RoleMember, Active: true, CreatedAt: now, UpdatedAt: now}
+		if err := f.r.players.Create(ctx, owner); err != nil {
+			t.Fatal(err)
+		}
+		c := &character.Character{PlayerID: owner.ID, Name: name, Class: "Magier", MainSpec: "Feuer", Active: true, CreatedAt: now, UpdatedAt: now}
 		if err := f.r.characters.Create(ctx, c); err != nil {
 			t.Fatal(err)
 		}
-		row := &attendance.Attendance{RaidID: f.raid.ID, PlayerID: f.actor.ID, CharacterID: c.ID, Role: validation.RoleDD}
+		row := &attendance.Attendance{RaidID: f.raid.ID, PlayerID: owner.ID, CharacterID: c.ID, Role: validation.RoleDD}
 		if err := f.s.SaveAttendance(ctx, row, f.actor.ID, ""); err != nil {
 			t.Fatal(err)
 		}
@@ -72,10 +77,11 @@ func newRemoveFixture(t *testing.T, status validation.RaidStatus) removeFixture 
 	return f
 }
 
-func (f removeFixture) addLoot(t *testing.T, characterID int64, withdrawn bool) {
+func (f removeFixture) addLoot(t *testing.T, row *attendance.Attendance, withdrawn bool) {
 	t.Helper()
+	characterID := row.CharacterID
 	now := time.Now().UTC()
-	award := &loot.Award{RaidID: f.raid.ID, Boss: "Boss", ItemID: "1", ItemName: "Schwert", AwardedToPlayerID: f.actor.ID, AwardedToCharacterID: &characterID, AwardedByPlayerID: f.actor.ID, Source: "manual", AwardMethod: loot.Main, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
+	award := &loot.Award{RaidID: f.raid.ID, Boss: "Boss", ItemID: "1", ItemName: "Schwert", AwardedToPlayerID: row.PlayerID, AwardedToCharacterID: &characterID, AwardedByPlayerID: f.actor.ID, Source: "manual", AwardMethod: loot.Main, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
 	if withdrawn {
 		award.WithdrawnAt = &now
 	}
@@ -92,7 +98,7 @@ func TestRemoveAttendanceHardDeletesRowFromOpenRaidWithAudit(t *testing.T) {
 	if err := f.r.saveQuickAddRequest(ctx, f.raid.ID, f.actor.ID, "req-1", "{}", leaver.ID); err != nil {
 		t.Fatal(err)
 	}
-	f.addLoot(t, leaver.CharacterID, true) // withdrawn loot does not block
+	f.addLoot(t, leaver, true) // withdrawn loot does not block
 	if err := f.s.RemoveAttendance(ctx, f.raid.ID, leaver.ID, f.actor.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +121,7 @@ func TestRemoveAttendanceHardDeletesRowFromOpenRaidWithAudit(t *testing.T) {
 func TestRemoveAttendanceRejectsLootHoldersWrongRaidAndClosedRaids(t *testing.T) {
 	ctx := context.Background()
 	f := newRemoveFixture(t, validation.RaidStatusPlanned)
-	f.addLoot(t, f.rows[0].CharacterID, false)
+	f.addLoot(t, f.rows[0], false)
 	if err := f.s.RemoveAttendance(ctx, f.raid.ID, f.rows[0].ID, f.actor.ID); !errors.Is(err, ErrHasLoot) {
 		t.Fatalf("loot holder: %v", err)
 	}

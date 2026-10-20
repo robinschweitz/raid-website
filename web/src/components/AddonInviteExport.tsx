@@ -31,7 +31,7 @@ export function AddonInviteExport({ raidID, rosterKey }: Props) {
 
   return <section className="subcard" aria-label="Einladungen für Addon">
     <h3>Einladungen für Addon</h3>
-    <p className="muted">In RaidLedger unter „RAID“ (oder /ledger setup) einfügen und „EINLESEN“ klicken. Das Addon lädt diese Charaktere ingame in den Raid ein und legt mit „KALENDER-TERMIN“ den Termin im Spielkalender an. <Link to="/addons/raidledger">RaidLedger herunterladen</Link></p>
+    <p className="muted">In RaidLedger unter „RAID“ (oder /ledger setup) einfügen und „EINLESEN“ klicken. Das Addon lädt die Aufstellung ingame in den Raid ein und legt mit „KALENDER-TERMIN“ den Termin im Spielkalender an. Wer ohne Platz in der Aufstellung angemeldet, unsicher oder abgesagt ist, steht mit dieser Antwort darunter: er kommt nur in den Kalender-Termin, nicht in die Raidgruppe. „ABGLEICHEN“ setzt im bestehenden Termin alle Status nach dieser Liste. <Link to="/addons/raidledger">RaidLedger herunterladen</Link></p>
     {error && <p className="error" role="alert">{error}</p>}
     <label className="check"><input type="checkbox" checked={includeBench} onChange={(e) => setIncludeBench(e.target.checked)} /> Ersatzbank einbeziehen</label>
     <textarea className="addon-code-export" aria-label="Einladungs-Export" readOnly value={text} rows={Math.min(8, Math.max(3, memberCount + 1))} />

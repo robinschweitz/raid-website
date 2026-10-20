@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -25,7 +26,25 @@ var (
 	ErrInvalid   = errors.New("invalid correction")
 	ErrConflict  = errors.New("attendance already exists")
 	ErrHasLoot   = errors.New("character still holds loot in this raid")
+	// ErrPlayerInRoster means the player already has another character in the
+	// raid's roster (bench included). A player raids with one character; a
+	// different character replaces the existing slot explicitly (ADR 092).
+	ErrPlayerInRoster = errors.New("player already has another character in the roster")
 )
+
+// PlayerInRosterError names the character that already holds the player's
+// roster slot, so staff see which one to replace. It matches ErrPlayerInRoster.
+type PlayerInRosterError struct {
+	AttendanceID  int64
+	CharacterID   int64
+	CharacterName string
+}
+
+func (e *PlayerInRosterError) Error() string {
+	return fmt.Sprintf("%s: %s", ErrPlayerInRoster.Error(), e.CharacterName)
+}
+
+func (e *PlayerInRosterError) Unwrap() error { return ErrPlayerInRoster }
 
 // Service applies history changes with audit and append-only compensation.
 type Service struct {
@@ -215,6 +234,20 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 		for _, existing := range rows {
 			if existing.ID != row.ID && existing.PlayerID == row.PlayerID && existing.CharacterID == row.CharacterID {
 				return ErrConflict
+			}
+		}
+		// One roster slot per player (ADR 092). Checked only when a row is added
+		// or moves to another player, so ordinary corrections of rows that
+		// predate this rule (legacy imports, account merges) keep working.
+		if row.ID == 0 || (old != nil && old.PlayerID != row.PlayerID) {
+			for _, existing := range rows {
+				if existing.ID != row.ID && existing.PlayerID == row.PlayerID {
+					name := existing.CharacterName
+					if c, err := r.characters.Get(ctx, existing.CharacterID); err == nil {
+						name = c.Name
+					}
+					return &PlayerInRosterError{AttendanceID: existing.ID, CharacterID: existing.CharacterID, CharacterName: name}
+				}
 			}
 		}
 		var eligibilityBefore map[int64]int

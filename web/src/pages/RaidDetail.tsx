@@ -13,6 +13,7 @@ import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
 import { RaidQuickAdd } from '../components/RaidQuickAdd'
 import { AddonInviteExport } from '../components/AddonInviteExport'
+import { AddonCalendarImport } from '../components/AddonCalendarImport'
 import { AddonLootImport } from '../components/AddonLootImport'
 import { UnclaimedLoot } from '../components/UnclaimedLoot'
 import { AddonRosterImport } from '../components/AddonRosterImport'
@@ -949,7 +950,8 @@ function RaidDetail({ raidID, initialView }: Props) {
         </RaidRosterBoard>
         <p className="muted setup-caption">Gespeicherte Aufstellung dieses Raids. Die Ersatzbank folgt derselben EP-Regel.</p>
         {raid.status !== 'CANCELLED' && <ShadowmourneRaidCard raidID={raidID} rosterKey={attendance.map((row) => row.character_id).join(',')} />}
-        {canManage && attendance.length > 0 && <AddonInviteExport raidID={raidID} rosterKey={attendance.map((row) => `${row.id}:${row.character_id}:${row.is_bench}`).join(',')} />}
+        {canManage && <AddonInviteExport raidID={raidID} rosterKey={attendance.map((row) => `${row.id}:${row.character_id}:${row.is_bench}`).join(',')} />}
+        {canWrite && isActiveRaid && <AddonCalendarImport raidID={raidID} onImported={load} />}
         {canWrite && isActiveRaid && <AddonRosterImport raidID={raidID} onImported={load} onQuickAdd={(name) => { editAttendance(null); setQuickAddName(name); setQuickAdd(true) }} />}
       </section>
 

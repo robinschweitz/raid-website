@@ -192,7 +192,7 @@ export function GuidePage() {
       <h3>Noch nicht sicher: „Unsicher“</h3>
       <p>Klicke auf <strong>Unsicher</strong> und schreib einen kurzen Hinweis, z. B. <em>komme evtl. später</em>. Die Raidleitung sieht das sofort. Sobald du es weißt, klickst du auf <strong>Sicher dabei</strong> oder <strong>Kann nicht</strong>.</p>
       <Shot name="13-angemeldet-und-unsicher" caption="Links angemeldet, in der Mitte als unsicher gemeldet" />
-      <Tip><strong>Tipp:</strong> Du kannst deinen Status ändern, solange die Anmeldung offen ist. Eine Absage oder „unsicher“ löscht deine Anmeldung nicht. Die Raidleitung entscheidet, wer mitkommt.</Tip>
+      <Tip><strong>Tipp:</strong> Du kannst deinen Status ändern, solange die Anmeldung offen ist. „Unsicher“ ändert an deiner Anmeldung nichts. Eine Absage zieht deine Anmeldung zurück und gibt deinen Platz in der Aufstellung frei; nimmst du sie zurück, meldest du dich einfach neu an.</Tip>
       <h3>Mit Twink oder anderem Spec anmelden</h3>
       <ol>
         <li>Klicke auf der Karte auf <strong>Anderer Charakter oder Spec</strong>.</li>
@@ -307,7 +307,8 @@ export function GuidePage() {
       <p>Unter <strong>Charakteroptionen nach Spieler</strong> steht jeder Angemeldete mit allen angebotenen Charakteren. Bei <em>Ausstehend</em> klickst du <strong>In Aufstellung übernehmen</strong>. Mit <strong>Auf diesen Charakter wechseln</strong> tauschst du den Charakter. Pro Spieler kommt nur ein Charakter in den Raid.</p>
       <Shot name="33-anmeldungen-uebernehmen" caption="Charakteroptionen nach Spieler" />
       <h3>Die Aufstellung</h3>
-      <p>Der Reiter <strong>Aufstellung</strong> sortiert nach Tanks, Heilung, Nahkampf und Fernkampf, dazu die Ersatzbank. Mit <strong>Teilnahme hinzufügen</strong> trägst du jemanden ohne Anmeldung ein. Mit dem <strong>Stift</strong> änderst du Charakter und Spec oder nimmst jemanden mit <strong>Entfernen</strong> heraus.</p>
+      <p>Der Reiter <strong>Aufstellung</strong> sortiert nach Tanks, Heilung, Nahkampf und Fernkampf, dazu die Ersatzbank. Mit <strong>Teilnahme hinzufügen</strong> trägst du jemanden ohne Anmeldung ein. Mit dem <strong>Stift</strong> änderst du Charakter und Spec oder nimmst jemanden mit <strong>Entfernen</strong> heraus. Jeder Spieler hat nur einen Platz, auch auf der Ersatzbank: Steht er schon mit einem anderen Charakter drin, nennt die Seite diesen Charakter, und du tauschst ihn mit dem Stift.</p>
+      <p>Wer im <strong>Spielkalender</strong> auf die Einladung geantwortet hat, holst du unter <strong>Antworten aus dem Spielkalender</strong> auf die Website (Text aus RaidLedger, siehe <Link to="/addons/raidledger">RaidLedger</Link>): Zusagen werden zu offenen Anmeldungen mit der Main-Spec, Absagen zu „kann nicht“.</p>
       <Shot name="34-aufstellung" caption="Raidaufstellung nach Rollen" />
       <Shot name="35-aufstellung-bearbeiten" caption="Teilnehmer bearbeiten oder entfernen" />
       <h3>Gesuchtext</h3>

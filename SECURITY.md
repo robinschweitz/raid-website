@@ -51,7 +51,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-002 - Self-service actions bound to the session actor**
 - **Status:** ACTIVE
-- **Rule:** Item locks, wishlist writes, signups, absences, votes, and password or MFA changes MUST act on the session's player; a path or body player ID that differs MUST be rejected unless a staff or Admin rule explicitly allows it. There is no Admin bypass for own-lock operations.
+- **Rule:** The domain service of every self-service write (own locks FR-17.1, own wishlist FR-19.1, own signups and absences FR-12, own vote FR-24.3, own password and MFA FR-2.7, FR-3) MUST compare the target player with the session's player and reject a mismatch, unless a staff or Admin requirement allows it.
 - **Enforcement:** `enhancepoints`, `wishlist`, `raidsignup`, `poll`, `auth` services.
 - **Evidence:** FR-17.1, FR-19.1, ADR 020. Code: compliant.
 - **Verification:** A MEMBER request for another player's lock, wishlist, or absence returns 403 and changes nothing.
@@ -65,7 +65,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-004 - Public data stays minimal**
 - **Status:** ACTIVE
-- **Rule:** Only the reads in FR-1.2 may be served without a session (paths: `ARCHITECTURE.md` "Public interface"). Unauthenticated responses MUST contain only the fields FR-1.3, FR-27.2, and FR-30.1 allow. Login names, EP balances, item lists in statistics, audit data, and Rising-Gods raw data MUST NOT appear in public responses.
+- **Rule:** Only the reads in FR-1.2 may be served without a session (paths: `ARCHITECTURE.md` "Public interface"). Unauthenticated responses MUST be built from dedicated public DTOs that contain only the fields FR-1.3, FR-27.2, and FR-30.1 allow, never from the authenticated DTOs.
 - **Enforcement:** DTOs of the public endpoints; `GET /api/v1/statistics` (not built).
 - **Evidence:** FR-1.2, FR-1.3, FR-27.2, ADR 067. Code: compliant for existing endpoints.
 - **Verification:** HTTP tests compare the exact field set of each public response.
@@ -266,7 +266,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-031 - Audit snapshots without secrets**
 - **Status:** ACTIVE
-- **Rule:** Audit before and after snapshots MUST exclude every value listed in FR-26.3 and MUST record account changes only as "password changed: yes/no".
+- **Rule:** Audit before and after snapshots (FR-26.3) MUST NOT contain passwords, password hashes, TOTP secrets, recovery codes, registration codes, or raw Rising-Gods profile data, and MUST record account changes only as "password changed: yes/no".
 - **Enforcement:** `audit` writers in each domain.
 - **Evidence:** FR-26.3, ADR 077. Code: compliant.
 - **Verification:** `audit_coverage_test` checks the account snapshot for the password and hash; the same check is needed for MFA, registration-code, and Rising-Gods snapshots.

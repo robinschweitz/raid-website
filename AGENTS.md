@@ -58,6 +58,7 @@ below. This file adds only how to work; it defines no behaviour or architecture.
 | End-to-end | `cd web && npx playwright install chromium && npm run e2e` |
 | Guide screenshots | `cd web && npm run build && DOCS_TOUR=1 npx playwright test e2e/zz-docs-tour.spec.ts` |
 | Sync addon bundle | `go run ./cmd/sync-addons <wow-addons checkout>` |
+| Regenerate loot catalog | `python scripts/build_loot_db_localized.py scripts/lootcatalog.localized.json` |
 
 - Development defaults: `PORT=8080`, `DATABASE_URL=file:raid.db?_pragma=journal_mode(WAL)`.
   Production configuration is described in `deploy/README.md` and `SECURITY.md` SC-033.

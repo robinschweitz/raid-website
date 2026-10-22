@@ -106,7 +106,7 @@ implemented yet when it differs from the code.
 - **FR-7.2** The lookup MUST accept a character name or a Rising-Gods profile URL. (ADR 044)
 - **FR-7.3** The system MUST query Rising-Gods only for a user request. It MUST NOT warm a cache in the background. (ADR 049)
 - **FR-7.4** The system MUST load the selected profile again before it stores a character. (ADR 044)
-- **FR-7.5** When Rising-Gods is unavailable, the system MUST answer with HTTP 502 `rising_gods_unavailable`. User-facing errors MUST stay generic. (ADR 049, 053)
+- **FR-7.5** When Rising-Gods is unavailable, the system MUST answer with HTTP 502 `rising_gods_unavailable` (error content: SC-023). (ADR 049, 053)
 - **FR-7.6** The system MUST limit how many Rising-Gods searches a visitor without a session can start per time period. Registration requests count toward the same limit. Logged-in users MUST NOT be limited. The limit value is owned by `SECURITY.md` (SC-028). (Owner 2026-10-22, review)
 
 ### 8. Guild configuration
@@ -306,7 +306,7 @@ implemented yet when it differs from the code.
 
 - **FR-26.1** Every website write by a user MUST write one audit entry with actor, entity, action, and before and after snapshots. (ADR 077)
 - **FR-26.2** Where the write is transactional, the entry MUST be part of the same transaction. (ADR 077)
-- **FR-26.3** Snapshots MUST NOT contain passwords, password hashes, TOTP secrets, recovery codes, registration codes, or raw Rising-Gods profile data. (ADR 077)
+- **FR-26.3** Snapshots MUST NOT contain secrets (list: SC-031). (ADR 077)
 - **FR-26.4** Login, logout, and MFA verification MUST NOT write audit entries. (ADR 077)
 - **FR-26.5** Changes to an archived raid MUST require a nonblank reason. Changes to unarchived raids and live characters MUST NOT require a reason. (ADR 032)
 - **FR-26.6** An ADMIN MUST be able to read the audit log, newest first, with German labels and the raw snapshots in a collapsed section. The log MUST be read-only. (ADR 074, 075)
@@ -339,7 +339,7 @@ implemented yet when it differs from the code.
 
 ### 30. Privacy
 
-- **FR-30.1** The system MUST provide a German privacy page (Datenschutzerklärung) that is readable without login. It MUST name the owner as the responsible person with a contact address. The name and address MUST come from configuration, not from the repository. (Owner 2026-10-22, OQ-9 and OQ-12)
+- **FR-30.1** The system MUST provide a German privacy page (Datenschutzerklärung) that is readable without login. It MUST name the owner as the responsible person with a contact address (where the values come from: SC-033). (Owner 2026-10-22, OQ-9 and OQ-12)
 - **FR-30.2** An ADMIN MUST be able to anonymise a player. Anonymisation MUST delete the login, password, sessions, MFA data, and Rising-Gods profile data, and MUST replace the player name with the name of the player's main character. With several main characters, the oldest main MUST be used; with none, the oldest character; with no character, "Ehemaliges Mitglied #<player ID>". (Owner 2026-10-22, OQ-9, OQ-12 and OQ-13)
 - **FR-30.3** Anonymisation MUST keep raid rosters, loot, EP transactions, and character names in raid history. (Owner 2026-10-22, OQ-9)
 - **FR-30.4** Audit entries MUST stay without a time limit. They MUST NOT show the name of an anonymised player. (Owner 2026-10-22, OQ-9 and OQ-12)
@@ -350,7 +350,7 @@ implemented yet when it differs from the code.
 - **FR-31.1** Records that affect history MUST be archived (`archived_at`, `removed_at`, `withdrawn_at`), not deleted. (ADR 007)
 - **FR-31.2** The only hard deletes MUST be: the merge source (FR-5.5, FR-6.10), a roster row of a planned or open raid (FR-13.7), a revoked absence (FR-12.9), a removed wishlist item (FR-19.1), and the account data that anonymisation deletes (FR-30.2). Each MUST write an audit entry with the removed data, without secrets (FR-26.3). (ADR 056, 069, 076; Owner 2026-10-22, OQ-9)
 - **FR-31.3** A bulk write MUST report what it created, skipped, and rejected, and MUST NOT overwrite existing records. (ADR 008)
-- **FR-31.4** The system MUST NOT have a Google Sheets integration. Data imported from the old sheet stays authoritative. A future historical import MUST be a one-time offline operation with a dry run and a report, not a web feature. (ADR 066)
+- **FR-31.4** The system MUST NOT have a Google Sheets integration. Data imported from the old sheet stays authoritative. A future historical import MUST be a one-time offline operation with a database backup, a dry run, and a report, not a web feature. (ADR 066)
 
 ## Non-Functional Requirements
 
@@ -359,7 +359,7 @@ implemented yet when it differs from the code.
 - **NFR-1.3** Production network exposure: SC-025. (ADR 070)
 - **NFR-2.1** The system MUST take a verified database snapshot before each deployment. (ADR 071, 072)
 - **NFR-2.2** The system MUST keep 48 hourly, 32 daily, 13 weekly, and 25 monthly database snapshots. A weekly job MUST verify the newest snapshot. (ADR 070)
-- **NFR-2.3** An encrypted copy of the newest verified snapshot MUST leave the server every day for storage that the owner controls. The maximum data loss is therefore one day. The storage and the key holder are DEFERRED (OQ-14). The key MUST NOT be stored only on the production server. (ADR 070; Owner 2026-10-22, OQ-8)
+- **NFR-2.3** An encrypted copy of the newest verified snapshot MUST leave the server every day for storage that the owner controls. The maximum data loss is therefore one day. The storage and the key holder are DEFERRED (OQ-14); encryption and key rules: SC-034. (ADR 070; Owner 2026-10-22, OQ-8)
 - **NFR-2.5** A restore from the off-server copy MUST be tested every month. (Owner 2026-10-22, OQ-8)
 - **NFR-3.1** The system MUST cache Rising-Gods name searches for 12 hours and MAY serve them stale for up to 7 days while it refreshes. The cache MUST hold at most 2000 searches. (ADR 044)
 - **NFR-3.2** Parallel identical Rising-Gods lookups MUST share one upstream request. (ADR 044)

@@ -395,6 +395,8 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
   (ADR 069).
 - **EP card:** balance, the shifted roll range preview and history; never a roll, spend or amount
   control (FR-16.3, FR-16.4).
+- **Loot catalog:** read-only; catalog provenance and raw source variants are secondary detail,
+  hidden from the ordinary item view (ADR 030).
 - **Copy box:** for addon exports, numbered steps and one "Export kopieren" button; if the
   clipboard is blocked, the text is shown selected for manual copying (ADR 081).
 

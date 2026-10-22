@@ -65,7 +65,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-004 - Public data stays minimal**
 - **Status:** ACTIVE
-- **Rule:** Unauthenticated responses MUST contain only the fields FR-1.3, FR-27.2, and FR-30.1 allow. Login names, EP balances, item lists in statistics, audit data, and Rising-Gods raw data MUST NOT appear in public responses.
+- **Rule:** The only unauthenticated reads are `GET /api/v1/raids`, `/players`, `/polls`, `/raids/{id}/attendance`, `/addons`, `/addons/{name}/download`, `/external/rising-gods/characters`, `/health`, `/auth/csrf`, and, once built, `/statistics` and `/privacy-contact` (FR-1.2). Unauthenticated responses MUST contain only the fields FR-1.3, FR-27.2, and FR-30.1 allow. Login names, EP balances, item lists in statistics, audit data, and Rising-Gods raw data MUST NOT appear in public responses.
 - **Enforcement:** DTOs of the public endpoints; `GET /api/v1/statistics` (not built).
 - **Evidence:** FR-1.2, FR-1.3, FR-27.2, ADR 067. Code: compliant for existing endpoints.
 - **Verification:** HTTP tests compare the exact field set of each public response.
@@ -305,13 +305,21 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** New Go or npm dependencies need owner approval (DR-11). Builds MUST use the committed lock files (`go.sum`, `npm ci`). CI workflows MUST declare minimal `permissions`. Every GitHub Action MUST be pinned to a full commit SHA with its version in a comment, and Dependabot MUST propose updates for GitHub Actions, Go modules, and npm as pull requests (Owner 2026-10-22, OD-006). Deploys come only from the protected `main` branch.
 - **Enforcement:** `.github/workflows/`, `deploy/`.
-- **Evidence:** ADR 071, ADR 072, AGENTS.md, OD-006. Code: lock files and permissions compliant; actions are pinned by tag (**not compliant**); no Dependabot configuration.
+- **Evidence:** ADR 071, ADR 072, DR-11, OD-006. Code: lock files and permissions compliant; actions are pinned by tag (**not compliant**); no Dependabot configuration.
 - **Verification:** Workflow review; `npm ci` and `go build` fail on a lock-file mismatch.
 
 ## Open Security Decisions
 
 The owner decided OD-001 to OD-006 and OD-008 on 2026-10-22; the answers are in the rules that
 cite them. IDs are not reused.
+
+- **OD-001** Own password change and Admin account changes end other sessions → SC-017.
+- **OD-002** 5 wrong MFA codes per challenge → SC-011.
+- **OD-003** TOTP secrets encrypted with a key from the environment file → SC-014.
+- **OD-004** 10 Rising-Gods-reaching visitor requests per 10 minutes → SC-028.
+- **OD-005** Timeouts 10 / 30 / 60 / 120 s, 25 s shutdown → SC-026.
+- **OD-006** Actions pinned by SHA, Dependabot → SC-036.
+- **OD-008** 7-day idle timeout → SC-018.
 
 - **OD-007** DEFERRED. Off-server backup storage and key holder (SC-034).
   - Missing: storage location and who holds the encryption key. Same decision as OQ-14 in `REQUIREMENTS.md`.

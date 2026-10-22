@@ -39,7 +39,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   Timestamps are stored in UTC (ADR 003).
 - **Append-only history.** EP transactions and the audit log are only inserted; corrections add
   compensating rows (FR-16.1, FR-26.1). History rows are archived (`archived_at`, `removed_at`,
-  `withdrawn_at`), with the explicit hard-delete exceptions in FR-5.5, FR-6.10, and FR-13.7.
+  `withdrawn_at`); the only hard deletes are listed in FR-31.2.
 - **Bundled read-only data.** The loot catalog JSON (ADR 027) and the addon bundles (ADR 085)
   are embedded in the binary and validated at startup; invalid data stops startup (NFR-1.1).
 - **Frontend.** A single-page app with a hash router (`#/raids/12`) and one fetch wrapper
@@ -231,7 +231,7 @@ sequenceDiagram
   future rate limiter) is allowed only under this rule.
 - **DR-10** The web client talks to the server only through `web/src/api.ts` and only to
   same-origin `/api/v1`.
-- **DR-11** A new Go or npm dependency needs owner approval (AGENTS.md). `go.mod` stays tidy
+- **DR-11** A new Go or npm dependency needs owner approval. `go.mod` stays tidy
   (`go mod tidy`), so direct dependencies are not marked `// indirect` (Owner 2026-10-22, AQ-8).
 - **DR-12** Code that nothing imports or calls is deleted, not kept switched off; Git history keeps
   it. Not yet followed by `internal/registration/rising_gods_warm.go` and `internal/logger`
@@ -244,3 +244,12 @@ sequenceDiagram
 
 None open. The owner resolved AQ-1 to AQ-8 on 2026-10-22; the answers are in the rules marked
 "Owner 2026-10-22". IDs are not reused.
+
+- **AQ-1** SQL moves into `repo.go`; DR-4 has no exceptions.
+- **AQ-2** Public `GET /api/v1/statistics` with server-side aggregates.
+- **AQ-3** HTTP timeouts and graceful shutdown; no production start without the web build (DR-13).
+- **AQ-4** Delete the unused Rising-Gods cache warmer (DR-12).
+- **AQ-5** New `bosskill` package, written through `raidcorrection`.
+- **AQ-6** Anonymise in `accountmerge`; privacy contact from configuration.
+- **AQ-7** Visitor search counter in memory.
+- **AQ-8** `go mod tidy`, delete `internal/logger` (DR-11, DR-12).

@@ -1,7 +1,7 @@
 # Requirements — raid-website
 
 This file owns WHAT the system must do. It describes the behaviour of version 1.0.27
-(2026-10-22), derived from `AGENTS.md`, `docs/decisions/*.md`, and the code. The text in
+(2026-10-22), derived from the owner's original brief (the pre-2026-10-22 `AGENTS.md`), `docs/decisions/*.md`, and the code. The text in
 parentheses after a requirement names its source decision. The ADRs keep the reasons; this
 file keeps the current rule. If code and an ADR disagree, the item is in `## Open Questions`.
 A requirement marked "Owner 2026-10-22" is a decision from the owner's question and review pass. It is not
@@ -85,8 +85,8 @@ implemented yet when it differs from the code.
 
 ### 6. Characters
 
-- **FR-6.1** A player MAY own more than one character. Each character MUST have a class, a main spec, and an optional second spec. (AGENTS.md 4.1)
-- **FR-6.2** A character MAY carry a "main" flag. The flag MUST NOT be unique for a player. (AGENTS.md 4.1)
+- **FR-6.1** A player MAY own more than one character. Each character MUST have a class, a main spec, and an optional second spec. (owner brief)
+- **FR-6.2** A character MAY carry a "main" flag. The flag MUST NOT be unique for a player. (owner brief)
 - **FR-6.3** Character names MUST be changeable. The system MUST keep a name history. The system MUST NOT require globally unique character names. (ADR 013)
 - **FR-6.4** Interactive creation of a character MUST use a loaded Rising-Gods profile for name, class, and specs. (ADR 042)
 - **FR-6.5** The system MUST NOT link one Rising-Gods profile to two players. (ADR 042)
@@ -132,7 +132,7 @@ implemented yet when it differs from the code.
 
 - **FR-10.1** Staff MUST be able to create a raid with an instance, a size, an optional series, and an optional scheduled start. (ADR 021)
 - **FR-10.2** With a series, the system MUST take the raid name from the series template and MUST ignore a sent name. Without a series, the name MUST be given, else `name_required`. (ADR 035)
-- **FR-10.3** A raid MUST have one status: PLANNED, OPEN, COMPLETED, or CANCELLED. (AGENTS.md)
+- **FR-10.3** A raid MUST have one status: PLANNED, OPEN, COMPLETED, or CANCELLED. (owner brief)
 - **FR-10.4** Staff MUST be able to cancel a raid that is not archived, completed, or cancelled. A cancelled raid MUST NOT get EP. Cancelling MUST expire the active item locks of the raid (FR-17.6). (ADR 015; Owner 2026-10-22, OQ-2)
 - **FR-10.5** Staff MUST be able to set the series and scheduled start of an active raid. The name MUST be editable only for a raid without a series. (ADR 021)
 - **FR-10.6** "Archivieren" MUST be the only final action. It MUST set COMPLETED, the completion time, and the archive time together. (ADR 021)
@@ -185,6 +185,7 @@ implemented yet when it differs from the code.
 - **FR-13.10** Roster filters MUST NOT change roster data. (ADR 068)
 - **FR-13.11** Staff MUST be able to correct and add roster rows and loot of PLANNED, OPEN, and COMPLETED raids, also when archived. Cancelled raids, and archived raids that are not COMPLETED, MUST reject these writes. (ADR 018, 032)
 - **FR-13.12** A correction of an archived raid MUST NOT change the archive times, run the finalization again, create a successor, or revive a used or expired lock. (ADR 032)
+- **FR-13.13** Roster rows from before snapshots existed MUST show missing name, class, role, or spec as unavailable. The system MUST NOT fill them from live character data. (ADR 022)
 
 ### 14. Loot awards
 
@@ -216,7 +217,7 @@ implemented yet when it differs from the code.
 - **FR-16.5** A correction of a completed raid MUST add only the change in EP eligibility: +10 when a player becomes eligible, −10 when a player is no longer eligible, limited by FR-16.6. (ADR 018)
 - **FR-16.6** A correction MUST NOT make an EP balance lower than 0. It MUST take only the points that the player still has. The points not taken MUST NOT be taken later. (Owner 2026-10-22, review)
 - **FR-16.8** Before staff save a correction that FR-16.6 limits, the system MUST warn them with the player and the number of points not taken. The audit entry MUST record that number. (Owner 2026-10-22, review)
-- **FR-16.7** The system MUST NOT recalculate existing ledger history under new rules. (AGENTS.md)
+- **FR-16.7** The system MUST NOT recalculate existing ledger history under new rules. (owner brief)
 
 ### 17. Item locks
 
@@ -244,7 +245,7 @@ implemented yet when it differs from the code.
 ### 20. Addon exchange
 
 - **FR-20.1** An authenticated user MUST be able to get the invite export `RS2;INV` of a raid roster with current character names. Bench rows MUST be included only on request. (ADR 045, 070)
-- **FR-20.2** The invite header MUST contain the raid date and start time in the series timezone when the raid has a series and a scheduled start. Else it MUST have five fields. (ADR 085)
+- **FR-20.2** The invite header MUST be `RS2;INV;<raidID>;<raidName>;<size>;<YYYY-MM-DD>;<HH:MM>` with date and start time in the series timezone when the raid has a series and a scheduled start, else the five-field `RS2;INV;<raidID>;<raidName>;<size>`. Each line MUST be `<name>;<TANK|HEAL|DD>;<class>;<bench 0/1>`. (ADR 070, 085)
 - **FR-20.3** Roster and loot imports MUST be a preview followed by an explicit apply, by staff, for PLANNED or OPEN raids that are not archived. The preview MUST NOT write. (ADR 045)
 - **FR-20.4** The imports MUST read RS1 (`|`-separated) and RS2 (`;`-separated). (ADR 070)
 - **FR-20.5** Roster apply MUST add only selected known characters through the normal roster path. It MUST NOT create unknown characters. The preview MUST hand unknown names to quick-add. (ADR 045)
@@ -255,7 +256,9 @@ implemented yet when it differs from the code.
 - **FR-20.10** `disenchanted` and `bank` lines MUST be imported as unclaimed loot, once per line key. (ADR 089)
 - **FR-20.11** An import MUST NOT withdraw or move an existing award. The preview MUST warn when the export names another recipient. (ADR 045, 070)
 - **FR-20.12** When the addon range and the account balance disagree, the preview MUST warn and the system MUST debit the account value. (ADR 070)
-- **FR-20.13** The owner and staff MUST be able to get the WL2 wishlist export with the current EP balance, in priority order. (ADR 070)
+- **FR-20.13** The owner and staff MUST be able to get the WL2 wishlist export with the current EP balance, in priority order: header `WL2;<character>;<exportUnix>;<EP balance>`, lines `<itemID>;<ms|os>;<enhanced 0/1>;<rank>;<note>`. (ADR 070)
+- **FR-20.14** In the loot import preview, a `held` line with a winner MUST suggest the winner as recipient and be preselected with a warning that the trade is open; a `held` line without a winner MUST NOT be preselected. (ADR 045, 070)
+- **FR-20.15** A changed exchange format MUST get a new version prefix and matching changes in the addon repository. (ADR 045)
 
 ### 21. Addon downloads
 
@@ -296,7 +299,7 @@ implemented yet when it differs from the code.
 
 - **FR-25.1** The catalog MUST come only from the bundled file. The system MUST NOT offer catalog upload or edit. (ADR 027)
 - **FR-25.2** Every authenticated role MUST be able to read the catalog. (ADR 027)
-- **FR-25.3** The catalog MUST group drops into NORMAL, HEROIC, and HARDMODE and MUST mark unproven drops as conditional. (ADR 027)
+- **FR-25.3** The catalog MUST group drops into NORMAL, HEROIC, and HARDMODE, MUST keep the raw source paths of merged drops as source variants, and MUST mark unproven drops as conditional. Loot masks MUST NOT imply a mode. (ADR 027)
 - **FR-25.4** The system MUST NOT rewrite historical free-text or imported loot to match the catalog. (ADR 027)
 
 ### 26. Audit log
@@ -317,7 +320,7 @@ implemented yet when it differs from the code.
 
 - **FR-28.1** The system MUST provide the guide `/anleitung` with chapters for each role and generated screenshots. (ADR 083)
 - **FR-28.2** The navigation MUST show the application version. A changelog page MUST list user-facing changes in German. (ADR 056)
-- **FR-28.3** All user-facing text MUST be German. (AGENTS.md)
+- **FR-28.3** All user-facing text MUST be German. (owner brief)
 - **FR-28.4** The UI MUST show times in the user's local timezone. (ADR 003)
 
 ### 29. Boss kills
@@ -342,6 +345,13 @@ implemented yet when it differs from the code.
 - **FR-30.3** Anonymisation MUST keep raid rosters, loot, EP transactions, and character names in raid history. (Owner 2026-10-22, OQ-9)
 - **FR-30.4** Audit entries MUST stay without a time limit. They MUST NOT show the name of an anonymised player. (Owner 2026-10-22, OQ-9 and OQ-12)
 
+### 31. History and bulk changes
+
+- **FR-31.1** Records that affect history MUST be archived (`archived_at`, `removed_at`, `withdrawn_at`), not deleted. (ADR 007)
+- **FR-31.2** The only hard deletes MUST be: the merge source (FR-5.5, FR-6.10), a roster row of a planned or open raid (FR-13.7), a revoked absence (FR-12.9), and a removed wishlist item (FR-19.1). Each MUST write an audit entry with the removed data. (ADR 056, 069, 076)
+- **FR-31.3** A bulk write MUST report what it created, skipped, and rejected, and MUST NOT overwrite existing records. (ADR 008)
+- **FR-31.4** The system MUST NOT have a Google Sheets integration. Data imported from the old sheet stays authoritative. A future historical import MUST be a one-time offline operation with a dry run and a report, not a web feature. (ADR 066)
+
 ## Non-Functional Requirements
 
 - **NFR-1.1** The system MUST NOT start when the configuration, a migration, the bootstrap admin, the bundled catalog, or the addon bundle is invalid, or, in production, when the web build is missing. (ADR 020, 027, 085; Owner 2026-10-22, AQ-3)
@@ -353,6 +363,7 @@ implemented yet when it differs from the code.
 - **NFR-2.5** A restore from the off-server copy MUST be tested every month. (Owner 2026-10-22, OQ-8)
 - **NFR-3.1** The system MUST cache Rising-Gods name searches for 12 hours and MAY serve them stale for up to 7 days while it refreshes. The cache MUST hold at most 2000 searches. (ADR 044)
 - **NFR-3.2** Parallel identical Rising-Gods lookups MUST share one upstream request. (ADR 044)
+- **NFR-3.3** A Rising-Gods list result that reached the upstream cap (300 rows) MUST NOT be treated as complete or reused to answer a more specific query. (ADR 044)
 - **NFR-4.1** The server MUST reject a request body larger than 1 MiB. (code)
 - **NFR-4.2** The server MUST close a connection whose request does not complete within a time limit, and MUST finish running requests before it stops. The limit values are owned by `SECURITY.md`. (Owner 2026-10-22, AQ-3)
 - **NFR-5.1** The production host MUST deploy only from the protected `main` branch, check hourly, and restart for kernel updates at 03:00 Europe/Berlin only when a reboot is required. (ADR 072, 073)
@@ -364,3 +375,20 @@ the requirements marked "Owner 2026-10-22". NFR-2.4 (delete the pre-migration-06
 done and was removed. IDs are not reused.
 
 - **OQ-14** DEFERRED. Off-server backup (NFR-2.3): Which storage, and who holds the encryption key? Blocks only NFR-2.3.
+
+### Resolved (2026-10-22)
+
+- **OQ-1** Loot withdrawal needs a reason only for archived raids → FR-14.9.
+- **OQ-2** Cancelling a raid expires its locks; earlier cancellations unchanged → FR-10.4, FR-17.6, FR-17.7.
+- **OQ-3** New registrations become MEMBER; existing GUEST accounts stay → FR-4.5, FR-4.10.
+- **OQ-4** The server validates recruitment slot values → FR-23.4.
+- **OQ-5** CSRF token on every cookie-authenticated change, no header bypass → FR-2.8.
+- **OQ-6** Statistics are public, including loot totals, no item lists or EP → FR-1.2, FR-27.
+- **OQ-7** Difficulty is tracked per boss through a kill log → FR-29.
+- **OQ-8** Daily encrypted off-server copy, monthly restore test → NFR-2.3, NFR-2.5.
+- **OQ-9** GDPR applies: privacy page and Admin anonymisation → FR-30.
+- **OQ-10** Poll writes without a session answer `login_required` → FR-24.6.
+- **OQ-11** Kill log details → FR-29.5–29.11.
+- **OQ-12** Privacy details → FR-30.1–30.5.
+- **OQ-13** Anonymised name: oldest main, else oldest character → FR-30.2.
+- Owner review: EP stops at zero with a warning → FR-16.6, FR-16.8; visitor search limit → FR-7.6; pre-066 backup deleted (former NFR-2.4).

@@ -1,444 +1,92 @@
-# AI Working Agreement — raid-website
+# AGENTS.md — raid-website
 
-Single entry point for AI agents (and humans) working in this repository. It records the
-requirements and constraints the project owner defined **before** implementation started, so that
-future agents do not re-litigate them or silently change them.
+Operating rules for AI agents and humans who change this repository. The project is specified
+before it is changed: behaviour, design, architecture, and security live in the four spec files
+below. This file adds only how to work; it defines no behaviour or architecture.
 
-**If a rule is not listed here, you do not know it. Do not invent it — ask.**
+@REQUIREMENTS.md
+@DESIGN.md
+@ARCHITECTURE.md
+@SECURITY.md
+@CODING_RULES.md
 
-Accepted decisions are current project memory, not untouchable law. Follow them while they are
-current. If the owner says an old decision is wrong, incomplete, or no longer wanted, update the
-decision record in the same change: add a new ADR that supersedes or amends the old one, and update
-this file when it summarizes the changed rule. Do not force an implementation just because an old ADR
-exists; ask, then record the new decision explicitly (ADR 043).
+## Sources of truth
 
-Authoritative sources, in order of precedence:
+| File | Owns |
+| --- | --- |
+| `REQUIREMENTS.md` | What the system does (`FR-*`, `NFR-*`, `OQ-*`) |
+| `DESIGN.md` | Look, components, accessibility, rendering safety (`DQ-*`) |
+| `ARCHITECTURE.md` | Components, data ownership, flows, trust boundaries (`DR-*`, `AQ-*`) |
+| `SECURITY.md` | Secure-coding rules and security decisions (`SC-*`, `OD-*`) |
+| `CODING_RULES.md` | Code conventions (German) |
+| `REQUIREMENT_TEMPLATE.md` | Body of every leaf implementation issue |
+| `docs/decisions/*.md` | Decision history (ADRs): why a rule exists |
 
-1. This file (owner-level requirements and constraints)
-2. `docs/decisions/*.md` (one accepted decision per file)
-3. `ARCHITECTURE.md` (module map and principles)
-4. `CODING_RULES.md` (defines the coding rules)
-5. `README.md` (commands)
+- Each topic has exactly one owning file. Other files reference its IDs and never restate it.
+- A rule marked "Owner 2026-10-22" or "not built" is decided but not yet in the code: the code is
+  wrong, not the spec. Do not "fix" the spec to match the code.
+- Code and spec disagree in a way the spec does not explain: stop and ask the owner.
 
----
+## Working rules
 
-## What this project is
+1. **Do not guess. Ask.** If a rule, number, status, role, or workflow is not in the spec files,
+   it is unknown. Ask the owner; never invent it.
+2. **Spec first.** A change in behaviour, design, architecture, or security updates the owning
+   spec file in the same change, with the owner's decision. Record new open items under the
+   owning file's next free ID (`OQ-*`, `DQ-*`, `AQ-*`, `OD-*`). IDs are never reused.
+3. **Decisions are history.** When the owner changes or rejects an earlier decision, add a new ADR
+   with the next number that supersedes or amends the old one. Do not rewrite accepted ADRs, and do
+   not enforce an outdated ADR against the owner's current answer (ADR 043).
+4. **Backlog.** Work is tracked as GitHub issues. Every leaf implementation issue MUST follow
+   `REQUIREMENT_TEMPLATE.md`. Epic, workstream, and decision (`REQ-DECISION-*`) issues use short,
+   purpose-specific bodies that link the affected spec IDs and issues. One branch and one pull
+   request per leaf issue, linked with `Closes #<number>`.
+5. **New dependencies** (Go or npm) need the owner's approval first (DR-11).
+6. **Never commit secrets** (passwords, tokens, the privacy contact, keys) or production data.
 
-A WoW WotLK guild raid-management website: raids, attendance, loot, Enhance Points, Armor Tokens,
-polls, roster configuration, and a one-off import of a legacy Google Sheet.
-
-Architecture is a **modular monolith** (ADR 001): Go backend + SQLite via Bun (ADR 002), React +
-TypeScript frontend built with Vite. One binary serves both the JSON API and the compiled SPA.
-
----
-
-## Non-negotiable engineering rules
-
-These came from a strict, German-language engineering-standards document that governs the whole
-codebase. They are not stylistic preferences.
-
-`CODING_RULES.md` elaborates these rules for day-to-day coding (layers, errors, migrations, tests,
-frontend, git) in 16 sections. It never overrides the list below; where the two disagree, this file
-wins and the difference is fixed here first.
-
-1. **Boring, explicit, predictable.** No clever abstractions, no hidden magic, no speculative
-   generality. Prefer long and obvious over short and clever. Name things after the domain.
-2. **Domain-first.** Business logic lives in `internal/<domain>` packages, never in HTTP handlers.
-   Handlers only decode, delegate, and encode. Repositories own the ORM; Bun never appears outside
-   the repository layer (ADR 002).
-3. **"Do not guess. Ask."** If a business rule is ambiguous, stop and ask the owner. Never invent
-   numbers, thresholds, statuses, or workflows.
-4. **Append-only ledgers.** Enhance Points and the audit log are append-only.
-   EP balances are computed by summing transactions. Never `UPDATE` or delete history; a correction is
-   a new, compensating entry (ADR 004). Armor Tokens are derived from loot awards, not tracked in a ledger (ADR 041).
-5. **Never silently overwrite.** Legacy import and any bulk write must produce a report and must not
-   clobber existing data (ADR 008).
-6. **Archive by default.** History-affecting records are archived (`archived_at`), never deleted.
-   A hard delete must be explicitly requested by a human and is Admin-only (ADR 007).
-   For raids, archiving means final processing, not removal or hiding (ADR 021).
-   Exception: a roster row of a planned or open raid may be hard-deleted by staff; the audit log
-   keeps the removed row and loot in that raid blocks it (ADR 076).
-7. **Edits are audited.** Changes to history-affecting records (loot, attendance, character renames)
-   require an actor and write an audit log entry. A reason is mandatory only for archived raid changes
-   (ADR 032 supersedes the reason requirement in ADR 006). Numeric corrections prefer new
-   adjustment transactions over mutating values.
-   Since ADR 077 every website write (raid lifecycle, roster additions, wishlist, polls, item
-   locks, guild configuration, players, accounts, registration) also writes an audit entry with
-   its actor; snapshots never contain secrets.
-8. **UTC in storage, local time at display.** Persist all timestamps in UTC; the frontend formats in
-   the user's timezone. Import must convert German sheet timestamps explicitly (ADR 003).
-9. **Authorization is server-side.** The client never decides permissions. Every mutation is checked
-   against the caller's role; hiding a button is not access control (ADR 010).
-10. **Explicit configuration, not hard-coding.** Guild ranks and raid groups are DB rows that an
-    Admin can change (ADR 009). Do not bake such values into code or migrations.
-11. **Errors are explicit.** Domain packages return typed errors (e.g. `ErrLockNotAllowed`); handlers
-    map them to HTTP status + stable machine-readable `code`. No silent `nil`-swallowing.
-12. **Tests and gates.** New behaviour needs a test. Code must pass `gofmt`, `go vet`,
-    `go build ./...`, `go test ./...`, TypeScript strict and ESLint before being considered done.
-
----
-
-## Stack (fixed — do not substitute)
-
-- Go 1.26, `net/http` with the Go 1.22+ method-pattern `ServeMux` (`mux.HandleFunc("GET /api/v1/...")`).
-- Bun ORM v1.3 with the SQLite dialect (`sqlitedialect` + `sqliteshim` + `modernc.org/sqlite`).
-- SQL migrations as numbered `.up.sql` / `.down.sql` files embedded via `go:embed`
-  (filename regex: `^(\d{1,14})_([0-9a-z_\-]+)\.`).
-- Frontend: React 18 + TypeScript (strict) + Vite. No state-management or HTTP library was added, so
-  the client is a small hand-rolled fetch wrapper plus a hash router. **Adding a dependency is a
-  decision for the owner — ask first.**
-- Password hashing: `golang.org/x/crypto/bcrypt`.
-
----
-
-## Domain rules the owner confirmed
-
-Every item here was explicitly decided by the owner. Do not "improve" on them.
-
-### 4.1 Players and characters
-- A player may own multiple characters. Each character has a class, a main spec, and a second spec.
-- `is_main` marks the character the player currently raids on as main — it is a preference flag, not
-  a uniqueness constraint.
-- Character names are mutable because players rename in game. Therefore **no DB-level global
-  `UNIQUE(name)`**; records are addressed by stable IDs and renames are recorded in name history
-  (ADR 013).
-- ADMIN may correct a mistakenly assigned character by moving it to another player. Its wishlist
-  and all matching raid-attendance player references move with it; loot, EP, locks, and signups do
-  not (ADR 091 amends ADR 090).
-- ADMIN may merge an active source account into a distinct target with a required reason. The target
-  keeps credentials, role, and MFA; source authentication is revoked, all references transfer, and
-  the source account is permanently deleted (ADR 056 supersedes ADR 050).
-- Raid attendance selection is character-first. RAIDASSISTENT and higher may create a new
-  character and optionally its new player through atomic raid quick-add (ADR 037). New player
-  names default to the character name and are editable; these players use the existing GUEST
-  default without login credentials. General account administration remains Admin-only.
-- Interactive Rising-Gods character lookup is restricted to Alliance level-80 characters. Pasted
-  normal Rising-Gods profile URLs may be resolved server-side to the faster profiler load endpoint;
-  broad name search remains available and uses targeted filtered Rising-Gods queries with
-  caching/coalescing where practical. Broad Rising-Gods listviews are capped and must not be treated
-  as complete character indexes (ADR 044).
-
-### Raids
-- Lifecycle: `PLANNED` → `OPEN` → `COMPLETED`, with cancellation as `CANCELLED`.
-  `Archivieren` is the single final action: it sets completed and archived timestamps together.
-  There is no separate completion action (ADR 021 supersedes the former raid archive semantics).
-- Archiving finalizes roster/loot processing, awards EP, expires unused locks, and schedules the
-  next raid atomically. Repeated requests must neither award twice nor create duplicate successors.
-- Archived raids remain visible as history. Raid staff can correct roster and loot or add missing
-  entries with a mandatory reason; archival timestamps, finalization, and successors stay fixed (ADR 032).
-- Each recurring raid series explicitly configures name, leader, weekday(s), week interval,
-  local start time, and IANA timezone. No guild schedule is seeded or hard-coded.
-- Recurrence weeks are anchored to the current raid's local Monday week. Archiving chooses the
-  next future occurrence, skipping elapsed dates, and preserves local wall time across DST.
-  Ambiguous/nonexistent local times fail explicitly rather than silently shifting the schedule.
-- A preplanned eligible next occurrence is reused without replacing its data. A cancelled
-  occurrence is skipped and the next one in the rhythm is used; a conflicting finalized
-  occurrence or another predecessor is reported, not overwritten (ADR 078).
-- Raids of a series can be planned ahead: RAIDASSISTENT and up plan up to a chosen day, and an
-  Admin-set per-series window (`plan_weeks_ahead`, 0 = off) is topped up on series save and on
-  every archive. Existing raids are never changed (ADR 078).
-- Existing stored completed raids are historical: archival never recreates their EP or starts
-  a new recurrence chain. Existing active raids can be assigned a series and scheduled start.
-
-#### Future raid signups (ADR 033)
-- RAIDASSISTENT and higher explicitly open/close signups independently of raid lifecycle.
-  Raids the site creates from a series (planned ahead or archive successor) start open (ADR 078).
-- MEMBER and higher may submit multiple own characters, each with any valid class spec.
-- Pending choices can be edited/withdrawn while open; accepted choices are staff-managed.
-- Only one character per player is accepted, automatically creating the roster snapshot.
-- Alternatives remain visible; staff can explicitly switch the roster slot.
-- Signups close at the scheduled start (server-enforced) or manually earlier. Staff may
-  continue accepting choices in active raids after closing. All changes are audited.
-- Players (and staff for anyone) can mark a raid as "kann nicht" (`DECLINED`) or "unsicher"
-  (`TENTATIVE`). Only declined players are offered for "keine EP" at archive; unsure players keep
-  the normal EP rule (ADR 082).
-
-### User guide (ADR 083)
-- `/anleitung` is the in-app guide for every role and is readable without login. When a change
-  alters a screen the guide describes, update `web/src/pages/Guide.tsx` and regenerate the screenshots
-  with `DOCS_TOUR=1 npx playwright test e2e/zz-docs-tour.spec.ts` (after `npm run build`).
-
-### Addon downloads and pages (ADR 085)
-- The site serves RaidLedger and RaidWishlist itself: `internal/addons/bundle/<Name>/` (the `.toc`
-  and exactly its files) is embedded, zipped at startup and offered at `/addons`. The source of the
-  shipped versions is the `wow-addons` repository; update with
-  `go run ./cmd/sync-addons <wow-addons checkout>`, then update `web/src/pages/Addons.tsx` and the
-  screenshots in `web/public/addons/` (crops of live test-run screenshots, never account names,
-  passwords or the login screen) in the same change.
-- `/addons`, `/addons/raidledger`, `/addons/raidwishlist` and the download API are public.
-
-### Enhance Points (EP) — the core rule
-- **+10 EP** for a player who received **no main-spec loot** in that raid.
-- Awarded **only by final archiving**, which moves the raid to `COMPLETED` (ADR 021).
-- **No EP at all if the raid is `CANCELLED`** (ADR 015).
-- One award per (player, raid) — idempotent.
-- Balance is `SUM(amount)` over the append-only `enhance_point_transactions` (ADR 004).
-
-### Recorded enhanced loot (ADR 023-024)
-- The website tracks EP and outside raid outcomes; it never generates a roll or exposes a
-  player spend button, amount selector, or standalone EP-use action.
-- The actual outside roll is a shifted 1-100 roll: `1 + X` through `100 + X`, with
-  `X = min(balance, 50)`. Only an enhanced winner pays; losing rolls cost nothing.
-- Raid staff records winning loot as `MAIN`, `SECOND`, `ENHANCED`, or `BOE`. An enhanced
-  award atomically debits `X`, requires `X >= 1`, and counts as main-spec loot. The amount
-  cannot be selected or split. A player BoE award does not affect main-spec EP eligibility.
-- Loot recipients are characters in that raid's roster. Ordinary main/second awards and
-  token derivation retain their rules. Active locks still award main-spec for zero EP.
-- Coupled corrections preserve the historical cost for the same enhanced winner on
-  unrelated edits. Changing away from enhanced refunds that cost; changing the enhanced
-  recipient refunds the old winner and charges `min(new winner's current balance, 50)`.
-  All corrections are actor-audited, require a reason for archived raids, and append compensating transactions atomically.
-- Existing ledger history is retained, not recalculated under the revised rules.
-
-### Item locks
-- A lock requires `balance >= 150` but **costs 0 EP** (ADR 012).
-- A player may hold **multiple** simultaneous locks.
-- If the locked item drops in that raid, it is auto-awarded to the locker **as a main-spec award**.
-- If it does not drop, the lock **expires at raid completion** with no loss (ADR 012).
-
-### Attendance
-- A **substitute** is a normal player; substitute and regular participants are treated identically.
-- **Bench** participants follow the **same EP rule** as raiders: they earn +10 if they got no
-  main-spec loot (ADR 016).
-- The raid roster remains editable after archival with a reason. It stores the actual character name, role,
-  class, and spec played in that raid, independently of later live-character changes (ADR 022).
-- Archive rejects an incomplete active roster. Legacy unknown snapshots are not fabricated;
-  new sheet imports preserve Raid Archive's own character name, role, class, and spec.
-
-### Armor Tokens
-- Tokens are derived from awarding the three specific loot items
-  `Weiheabzeichen des Beschützers`, `Weiheabzeichen des Bezwingers`,
-  `Weiheabzeichen des Eroberers` (ADR 014).
-- There is no token ledger or separate token balance. Token information is a filtered view of loot awards (ADR 041 supersedes ADR 005).
-- The legacy sheet's "Tokens gesammelt" total is **reconciliation-only** and must never be written
-  over derived data.
-
-### Raid addon exchange (ADR 045, ADR 070)
-- RaidLedger replaced RaidSync (both in the `wow-addons` repository). Its formats are `;`-separated
-  RS2: invite export `RS2;INV`, attendance `RS2;ROSTER`, loot `RS2;LOOT`; the imports still read RS1.
-- The in-game addon (originally RaidSync) exchanges copy-and-paste text with the
-  website: an invite export of the saved roster (current character names, bench optional), a roster
-  export of who was actually in the raid, and a loot export recorded in game by master loot, including
-  trades of items the loot master held.
-- Roster import is preview then apply, RAIDASSISTENT and up, only for planned/open unarchived raids. It
-  adds selected known characters through the ordinary attendance path; unknown characters go through
-  the Rising-Gods quick-add, never automatic creation.
-- Loot import is preview then apply with the same permissions and raid states. Staff choose the award
-  method (default `MAIN`, armor tokens `SECOND`) and may override the recorded recipient with any roster
-  character. Lines go through the ordinary loot path (catalog, locks, Enhanced costs) with request IDs
-  derived from the addon's entry ID, so repeated imports create nothing new even after a trade changed
-  the recipient. `raidsync-` request IDs are raid-scoped (`loot.RaidScopedRequestPrefix`, checked in the
-  write transaction and by `idx_loot_raid_request`), unlike ordinary per-actor request IDs.
-- RaidLedger exports loot as RS2 (`;`-separated, with roll, spec, range and winner; ADR 070).
-  Enhanced ranges default to `ENHANCED`, second-spec rolls to `SECOND`; `held` lines with a winner
-  suggest the winner; `parked` and `deleted` lines are shown but never imported.
-- Wishes carry `spec` (MAIN/SECOND) and `is_enhanced` (MAIN only). The owner edits them; owner and
-  staff can export WL2 with the owner's EP balance for RaidWishlist (ADR 070).
-- The invite export header carries the raid's date and start time in the series timezone (realm
-  time) for RaidLedger's calendar event: `RS2;INV;<id>;<name>;<size>;<YYYY-MM-DD>;<HH:MM>`. Raids
-  without a series or scheduled start keep the five-field header (ADR 085).
-
-### Shadowmourne (ADR 086)
-- One shared list: each active entry is a Krieger/Paladin/Todesritter character with a priority and
-  a questline stage (`PREQUEST`, `SOULS`, `UNHOLY`, `BLOOD`, `FROST`, `SHARDS`, `FINAL`); several can
-  be active at once, each character only once. The shard target defaults to 50 and stays editable.
-- `Fertig` needs the target reached and moves the entry to history; `Entfernen` archives (`removed_at`).
-- Per raid, `UNHOLY`/`BLOOD`/`FROST`/`SHARDS` are suggested from the highest-priority roster character
-  on that stage; RAIDASSISTENT and up may override per raid, except for cancelled/archived raids.
-- Raid choices store a roster character: list entries on that step or Krieger/Paladin/Todesritter
-  in the roster that are not on the active list (ADR 087).
-
-### Current raid and boss order (ADR 088)
-- "Aktueller Raid" opens the newest raid that has begun (real, else scheduled start not in the
-  future), else the next one; cancelled raids are skipped.
-- An Admin sets each instance's boss order (every boss once, audited). Boss pickers, boss lists
-  and a raid's loot follow it; unordered bosses come after, in catalog order.
-
-### Loot that went to nobody (ADR 089)
-- Disenchanted, guild-bank and unwanted items are `unclaimed_loot`, never awards: no player,
-  no EP, no tallies, no locks. RAIDASSISTENT and up record and remove them (archived raids need a
-  reason); removal archives the row. Every write is audited.
-- The RS2 loot import records `disenchanted` / `bank` lines there (idempotent by line key); parked
-  and deleted lines are still shown only.
-
-### Loot, attendance, and character corrections
-- Corrections are actor-audited with before/after snapshots. Reasons are mandatory for archived
-  raid history only; live-character changes never rewrite raid snapshots (ADR 032).
-
-### Roster configuration
-- Guild ranks and raid groups are configurable rows in the database, not hard-coded constants
-  (ADR 009).
-
-### Historical legacy import
-- Google Sheets import and synchronization were removed (ADR 066). Existing imported domain data
-  remains authoritative; no Google credentials, import endpoints, or runtime mappings exist.
-- A future exceptional historical import is an offline, one-time Python operation with an explicit
-  dry-run and report, never a recurring web feature.
-
-### Core hardening decisions (ADR 017-020)
-- Only one matching active item lock may exist per raid. Competing locks are rejected;
-  one player may still lock multiple different items. Item IDs are authoritative when both
-  records have IDs; otherwise matching uses the trimmed item name.
-- Attendance and loot corrections use explicit actor + transactional before/after audit snapshots.
-  Planned, open, and completed raids can be corrected, including archived completed raids.
-  Cancelled and inconsistently archived active raids remain blocked. Archived corrections and
-  additions require a nonblank reason; unarchived writes do not (ADR 032).
-- Completed corrections append only the before/after EP eligibility difference. This preserves
-  imported opening balances and never recreates historical raid rewards. Token visibility follows
-  the corrected loot award; consumed locks are not implicitly revived.
-- Production requires explicit nondefault bootstrap credentials. Configuration, migrations,
-  and bootstrap failures stop startup. SQLite foreign keys are enabled on every connection.
-
-### Loot catalog is bundled and read-only (ADR 027)
-- `scripts/data/catalog-wotlk335.json` is the sole catalog authority. It is embedded with
-  `go:embed` and mirrored into the catalog tables at startup. There is no upload, preview, or
-  merge; updating the catalog means committing a new file. An invalid source or a failed mirror
-  stops startup.
-- Catalog reads are served from the embedded source, never from the mirror. The mirror exists to
-  keep historical foreign keys valid; rows are retained, never deleted.
-- Source paths are normalized server-side into `NORMAL`, `HEROIC`, and `HARDMODE`. Relationships
-  sharing boss, item, raid size, and mode are merged; raw `difficulty`/`loot_mode` pairs survive
-  as `source_variants`, and unproven conditions are marked `conditional`. Loot masks never imply
-  a mode.
-- New loot must reference a bundled boss/item pair for the raid's persisted
-  `catalog_instance_id` and `raid_size`; names are derived server-side. Missing context is
-  `catalog_context_required`, an unproven pair is `catalog_item_invalid`.
-- Historical free-text and imported loot is never rewritten to match the current catalog.
-
----
-
-## Authentication and permissions (ADR 010)
-
-- Local accounts. `username` + bcrypt `password_hash` live on the player row.
-- Login returns an opaque random session token, stored sha256-hashed, in the `sessions` table and
-  sent as an `HttpOnly`, `SameSite=Lax` cookie named `raid_session`. `Secure` when
-  `COOKIE_SECURE=true` or `ENV=production`. Sessions last 30 days and are validated per request;
-  unknown or expired cookies mean *unauthenticated* (not error).
-- The legacy `X-Actor-ID` header is **removed** and must not come back.
-- Roles, ascending: `GUEST` < `MEMBER` < `RAIDASSISTENT` < `RAIDLEADER` < `ADMIN`, stored in
-  `players.role`; higher roles include all powers of lower ones (`Role.AtLeast`).
-- Matrix:
-  - **Read** — any authenticated role: all `GET` endpoints except the public dashboard reads below.
-  - **Public dashboard** — visitors may call `GET /api/v1/raids`, `GET /api/v1/players`,
-    `GET /api/v1/polls`, and `GET /api/v1/raids/{id}/attendance` without a session. All other
-    reads require authentication; every mutation retains its existing authorization check (ADR 067).
-  - **Public addon downloads** — `GET /api/v1/addons` and `GET /api/v1/addons/{name}/download`
-    need no session (ADR 085).
-  - **Config (`ADMIN`)** — create player; set account/credentials; create or update characters;
-    guild ranks; raid groups; recurring raid series; list/import legacy data; account overview
-    (ADR 084).
-  - **Raid operations (`RAIDASSISTENT` and up, i.e. RA + RL)** — create raid; configure its
-    series/start; cancel; archive/finalize; attendance; loot; create and close polls; create
-    character and optional player together with attendance through raid quick-add (ADR 037).
-  - **Self-service (`MEMBER` and up)** — create and cancel **own** item locks;
-    vote on polls.
-- The first admin is bootstrapped from `ADMIN_USERNAME` / `ADMIN_PASSWORD` at startup.
-- Login MFA options are server-reported per challenge. The frontend shows only configured factors;
-  WebAuthn/FIDO2 security keys are the default option when available and supported (ADR 047).
-- A Rising-Gods profile has at most one pending, approved, or consumed registration request. Rejected
-  requests may be submitted again; existing duplicate history is retained (ADR 055).
-
----
-
-## API conventions
-
-- All endpoints live under `/api/v1`. Version changes go in a new package, not in place.
-- Success envelope: `{"data": ...}`. Errors: `{"error": {"code": "...", "message": "..."}}`.
-- JSON is **snake_case**, on models and request DTOs alike. Request decoding uses
-  `DisallowUnknownFields`, so DTOs must cover exactly the accepted fields.
-- **List endpoints must always encode an empty JSON array, never `null`** — use
-  `writeListJSON` / `nonNil` in `internal/httpapi/v1`. The frontend iterates these responses
-  unguarded. Same for nested lists such as `transactions`. This is covered by
-  `TestListEndpointsReturnEmptyArrays`; do not bypass it with a raw `WriteJSON` on a slice.
-- Handlers resolve the actor from the session via the context, never from a request header.
-- Timestamps are RFC3339 UTC strings; the client formats them locally.
-
----
-
-## Frontend conventions
-
-- Sessions travel in the `raid_session` cookie, so all API calls must use `credentials: 'include'`.
-  In dev, Vite proxies `/api` to `http://localhost:8080` so the browser stays same-origin.
-- Routing is a small hash router (`web/src/router.tsx`). Keep it dependency-free unless the owner
-  approves a routing library.
-- Authorization is enforced by the server; the UI may hide controls for convenience but must not be
-  the only check.
-- The compiled SPA is built by Vite into `internal/webui/dist` and embedded with `go:embed`, so the
-  frontend must be built **before** the Go binary. `web/go.mod` exists only to keep `node_modules`
-  out of the root Go module.
-- User-facing text is German.
-- The visible application version and changelog live in `web/src/release.ts`. Every user-facing
-  change increments the patch version and adds a concise German changelog entry in the same change.
-- Visual identity: "Bratwurst des Schicksals", dark premium ICC-inspired navy/black panels,
-  icy blue/cyan/silver accents, original SVG/CSS crest and atmosphere, class-colored details,
-  restrained frost borders/glow, readable typography, desktop sidebar and mobile companion
-  navigation. No fake statistics, notifications, progression, or unsupported controls (ADR 026).
-
----
-
-## Commands and configuration
+## Commands
 
 | Purpose | Command |
 | --- | --- |
 | Backend (dev) | `go run ./cmd/server` |
-| Frontend (dev) | `cd web && npm run dev` (proxy → `:8080`) |
-| Frontend build | `cd web && npm run build` |
-| Go gates | `gofmt -w cmd internal`, `go vet ./...`, `go test ./...` |
-| Frontend gates | `npm run build`, `npm run lint` |
-| Frontend regression tests | `cd web && npm test` |
-| End-to-end tests (real server + Chromium) | `cd web && npx playwright install chromium && npm run e2e` |
+| Frontend (dev) | `cd web && npm run dev` (Vite proxies `/api` to `:8080`) |
+| Full build | `make build` (frontend first, then Go; the SPA is embedded) |
+| Frontend build | `cd web && npm ci && npm run build` (writes `internal/webui/dist`) |
+| Go gates | `gofmt -l cmd internal` (no output), `go vet ./...`, `golangci-lint run`, `go build ./...`, `go test ./...` |
+| Frontend gates | `cd web && npm run lint && npm test` |
+| End-to-end | `cd web && npx playwright install chromium && npm run e2e` |
+| Guide screenshots | `cd web && npm run build && DOCS_TOUR=1 npx playwright test e2e/zz-docs-tour.spec.ts` |
+| Sync addon bundle | `go run ./cmd/sync-addons <wow-addons checkout>` |
 
-Environment variables: `PORT` (default `8080`), `DATABASE_URL` (default
-`file:raid.db?_pragma=journal_mode(WAL)`), `ENV`, `COOKIE_SECURE`, `ADMIN_USERNAME`,
-`ADMIN_PASSWORD`.
-
-Build order matters: `make build` runs the frontend build first, then `go build`.
-
----
-
-## Toolchain notes
-
-Prefer the documented repo commands and avoid machine-specific assumptions.
-
-### Linux / NixOS
-
-- Use normal POSIX shell command chaining (`cmd && next`) when commands depend on prior success.
-- `make build` is the preferred full build when `make`, Go, Node, and npm are available in the
-  active shell or development environment.
-- If using a Nix shell/dev environment, enter it before running Go, npm, or Python catalog commands.
-
-### Windows
-
-- PowerShell 5.1 does not support `&&`; use `cmd; if ($?) { next }` for dependent commands.
-- When writing UTF-8 files with PowerShell cmdlets, specify UTF-8 explicitly to preserve German text.
-- If `make` is unavailable or resolves to an incompatible shell, run the underlying `npm` and `go`
-  commands directly.
-
-Build order matters: run the frontend build before the Go binary when producing an embedded SPA.
-Verify generated or formatted output with the relevant build/test command instead of trusting
-terminal rendering alone.
-
----
+- Development defaults: `PORT=8080`, `DATABASE_URL=file:raid.db?_pragma=journal_mode(WAL)`.
+  Production configuration is described in `deploy/README.md` and `SECURITY.md` SC-033.
+- `web/go.mod` exists only to keep `node_modules` out of the root Go module.
+- A gate that cannot run is reported, never skipped silently.
 
 ## Definition of done
 
 A change is done when:
 
-1. It satisfies a rule above, or the owner has explicitly changed a rule.
-2. Business logic lives in the domain package; handlers stay thin.
-3. It is covered by tests, including the permission boundary it touches.
-4. `gofmt`, `go vet`, `go build ./...`, `go test ./...`, `npm run build`, `npm run lint` all pass.
-5. Any behaviour change is reflected in the ADR set. New or changed decisions get a new ADR file
-   that supersedes or amends the old decision; do not silently rewrite old project history.
+1. It implements its issue's acceptance criteria, and the owning spec files describe the result
+   (resolved "not built" notes removed).
+2. Tests cover the new behaviour, including the permission boundary it touches (a role one step
+   too low gets 403) and its failure paths.
+3. All Go and frontend gates pass.
+4. A changed decision has a new ADR.
+5. A user-facing change bumps the patch version in `web/src/release.ts` and adds a short German
+   changelog entry there.
+6. A changed screen that `/anleitung` describes updates `web/src/pages/Guide.tsx` and regenerates
+   its screenshots.
+7. A new addon version is synced with `cmd/sync-addons`, and `web/src/pages/Addons.tsx` and
+   `web/public/addons/` screenshots are updated in the same change. Screenshots never show account
+   names, passwords, or the login screen.
 
----
+## Toolchain notes
 
-## Known gaps — do not assume these exist
-
-- The only hard-delete endpoints are removing a roster row from a planned/open raid (ADR 076),
-  revoking an absence and removing a wishlist item. Everything else uses archive/expire flows (ADR 007).
-- `internal/export` is an empty directory; general data export is not implemented. The RaidSync
-  addon exchange lives in `internal/addonsync` (ADR 045).
-- Admins can view the read-only audit log at `GET /api/v1/audit-log`; no non-Admin read endpoint exists.
-- Admins can see which player has a login and through which registration at
-  `GET /api/v1/player-accounts` (ADR 084); login names never appear in the public player list.
+- **Linux / NixOS:** chain dependent commands with `&&`; enter the Nix dev shell first if you use
+  one.
+- **Windows:** PowerShell 5.1 has no `&&`; use `cmd; if ($?) { next }`. Write files as UTF-8
+  explicitly so German text survives. Without a working `make`, run the `npm` and `go` commands
+  directly.
+- Check generated or formatted output with the build and test commands, not by reading terminal
+  output alone.

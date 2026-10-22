@@ -1,9 +1,12 @@
 # Coding Rules
 
-Regeln für Code in diesem Repository. Dieses Dokument erklärt die Anforderungen aus `AGENTS.md`
-und die akzeptierten Entscheidungen aus `docs/decisions/*.md` für den Alltag des Schreibens.
+Regeln für Code in diesem Repository: die Code-Konventionen für den Alltag des Schreibens.
+`AGENTS.md` importiert dieses Dokument.
 
-Vorrang: `AGENTS.md` → `docs/decisions/*.md` → `ARCHITECTURE.md` → dieses Dokument.
+Zuständigkeit: Verhalten steht in `REQUIREMENTS.md`, Gestaltung in `DESIGN.md`, Aufbau und
+Abhängigkeitsregeln in `ARCHITECTURE.md`, Sicherheitsregeln in `SECURITY.md`, die Arbeitsweise in
+`AGENTS.md`. Dieses Dokument wiederholt deren Inhalte nicht, sondern verweist auf ihre IDs.
+`docs/decisions/*.md` ist die Entscheidungshistorie.
 Widersprüche werden nicht stillschweigend aufgelöst; der Owner entscheidet, bei
 verhaltensrelevanten Fragen mit einer neuen ADR. Alte Entscheidungen sind zu befolgen, solange sie
 aktuell sind. Wenn der Owner eine alte Entscheidung ändert oder verwirft, wird das aktiv als neue,
@@ -22,37 +25,32 @@ Verhalten, keine spekulative Generizität. Lieber lang und offensichtlich als ku
 1.2 **Domain-first.** Fachlogik liegt in `internal/<domain>`, niemals im HTTP-Handler. Handler
 dekodieren, delegieren, kodieren.
 
-1.3 **Repository-Besitz.** Bun und SQL erscheinen ausschließlich in den Repositories der
-jeweiligen Domain (ADR-002). Kein `db.NewSelect()`, kein Bun-Model außerhalb von
-`internal/<domain>/repo.go`.
+1.3 **Repository-Besitz.** SQL und Bun-Query-Builder erscheinen ausschließlich in
+`internal/<domain>/repo.go`; Modelle dürfen Bun-Struct-Tags tragen (`ARCHITECTURE.md` DR-4,
+ADR-002).
 
 1.4 **Nicht raten.** Ist eine Fachregel unklar, wird gefragt. Keine erfundenen Zahlen,
 Schwellen, Status, Rollen oder Workflows.
 
-1.5 **Nie still überschreiben.** Legacy-Import und jeder Massenwrite erzeugen einen Report und
-überschreiben keinen Bestand (ADR-008).
+1.5 **Nie still überschreiben.** Massenwrites erzeugen einen Report (`REQUIREMENTS.md` FR-31.3).
 
-1.6 **Archiv statt Löschen.** Historie-beeinflussende Datensätze werden archiviert. Hard Delete
-nur auf ausdrückliche Anforderung eines Menschen und nur als Admin (ADR-007).
+1.6 **Archiv statt Löschen.** Siehe FR-31.1 und die abschließende Liste der Hard Deletes in FR-31.2.
 
-1.7 **Änderungen sind auditiert.** Eingriffe in Historie (Loot, Anwesenheit, Umbenennungen) brauchen
-einen Actor und schreiben einen Audit-Eintrag. Eine Reason ist nur für Änderungen an archivierten
-Raids erforderlich (ADR-032 ersetzt diese Anforderung aus ADR-006). Zahlenkorrekturen sind neue
-Ausgleichstransaktionen im Ledger, kein `UPDATE` auf einem Saldo.
+1.7 **Änderungen sind auditiert.** Jeder Write schreibt seinen Audit-Eintrag in derselben
+Transaktion (FR-26.1, FR-26.2, DR-5); Reason-Pflicht nach FR-26.5. Zahlenkorrekturen sind neue
+Ausgleichstransaktionen im Ledger, kein `UPDATE` auf einem Saldo (FR-16.1).
 
-1.8 **UTC speichern, lokal anzeigen.** Alle Zeitstempel werden in UTC persistiert; das Frontend
-formatiert in der Zeitzone des Nutzers (ADR-003).
+1.8 **UTC speichern, lokal anzeigen.** `ARCHITECTURE.md` „Persistence“, FR-28.4.
 
-1.9 **Autorisierung ist serverseitig.** Jede Mutation prüft die Rolle des Aufrufers. Ein versteckter
-Button ist keine Zugriffskontrolle (ADR-010).
+1.9 **Autorisierung ist serverseitig.** `SECURITY.md` SC-001 bis SC-003.
 
-1.10 **Konfiguration ist explizit.** Guild-Ranks und Raid-Groups sind DB-Zeilen, die ein Admin
-ändert (ADR-009). Nichts davon in Code oder Migrationen fest verdrahten.
+1.10 **Konfiguration ist explizit.** Admin-änderbare Werte sind DB-Zeilen, keine Konstanten oder
+Migrationen (FR-8.1, FR-9.2); Umgebung nur über `internal/config` (DR-7).
 
 1.11 **Fehler sind explizit.** Domain-Pakete liefern typisierte Fehler; Handler bilden sie auf
 HTTP-Status und einen stabilen, maschinenlesbaren `code` ab. Kein stilles `nil`-Schlucken.
 
-1.12 **Neues Verhalten braucht Tests.** Definition of Done in `AGENTS.md` §10.
+1.12 **Neues Verhalten braucht Tests.** Definition of Done in `AGENTS.md`.
 
 1.13 **Idiomatisches Go.** Die Konventionen aus *Effective Go* und der Standard Library sind der
 Massstab. Eine Dependency, deren Aufgabe die Standard Library bereits erledigt, wird nicht
@@ -258,7 +256,8 @@ Concurrency-Dependency. Reihenfolge ist fast immer die einfachere und korrektere
 
 ## 9. Datenbank und Migrationen
 
-9.1 Migrationen sind nummerierte Datei-Paare in `internal/migrations`:
+9.1 Migrationen sind nummerierte Datei-Paare in `internal/migrations` (Dateinamen-Regex
+`^(\d{1,14})_([0-9a-z_\-]+)\.`):
 
 ```text
 001_init.up.sql
@@ -287,7 +286,7 @@ akzeptierten Felder ab, weil das Decoding `DisallowUnknownFields` verwendet.
 10.2 Zeitstempel sind RFC3339-UTC-Strings.
 
 10.3 Listen werden immer als `[]` kodiert, nie als `null` — dafür `writeListJSON` bzw. `nonNil`
-verwenden. Kein rohes `WriteJSON` auf Slices.
+verwenden. Kein rohes `WriteJSON` auf Slices. Abgesichert durch `TestListEndpointsReturnEmptyArrays`.
 
 10.4 Antwortformat: Erfolg `{"data": ...}`, Fehler `{"error": {"code": "...", "message": "..."}}`.
 `code` ist stabil und wird nicht lokalisiert.
@@ -305,7 +304,7 @@ verwenden. Kein rohes `WriteJSON` auf Slices.
 
 11.3 Default-Zugangsdaten für Entwicklung sind erlaubt, aber `ENV=production` startet nicht mit
 den eingebauten Defaults oder ohne gesetztes `ADMIN_PASSWORD`. Siehe `internal/config` und
-`AGENTS.md` §5.
+`SECURITY.md` SC-033.
 
 11.4 Eine neue Dependency — Go oder npm — ist eine Entscheidung des Owners und wird vorher
 gefragt.

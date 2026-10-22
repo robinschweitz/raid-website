@@ -461,3 +461,9 @@ Target: WCAG 2.2 level AA.
 
 None open. The owner resolved DQ-1 to DQ-5 on 2026-10-22; the answers are in the rules marked
 "Owner 2026-10-22". IDs are not reused.
+
+- **DQ-1** Control borders use `outline-control` `#5989a3`.
+- **DQ-2** Class icons are served from the site; CSP drops `wow.zamimg.com`.
+- **DQ-3** No text below 12px.
+- **DQ-4** New screens are designed in their implementation issues.
+- **DQ-5** One shared error component with `role="alert"`.

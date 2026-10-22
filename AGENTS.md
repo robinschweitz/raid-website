@@ -23,8 +23,9 @@ below. This file adds only how to work; it defines no behaviour or architecture.
 | `docs/decisions/*.md` | Decision history (ADRs): why a rule exists |
 
 - Each topic has exactly one owning file. Other files reference its IDs and never restate it.
-- A rule marked "Owner 2026-10-22" or "not built" is decided but not yet in the code: the code is
-  wrong, not the spec. Do not "fix" the spec to match the code.
+- Where a spec entry says "not built", "not compliant", or "The code still …", the decision is made
+  and the code is behind: change the code, not the spec. ("Owner 2026-10-22" only marks who
+  decided; such a rule may already be in the code.)
 - Code and spec disagree in a way the spec does not explain: stop and ask the owner.
 
 ## Working rules
@@ -42,7 +43,7 @@ below. This file adds only how to work; it defines no behaviour or architecture.
    purpose-specific bodies that link the affected spec IDs and issues. One branch and one pull
    request per leaf issue, linked with `Closes #<number>`.
 5. **New dependencies** (Go or npm) need the owner's approval first (DR-11).
-6. **Never commit secrets** (passwords, tokens, the privacy contact, keys) or production data.
+6. **Never commit secrets** or production data (SC-033).
 
 ## Commands
 
@@ -69,8 +70,8 @@ A change is done when:
 
 1. It implements its issue's acceptance criteria, and the owning spec files describe the result
    (resolved "not built" notes removed).
-2. Tests cover the new behaviour, including the permission boundary it touches (a role one step
-   too low gets 403) and its failure paths.
+2. Tests cover the new behaviour, its permission boundary, and its failure paths
+   (`CODING_RULES.md` §13).
 3. All Go and frontend gates pass.
 4. A changed decision has a new ADR.
 5. A user-facing change bumps the patch version in `web/src/release.ts` and adds a short German

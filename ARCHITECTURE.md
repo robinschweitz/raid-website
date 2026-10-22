@@ -16,8 +16,8 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
 - Server framework: Go standard library `net/http` with the Go 1.22+ method-pattern `ServeMux`; Go 1.26.
 - Server runtime: Go 1.26 (CI uses 1.26.x); single statically linked binary that embeds the SPA, migrations, loot catalog, and addon bundles.
 - Client framework(s): React 18.3 with TypeScript 5.6 (strict), built by Vite 8.3; no router, state, or HTTP library. Runtime libraries: `recharts` 3 (charts), `qrcode` 1.5 (TOTP setup QR).
-- API style and integration model: JSON over HTTP under `/api/v1`, snake_case, `{"data": …}` / `{"error": {"code", "message"}}` envelopes, same-origin cookie session. Rising-Gods: outbound HTTPS GET, direct or through the Worker. Addons: versioned plain-text formats RS1, RS2, WL2 carried by a person.
-- Authentication and session model: local accounts (bcrypt), optional TOTP, recovery codes, and WebAuthn; opaque random session token stored hashed in the database and sent as an `HttpOnly` cookie; CSRF token for state-changing requests. Detailed controls: `SECURITY.md`.
+- API style and integration model: JSON over HTTP under `/api/v1`, snake_case, `{"data": …}` / `{"error": {"code", "message"}}` envelopes with a stable, unlocalised `code`, RFC3339 UTC timestamps, lists always `[]` and never `null`, same-origin cookie session. A new API version is a new package, never a change to `/api/v1` contracts. Rising-Gods: outbound HTTPS GET, direct or through the Worker. Addons: versioned plain-text formats RS1, RS2, WL2 carried by a person.
+- Authentication and session model: local accounts with optional TOTP, recovery codes, and WebAuthn; opaque server-side sessions in a cookie; CSRF token for state-changing requests. Mechanisms and values: `SECURITY.md` SC-005 to SC-019.
 - Data model and scale expectations: one guild; tens of players, hundreds of characters, a few raids per week. SQLite with one open connection, so all writes are serialized. Exact scale targets: UNKNOWN (none stated).
 - Security expectations: deferred to `SECURITY.md`.
 
@@ -26,7 +26,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
 - **Modular monolith (ADR 001).** One Go module, one process, one database. Each business
   capability is a package under `internal/<domain>`; there are no network calls between
   components.
-- **Layers (ADR 002, CODING_RULES §6).** HTTP layer → domain services → domain repositories →
+- **Layers (ADR 002; DR-1, DR-5, DR-6).** HTTP layer → domain services → domain repositories →
   database. Handlers decode, check the route guard, delegate, and encode. Business rules live in
   domain services. Bun ORM and SQL live in repositories (DR-4).
 - **Coordinators for cross-domain writes.** `raidcorrection` (roster, loot, corrections,
@@ -68,6 +68,10 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   difficulty; unique per raid and boss). `loot` reads the kill for the award difficulty.
   `raidcorrection` writes kills, so the manual loot path and the `addonsync` import create a
   missing kill and the loot in one transaction (FR-29.7, FR-29.8) (Owner 2026-10-22, AQ-5). Not built.
+- **Public interface.** Without a session, only these reads answer (FR-1.2): `GET /api/v1/raids`,
+  `/players`, `/polls`, `/raids/{id}/attendance`, `/addons`, `/addons/{name}/download`,
+  `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, and, not
+  built, `/statistics` and `/privacy-contact`. Login, MFA, and registration writes are public too.
 - **No background jobs.** Deadlines (signup close, MFA expiry) are evaluated on each request.
   Planning ahead runs on series save and archive (FR-9.7). The only periodic work is on the host
   (backups, updates, reboots; see `deploy/`).
@@ -110,7 +114,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (not built) |
 | Privacy page | Static page with contact from configuration | None | none | FR-30.1 | SUPPORTED (not built) |
 | Infrastructure (`config`, `db`, `migrations`, `validation`, `webui`) | Environment config, DB open, schema, enums, embedded SPA | Production config rules, foreign keys, SPA present in production | schema | NFR-1 | SUPPORTED (SPA check not built) |
-| Rising-Gods Worker (`workers/`) | Authenticated fixed-origin GET proxy to `db.rising-gods.de` | Fixed origin, bearer token | none | FR-7, ADR 048, ADR 053 | SUPPORTED |
+| Rising-Gods Worker (`workers/`) | Authenticated fixed-origin GET proxy to `db.rising-gods.de` | Fixed origin and shared token (SC-029) | none | FR-7, ADR 048, ADR 053 | SUPPORTED |
 
 ### Main data flows
 
@@ -118,7 +122,7 @@ and similar notes say which specified parts the code does not have yet. All rows
    logging → CSRF → session) → route guard → handler → domain repository → SQLite → JSON
    envelope → browser renders it as text.
 2. **Change data.** Same path; the client first gets a CSRF token (`GET /api/v1/auth/csrf`) and
-   sends it as `X-CSRF-Token`. The handler passes the actor from the context to a domain service
+   sends it as `X-CSRF-Token` (SC-019). The handler passes the actor from the context to a domain service
    or coordinator, which opens one transaction for the record, its ledger consequences, and its
    audit entry.
 3. **Archive a raid.** Staff → `raidcompletion` → in one transaction: lifecycle, +10 EP rows,
@@ -133,8 +137,8 @@ and similar notes say which specified parts the code does not have yet. All rows
 ### Trust boundaries
 
 - **TB-1 Internet → reverse proxy.** TLS termination; the only network entry point.
-- **TB-2 Reverse proxy → application.** The Go process listens on loopback only (NFR-1.3).
-  Forwarded client address and scheme are trusted only when `TRUST_PROXY_HEADERS` is set.
+- **TB-2 Reverse proxy → application.** Loopback only (SC-025); which forwarded headers are
+  trusted: SC-006, SC-007.
 - **TB-3 Browser → API.** Everything from the browser is untrusted: identity comes only from the
   session cookie, permissions only from the server (FR-1.1).
 - **TB-4 Application → Rising-Gods / Worker.** Responses are untrusted input; a chosen profile is
@@ -236,9 +240,9 @@ sequenceDiagram
 - **DR-12** Code that nothing imports or calls is deleted, not kept switched off; Git history keeps
   it. Not yet followed by `internal/registration/rising_gods_warm.go` and `internal/logger`
   (Owner 2026-10-22, AQ-4 and AQ-8).
-- **DR-13** In production, the server MUST NOT start without the embedded web build
-  (`index.html`), like an invalid catalog or addon bundle (NFR-1.1) (Owner 2026-10-22, AQ-3).
-  Development without a web build keeps working.
+- **DR-13** The embedded web build (`index.html`) is checked at startup like the catalog and addon
+  bundles; the production rule is NFR-1.1. Development without a web build keeps working
+  (Owner 2026-10-22, AQ-3).
 
 ## Open Questions
 

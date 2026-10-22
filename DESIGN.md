@@ -412,7 +412,7 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
 - Don't reproduce a screenshot or game art as the page background or as UI chrome.
 - Don't add fake progression, RSVP percentages, notifications or performance statistics.
 - Don't add a CSS framework, component library, icon font or web font without owner approval.
-- Don't hide information from a role only by styling; permissions are the server's job (FR-1.1).
+- Don't hide information from a role only by styling; permissions are the server's job (SC-001).
 
 ## Accessibility
 
@@ -438,24 +438,24 @@ Target: WCAG 2.2 level AA.
 
 ## Interaction & Rendering Safety
 
-- **Text only:** user and external data (names, notes, poll answers, Rising-Gods data, addon
-  import lines) are rendered as React text, never as HTML. `dangerouslySetInnerHTML` is not used.
+- **Text only:** names, notes, poll answers, Rising-Gods data, and addon lines appear as plain
+  text, never as formatted HTML (rule: SC-022).
 - **Confirmations:** cancelling or archiving a raid, withdrawing loot, removing a roster row,
   merging accounts or characters, moving a character, and finishing or removing a Shadowmourne
   entry ask for confirmation first; declining
   sends nothing (ADR 069, ADR 076). The archive dialog shows the EP preview before it commits
   (FR-10.11).
 - **Secrets shown once:** recovery codes, the TOTP setup secret and new registration codes are
-  shown one time only; the server stores only hashes. Recovery codes say so on screen
-  ("Wiederherstellungscodes werden nur jetzt angezeigt.").
+  shown one time only (SC-013, SC-014), and the screen says so ("Wiederherstellungscodes werden
+  nur jetzt angezeigt.").
 - **MFA choice:** the login screen shows only the factors the server reported, security key first
   (FR-3.7, FR-3.8).
 - **External links:** Rising-Gods profiles, Wowhead items and full-size screenshots open in a new
   tab with `rel="noreferrer"`.
-- **External assets:** the content security policy allows images only from `self` and `data:`
-  (Owner 2026-10-22, DQ-2). `https://wow.zamimg.com` is removed once the class icons are stored locally.
-- **Visible role gating:** controls a role cannot use are hidden or explained, and the server
-  remains the only check (FR-1.1).
+- **External assets:** every image comes from the site itself (Owner 2026-10-22, DQ-2); the
+  content security policy that enforces it is SC-024.
+- **Visible role gating:** controls a role cannot use are hidden or explained; the server check
+  is SC-001.
 
 ## Open Questions
 

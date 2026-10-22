@@ -21,7 +21,7 @@ implemented yet when it differs from the code.
 
 ### 1. Access and roles
 
-- **FR-1.1** The system MUST enforce every permission on the server. Hidden UI controls MUST NOT be the only check. (ADR 010)
+- **FR-1.1** Every permission in this file MUST be enforced by the server (SC-001). (ADR 010)
 - **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the statistics, the privacy contact, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044; Owner 2026-10-22, OQ-6)
 - **FR-1.3** The public player list MUST show only ID, name, guild rank, and active state. It MUST NOT show login names. (ADR 067, 084)
 - **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/statistics`, and the privacy page without a session. (ADR 083, 085; Owner 2026-10-22, OQ-6 and OQ-9)
@@ -34,17 +34,17 @@ implemented yet when it differs from the code.
 ### 2. Authentication and sessions
 
 - **FR-2.1** A user MUST log in with a username and a password. (ADR 010)
-- **FR-2.2** The system MUST reject a new or changed password with fewer than 12 characters after trimming whitespace. (ADR 046)
-- **FR-2.3** The system MUST block login for a username and client address after 5 failed attempts in 15 minutes. (ADR 046)
-- **FR-2.4** A successful login MUST start a session that is valid for 30 days. (ADR 010)
+- **FR-2.2** The system MUST reject a new or changed password that does not meet the password policy (SC-005). (ADR 046)
+- **FR-2.3** The system MUST temporarily block login for a username and client address after repeated failed attempts (limits: SC-008). (ADR 046)
+- **FR-2.4** A successful login MUST start a session. The session MUST end at its maximum lifetime (SC-018). (ADR 010)
 - **FR-2.5** The system MUST treat an unknown or expired session as no session, not as an error. (ADR 010, 020)
 - **FR-2.6** Logout MUST end the session. (ADR 010)
 - **FR-2.7** A logged-in user MUST be able to change the own password. (ADR 046)
-- **FR-2.8** The system MUST reject every state-changing request that carries a session cookie and has no valid CSRF token. Missing `Origin` and `Sec-Fetch-Site` headers MUST NOT skip this check. (ADR 046; Owner 2026-10-22, OQ-5)
+- **FR-2.8** The system MUST reject a state-changing request that carries a session cookie and has no valid CSRF token, whatever other headers it has (mechanism: SC-019). (ADR 046; Owner 2026-10-22, OQ-5)
 - **FR-2.9** An inactive account MUST NOT log in. (ADR 020)
 - **FR-2.10** At startup, the system MUST create the first ADMIN from the configured bootstrap credentials if the account does not exist. It MUST NOT change an existing account. (ADR 020)
 - **FR-2.11** The `/login` page MUST send a logged-in user to the overview. (ADR 081)
-- **FR-2.12** A session that has not been used for 7 days MUST end. The user MUST log in again. (Owner 2026-10-22, OD-008)
+- **FR-2.12** A session that has not been used for the idle time in SC-018 MUST end. The user MUST log in again. (Owner 2026-10-22, OD-008)
 - **FR-2.13** Changing the own password MUST log out all other devices of the user and MUST keep the current device logged in. (Owner 2026-10-22, OD-001)
 - **FR-2.14** When an ADMIN changes a player's password, login name, or role, all sessions of that player MUST end. (Owner 2026-10-22, OD-001)
 
@@ -52,20 +52,20 @@ implemented yet when it differs from the code.
 
 - **FR-3.1** MFA MUST be optional for each account. An account without MFA MUST log in with the password only. (ADR 046)
 - **FR-3.2** A user MUST be able to set up, enable, and disable authenticator-app TOTP with six-digit codes. (ADR 046)
-- **FR-3.3** Enabling TOTP MUST show 10 recovery codes one time. Each recovery code MUST work one time only. (ADR 046)
+- **FR-3.3** Enabling TOTP MUST show a set of recovery codes one time. Each recovery code MUST work one time only (SC-013). (ADR 046)
 - **FR-3.4** A user MUST be able to register and remove WebAuthn/FIDO2 security keys. (ADR 046)
 - **FR-3.5** For an account with MFA, a correct password MUST start an MFA challenge and MUST NOT start a session. The session MUST start only after a valid second factor. (ADR 046)
-- **FR-3.6** An MFA challenge MUST expire after 5 minutes. (code; Owner 2026-10-22, review)
+- **FR-3.6** An MFA challenge MUST expire after a short time (SC-010). (code; Owner 2026-10-22, review)
 - **FR-3.7** The login response MUST list only the factors that the account has configured. The UI MUST show only these factors. (ADR 047)
 - **FR-3.8** If the account has a security key and the browser supports WebAuthn, the UI MUST offer the security key first. Code login MUST stay available as a fallback only when the account has TOTP or recovery codes. (ADR 047)
-- **FR-3.9** After 5 wrong codes in one MFA challenge, the user MUST start again with the password. (Owner 2026-10-22, OD-002)
+- **FR-3.9** After too many wrong codes in one MFA challenge (SC-011), the user MUST start again with the password. (Owner 2026-10-22, OD-002)
 
 ### 4. Registration and character claiming
 
 - **FR-4.1** A visitor MUST be able to request registration only for a Rising-Gods profile character. The system MUST NOT accept a manual character name. (ADR 040)
 - **FR-4.2** The system MUST reject a registration or claim request with HTTP 409 `registration_request_exists` when a request for the same profile is PENDING, APPROVED, or CONSUMED. A REJECTED request MUST NOT block a new request. (ADR 055)
 - **FR-4.3** An ADMIN MUST be able to list requests, reject a request, create a single-use code for a request, mark a code as sent, and revoke an unused code. (ADR 040)
-- **FR-4.4** A registration code MUST expire 14 days after creation. (ADR 040)
+- **FR-4.4** A registration code MUST expire after its lifetime (SC-013). (ADR 040)
 - **FR-4.5** Redeeming a new-account code MUST create a MEMBER account, create or link the character, start a session, and consume the code. (ADR 040; Owner 2026-10-22, OQ-3)
 - **FR-4.6** A logged-in user MUST be able to request a claim for a Rising-Gods character. Redeeming a claim code MUST link or move the character to the user. (ADR 040)
 - **FR-4.7** A claim MUST NOT change existing raid roster snapshots. (ADR 040)
@@ -145,14 +145,14 @@ implemented yet when it differs from the code.
 - **FR-10.13** The archive dialog MUST preselect "no EP" for each declined roster player. (ADR 069)
 - **FR-10.14** Archived raids MUST stay visible as history. (ADR 021)
 - **FR-10.15** Archiving a raid that was COMPLETED before this rule MUST only set the archive time. It MUST NOT award EP or start a series chain. (ADR 021)
-- **FR-10.16** The UI MUST ask for confirmation before it cancels or archives a raid. (ADR 069)
+- **FR-10.16** Cancelling and archiving a raid MUST need a confirmation (which actions: `DESIGN.md` "Interaction & Rendering Safety"). (ADR 069)
 
 ### 11. Current raid and dashboard
 
 - **FR-11.1** "Aktueller Raid" MUST open the newest non-cancelled raid whose real or scheduled start is not in the future, else the next raid. With no raid, the answer MUST be HTTP 404 `no_current_raid`. (ADR 088)
 - **FR-11.2** The dashboard MUST show an active raid with a start time in the past as "Läuft" until staff archives it. This MUST NOT be a stored status. (ADR 034)
 - **FR-11.3** For MEMBER and higher, the overview MUST show the next four raids that have not started, with the user's status and actions to sign up with the main character, to decline, and to take back a decline. (ADR 081)
-- **FR-11.4** The dashboard MUST show the encounters of the configured instance. It MAY show kills only from recorded boss kills (FR-29.4). (ADR 030; Owner 2026-10-22, OQ-7)
+- **FR-11.4** The dashboard MUST show the encounters of the configured instance; kill progress follows FR-29.4. (ADR 030; Owner 2026-10-22, OQ-7)
 - **FR-11.5** The UI MUST NOT show invented data: progression, RSVP rates, notifications, or performance numbers. (ADR 026)
 
 ### 12. Signups and absences
@@ -216,8 +216,8 @@ implemented yet when it differs from the code.
 - **FR-16.4** The UI MUST show the balance, the shifted roll range 1+X to 100+X with X = min(balance, 50), and the history. (ADR 023, 026)
 - **FR-16.5** A correction of a completed raid MUST add only the change in EP eligibility: +10 when a player becomes eligible, −10 when a player is no longer eligible, limited by FR-16.6. (ADR 018)
 - **FR-16.6** A correction MUST NOT make an EP balance lower than 0. It MUST take only the points that the player still has. The points not taken MUST NOT be taken later. (Owner 2026-10-22, review)
-- **FR-16.8** Before staff save a correction that FR-16.6 limits, the system MUST warn them with the player and the number of points not taken. The audit entry MUST record that number. (Owner 2026-10-22, review)
 - **FR-16.7** The system MUST NOT recalculate existing ledger history under new rules. (owner brief)
+- **FR-16.8** Before staff save a correction that FR-16.6 limits, the system MUST warn them with the player and the number of points not taken. The audit entry MUST record that number. (Owner 2026-10-22, review)
 
 ### 17. Item locks
 
@@ -341,22 +341,22 @@ implemented yet when it differs from the code.
 
 - **FR-30.1** The system MUST provide a German privacy page (Datenschutzerklärung) that is readable without login. It MUST name the owner as the responsible person with a contact address. The name and address MUST come from configuration, not from the repository. (Owner 2026-10-22, OQ-9 and OQ-12)
 - **FR-30.2** An ADMIN MUST be able to anonymise a player. Anonymisation MUST delete the login, password, sessions, MFA data, and Rising-Gods profile data, and MUST replace the player name with the name of the player's main character. With several main characters, the oldest main MUST be used; with none, the oldest character; with no character, "Ehemaliges Mitglied #<player ID>". (Owner 2026-10-22, OQ-9, OQ-12 and OQ-13)
-- **FR-30.5** A person MUST ask for anonymisation through the contact on the privacy page. Only an ADMIN MUST be able to do it. Members MUST NOT get a self-service delete. (Owner 2026-10-22, OQ-12)
 - **FR-30.3** Anonymisation MUST keep raid rosters, loot, EP transactions, and character names in raid history. (Owner 2026-10-22, OQ-9)
 - **FR-30.4** Audit entries MUST stay without a time limit. They MUST NOT show the name of an anonymised player. (Owner 2026-10-22, OQ-9 and OQ-12)
+- **FR-30.5** A person MUST ask for anonymisation through the contact on the privacy page. Only an ADMIN MUST be able to do it. Members MUST NOT get a self-service delete. (Owner 2026-10-22, OQ-12)
 
 ### 31. History and bulk changes
 
 - **FR-31.1** Records that affect history MUST be archived (`archived_at`, `removed_at`, `withdrawn_at`), not deleted. (ADR 007)
-- **FR-31.2** The only hard deletes MUST be: the merge source (FR-5.5, FR-6.10), a roster row of a planned or open raid (FR-13.7), a revoked absence (FR-12.9), and a removed wishlist item (FR-19.1). Each MUST write an audit entry with the removed data. (ADR 056, 069, 076)
+- **FR-31.2** The only hard deletes MUST be: the merge source (FR-5.5, FR-6.10), a roster row of a planned or open raid (FR-13.7), a revoked absence (FR-12.9), a removed wishlist item (FR-19.1), and the account data that anonymisation deletes (FR-30.2). Each MUST write an audit entry with the removed data, without secrets (FR-26.3). (ADR 056, 069, 076; Owner 2026-10-22, OQ-9)
 - **FR-31.3** A bulk write MUST report what it created, skipped, and rejected, and MUST NOT overwrite existing records. (ADR 008)
 - **FR-31.4** The system MUST NOT have a Google Sheets integration. Data imported from the old sheet stays authoritative. A future historical import MUST be a one-time offline operation with a dry run and a report, not a web feature. (ADR 066)
 
 ## Non-Functional Requirements
 
 - **NFR-1.1** The system MUST NOT start when the configuration, a migration, the bootstrap admin, the bundled catalog, or the addon bundle is invalid, or, in production, when the web build is missing. (ADR 020, 027, 085; Owner 2026-10-22, AQ-3)
-- **NFR-1.2** In production, the system MUST NOT start with default or missing bootstrap credentials. (ADR 020)
-- **NFR-1.3** In production, the application MUST listen only on a loopback address behind a TLS reverse proxy. (ADR 070)
+- **NFR-1.2** Production startup rules for credentials and secrets: SC-033. (ADR 020)
+- **NFR-1.3** Production network exposure: SC-025. (ADR 070)
 - **NFR-2.1** The system MUST take a verified database snapshot before each deployment. (ADR 071, 072)
 - **NFR-2.2** The system MUST keep 48 hourly, 32 daily, 13 weekly, and 25 monthly database snapshots. A weekly job MUST verify the newest snapshot. (ADR 070)
 - **NFR-2.3** An encrypted copy of the newest verified snapshot MUST leave the server every day for storage that the owner controls. The maximum data loss is therefore one day. The storage and the key holder are DEFERRED (OQ-14). The key MUST NOT be stored only on the production server. (ADR 070; Owner 2026-10-22, OQ-8)
@@ -364,9 +364,9 @@ implemented yet when it differs from the code.
 - **NFR-3.1** The system MUST cache Rising-Gods name searches for 12 hours and MAY serve them stale for up to 7 days while it refreshes. The cache MUST hold at most 2000 searches. (ADR 044)
 - **NFR-3.2** Parallel identical Rising-Gods lookups MUST share one upstream request. (ADR 044)
 - **NFR-3.3** A Rising-Gods list result that reached the upstream cap (300 rows) MUST NOT be treated as complete or reused to answer a more specific query. (ADR 044)
-- **NFR-4.1** The server MUST reject a request body larger than 1 MiB. (code)
-- **NFR-4.2** The server MUST close a connection whose request does not complete within a time limit, and MUST finish running requests before it stops. The limit values are owned by `SECURITY.md`. (Owner 2026-10-22, AQ-3)
-- **NFR-5.1** The production host MUST deploy only from the protected `main` branch, check hourly, and restart for kernel updates at 03:00 Europe/Berlin only when a reboot is required. (ADR 072, 073)
+- **NFR-4.1** The server MUST reject an oversized request body (limit: SC-020). (code)
+- **NFR-4.2** The server MUST close a connection whose request does not complete within a time limit, and MUST finish running requests before it stops. The limit values are in SC-026. (Owner 2026-10-22, AQ-3)
+- **NFR-5.1** The production host MUST check for a new release hourly (source branch: SC-036) and restart for kernel updates at 03:00 Europe/Berlin only when a reboot is required. (ADR 072, 073)
 
 ## Open Questions
 

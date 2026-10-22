@@ -65,7 +65,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-004 - Public data stays minimal**
 - **Status:** ACTIVE
-- **Rule:** The only unauthenticated reads are `GET /api/v1/raids`, `/players`, `/polls`, `/raids/{id}/attendance`, `/addons`, `/addons/{name}/download`, `/external/rising-gods/characters`, `/health`, `/auth/csrf`, and, once built, `/statistics` and `/privacy-contact` (FR-1.2). Unauthenticated responses MUST contain only the fields FR-1.3, FR-27.2, and FR-30.1 allow. Login names, EP balances, item lists in statistics, audit data, and Rising-Gods raw data MUST NOT appear in public responses.
+- **Rule:** Only the reads in FR-1.2 may be served without a session (paths: `ARCHITECTURE.md` "Public interface"). Unauthenticated responses MUST contain only the fields FR-1.3, FR-27.2, and FR-30.1 allow. Login names, EP balances, item lists in statistics, audit data, and Rising-Gods raw data MUST NOT appear in public responses.
 - **Enforcement:** DTOs of the public endpoints; `GET /api/v1/statistics` (not built).
 - **Evidence:** FR-1.2, FR-1.3, FR-27.2, ADR 067. Code: compliant for existing endpoints.
 - **Verification:** HTTP tests compare the exact field set of each public response.
@@ -74,7 +74,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-005 - Password storage and policy**
 - **Status:** ACTIVE
-- **Rule:** Passwords MUST be hashed with bcrypt (`golang.org/x/crypto/bcrypt`, `DefaultCost`) and MUST be at least 12 characters after trimming. A password longer than bcrypt's 72-byte input limit MUST be rejected with a validation error, not truncated and not answered with a 500.
+- **Rule:** Password policy: at least 12 characters after trimming. Passwords MUST be hashed with bcrypt (`golang.org/x/crypto/bcrypt`, `DefaultCost`). A password longer than bcrypt's 72-byte input limit MUST be rejected with a validation error, not truncated and not answered with a 500.
 - **Enforcement:** `auth.ValidatePassword`, `auth.HashPassword`.
 - **Evidence:** FR-2.2, ADR 046. Code: compliant for hashing and minimum; the over-72-byte case is not validated before hashing.
 - **Verification:** A 73-byte password gets a 4xx validation error; a 12-character one is accepted; the stored value starts with `$2`.
@@ -109,7 +109,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-010 - MFA challenge**
 - **Status:** ACTIVE
-- **Rule:** A password-verified MFA account MUST receive only a random 32-byte challenge, stored as a SHA-256 hash, valid for 5 minutes and usable once. No session cookie is issued before a valid factor.
+- **Rule:** The MFA challenge of FR-3.5 MUST be a random 32-byte value, stored as a SHA-256 hash, valid for 5 minutes and usable once.
 - **Enforcement:** `auth.StartLogin`, `auth.VerifyMFAChallenge`.
 - **Evidence:** FR-3.5, FR-3.6. Code: compliant.
 - **Verification:** A challenge older than 5 minutes or already used is rejected; no `raid_session` cookie before the second factor.
@@ -118,7 +118,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** One MFA challenge MUST accept at most 5 wrong TOTP or recovery codes. The fifth wrong code MUST invalidate the challenge, so the user starts again at the password step, which SC-008 limits.
 - **Enforcement:** `auth.VerifyMFAChallenge`; the challenge row counts failures.
-- **Evidence:** FR-3.9, V6, OD-002 (Owner 2026-10-22, OD-002). Code: **not compliant** — no limit today.
+- **Evidence:** FR-3.9, V6, OD-002 (owner, 2026-10-22). Code: **not compliant** — no limit today.
 - **Verification:** After 5 wrong codes, the correct code for that challenge is rejected and a new password login is needed.
 
 **SC-012 - TOTP codes used once**
@@ -139,7 +139,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** TOTP secrets MUST be stored encrypted with a 256-bit key that comes only from the environment file (`TOTP_ENCRYPTION_KEY`), never from the database or repository. PROPOSED algorithm: AES-256-GCM from the Go standard library with a random nonce per secret. Existing plaintext secrets MUST be encrypted once at startup. With TOTP in use, production MUST NOT start without the key.
 - **Enforcement:** `auth` MFA settings repository; `internal/config`.
-- **Evidence:** V11, V14, OD-003 (Owner 2026-10-22, OD-003). Code: **not compliant** — stored as plaintext.
+- **Evidence:** V11, V14, OD-003 (owner, 2026-10-22). Code: **not compliant** — stored as plaintext.
 - **Verification:** The `totp_secret` column holds no base32 secret; a login with a valid code still works; startup without the key fails while a TOTP setup exists.
 
 **SC-015 - Re-authentication for security changes**
@@ -160,23 +160,23 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-017 - Ending other sessions**
 - **Status:** ACTIVE
-- **Rule:** Changing the own password MUST end all other sessions of the player and keep the current one. An Admin setting a player's password, login name, or role MUST end all sessions of that player. Account merge (source) and anonymisation MUST end all sessions of that player. Disabling MFA does not end sessions.
+- **Rule:** The events in FR-2.13, FR-2.14, FR-5.4, and FR-30.2 MUST delete the affected session rows in the same transaction as the change. Disabling MFA does not end sessions.
 - **Enforcement:** `auth.ChangeOwnPassword`, the Admin account write in `registration`/`auth`, `accountmerge`.
-- **Evidence:** FR-2.13, FR-2.14, FR-5.4, FR-30.2, OD-001 (Owner 2026-10-22, OD-001). Code: merge compliant; password and Admin changes **not compliant**.
+- **Evidence:** FR-2.13, FR-2.14, FR-5.4, FR-30.2, OD-001 (owner, 2026-10-22). Code: merge compliant; password and Admin changes **not compliant**.
 - **Verification:** After a password change, a second session cookie returns 401 and the current one still works.
 
 **SC-018 - Session lifetime**
 - **Status:** ACTIVE
 - **Rule:** A session MUST end 30 days after login at the latest, and MUST end earlier when it has not been used for 7 days. Each authenticated request resets the idle clock; updating the last-use time at most once per hour is enough.
 - **Enforcement:** `auth` session validation; a last-used timestamp on `sessions`.
-- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (Owner 2026-10-22, OD-008). Code: 30-day maximum compliant; idle timeout **not built**.
+- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (owner, 2026-10-22). Code: 30-day maximum compliant; idle timeout **not built**.
 - **Verification:** A session unused for 7 days and 1 minute returns 401; a session used daily stays valid until day 30.
 
 **SC-019 - CSRF protection**
 - **Status:** ACTIVE
-- **Rule:** Every state-changing request (not GET, HEAD, OPTIONS) MUST carry an `X-CSRF-Token` header equal to the CSRF cookie, compared in constant time, whether or not `Origin` or `Sec-Fetch-Site` is present. The token MUST be 32 bytes from `crypto/rand`.
+- **Rule:** Every state-changing request (not GET, HEAD, OPTIONS) that carries the session cookie MUST carry an `X-CSRF-Token` header equal to the CSRF cookie, compared in constant time, whether or not `Origin` or `Sec-Fetch-Site` is present. The token MUST be 32 bytes from `crypto/rand`. Requests without a session cookie (login, MFA, registration): **OD-009**.
 - **Enforcement:** `csrfProtection` middleware; `GET /api/v1/auth/csrf`; `web/src/api.ts`.
-- **Evidence:** FR-2.8. Code: **not compliant** — requests without `Origin` and `Sec-Fetch-Site` skip the check.
+- **Evidence:** FR-2.8. Code: **not compliant** — requests without `Origin` and `Sec-Fetch-Site` skip the check. Today the check also covers requests without a session cookie whenever `Origin` or `Sec-Fetch-Site` is present.
 - **Verification:** A POST with the session cookie, no CSRF header, and no `Origin` returns 403 `csrf_required`.
 
 ### Input, output, and API (V1, V2, V4)
@@ -192,14 +192,14 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** SQL MUST use Bun query builders or `?` parameter binding; user input MUST NOT be concatenated into SQL. Queries live in `repo.go` (DR-4).
 - **Enforcement:** repositories.
-- **Evidence:** CODING_RULES §9.4. Code: compliant for binding; four files outside `repo.go` (DR-4).
+- **Evidence:** ADR 002, V1. Code: compliant for binding; four files outside `repo.go` (DR-4).
 - **Verification:** Review of every `NewRaw`, `Where(` with formatted strings, and `ExecContext` call.
 
 **SC-022 - Text-only rendering**
 - **Status:** ACTIVE
 - **Rule:** The client MUST render all user, addon, and Rising-Gods data as React text; `dangerouslySetInnerHTML`, `innerHTML`, and `eval` MUST NOT be used. Text written into addon formats MUST replace the format separators (`;` → `,`, `|` → `/`).
 - **Enforcement:** `web/src`; `internal/addonsync`, `internal/wishlist` exporters.
-- **Evidence:** `DESIGN.md` Interaction & Rendering Safety, ADR 070. Code: compliant.
+- **Evidence:** ADR 070, TB-3, TB-5. Code: compliant.
 - **Verification:** Code search finds none of the forbidden APIs; a name containing `;` round-trips without adding a field.
 
 **SC-023 - Safe errors**
@@ -229,7 +229,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** The Go server MUST set `ReadHeaderTimeout` 10 s, `ReadTimeout` 30 s, `WriteTimeout` 60 s, and `IdleTimeout` 120 s, and on SIGTERM MUST stop accepting connections and give running requests 25 s to finish (systemd stops the service after 30 s).
 - **Enforcement:** `cmd/server/main.go` (`http.Server`, `Shutdown`).
-- **Evidence:** NFR-4.2, ARCHITECTURE "Server lifecycle", OD-005 (Owner 2026-10-22, OD-005). Code: **not compliant** — `http.ListenAndServe` without limits.
+- **Evidence:** NFR-4.2, ARCHITECTURE "Server lifecycle", OD-005 (owner, 2026-10-22). Code: **not compliant** — `http.ListenAndServe` without limits.
 - **Verification:** A client that sends headers slower than 10 s is disconnected; a request running during `systemctl restart` completes.
 
 ### External systems (V4, V12, V13)
@@ -243,9 +243,9 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-028 - Visitor lookup limit**
 - **Status:** ACTIVE
-- **Rule:** Without a session, one client address (SC-006) MUST NOT start more than 10 requests in 10 minutes that can reach Rising-Gods: character searches and registration requests together. Answers served from the cache MUST NOT count. Further requests get HTTP 429 with a stable code. The counter is in memory (DR-9). Logged-in users are not limited.
+- **Rule:** For the requests that FR-7.6 limits, one client address (SC-006) MUST NOT start more than 10 in 10 minutes. Answers served from the cache MUST NOT count. Further requests get HTTP 429 with a stable code. The counter is in memory (DR-9).
 - **Enforcement:** `GET /api/v1/external/rising-gods/characters`, `POST /api/v1/auth/registration-requests`; counter in `registration` or the HTTP layer.
-- **Evidence:** FR-7.6, AQ-7, OD-004 (Owner 2026-10-22, OD-004). Code: none.
+- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: none.
 - **Verification:** The eleventh uncached visitor search within 10 minutes returns 429 without an upstream request; a logged-in user is not limited.
 
 **SC-029 - Worker access**
@@ -273,7 +273,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-032 - Anonymisation**
 - **Status:** ACTIVE
-- **Rule:** Anonymisation MUST delete the login name, password hash, sessions, MFA settings, recovery codes, WebAuthn credentials, and Rising-Gods profile data of the player in one transaction, and MUST replace the player name in audit display (FR-30.2–30.4).
+- **Rule:** Anonymisation (FR-30.2–30.4) MUST run in one transaction and MUST remove every credential row of the player: password hash, sessions, MFA settings, recovery codes, and WebAuthn credentials (SC-017).
 - **Enforcement:** `accountmerge` anonymise operation (not built).
 - **Evidence:** FR-30, AQ-6. Code: not built.
 - **Verification:** After anonymisation no row links the player to a login, secret, or external profile; old sessions return 401.
@@ -282,7 +282,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** `ADMIN_PASSWORD`, `RISING_GODS_PROXY_TOKEN`, and the privacy contact values MUST come only from `/etc/raid-website.env` (readable by root and the service only) or Cloudflare secrets, never from the repository. Production MUST NOT start with default admin credentials.
 - **Enforcement:** `internal/config`, `deploy/`.
-- **Evidence:** NFR-1.2, FR-30.1, CODING_RULES §15.2. Code: compliant.
+- **Evidence:** NFR-1.2, FR-30.1, ADR 020, ADR 048. Code: compliant.
 - **Verification:** A secret scan of the repository finds none; production with default credentials fails startup.
 
 **SC-034 - Off-server backups**
@@ -324,3 +324,7 @@ cite them. IDs are not reused.
 - **OD-007** DEFERRED. Off-server backup storage and key holder (SC-034).
   - Missing: storage location and who holds the encryption key. Same decision as OQ-14 in `REQUIREMENTS.md`.
   - Affected: SC-034, NFR-2.3. Owner: owner.
+- **OD-009** CSRF for requests without a session cookie (SC-019).
+  - Conflict found in reconciliation: FR-2.8 (owner decision OQ-5) covers requests that carry a session cookie; `SECURITY.md` first required the token on every state-changing request. Login, MFA verification, and registration have no session cookie.
+  - Alternatives: (a) require the token on all state-changing requests, which also blocks login CSRF; (b) require it only with a session cookie, as FR-2.8 states.
+  - Affected: SC-019, FR-2.8. Owner: owner.

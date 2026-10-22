@@ -174,9 +174,9 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-019 - CSRF protection**
 - **Status:** ACTIVE
-- **Rule:** Every state-changing request (not GET, HEAD, OPTIONS) that carries the session cookie MUST carry an `X-CSRF-Token` header equal to the CSRF cookie, compared in constant time, whether or not `Origin` or `Sec-Fetch-Site` is present. The token MUST be 32 bytes from `crypto/rand`. Requests without a session cookie (login, MFA, registration): **OD-009**.
+- **Rule:** Every state-changing request (not GET, HEAD, OPTIONS) MUST carry an `X-CSRF-Token` header equal to the CSRF cookie, compared in constant time, whether or not it carries a session cookie, `Origin`, or `Sec-Fetch-Site`. This includes login, MFA verification, and registration. The token MUST be 32 bytes from `crypto/rand`.
 - **Enforcement:** `csrfProtection` middleware; `GET /api/v1/auth/csrf`; `web/src/api.ts`.
-- **Evidence:** FR-2.8. Code: **not compliant** — requests without `Origin` and `Sec-Fetch-Site` skip the check. Today the check also covers requests without a session cookie whenever `Origin` or `Sec-Fetch-Site` is present.
+- **Evidence:** FR-2.8, OD-009 (owner, 2026-10-22). Code: **not compliant** — requests without `Origin` and `Sec-Fetch-Site` skip the check. `web/src/api.ts` already sends the token on every non-GET request.
 - **Verification:** A POST with the session cookie, no CSRF header, and no `Origin` returns 403 `csrf_required`.
 
 ### Input, output, and API (V1, V2, V4)
@@ -310,7 +310,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 ## Open Security Decisions
 
-The owner decided OD-001 to OD-006 and OD-008 on 2026-10-22; the answers are in the rules that
+The owner decided OD-001 to OD-006, OD-008, and OD-009 on 2026-10-22; the answers are in the rules that
 cite them. IDs are not reused.
 
 - **OD-001** Own password change and Admin account changes end other sessions → SC-017.
@@ -320,11 +320,9 @@ cite them. IDs are not reused.
 - **OD-005** Timeouts 10 / 30 / 60 / 120 s, 25 s shutdown → SC-026.
 - **OD-006** Actions pinned by SHA, Dependabot → SC-036.
 - **OD-008** 7-day idle timeout → SC-018.
+- **OD-009** CSRF token also for requests without a session cookie (login, MFA, registration) → SC-019, FR-2.8. Found during ownership reconciliation.
 
 - **OD-007** DEFERRED. Off-server backup storage and key holder (SC-034).
   - Missing: storage location and who holds the encryption key. Same decision as OQ-14 in `REQUIREMENTS.md`.
   - Affected: SC-034, NFR-2.3. Owner: owner.
-- **OD-009** CSRF for requests without a session cookie (SC-019).
-  - Conflict found in reconciliation: FR-2.8 (owner decision OQ-5) covers requests that carry a session cookie; `SECURITY.md` first required the token on every state-changing request. Login, MFA verification, and registration have no session cookie.
-  - Alternatives: (a) require the token on all state-changing requests, which also blocks login CSRF; (b) require it only with a session cookie, as FR-2.8 states.
-  - Affected: SC-019, FR-2.8. Owner: owner.
+

@@ -40,7 +40,7 @@ implemented yet when it differs from the code.
 - **FR-2.5** The system MUST treat an unknown or expired session as no session, not as an error. (ADR 010, 020)
 - **FR-2.6** Logout MUST end the session. (ADR 010)
 - **FR-2.7** A logged-in user MUST be able to change the own password. (ADR 046)
-- **FR-2.8** The system MUST reject a state-changing request that carries a session cookie and has no valid CSRF token, whatever other headers it has (mechanism: SC-019). (ADR 046; Owner 2026-10-22, OQ-5)
+- **FR-2.8** The system MUST reject a state-changing request without a valid CSRF token, with or without a session cookie and whatever other headers it has (mechanism: SC-019). (ADR 046; Owner 2026-10-22, OQ-5 and OD-009)
 - **FR-2.9** An inactive account MUST NOT log in. (ADR 020)
 - **FR-2.10** At startup, the system MUST create the first ADMIN from the configured bootstrap credentials if the account does not exist. It MUST NOT change an existing account. (ADR 020)
 - **FR-2.11** The `/login` page MUST send a logged-in user to the overview. (ADR 081)
@@ -382,7 +382,7 @@ done and was removed. IDs are not reused.
 - **OQ-2** Cancelling a raid expires its locks; earlier cancellations unchanged → FR-10.4, FR-17.6, FR-17.7.
 - **OQ-3** New registrations become MEMBER; existing GUEST accounts stay → FR-4.5, FR-4.10.
 - **OQ-4** The server validates recruitment slot values → FR-23.4.
-- **OQ-5** CSRF token on every cookie-authenticated change, no header bypass → FR-2.8.
+- **OQ-5** CSRF token on every change, no header bypass; extended to requests without a session by OD-009 → FR-2.8.
 - **OQ-6** Statistics are public, including loot totals, no item lists or EP → FR-1.2, FR-27.
 - **OQ-7** Difficulty is tracked per boss through a kill log → FR-29.
 - **OQ-8** Daily encrypted off-server copy, monthly restore test → NFR-2.3, NFR-2.5.

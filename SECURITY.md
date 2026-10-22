@@ -17,7 +17,7 @@ and open security decisions. All security controls are written here; other files
   `db.rising-gods.de`, optionally via a Cloudflare Worker; personal data under GDPR (FR-30);
   production sets `ENV=production`, `COOKIE_SECURE=true`, `TRUST_PROXY_HEADERS=true`,
   `PUBLIC_ORIGIN` (deploy/README.md).
-- **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (T-001 to T-030).
+- **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (T-001 to T-041, all OWASP cheat-sheet techniques).
 - **Material gaps:** off-server backup storage and key holder (OQ-14, OD-007).
 - **Conflicts found:** the client address can be forged behind nginx (SC-006, fixed in PR #44);
   production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007); `main` is
@@ -247,7 +247,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** For the requests that FR-7.6 limits, one client address (SC-006) MUST NOT start more than 10 in 10 minutes. Answers served from the cache MUST NOT count. Further requests get HTTP 429 with a stable code. The counter is in memory (DR-9).
 - **Enforcement:** `GET /api/v1/external/rising-gods/characters`, `POST /api/v1/auth/registration-requests`; counter in `registration` or the HTTP layer.
-- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: none. Threats: T-016.
+- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: none. Threats: T-016, T-035.
 - **Verification:** The eleventh uncached visitor search within 10 minutes returns 429 without an upstream request; a logged-in user is not limited.
 
 **SC-029 - Worker access**
@@ -359,6 +359,13 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Evidence:** FR-2.3; today only per username and address. Depends on **OD-010**. Threats: T-002, T-003.
 - **Verification:** Defined by OD-010.
 
+**SC-044 - Emergency revocation and secret rotation**
+- **Status:** BLOCKED
+- **Rule:** An Admin MUST be able to end all sessions (of one player or of everyone) in one step, and `deploy/README.md` MUST describe how to rotate `ADMIN_PASSWORD`, the Worker token, the Cloudflare API token, and the TOTP key. Who acts, and what the incident steps are, is not decided.
+- **Enforcement:** `auth`; `deploy/README.md`.
+- **Evidence:** only account merge revokes sessions (`accountmerge.RevokeSourceAuth`); no rotation steps documented. Depends on **OD-015**. Threats: T-040, T-041.
+- **Verification:** After the emergency action every old session cookie returns 401; each rotation step was carried out once on a test setup.
+
 ## Open Security Decisions
 
 The owner decided OD-001 to OD-006, OD-008, and OD-009 on 2026-10-22; the answers are in the rules that
@@ -393,5 +400,8 @@ Open decisions from the threat model (`THREAT_MODEL.md`):
   - Owner: owner.
 - **OD-014** Account recovery (SC-042; T-026).
   - Choice: how an Admin verifies a person who lost their password (for example a code sent in game to their main character, as for registration) before setting a new one.
+  - Owner: owner.
+- **OD-015** Incident response and continuity (SC-044; T-040, T-041).
+  - Missing: who besides the owner can act in an emergency (a second Admin or a sealed copy of the keys), and the steps when a compromise is suspected (end sessions, rotate secrets, stop deploys, restore).
   - Owner: owner.
 

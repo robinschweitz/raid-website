@@ -376,6 +376,7 @@ the requirements marked "Owner 2026-10-22". NFR-2.4 (delete the pre-migration-06
 done and was removed. IDs are not reused.
 
 - **OQ-14** DEFERRED. Off-server backup (NFR-2.3): Which storage, and who holds the encryption key? Blocks only NFR-2.3.
+- **OQ-15** Access to one's own data (THREAT_MODEL T-038): May a member see, or download, the data the site stores about them (account, characters, signups, loot, EP history), and how: a page, a download, or on request to the Admin?
 
 ### Resolved (2026-10-22)
 

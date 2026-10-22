@@ -8,27 +8,35 @@ specification and code of v1.0.27 and the `deploy/` templates as of 2026-10-22.
 ## Method
 
 The Manicode bootstrap (step 08) runs a private threat-modeling pipeline
-(`aegis/security-utilities-knowledge/content/pipelines/threat-modeling`, stages 00–11). That
-pipeline is not available to this project. Its stages were followed by hand:
+(`aegis/security-utilities-knowledge/content/pipelines/threat-modeling`, stages 00–11) that is not
+available to this project. Instead, every technique in the OWASP Threat Modeling Cheat Sheet
+("Choosing a threat modeling technique") was applied, each from its own angle, and the results
+were merged into one register:
 
-| Stage | Covered in |
-| --- | --- |
-| 00 Scope and assumptions | [Scope](#scope) |
-| 01 Assets | [Assets](#assets) |
-| 02 Actors and entry points | [Actors and entry points](#actors-and-entry-points) |
-| 03 Data flow and trust boundaries | [Data flow](#data-flow), `ARCHITECTURE.md` TB-1 to TB-7 |
-| 04 STRIDE per element | [Threat register](#threat-register), category column |
-| 05 Abuse cases per role | Threat register, "Actor" field |
-| 06 Implementation evidence | [Implementation evidence](#implementation-evidence) |
-| 07 Privacy (LINDDUN categories) | Threats T-011, T-022 to T-024 |
-| 08 Consolidation | One register; duplicates merged |
-| 09–10 Diagrams | [Diagrams](#diagrams) |
-| 11 Report | This file |
+| Technique | Angle | Section |
+| --- | --- | --- |
+| DFD | System model: entities, processes, stores, flows, boundaries | [DFD elements](#dfd-elements) |
+| STRIDE | Technical threats per DFD element | [STRIDE per element](#stride-per-element) |
+| Attack trees | Paths to the four highest-value attacker goals | [Attack trees](#attack-trees) |
+| Misuse and abuse cases | Valid workflows used out of order, repeatedly, concurrently, or for unintended results | [Misuse and abuse cases](#misuse-and-abuse-cases) |
+| LINDDUN | Privacy harms STRIDE does not cover | [LINDDUN](#linddun) |
+| PASTA | Business objectives → technical threats → business impact | [PASTA](#pasta) |
+| OCTAVE | Organisation-wide risk to critical assets: people and process | [OCTAVE](#octave) |
+| VAST | Split into application and operational threat models | `VAST` column in [Coverage](#coverage) |
+| Brainstorming | Shared vocabulary with the owner | [Brainstorming](#brainstorming) |
+| Shostack responses | Mitigate, Eliminate, Transfer, or Accept per threat | `Response` column in [Coverage](#coverage) |
+| Review and validation | The cheat sheet's stakeholder checklist | [Review and validation](#review-and-validation) |
+
+The Manicode stages map onto these: 00 [Scope](#scope), 01 [Assets](#assets), 02
+[Actors](#actors-and-entry-points), 03 DFD, 04 STRIDE, 05 abuse cases, 06
+[Implementation evidence](#implementation-evidence), 07 LINDDUN, 08 the single register,
+09–10 [Diagrams](#diagrams), 11 this file.
 
 Rules: missing information is an evidence gap, not a vulnerability. No numeric risk scores are
-assigned. Each threat has a **status**: `MITIGATED` (controls exist and are verified in code),
-`PARTIAL` (some controls exist or a fix is pending), `OPEN` (a rule exists or is planned but is not
-built), `DECISION` (needs an owner decision, linked `OD-*`), or `ACCEPTED` (the owner accepted it).
+assigned; PASTA impact is described in words. Each threat has a **status**: `MITIGATED` (controls
+exist and are verified in code), `PARTIAL` (some controls exist or a fix is pending), `OPEN` (a
+rule exists or is planned but is not built), `DECISION` (needs an owner decision, linked `OD-*` or
+`OQ-*`), or `ACCEPTED` (the owner accepted it).
 
 ## Scope
 
@@ -284,6 +292,81 @@ The components, flows, and trust boundaries are those in `ARCHITECTURE.md` ("Mai
   the same host; the off-server copy is deferred.
 - **Status:** DECISION — OD-007. **Controls:** SC-034; NFR-2.3.
 
+### Business-rule abuse (misuse cases)
+
+**T-031 — One player locks every valuable item**
+- **Category:** Tampering (fairness). **Actor:** MEMBER with 150 or more EP. **Asset:** A-2.
+- **Scenario:** Locks cost nothing and a player may hold several (FR-17.2, FR-17.3), so a rich
+  player can lock many items of one raid; competing locks are then rejected.
+- **Status:** ACCEPTED — owner rule ADR 012 / ADR 017.
+
+**T-032 — Concurrent or repeated writes charge or award twice**
+- **Category:** Tampering. **Actor:** staff (double click, retry, two staff importing at once).
+- **Evidence:** `request_id` idempotency for enhanced awards (FR-14.6), raid-scoped import keys
+  (FR-20.7), quick-add receipts (FR-13.6), idempotent archive (FR-10.9), one SQLite connection.
+- **Status:** MITIGATED.
+
+**T-033 — Acting after a deadline**
+- **Category:** Tampering. **Actor:** MEMBER changing a signup or absence after the raid started.
+- **Evidence:** deadlines use the server's UTC clock on every request (FR-12.2, FR-12.9).
+- **Status:** MITIGATED.
+
+**T-034 — Quietly rewriting archived history**
+- **Category:** Tampering, Repudiation. **Actor:** staff.
+- **Evidence:** archived corrections need a reason, keep finalisation fixed, and are audited
+  (FR-13.12, FR-26.5).
+- **Status:** MITIGATED.
+
+**T-035 — Registration request flooding**
+- **Category:** Denial of service. **Actor:** visitor. **Asset:** Admin attention, A-7.
+- **Evidence:** one open request per Rising-Gods profile (FR-4.2); no rate limit yet.
+- **Status:** OPEN. **Controls:** SC-028.
+
+**T-036 — Using the EP floor to keep points**
+- **Category:** Tampering. **Actor:** staff together with a player.
+- **Scenario:** A correction that would take a player below 0 forgives the rest (FR-16.6), so a
+  spend-then-correct sequence can leave points that a normal history would not.
+- **Evidence:** staff see a warning and the forgiven amount is audited (FR-16.8).
+- **Status:** ACCEPTED — owner decision of 2026-10-22; staff are trusted (T-019).
+
+### Privacy (LINDDUN)
+
+**T-037 — Members are not told what is stored (Unawareness)**
+- **Category:** LINDDUN Unawareness. **Asset:** A-4.
+- **Evidence:** the privacy page is specified (FR-30.1) but not built.
+- **Status:** OPEN.
+
+**T-038 — Members cannot see or get their own data (Unintervenability)**
+- **Category:** LINDDUN Unintervenability. **Asset:** A-4.
+- **Scenario:** A member can ask for anonymisation (FR-30.5) but has no way to see or export the
+  data stored about them; GDPR gives a right of access and portability.
+- **Evidence:** no export or "my data" view in the spec or the code.
+- **Status:** DECISION — OQ-15.
+
+**T-039 — Retention conflicts with storage limitation (Non-compliance)**
+- **Category:** LINDDUN Non-compliance. **Asset:** A-3, A-4.
+- **Scenario:** The audit log keeps personal data without a time limit (FR-30.4), and no legal
+  review of the privacy setup has happened.
+- **Status:** ACCEPTED — owner decision OQ-12; a legal review stays recommended.
+
+### Organisation (OCTAVE)
+
+**T-040 — Everything depends on one person**
+- **Category:** Availability, Elevation (people and process). **Asset:** A-5, A-6, A-8.
+- **Scenario:** The owner is the only maintainer and holds the GitHub, Cloudflare, and host access
+  and the planned backup and TOTP keys. If that person is unavailable or their accounts are
+  compromised, nobody can restore, rotate, or even notice.
+- **Status:** DECISION — OD-015.
+
+**T-041 — No plan for a suspected compromise**
+- **Category:** Repudiation, Elevation (process). **Asset:** all.
+- **Scenario:** There is no written incident procedure, no Admin action to end every session at
+  once, and no documented way to rotate `ADMIN_PASSWORD`, the Worker token, the Cloudflare token,
+  or the planned TOTP key.
+- **Evidence:** only account merge revokes sessions (`accountmerge.RevokeSourceAuth`); no
+  rotation steps in `deploy/README.md`.
+- **Status:** DECISION — OD-015.
+
 ## Implementation evidence
 
 Unlike the Manicode playbook's empty repository, an implementation exists. It was reviewed for the
@@ -302,45 +385,217 @@ API usage, and the installed state of the production host.
   findings rely on the templates.
 - **Gap:** who has push access to the repository could not be read (the API path is not available
   to this review).
+- **Gap:** no incident procedure or secret-rotation steps exist (T-041).
 - **Gap:** the Hetzner provider snapshot policy mentioned in `deploy/README.md` is not documented
   as active (OD-007).
+
+## DFD elements
+
+| Kind | Elements |
+| --- | --- |
+| External entities | Visitor and member browsers; foreign websites; players with addon text; Rising-Gods; Cloudflare Worker; GitHub (repository, Actions); `wow.zamimg.com` (until DQ-2) |
+| Processes | nginx; Go application (middleware, handlers, domain services); build user (`raiddeploy`); root publisher; backup and verify jobs; Worker |
+| Data stores | SQLite database; host snapshots; off-server copy (planned); environment files (`/etc/raid-website*.env`); GitHub secrets; Cloudflare secrets; browser cookies and `localStorage` |
+| Flows | The five flows in `ARCHITECTURE.md` "Main data flows", plus deploy (GitHub → build → publish) and backup (database → snapshot → off-server) |
+| Boundaries | TB-1 to TB-7 in `ARCHITECTURE.md` |
+
+## STRIDE per element
+
+Threat IDs per element and category; "—" means the category was checked and nothing material was
+found.
+
+| Element | S | T | R | I | D | E |
+| --- | --- | --- | --- | --- | --- | --- |
+| Browser → nginx (TB-1) | T-001, T-002, T-007 | — | — | — | T-003, T-016, T-017 | — |
+| nginx → application (TB-2) | T-001, T-008 | — | — | — | T-017 | — |
+| Authentication (`auth`) | T-002, T-005, T-006, T-010, T-026 | — | T-021 | T-004 | T-003 | T-020 |
+| Domain services and API | — | T-018, T-027, T-031 to T-034, T-036 | T-019 | T-023 | T-035 | T-009 |
+| Rising-Gods / Worker (TB-4) | T-015 | — | — | — | T-016 | — |
+| Addon text (TB-5) | — | T-018 | — | — | — | — |
+| SQLite and snapshots (TB-6) | — | — | T-021 | T-011, T-022 | T-030 | — |
+| Build and deploy (TB-7) | — | T-012, T-013, T-014, T-028 | — | T-014 | — | T-012, T-013, T-029 |
+| Third-party image host | — | — | — | T-024 | — | — |
+| Organisation | — | — | T-041 | — | T-040 | T-040, T-041 |
+
+## Attack trees
+
+OR = any child is enough; AND = all children are needed.
+
+```mermaid
+flowchart TD
+  G1["Goal 1: control an Admin account"] --> O1{OR}
+  O1 --> A1["Guess the password"] --> O1a{OR}
+  O1a --> A1a["Forge client address to bypass the limit — T-001"]
+  O1a --> A1b["Spread guesses over many addresses — T-002"]
+  O1 --> A2["Pass MFA too"] --> O2{OR}
+  O2 --> A2a["No MFA on the Admin — T-020"]
+  O2 --> A2b["Guess the 6-digit code — T-005"]
+  O2 --> A2c["Replay a seen code — T-006"]
+  O1 --> A3["Steal a session — T-009, T-010"]
+  O1 --> A4["Talk an Admin into a password reset — T-026"]
+  O1 --> A5["Ship code that grants it — see Goal 3"]
+```
+
+```mermaid
+flowchart TD
+  G2["Goal 2: unfair EP or loot standing"] --> O{OR}
+  O --> B1["Staff record or correct loot dishonestly — T-019, T-036 (audited)"]
+  O --> B2["Hoard items with free locks — T-031 (accepted rule)"]
+  O --> B3["Double charge or double award by retries — T-032 (mitigated)"]
+  O --> B4["Rewrite archived history — T-034 (reason + audit)"]
+  O --> B5["Take over a staff or Admin account — Goal 1"]
+  O --> B6["Edit the database or a backup — T-011, T-029"]
+```
+
+```mermaid
+flowchart TD
+  G3["Goal 3: run code on the production host"] --> O{OR}
+  O --> C1["Get a commit onto main"] --> OC{OR}
+  OC --> C1a["Push directly: main unprotected — T-012"]
+  OC --> C1b["Compromise the owner's GitHub account — T-012, T-040"]
+  OC --> C1c["Malicious dependency or Action — T-014, T-028"]
+  C1 --> W["…then wait at most one hour for the automatic deploy (ADR 072)"]
+  O --> C2["Tamper with the unreviewed deploy scripts — T-013"]
+  O --> C3["Break into the host over SSH or a package — T-029"]
+```
+
+```mermaid
+flowchart TD
+  G4["Goal 4: take the site down on raid night"] --> O{OR}
+  O --> D1["Hold connections open — T-017"]
+  O --> D2["Burn CPU with logins — T-003"]
+  O --> D3["Get the guild blocked by Rising-Gods — T-016, T-035"]
+  O --> D4["Destroy the host, no off-server copy — T-030"]
+  O --> D5["Deploy a broken build — T-012"]
+```
+
+## Misuse and abuse cases
+
+Each valid workflow was checked for use out of order, repeatedly, concurrently, and for an
+unintended result. Findings are T-031 to T-036; checked without a new finding:
+
+| Workflow | Out of order | Repeated | Concurrent | Unintended result |
+| --- | --- | --- | --- | --- |
+| Archive raid | Rejected without series, start, or full roster (FR-10.7) | Idempotent (FR-10.9) | Serialized writes | — |
+| Enhanced loot | Needs roster recipient (FR-14.3) | `request_id` (FR-14.6) | One connection | EP floor: T-036 |
+| Addon import | Preview before apply (FR-20.3) | Raid-scoped keys (FR-20.7) | Same | Moves no awards (FR-20.11) |
+| Item lock | Rejected on closed raids (FR-17.5) | Competing lock rejected (FR-17.3) | Atomic check | Hoarding: T-031 |
+| Signup / absence | Server deadline (FR-12.2, FR-12.9) | Edits replace the choice | — | — |
+| Registration | Code only after Admin action (FR-4.3) | One open request per profile (FR-4.2) | Insert trigger | Flooding: T-035 |
+| Character claim | Code delivered in game | Single-use codes (SC-013) | — | — |
+| Merges, transfers | Admin only, reason | Conflicts rejected (FR-5.6, FR-6.9, FR-6.11) | Transaction | — |
+| Poll vote | Closed polls rejected (FR-24.4) | One vote per player (FR-24.3) | Upsert | — |
+
+## LINDDUN
+
+| Category | Finding |
+| --- | --- |
+| Linking | Login ↔ player ↔ Rising-Gods profile is linkable only by Admins (FR-1.3, FR-5.2); public data links characters to raids (T-023). |
+| Identifying | Character names are public in game and on the site (T-023, accepted); anonymisation keeps them (FR-30.3). |
+| Non-repudiation | The audit log permanently attributes every change to a person — useful for integrity, a privacy cost (T-039). |
+| Detecting | Public attendance reveals who raided when (T-023); third-party image requests reveal visits (T-024). |
+| Data disclosure | Plaintext TOTP secrets and unencrypted snapshots (T-011); never-pruned login attempts with addresses (T-022). |
+| Unawareness | No privacy notice yet (T-037). |
+| Unintervenability | No access or export for members (T-038); anonymisation only through an Admin (FR-30.5). |
+| Non-compliance | Unlimited audit retention, no legal review (T-039). |
+
+## PASTA
+
+1. **Business objectives:** a fair, trusted EP and loot record (A-2); members can sign up and see
+   standings on raid nights (A-7); low effort for one volunteer maintainer; GDPR-respectful
+   handling of members' data (A-4).
+2. **Technical scope:** see [Scope](#scope) and `ARCHITECTURE.md`.
+3. **Decomposition:** [DFD elements](#dfd-elements).
+4. **Threat analysis:** the attacker goals in [Attack trees](#attack-trees).
+5. **Weakness analysis:** the `not compliant` evidence in `SECURITY.md` and the gaps in
+   [Conflicts and evidence gaps](#conflicts-and-evidence-gaps).
+6. **Attack modeling:** [Attack trees](#attack-trees) and the T-001 sequence diagram.
+7. **Business impact (in words, no scores):**
+   - Losing the fairness record or trust in it (Goal 2, T-012, T-030) would undermine the guild's
+     loot system itself; this is the most damaging outcome.
+   - An Admin takeover (Goal 1) gives full control over accounts and history.
+   - Code on production (Goal 3) gives all of the above plus the secrets; today the shortest path is
+     T-012.
+   - Raid-night outages (Goal 4) are annoying but recoverable if backups exist off-server.
+   - Privacy failures (T-022, T-037 to T-039) are compliance and trust problems rather than
+     operational ones.
+
+## OCTAVE
+
+- **Critical assets:** A-2 (fairness record), A-5 (deployment path), A-1 (Admin accounts).
+- **Threat profiles (people and process):** single maintainer and key holder (T-040); no incident
+  procedure, no global session revocation, no secret rotation steps (T-041); account recovery
+  without identity check (T-026); unprotected `main` (T-012).
+- **Current practices that work:** unattended upgrades and scheduled reboots, sandboxed services,
+  verified snapshots, ADRs and audit log as a record of decisions and changes.
+- **Strategy:** protect the deployment path first (SC-039, SC-037), then Admin accounts (SC-040,
+  SC-043), then recovery and continuity (OD-007, OD-015).
+
+## Brainstorming
+
+The owner question passes of 2026-10-22 (OQ-*, DQ-*, AQ-*, OD-*) served as the brainstorming
+round: each was explained in plain language and answered by the owner. The threat model reuses
+that shared vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare key" backups).
+
+## Review and validation
+
+The cheat sheet's stakeholder checks:
+
+| Check | Result |
+| --- | --- |
+| Does the DFD match the system? | Yes for code and templates; the installed host was not inspected (gap). |
+| Are all threats identified? | All seven techniques applied; per-domain service code was not read line by line (gap). |
+| Does every threat have an agreed response? | Yes — `Response` column; DECISION items wait for the owner. |
+| Are mitigations testable and measurable? | Yes — every SC rule has a **Verification** field. |
+| Is the model kept up to date? | `AGENTS.md` lists this file as the owner of threats; new features add or update T entries. |
 
 ## Coverage
 
 ### Threats to controls
 
-| Threat | Status | Controls and decisions |
-| --- | --- | --- |
-| T-001 | PARTIAL | SC-006, SC-008 |
-| T-002 | DECISION | SC-008, SC-043, OD-010 |
-| T-003 | DECISION | SC-009, SC-043, OD-010 |
-| T-004 | OPEN | SC-009 |
-| T-005 | OPEN | SC-010, SC-011 |
-| T-006 | OPEN | SC-012 |
-| T-007 | OPEN | SC-019 |
-| T-008 | OPEN | SC-007 |
-| T-009 | MITIGATED | SC-016, SC-022, SC-024 |
-| T-010 | OPEN | SC-017, SC-018 |
-| T-011 | OPEN / DECISION | SC-014, SC-034, SC-035, OD-007 |
-| T-012 | DECISION | SC-036, SC-039, OD-011 |
-| T-013 | OPEN | SC-037 |
-| T-014 | OPEN | SC-036 |
-| T-015 | MITIGATED | SC-029 |
-| T-016 | OPEN | SC-027, SC-028 |
-| T-017 | OPEN | SC-026 |
-| T-018 | MITIGATED | SC-020, SC-022 |
-| T-019 | ACCEPTED | SC-031 |
-| T-020 | DECISION | SC-040, OD-012 |
-| T-021 | DECISION | SC-041, OD-013 |
-| T-022 | OPEN | SC-038 |
-| T-023 | ACCEPTED | SC-004 |
-| T-024 | OPEN | SC-024 |
-| T-025 | ACCEPTED | SC-013 |
-| T-026 | DECISION | SC-042, OD-014 |
-| T-027 | MITIGATED | SC-020, SC-021, SC-024 |
-| T-028 | DECISION | SC-036, SC-039, OD-011 |
-| T-029 | PARTIAL | SC-025, SC-035, SC-037 |
-| T-030 | DECISION | SC-034, OD-007 |
+| Threat | Status | Response | VAST | Controls and decisions |
+| --- | --- | --- | --- | --- |
+| T-001 | PARTIAL | Mitigate | App | SC-006, SC-008 |
+| T-002 | DECISION | Mitigate | App | SC-008, SC-043, OD-010 |
+| T-003 | DECISION | Mitigate | App | SC-009, SC-043, OD-010 |
+| T-004 | OPEN | Mitigate | App | SC-009 |
+| T-005 | OPEN | Mitigate | App | SC-010, SC-011 |
+| T-006 | OPEN | Mitigate | App | SC-012 |
+| T-007 | OPEN | Mitigate | App | SC-019 |
+| T-008 | OPEN | Mitigate | App | SC-007 |
+| T-009 | MITIGATED | Mitigate | App | SC-016, SC-022, SC-024 |
+| T-010 | OPEN | Mitigate | App | SC-017, SC-018 |
+| T-011 | OPEN / DECISION | Mitigate | App + Ops | SC-014, SC-034, SC-035, OD-007 |
+| T-012 | DECISION | Mitigate | Ops | SC-036, SC-039, OD-011 |
+| T-013 | OPEN | Mitigate | Ops | SC-037 |
+| T-014 | OPEN | Mitigate | Ops | SC-036 |
+| T-015 | MITIGATED | Mitigate | Ops | SC-029 |
+| T-016 | OPEN | Mitigate | App | SC-027, SC-028 |
+| T-017 | OPEN | Mitigate | App | SC-026 |
+| T-018 | MITIGATED | Mitigate | App | SC-020, SC-022 |
+| T-019 | ACCEPTED | Accept | App | SC-031 |
+| T-020 | DECISION | Mitigate | App | SC-040, OD-012 |
+| T-021 | DECISION | Mitigate | App + Ops | SC-041, OD-013 |
+| T-022 | OPEN | Eliminate | App | SC-038 |
+| T-023 | ACCEPTED | Accept | App | SC-004 |
+| T-024 | OPEN | Eliminate | App | SC-024 |
+| T-025 | ACCEPTED | Accept | App | SC-013 |
+| T-026 | DECISION | Mitigate | Ops | SC-042, OD-014 |
+| T-027 | MITIGATED | Mitigate | App | SC-020, SC-021, SC-024 |
+| T-028 | DECISION | Mitigate | Ops | SC-036, SC-039, OD-011 |
+| T-029 | PARTIAL | Mitigate | Ops | SC-025, SC-035, SC-037 |
+| T-030 | DECISION | Transfer or Mitigate | Ops | SC-034, OD-007 |
+| T-031 | ACCEPTED | Accept | App | FR-17.2, FR-17.3 |
+| T-032 | MITIGATED | Mitigate | App | FR-10.9, FR-13.6, FR-14.6, FR-20.7 |
+| T-033 | MITIGATED | Mitigate | App | FR-12.2, FR-12.9 |
+| T-034 | MITIGATED | Mitigate | App | FR-13.12, FR-26.5 |
+| T-035 | OPEN | Mitigate | App | SC-028 |
+| T-036 | ACCEPTED | Accept | App | FR-16.6, FR-16.8 |
+| T-037 | OPEN | Mitigate | App | FR-30.1 |
+| T-038 | DECISION | Mitigate | App | OQ-15 |
+| T-039 | ACCEPTED | Accept | Ops | FR-30.4 |
+| T-040 | DECISION | Mitigate | Ops | OD-015 |
+| T-041 | DECISION | Mitigate | Ops | SC-044, OD-015 |
 
 ### Trust boundaries to threats
 
@@ -348,12 +603,13 @@ API usage, and the installed state of the production host.
 | --- | --- |
 | TB-1 Internet → proxy | T-001, T-003, T-016, T-017 |
 | TB-2 Proxy → application | T-001, T-008 |
-| TB-3 Browser → API | T-002 to T-007, T-009, T-010, T-019, T-020, T-023, T-026, T-027 |
+| TB-3 Browser → API | T-002 to T-007, T-009, T-010, T-019, T-020, T-023, T-026, T-027, T-031 to T-036, T-038 |
 | TB-4 Application → Rising-Gods | T-015, T-016, T-025 |
 | TB-5 Addon text → application | T-018 |
 | TB-6 Application → database and snapshots | T-011, T-021, T-022, T-030 |
 | TB-7 Build and deploy | T-012, T-013, T-014, T-028, T-029 |
 | Third-party browser requests | T-024 |
+| Organisation (no technical boundary) | T-037, T-039, T-040, T-041 |
 
 ### Rules without a threat
 

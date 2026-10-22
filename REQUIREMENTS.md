@@ -44,6 +44,9 @@ implemented yet when it differs from the code.
 - **FR-2.9** An inactive account MUST NOT log in. (ADR 020)
 - **FR-2.10** At startup, the system MUST create the first ADMIN from the configured bootstrap credentials if the account does not exist. It MUST NOT change an existing account. (ADR 020)
 - **FR-2.11** The `/login` page MUST send a logged-in user to the overview. (ADR 081)
+- **FR-2.12** A session that has not been used for 7 days MUST end. The user MUST log in again. (Owner 2026-10-22, OD-008)
+- **FR-2.13** Changing the own password MUST log out all other devices of the user and MUST keep the current device logged in. (Owner 2026-10-22, OD-001)
+- **FR-2.14** When an ADMIN changes a player's password, login name, or role, all sessions of that player MUST end. (Owner 2026-10-22, OD-001)
 
 ### 3. Multi-factor authentication
 
@@ -55,6 +58,7 @@ implemented yet when it differs from the code.
 - **FR-3.6** An MFA challenge MUST expire after 5 minutes. (code; Owner 2026-10-22, review)
 - **FR-3.7** The login response MUST list only the factors that the account has configured. The UI MUST show only these factors. (ADR 047)
 - **FR-3.8** If the account has a security key and the browser supports WebAuthn, the UI MUST offer the security key first. Code login MUST stay available as a fallback only when the account has TOTP or recovery codes. (ADR 047)
+- **FR-3.9** After 5 wrong codes in one MFA challenge, the user MUST start again with the password. (Owner 2026-10-22, OD-002)
 
 ### 4. Registration and character claiming
 
@@ -103,7 +107,7 @@ implemented yet when it differs from the code.
 - **FR-7.3** The system MUST query Rising-Gods only for a user request. It MUST NOT warm a cache in the background. (ADR 049)
 - **FR-7.4** The system MUST load the selected profile again before it stores a character. (ADR 044)
 - **FR-7.5** When Rising-Gods is unavailable, the system MUST answer with HTTP 502 `rising_gods_unavailable`. User-facing errors MUST stay generic. (ADR 049, 053)
-- **FR-7.6** The system MUST limit how many Rising-Gods searches a visitor without a session can start per time period. Logged-in users MUST NOT be limited. The limit value is owned by `SECURITY.md`. (Owner 2026-10-22, review)
+- **FR-7.6** The system MUST limit how many Rising-Gods searches a visitor without a session can start per time period. Registration requests count toward the same limit. Logged-in users MUST NOT be limited. The limit value is owned by `SECURITY.md` (SC-028). (Owner 2026-10-22, review)
 
 ### 8. Guild configuration
 

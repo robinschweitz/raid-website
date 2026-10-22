@@ -18,10 +18,9 @@ and open security decisions. All security controls are written here; other files
   production sets `ENV=production`, `COOKIE_SECURE=true`, `TRUST_PROXY_HEADERS=true`,
   `PUBLIC_ORIGIN` (deploy/README.md).
 - **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`.
-- **Material gaps:** off-server backup storage and key holder (OQ-14); several limit values
-  (OD-002, OD-004, OD-005, OD-008).
-- **Conflicts found:** the client address can be forged behind nginx (SC-006); production does
-  not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007).
+- **Material gaps:** off-server backup storage and key holder (OQ-14, OD-007).
+- **Conflicts found:** the client address can be forged behind nginx (SC-006, fixed in PR #44);
+  production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007).
 
 ## Selected Manicode Prompts
 
@@ -84,7 +83,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** With `TRUST_PROXY_HEADERS=true`, the client address MUST come from `X-Real-IP`, which nginx overwrites with `$remote_addr`. The leftmost `X-Forwarded-For` entry MUST NOT be used, because nginx appends to a client-supplied value. Without trusted proxy mode, `RemoteAddr` is used.
 - **Enforcement:** `clientAddress` in `internal/httpapi/v1/security.go`; `deploy/nginx/raid-website.conf`.
-- **Evidence:** FR-2.3, FR-7.6, ADR 046. Code: **not compliant** — it returns the first `X-Forwarded-For` entry, so any visitor can choose their own address and bypass the login rate limit.
+- **Evidence:** FR-2.3, FR-7.6, ADR 046. Code: **not compliant** on `main` — it returns the first `X-Forwarded-For` entry, so any visitor can choose their own address and bypass the login rate limit. Fixed in PR #44.
 - **Verification:** Six failed logins with six different forged `X-Forwarded-For` values from one connection are blocked at the sixth.
 
 **SC-007 - WebAuthn relying party from configuration**
@@ -116,11 +115,11 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Verification:** A challenge older than 5 minutes or already used is rejected; no `raid_session` cookie before the second factor.
 
 **SC-011 - MFA guess limit**
-- **Status:** BLOCKED
-- **Rule:** Wrong TOTP or recovery codes for one challenge MUST be limited; after the limit the challenge MUST be invalidated. Blocked on the limit value.
-- **Enforcement:** `auth.VerifyMFAChallenge`.
-- **Evidence:** V6. Code: no limit — a challenge accepts unlimited guesses for 5 minutes. Depends on **OD-002**.
-- **Verification:** After the limit, the correct code for that challenge is rejected.
+- **Status:** ACTIVE
+- **Rule:** One MFA challenge MUST accept at most 5 wrong TOTP or recovery codes. The fifth wrong code MUST invalidate the challenge, so the user starts again at the password step, which SC-008 limits.
+- **Enforcement:** `auth.VerifyMFAChallenge`; the challenge row counts failures.
+- **Evidence:** FR-3.9, V6, OD-002 (Owner 2026-10-22, OD-002). Code: **not compliant** — no limit today.
+- **Verification:** After 5 wrong codes, the correct code for that challenge is rejected and a new password login is needed.
 
 **SC-012 - TOTP codes used once**
 - **Status:** ACTIVE
@@ -136,12 +135,12 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Evidence:** FR-3.3, FR-4.4, ADR 040. Code: compliant.
 - **Verification:** The database holds no plaintext code; a second redemption fails.
 
-**SC-014 - TOTP secrets at rest**
-- **Status:** BLOCKED
-- **Rule:** TOTP secrets in the database and in backups need a protection decision. Blocked on the decision.
-- **Enforcement:** `mfa_settings.totp_secret`.
-- **Evidence:** V11, V14. Code: stored as plaintext, so anyone with a database copy can generate valid codes. Depends on **OD-003**.
-- **Verification:** Defined by OD-003.
+**SC-014 - TOTP secrets encrypted at rest**
+- **Status:** ACTIVE
+- **Rule:** TOTP secrets MUST be stored encrypted with a 256-bit key that comes only from the environment file (`TOTP_ENCRYPTION_KEY`), never from the database or repository. PROPOSED algorithm: AES-256-GCM from the Go standard library with a random nonce per secret. Existing plaintext secrets MUST be encrypted once at startup. With TOTP in use, production MUST NOT start without the key.
+- **Enforcement:** `auth` MFA settings repository; `internal/config`.
+- **Evidence:** V11, V14, OD-003 (Owner 2026-10-22, OD-003). Code: **not compliant** — stored as plaintext.
+- **Verification:** The `totp_secret` column holds no base32 secret; a login with a valid code still works; startup without the key fails while a TOTP setup exists.
 
 **SC-015 - Re-authentication for security changes**
 - **Status:** ACTIVE
@@ -160,18 +159,18 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Verification:** Cookie attributes in an HTTP test; the database holds no plaintext token; a logged-out cookie returns 401.
 
 **SC-017 - Ending other sessions**
-- **Status:** BLOCKED
-- **Rule:** Which events end a player's other sessions is not decided. Account merge (source) and anonymisation always end all sessions of that player.
-- **Enforcement:** `auth`, `accountmerge`.
-- **Evidence:** FR-5.4, FR-30.2. Code: merge compliant; password change and Admin credential change keep other sessions. Depends on **OD-001**.
-- **Verification:** Defined by OD-001.
+- **Status:** ACTIVE
+- **Rule:** Changing the own password MUST end all other sessions of the player and keep the current one. An Admin setting a player's password, login name, or role MUST end all sessions of that player. Account merge (source) and anonymisation MUST end all sessions of that player. Disabling MFA does not end sessions.
+- **Enforcement:** `auth.ChangeOwnPassword`, the Admin account write in `registration`/`auth`, `accountmerge`.
+- **Evidence:** FR-2.13, FR-2.14, FR-5.4, FR-30.2, OD-001 (Owner 2026-10-22, OD-001). Code: merge compliant; password and Admin changes **not compliant**.
+- **Verification:** After a password change, a second session cookie returns 401 and the current one still works.
 
 **SC-018 - Session lifetime**
-- **Status:** BLOCKED
-- **Rule:** Sessions last at most 30 days (FR-2.4). Whether an idle timeout applies as well is not decided.
-- **Enforcement:** `auth` session validation.
-- **Evidence:** FR-2.4, V7. Depends on **OD-008**.
-- **Verification:** Defined by OD-008.
+- **Status:** ACTIVE
+- **Rule:** A session MUST end 30 days after login at the latest, and MUST end earlier when it has not been used for 7 days. Each authenticated request resets the idle clock; updating the last-use time at most once per hour is enough.
+- **Enforcement:** `auth` session validation; a last-used timestamp on `sessions`.
+- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (Owner 2026-10-22, OD-008). Code: 30-day maximum compliant; idle timeout **not built**.
+- **Verification:** A session unused for 7 days and 1 minute returns 401; a session used daily stays valid until day 30.
 
 **SC-019 - CSRF protection**
 - **Status:** ACTIVE
@@ -227,11 +226,11 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Verification:** Startup with a non-loopback `LISTEN_ADDR` and `ENV=production` fails.
 
 **SC-026 - HTTP server limits**
-- **Status:** BLOCKED
-- **Rule:** The Go server MUST set read-header, read, write, and idle timeouts and shut down gracefully on SIGTERM. Blocked on the values.
-- **Enforcement:** `cmd/server/main.go`.
-- **Evidence:** NFR-4.2, ARCHITECTURE "Server lifecycle". Code: none set. Depends on **OD-005**.
-- **Verification:** A connection that sends headers slower than the limit is closed; a restart lets a running request finish.
+- **Status:** ACTIVE
+- **Rule:** The Go server MUST set `ReadHeaderTimeout` 10 s, `ReadTimeout` 30 s, `WriteTimeout` 60 s, and `IdleTimeout` 120 s, and on SIGTERM MUST stop accepting connections and give running requests 25 s to finish (systemd stops the service after 30 s).
+- **Enforcement:** `cmd/server/main.go` (`http.Server`, `Shutdown`).
+- **Evidence:** NFR-4.2, ARCHITECTURE "Server lifecycle", OD-005 (Owner 2026-10-22, OD-005). Code: **not compliant** — `http.ListenAndServe` without limits.
+- **Verification:** A client that sends headers slower than 10 s is disconnected; a request running during `systemctl restart` completes.
 
 ### External systems (V4, V12, V13)
 
@@ -243,11 +242,11 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Verification:** A pasted URL with another host is rejected without an outbound request.
 
 **SC-028 - Visitor lookup limit**
-- **Status:** BLOCKED
-- **Rule:** Rising-Gods searches started without a session MUST be limited per client address (SC-006), counted in memory (DR-9). Blocked on the value and scope.
-- **Enforcement:** `GET /api/v1/external/rising-gods/characters` and the public registration endpoints.
-- **Evidence:** FR-7.6, AQ-7. Code: none. Depends on **OD-004**.
-- **Verification:** Defined by OD-004.
+- **Status:** ACTIVE
+- **Rule:** Without a session, one client address (SC-006) MUST NOT start more than 10 requests in 10 minutes that can reach Rising-Gods: character searches and registration requests together. Answers served from the cache MUST NOT count. Further requests get HTTP 429 with a stable code. The counter is in memory (DR-9). Logged-in users are not limited.
+- **Enforcement:** `GET /api/v1/external/rising-gods/characters`, `POST /api/v1/auth/registration-requests`; counter in `registration` or the HTTP layer.
+- **Evidence:** FR-7.6, AQ-7, OD-004 (Owner 2026-10-22, OD-004). Code: none.
+- **Verification:** The eleventh uncached visitor search within 10 minutes returns 429 without an upstream request; a logged-in user is not limited.
 
 **SC-029 - Worker access**
 - **Status:** ACTIVE
@@ -304,34 +303,16 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-036 - Dependencies and CI**
 - **Status:** ACTIVE
-- **Rule:** New Go or npm dependencies need owner approval (DR-11). Builds MUST use the committed lock files (`go.sum`, `npm ci`). CI workflows MUST declare minimal `permissions`. Deploys come only from the protected `main` branch.
+- **Rule:** New Go or npm dependencies need owner approval (DR-11). Builds MUST use the committed lock files (`go.sum`, `npm ci`). CI workflows MUST declare minimal `permissions`. Every GitHub Action MUST be pinned to a full commit SHA with its version in a comment, and Dependabot MUST propose updates for GitHub Actions, Go modules, and npm as pull requests (Owner 2026-10-22, OD-006). Deploys come only from the protected `main` branch.
 - **Enforcement:** `.github/workflows/`, `deploy/`.
-- **Evidence:** ADR 071, ADR 072, AGENTS.md. Code: compliant; actions are pinned by version tag, not commit SHA (OD-006).
+- **Evidence:** ADR 071, ADR 072, AGENTS.md, OD-006. Code: lock files and permissions compliant; actions are pinned by tag (**not compliant**); no Dependabot configuration.
 - **Verification:** Workflow review; `npm ci` and `go build` fail on a lock-file mismatch.
 
 ## Open Security Decisions
 
-- **OD-001** Ending other sessions (SC-017).
-  - Choice: which of these end all other sessions of the player: own password change, Admin credential or role change, disabling MFA.
-  - Coverage: V7. Owner: owner.
-- **OD-002** MFA guess limit (SC-011).
-  - Choice: how many wrong codes one MFA challenge allows before it is invalidated.
-  - Coverage: V6. Owner: owner.
-- **OD-003** TOTP secrets at rest (SC-014).
-  - Choice: encrypt TOTP secrets with a key kept outside the database (environment file), or accept plaintext and rely on database and backup protection.
-  - Coverage: V11, V14. Owner: owner.
-- **OD-004** Visitor lookup limit (SC-028).
-  - Missing: number of searches per time window for visitors, and whether public registration and claim requests count too.
-  - Coverage: V2, V4. Owner: owner.
-- **OD-005** HTTP server timeouts (SC-026).
-  - Missing: values for read-header, read, write, and idle timeouts and the shutdown grace period (systemd stops after 30 seconds, `TimeoutStopSec=30`).
-  - Coverage: V13. Owner: owner.
-- **OD-006** CI action pinning (SC-036).
-  - Choice: pin GitHub Actions (including `cloudflare/wrangler-action`, which receives the Cloudflare token) to commit SHAs, or keep version tags.
-  - Coverage: V15. Owner: owner.
-- **OD-007** Off-server backup storage and key holder (SC-034).
-  - Missing: storage location and who holds the encryption key. Same decision as OQ-14 in `REQUIREMENTS.md`; DEFERRED there.
-  - Coverage: V14. Owner: owner.
-- **OD-008** Session idle timeout (SC-018).
-  - Choice: whether a session that is not used for some time ends before the 30-day maximum, and after how long.
-  - Coverage: V7. Owner: owner.
+The owner decided OD-001 to OD-006 and OD-008 on 2026-10-22; the answers are in the rules that
+cite them. IDs are not reused.
+
+- **OD-007** DEFERRED. Off-server backup storage and key holder (SC-034).
+  - Missing: storage location and who holds the encryption key. Same decision as OQ-14 in `REQUIREMENTS.md`.
+  - Affected: SC-034, NFR-2.3. Owner: owner.

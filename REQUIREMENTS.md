@@ -333,7 +333,7 @@ implemented yet when it differs from the code.
 ### 30. Privacy
 
 - **FR-30.1** The system MUST provide a German privacy page (Datenschutzerklärung) that is readable without login. It MUST name the owner as the responsible person with a contact address. The name and address MUST come from configuration, not from the repository. (Owner 2026-10-22, OQ-9 and OQ-12)
-- **FR-30.2** An ADMIN MUST be able to anonymise a player. Anonymisation MUST delete the login, password, sessions, MFA data, and Rising-Gods profile data, and MUST replace the player name with the name of the player's main character (see OQ-13). (Owner 2026-10-22, OQ-9 and OQ-12)
+- **FR-30.2** An ADMIN MUST be able to anonymise a player. Anonymisation MUST delete the login, password, sessions, MFA data, and Rising-Gods profile data, and MUST replace the player name with the name of the player's main character. With several main characters, the oldest main MUST be used; with none, the oldest character; with no character, "Ehemaliges Mitglied #<player ID>". (Owner 2026-10-22, OQ-9, OQ-12 and OQ-13)
 - **FR-30.5** A person MUST ask for anonymisation through the contact on the privacy page. Only an ADMIN MUST be able to do it. Members MUST NOT get a self-service delete. (Owner 2026-10-22, OQ-12)
 - **FR-30.3** Anonymisation MUST keep raid rosters, loot, EP transactions, and character names in raid history. (Owner 2026-10-22, OQ-9)
 - **FR-30.4** Audit entries MUST stay without a time limit. They MUST NOT show the name of an anonymised player. (Owner 2026-10-22, OQ-9 and OQ-12)
@@ -345,7 +345,7 @@ implemented yet when it differs from the code.
 - **NFR-1.3** In production, the application MUST listen only on a loopback address behind a TLS reverse proxy. (ADR 070)
 - **NFR-2.1** The system MUST take a verified database snapshot before each deployment. (ADR 071, 072)
 - **NFR-2.2** The system MUST keep 48 hourly, 32 daily, 13 weekly, and 25 monthly database snapshots. A weekly job MUST verify the newest snapshot. (ADR 070)
-- **NFR-2.3** An encrypted copy of the newest verified snapshot MUST leave the server every day for storage that the owner controls. The maximum data loss is therefore one day. The storage and the key holder are TO BE DECIDED (OQ-14). (ADR 070; Owner 2026-10-22, OQ-8)
+- **NFR-2.3** An encrypted copy of the newest verified snapshot MUST leave the server every day for storage that the owner controls. The maximum data loss is therefore one day. The storage and the key holder are DEFERRED (OQ-14). The key MUST NOT be stored only on the production server. (ADR 070; Owner 2026-10-22, OQ-8)
 - **NFR-2.5** A restore from the off-server copy MUST be tested every month. (Owner 2026-10-22, OQ-8)
 - **NFR-3.1** The system MUST cache Rising-Gods name searches for 12 hours and MAY serve them stale for up to 7 days while it refreshes. The cache MUST hold at most 2000 searches. (ADR 044)
 - **NFR-3.2** Parallel identical Rising-Gods lookups MUST share one upstream request. (ADR 044)
@@ -354,9 +354,8 @@ implemented yet when it differs from the code.
 
 ## Open Questions
 
-The owner's question and review pass on 2026-10-22 resolved OQ-1 to OQ-12. Their answers are in
+The owner's question and review pass on 2026-10-22 resolved OQ-1 to OQ-13. Their answers are in
 the requirements marked "Owner 2026-10-22". NFR-2.4 (delete the pre-migration-066 backup) is
 done and was removed. IDs are not reused.
 
-- **OQ-13** Anonymisation (FR-30.2): Which name applies when the player has several main characters (FR-6.2) or none?
-- **OQ-14** Off-server backup (NFR-2.3): Which storage, and who holds the encryption key?
+- **OQ-14** DEFERRED. Off-server backup (NFR-2.3): Which storage, and who holds the encryption key? Blocks only NFR-2.3.

@@ -3,9 +3,9 @@
 This file owns HOW the system is built: components, boundaries, technology choices, data
 ownership, data flow, and dependency rules. Behaviour is owned by `REQUIREMENTS.md`, look and
 interaction by `DESIGN.md`, and security controls by `SECURITY.md`; this file references their
-IDs instead of restating them. It describes the code of v1.0.27 (2026-10-22). Choices for
-features decided on 2026-10-22 that the code does not have yet are marked `PROPOSED` or
-`TO BE DECIDED`. ADRs keep the history of each decision.
+IDs instead of restating them. It describes the code of v1.0.27 (2026-10-22). Choices that
+the owner made on 2026-10-22 and that the code does not follow yet are marked
+"Owner 2026-10-22" and "not built". ADRs keep the history of each decision.
 
 ## Required Architecture Inputs
 
@@ -28,7 +28,7 @@ features decided on 2026-10-22 that the code does not have yet are marked `PROPO
   components.
 - **Layers (ADR 002, CODING_RULES §6).** HTTP layer → domain services → domain repositories →
   database. Handlers decode, check the route guard, delegate, and encode. Business rules live in
-  domain services. Bun ORM and SQL live in repositories (see AQ-1 for exceptions).
+  domain services. Bun ORM and SQL live in repositories (DR-4).
 - **Coordinators for cross-domain writes.** `raidcorrection` (roster, loot, corrections,
   quick-add, withdrawal), `raidcompletion` (archive), `raidsignup` (acceptance),
   `accountmerge`, and `addonsync` (imports) orchestrate several domains inside one database
@@ -50,27 +50,44 @@ features decided on 2026-10-22 that the code does not have yet are marked `PROPO
   actor on the request context; route guards `RequireAuth` and `RequireRole(role)` enforce the
   role matrix (FR-1.*); domain services re-check ownership where a rule depends on it (for
   example own locks, own wishlist).
-- **In-process state.** The Rising-Gods search cache and request coalescing are in memory.
+- **In-process state.** The Rising-Gods search cache, request coalescing, and the visitor
+  search counter (FR-7.6, per client address, reset on restart) are in memory (Owner 2026-10-22, AQ-7).
   Login attempts, sessions, and MFA challenges are in the database. The design therefore
   assumes exactly one application process (DR-9).
+- **Server lifecycle.** The HTTP server sets read-header, read, write, and idle timeouts and
+  shuts down gracefully on SIGTERM, finishing running requests (Owner 2026-10-22, AQ-3); the values
+  are owned by `SECURITY.md`. Not built: the code calls `http.ListenAndServe` without them.
+- **Statistics.** A public `GET /api/v1/statistics` returns only server-computed aggregates
+  (FR-27.2); the statistics page reads only this endpoint (Owner 2026-10-22, AQ-2). Not built: the
+  page now computes figures in the browser from login-only and per-raid loot endpoints.
+- **Privacy.** `accountmerge` gains an Admin-only anonymise operation (FR-30.2–30.5). The privacy
+  page is a static frontend page; its contact name and address come from two new configuration
+  values, read by `internal/config`, and reach the page through a public read endpoint, PROPOSED
+  `GET /api/v1/privacy-contact` (Owner 2026-10-22, AQ-6). Not built.
+- **Boss kills.** A new `bosskill` domain package owns `raid_boss_kills` (raid, catalog boss,
+  difficulty; unique per raid and boss). `loot` reads the kill for the award difficulty.
+  `raidcorrection` writes kills, so the manual loot path and the `addonsync` import create a
+  missing kill and the loot in one transaction (FR-29.7, FR-29.8) (Owner 2026-10-22, AQ-5). Not built.
 - **No background jobs.** Deadlines (signup close, MFA expiry) are evaluated on each request.
   Planning ahead runs on series save and archive (FR-9.7). The only periodic work is on the host
   (backups, updates, reboots; see `deploy/`).
 
 ## Components and Flows
 
-Status: `SUPPORTED` = built and specified; `PARTIALLY DEFINED` = built, with an open
-architecture item; `TO BE DECIDED` = specified in `REQUIREMENTS.md`, no component yet.
+Status describes the specification: `SUPPORTED` = fully specified; `PARTIALLY DEFINED` =
+specified with an open architecture item; `TO BE DECIDED` = no architecture yet. "(not built)"
+and similar notes say which specified parts the code does not have yet. All rows are
+`SUPPORTED` after the owner's answers of 2026-10-22.
 
 | Component | Responsibility | Business rules enforced | Data owned | Requirements | Status |
 | --- | --- | --- | --- | --- | --- |
 | Web client (`web/src`) | Pages, forms, hash routing, German UI, local drafts | None authoritative; convenience checks only | Browser drafts (`localStorage`) | FR-28, `DESIGN.md` | SUPPORTED |
-| HTTP layer (`httpapi`, `httpapi/v1`) | Middleware chain, route guards, DTOs, error mapping, SPA and health | Role matrix, session presence, CSRF, body size | None | FR-1, FR-2.8, NFR-4.1 | PARTIALLY DEFINED (AQ-3) |
+| HTTP layer (`httpapi`, `httpapi/v1`) | Middleware chain, route guards, DTOs, error mapping, SPA and health, server timeouts | Role matrix, session presence, CSRF, body size | None | FR-1, FR-2.8, NFR-4.1, NFR-4.2 | SUPPORTED (timeouts not built) |
 | `auth` | Login, sessions, passwords, TOTP, recovery codes, WebAuthn, bootstrap admin | Password length, login rate limit, MFA challenge expiry | sessions, login attempts, MFA secrets and credentials, password hash | FR-2, FR-3 | SUPPORTED |
-| `registration` | Rising-Gods client and cache; registration requests, codes, claims | Alliance level-80 filter, request deduplication, code expiry | registration requests, codes, external profiles | FR-4, FR-7 | PARTIALLY DEFINED (AQ-4, AQ-7) |
+| `registration` | Rising-Gods client and cache; registration requests, codes, claims; visitor search counter | Alliance level-80 filter, request deduplication, code expiry, visitor search limit | registration requests, codes, external profiles | FR-4, FR-7 | SUPPORTED (search limit not built; unused warmer to delete) |
 | `player` | Players, roles, public player view | Public field subset | players | FR-1.3, FR-1.9, FR-5.1–5.2 | SUPPORTED |
 | `character` | Characters, name history, merge aliases, transfer | Rising-Gods provenance uniqueness, merge conflicts | characters, name history, aliases | FR-6 | SUPPORTED |
-| `accountmerge` | Player merge | Same-item lock conflict, credential retention | (coordinator) | FR-5.3–5.7 | SUPPORTED |
+| `accountmerge` | Player merge; player anonymisation | Same-item lock conflict, credential retention; data deleted versus kept | (coordinator) | FR-5.3–5.7, FR-30.2–30.5 | SUPPORTED (anonymise not built) |
 | `roster` | Guild ranks and raid groups | Configurable rows only | guild ranks, raid groups | FR-8.1 | SUPPORTED |
 | `lootcatalog` | Embedded catalog, startup mirror, boss order | Mode normalisation, catalog pair validity, full boss order | catalog mirror, initialisation reports, boss order | FR-8.2–8.3, FR-25 | SUPPORTED |
 | `raidseries` | Series configuration, recurrence calendar, planning | Local-week anchoring, DST errors, 520-week guard | raid series | FR-9 | SUPPORTED |
@@ -79,20 +96,20 @@ architecture item; `TO BE DECIDED` = specified in `REQUIREMENTS.md`, no componen
 | `attendance` | Roster rows with per-raid snapshots | Snapshot completeness | raid attendance | FR-13.2–13.4 | SUPPORTED |
 | `raidcorrection` | Roster and loot writes, corrections, withdrawal, quick-add | Raid-state rules, archived reason, EP eligibility delta, retry receipts | quick-add receipts (coordinator otherwise) | FR-13, FR-14.8–14.10, FR-16.5–16.6 | SUPPORTED |
 | `loot` | Loot awards, methods, enhanced cost, lock auto-award, token derivation | Roster recipient, request-ID idempotency, cost formula | loot awards | FR-14, FR-18 | SUPPORTED |
-| `unclaimedloot` | Items that went to nobody | No player effect | unclaimed loot | FR-15 | PARTIALLY DEFINED (AQ-1) |
+| `unclaimedloot` | Items that went to nobody | No player effect | unclaimed loot | FR-15 | SUPPORTED (SQL to move, DR-4) |
 | `enhancepoints` | EP ledger, balances, item locks | 150-EP lock threshold, competing locks, ownership | EP transactions, item locks | FR-16, FR-17 | SUPPORTED |
 | `raidcompletion` | Archive: EP award, lock expiry, successor, plan-ahead top-up, preview | Idempotent finalisation, exclusions, successor conflicts | (coordinator) | FR-10.6–10.15 | SUPPORTED |
 | `addonsync` | RS1/RS2 parsing, roster and loot import previews and applies, invite export | Raid-scoped request IDs, importable states | (coordinator) | FR-20 | SUPPORTED |
 | `addons` | Embedded addon bundles and download zips | Bundle completeness | embedded files | FR-21 | SUPPORTED |
 | `wishlist` | Wishlist items, raid interests, WL2 export | Owner-only writes | wishlist items | FR-19, FR-20.13 | SUPPORTED |
 | `shadowmourne` | Questline list and raid task choices | Eligible classes, stage choice rules | entries, raid tasks | FR-22 | SUPPORTED |
-| `recruitment` | Recruitment template per series or raid | Length and shape | recruitment templates | FR-23 | PARTIALLY DEFINED (AQ-1, FR-23.4) |
+| `recruitment` | Recruitment template per series or raid | Length, shape, slot values | recruitment templates | FR-23 | SUPPORTED (slot check and SQL move not built) |
 | `poll` | Polls and votes | Option validity, closed polls | polls, options, votes | FR-24 | SUPPORTED |
 | `audit` | Audit writer and Admin reader | Append-only, no secrets in snapshots | audit log | FR-26 | SUPPORTED |
-| Statistics | Public aggregates | Public field subset (FR-27.2) | none (derived) | FR-27 | TO BE DECIDED (AQ-2) |
-| Boss kills | Kill list per raid, difficulty per boss | One kill per boss, loot blocks removal | boss kills | FR-29 | TO BE DECIDED (AQ-5) |
-| Privacy | Privacy page content, player anonymisation | Data to delete or keep | (coordinator) | FR-30 | TO BE DECIDED (AQ-6) |
-| Infrastructure (`config`, `db`, `migrations`, `validation`, `webui`) | Environment config, DB open, schema, enums, embedded SPA | Production config rules, foreign keys | schema | NFR-1 | SUPPORTED |
+| Statistics (`GET /api/v1/statistics`) | Public aggregates computed on the server | Public field subset (FR-27.2) | none (derived, read-only) | FR-27 | SUPPORTED (not built) |
+| `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (not built) |
+| Privacy page | Static page with contact from configuration | None | none | FR-30.1 | SUPPORTED (not built) |
+| Infrastructure (`config`, `db`, `migrations`, `validation`, `webui`) | Environment config, DB open, schema, enums, embedded SPA | Production config rules, foreign keys, SPA present in production | schema | NFR-1 | SUPPORTED (SPA check not built) |
 | Rising-Gods Worker (`workers/`) | Authenticated fixed-origin GET proxy to `db.rising-gods.de` | Fixed origin, bearer token | none | FR-7, ADR 048, ADR 053 | SUPPORTED |
 
 ### Main data flows
@@ -200,7 +217,9 @@ sequenceDiagram
 - **DR-3** Each table has exactly one owning domain package (the "Data owned" column). Only the
   owner's repository writes it; other components call the owner's repository or service.
 - **DR-4** SQL and Bun query builders appear only in `repo.go` files. Models may carry Bun struct
-  tags. (Exceptions today: AQ-1.)
+  tags. There are no exceptions (Owner 2026-10-22, AQ-1). Not yet followed by
+  `internal/character/merge.go`, `internal/lootcatalog/order.go`, `internal/recruitment/service.go`
+  and `internal/unclaimedloot/unclaimed.go`; their queries move into `repo.go`.
 - **DR-5** A write that touches more than one row or table, including its audit entry and ledger
   rows, runs in one transaction passed down with `WithTx`.
 - **DR-6** Business rules live in domain services, never in handlers, middleware, or the web
@@ -212,35 +231,16 @@ sequenceDiagram
   future rate limiter) is allowed only under this rule.
 - **DR-10** The web client talks to the server only through `web/src/api.ts` and only to
   same-origin `/api/v1`.
-- **DR-11** A new Go or npm dependency needs owner approval (AGENTS.md).
+- **DR-11** A new Go or npm dependency needs owner approval (AGENTS.md). `go.mod` stays tidy
+  (`go mod tidy`), so direct dependencies are not marked `// indirect` (Owner 2026-10-22, AQ-8).
+- **DR-12** Code that nothing imports or calls is deleted, not kept switched off; Git history keeps
+  it. Not yet followed by `internal/registration/rising_gods_warm.go` and `internal/logger`
+  (Owner 2026-10-22, AQ-4 and AQ-8).
+- **DR-13** In production, the server MUST NOT start without the embedded web build
+  (`index.html`), like an invalid catalog or addon bundle (NFR-1.1) (Owner 2026-10-22, AQ-3).
+  Development without a web build keeps working.
 
 ## Open Questions
 
-- **AQ-1** Four domain files run SQL outside their repository, against DR-4 and ADR 002:
-  `internal/character/merge.go`, `internal/lootcatalog/order.go`,
-  `internal/recruitment/service.go`, `internal/unclaimedloot/unclaimed.go`. Move the queries into
-  each package's `repo.go`, or accept these as exceptions?
-- **AQ-2** Public statistics (FR-27.2): the page now computes figures in the browser from
-  `GET /api/v1/characters` (login required) and one `GET /api/v1/raids/{id}/loot` per raid, which
-  returns item lists. Opening those endpoints would expose more than FR-27.2 allows. PROPOSED:
-  a new public `GET /api/v1/statistics` that returns only aggregates computed on the server.
-  TO BE DECIDED.
-- **AQ-3** The server starts with `http.ListenAndServe` without read, write, or header timeouts
-  and without graceful shutdown. The missing SPA build (`webui.Handler` error) is ignored at
-  startup instead of failing like the catalog. Timeout values go to `SECURITY.md`; should a
-  missing SPA stop startup?
-- **AQ-4** `internal/registration/rising_gods_warm.go` (`RunSearchCacheWarmer`) is unused since
-  ADR 049 removed cache warming. Delete it?
-- **AQ-5** Boss kills (FR-29): PROPOSED a new `bosskill` domain package that owns a
-  `raid_boss_kills` table (raid, boss, difficulty, unique per raid and boss), read by `loot` for
-  the award difficulty, and written through `raidcorrection` so that FR-29.7 can create the kill
-  and the loot in one transaction. TO BE DECIDED.
-- **AQ-6** Privacy (FR-30): PROPOSED an `anonymise` operation in `accountmerge` (it already moves
-  and deletes account data across domains) and the privacy page as a static frontend page whose
-  contact comes from two new config values. TO BE DECIDED.
-- **AQ-7** The visitor limit on Rising-Gods searches (FR-7.6) needs a counter. Under DR-9 an
-  in-memory counter per client address is enough; a database table survives restarts.
-  PROPOSED: in memory. TO BE DECIDED.
-- **AQ-8** `go.mod` lists every dependency as `// indirect`, and `internal/logger` is imported
-  nowhere. Run `go mod tidy` and remove the unused package? (`AGENTS.md` still mentions an empty
-  `internal/export`, which no longer exists.)
+None open. The owner resolved AQ-1 to AQ-8 on 2026-10-22; the answers are in the rules marked
+"Owner 2026-10-22". IDs are not reused.

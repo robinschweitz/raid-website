@@ -22,7 +22,7 @@ implemented yet when it differs from the code.
 ### 1. Access and roles
 
 - **FR-1.1** The system MUST enforce every permission on the server. Hidden UI controls MUST NOT be the only check. (ADR 010)
-- **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the statistics, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044; Owner 2026-10-22, OQ-6)
+- **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the statistics, the privacy contact, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044; Owner 2026-10-22, OQ-6)
 - **FR-1.3** The public player list MUST show only ID, name, guild rank, and active state. It MUST NOT show login names. (ADR 067, 084)
 - **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/statistics`, and the privacy page without a session. (ADR 083, 085; Owner 2026-10-22, OQ-6 and OQ-9)
 - **FR-1.5** The system MUST require a session for all other reads. (ADR 067)
@@ -340,7 +340,7 @@ implemented yet when it differs from the code.
 
 ## Non-Functional Requirements
 
-- **NFR-1.1** The system MUST NOT start when the configuration, a migration, the bootstrap admin, the bundled catalog, or the addon bundle is invalid. (ADR 020, 027, 085)
+- **NFR-1.1** The system MUST NOT start when the configuration, a migration, the bootstrap admin, the bundled catalog, or the addon bundle is invalid, or, in production, when the web build is missing. (ADR 020, 027, 085; Owner 2026-10-22, AQ-3)
 - **NFR-1.2** In production, the system MUST NOT start with default or missing bootstrap credentials. (ADR 020)
 - **NFR-1.3** In production, the application MUST listen only on a loopback address behind a TLS reverse proxy. (ADR 070)
 - **NFR-2.1** The system MUST take a verified database snapshot before each deployment. (ADR 071, 072)
@@ -350,6 +350,7 @@ implemented yet when it differs from the code.
 - **NFR-3.1** The system MUST cache Rising-Gods name searches for 12 hours and MAY serve them stale for up to 7 days while it refreshes. The cache MUST hold at most 2000 searches. (ADR 044)
 - **NFR-3.2** Parallel identical Rising-Gods lookups MUST share one upstream request. (ADR 044)
 - **NFR-4.1** The server MUST reject a request body larger than 1 MiB. (code)
+- **NFR-4.2** The server MUST close a connection whose request does not complete within a time limit, and MUST finish running requests before it stops. The limit values are owned by `SECURITY.md`. (Owner 2026-10-22, AQ-3)
 - **NFR-5.1** The production host MUST deploy only from the protected `main` branch, check hourly, and restart for kernel updates at 03:00 Europe/Berlin only when a reboot is required. (ADR 072, 073)
 
 ## Open Questions

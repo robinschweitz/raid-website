@@ -344,6 +344,7 @@ implemented yet when it differs from the code.
 - **FR-30.3** Anonymisation MUST keep raid rosters, loot, EP transactions, and character names in raid history. (Owner 2026-10-22, OQ-9)
 - **FR-30.4** Audit entries MUST stay without a time limit. They MUST NOT show the name of an anonymised player. (Owner 2026-10-22, OQ-9 and OQ-12)
 - **FR-30.5** A person MUST ask for anonymisation through the contact on the privacy page. Only an ADMIN MUST be able to do it. Members MUST NOT get a self-service delete. (Owner 2026-10-22, OQ-12)
+- **FR-30.6** Login attempts, expired sessions, and expired MFA challenges MUST be deleted once no rule needs them (SC-038). (THREAT_MODEL T-022)
 
 ### 31. History and bulk changes
 

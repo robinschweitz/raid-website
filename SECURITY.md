@@ -17,10 +17,12 @@ and open security decisions. All security controls are written here; other files
   `db.rising-gods.de`, optionally via a Cloudflare Worker; personal data under GDPR (FR-30);
   production sets `ENV=production`, `COOKIE_SECURE=true`, `TRUST_PROXY_HEADERS=true`,
   `PUBLIC_ORIGIN` (deploy/README.md).
-- **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`.
+- **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (T-001 to T-030).
 - **Material gaps:** off-server backup storage and key holder (OQ-14, OD-007).
 - **Conflicts found:** the client address can be forged behind nginx (SC-006, fixed in PR #44);
-  production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007).
+  production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007); `main` is
+  not protected although ADR 071/072 require it (SC-039, T-012); the deploy scripts that
+  `deploy/README.md` installs are not in the repository (SC-037, T-013).
 
 ## Selected Manicode Prompts
 
@@ -67,7 +69,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Only the reads in FR-1.2 may be served without a session (paths: `ARCHITECTURE.md` "Public interface"). Unauthenticated responses MUST be built from dedicated public DTOs that contain only the fields FR-1.3, FR-27.2, and FR-30.1 allow, never from the authenticated DTOs.
 - **Enforcement:** DTOs of the public endpoints; `GET /api/v1/statistics` (not built).
-- **Evidence:** FR-1.2, FR-1.3, FR-27.2, ADR 067. Code: compliant for existing endpoints.
+- **Evidence:** FR-1.2, FR-1.3, FR-27.2, ADR 067. Code: compliant for existing endpoints. Threats: T-023.
 - **Verification:** HTTP tests compare the exact field set of each public response.
 
 ### Authentication (V6)
@@ -83,63 +85,63 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** With `TRUST_PROXY_HEADERS=true`, the client address MUST come from `X-Real-IP`, which nginx overwrites with `$remote_addr`. The leftmost `X-Forwarded-For` entry MUST NOT be used, because nginx appends to a client-supplied value. Without trusted proxy mode, `RemoteAddr` is used.
 - **Enforcement:** `clientAddress` in `internal/httpapi/v1/security.go`; `deploy/nginx/raid-website.conf`.
-- **Evidence:** FR-2.3, FR-7.6, ADR 046. Code: **not compliant** on `main` — it returns the first `X-Forwarded-For` entry, so any visitor can choose their own address and bypass the login rate limit. Fixed in PR #44.
+- **Evidence:** FR-2.3, FR-7.6, ADR 046. Code: **not compliant** on `main` — it returns the first `X-Forwarded-For` entry, so any visitor can choose their own address and bypass the login rate limit. Fixed in PR #44. Threats: T-001.
 - **Verification:** Six failed logins with six different forged `X-Forwarded-For` values from one connection are blocked at the sixth.
 
 **SC-007 - WebAuthn relying party from configuration**
 - **Status:** ACTIVE
 - **Rule:** In production, startup MUST fail without a valid HTTPS `PUBLIC_ORIGIN`, and the WebAuthn RP ID and origin MUST come only from it, never from `Host`, `X-Forwarded-Host`, or `X-Forwarded-Proto`.
 - **Enforcement:** `internal/config`; `webAuthnRelyingParty`.
-- **Evidence:** ADR 046, `deploy/README.md`. Code: **not compliant** — production starts without `PUBLIC_ORIGIN`, and the fallback trusts forwarded headers that nginx does not overwrite.
+- **Evidence:** ADR 046, `deploy/README.md`. Code: **not compliant** — production starts without `PUBLIC_ORIGIN`, and the fallback trusts forwarded headers that nginx does not overwrite. Threats: T-008.
 - **Verification:** `ENV=production` without `PUBLIC_ORIGIN` stops startup; a forged `X-Forwarded-Host` does not change the WebAuthn origin.
 
 **SC-008 - Login throttling**
 - **Status:** ACTIVE
 - **Rule:** After 5 failed logins for the same normalised username and client address within 15 minutes, further attempts MUST be rejected without checking the password. Failures MUST be recorded in the database.
 - **Enforcement:** `auth.StartLogin`, `login_attempts` table.
-- **Evidence:** FR-2.3. Code: compliant, but bypassable until SC-006 is fixed.
+- **Evidence:** FR-2.3. Code: compliant, but bypassable until SC-006 is fixed. Threats: T-001, T-002.
 - **Verification:** The sixth attempt in the window returns the rate-limit error even with the correct password.
 
 **SC-009 - No username probing**
 - **Status:** ACTIVE
 - **Rule:** Login for an unknown username, an account without a password, and a wrong password MUST return the same error and MUST take comparable time (run a bcrypt comparison against a fixed dummy hash when no hash exists).
 - **Enforcement:** `auth.StartLogin`.
-- **Evidence:** V6. Code: **not compliant** — unknown usernames return without a bcrypt comparison, so response time reveals which usernames exist.
+- **Evidence:** V6. Code: **not compliant** — unknown usernames return without a bcrypt comparison, so response time reveals which usernames exist. Threats: T-003, T-004.
 - **Verification:** Median response time for an unknown and a known username differ by less than the bcrypt cost.
 
 **SC-010 - MFA challenge**
 - **Status:** ACTIVE
 - **Rule:** The MFA challenge of FR-3.5 MUST be a random 32-byte value, stored as a SHA-256 hash, valid for 5 minutes and usable once.
 - **Enforcement:** `auth.StartLogin`, `auth.VerifyMFAChallenge`.
-- **Evidence:** FR-3.5, FR-3.6. Code: compliant.
+- **Evidence:** FR-3.5, FR-3.6. Code: compliant. Threats: T-005.
 - **Verification:** A challenge older than 5 minutes or already used is rejected; no `raid_session` cookie before the second factor.
 
 **SC-011 - MFA guess limit**
 - **Status:** ACTIVE
 - **Rule:** One MFA challenge MUST accept at most 5 wrong TOTP or recovery codes. The fifth wrong code MUST invalidate the challenge, so the user starts again at the password step, which SC-008 limits.
 - **Enforcement:** `auth.VerifyMFAChallenge`; the challenge row counts failures.
-- **Evidence:** FR-3.9, V6, OD-002 (owner, 2026-10-22). Code: **not compliant** — no limit today.
+- **Evidence:** FR-3.9, V6, OD-002 (owner, 2026-10-22). Code: **not compliant** — no limit today. Threats: T-005.
 - **Verification:** After 5 wrong codes, the correct code for that challenge is rejected and a new password login is needed.
 
 **SC-012 - TOTP codes used once**
 - **Status:** ACTIVE
 - **Rule:** TOTP MUST use 6 digits, 30-second steps, and at most ±1 step of drift, and a code that was already accepted for an account MUST NOT be accepted again within its validity window.
 - **Enforcement:** `auth.verifyTOTP`; the MFA settings must store the last accepted time step.
-- **Evidence:** FR-3.2, V6. Code: **not compliant** for reuse — no last-used step is stored.
+- **Evidence:** FR-3.2, V6. Code: **not compliant** for reuse — no last-used step is stored. Threats: T-006.
 - **Verification:** Logging in twice with the same code in the same 30 seconds fails the second time.
 
 **SC-013 - Recovery and registration codes**
 - **Status:** ACTIVE
 - **Rule:** Recovery codes (10 per setup, 64 random bits) and registration codes (60 random bits, 14-day expiry, revocable) MUST come from `crypto/rand`, MUST be stored only as hashes, MUST be shown once, and MUST be single-use.
 - **Enforcement:** `auth.newRecoveryCodes`, `registration.newCode`.
-- **Evidence:** FR-3.3, FR-4.4, ADR 040. Code: compliant.
+- **Evidence:** FR-3.3, FR-4.4, ADR 040. Code: compliant. Threats: T-025.
 - **Verification:** The database holds no plaintext code; a second redemption fails.
 
 **SC-014 - TOTP secrets encrypted at rest**
 - **Status:** ACTIVE
 - **Rule:** TOTP secrets MUST be stored encrypted with a 256-bit key that comes only from the environment file (`TOTP_ENCRYPTION_KEY`), never from the database or repository. PROPOSED algorithm: AES-256-GCM from the Go standard library with a random nonce per secret. Existing plaintext secrets MUST be encrypted once at startup. With TOTP in use, production MUST NOT start without the key.
 - **Enforcement:** `auth` MFA settings repository; `internal/config`.
-- **Evidence:** V11, V14, OD-003 (owner, 2026-10-22). Code: **not compliant** — stored as plaintext.
+- **Evidence:** V11, V14, OD-003 (owner, 2026-10-22). Code: **not compliant** — stored as plaintext. Threats: T-011.
 - **Verification:** The `totp_secret` column holds no base32 secret; a login with a valid code still works; startup without the key fails while a TOTP setup exists.
 
 **SC-015 - Re-authentication for security changes**
@@ -155,28 +157,28 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Session tokens MUST be 32 bytes from `crypto/rand`, stored only as a SHA-256 hash, and sent as cookie `raid_session` with `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` in production. Each login MUST create a new token; logout MUST delete the session row.
 - **Enforcement:** `auth.createSession`, `internal/httpapi/v1/auth.go`.
-- **Evidence:** FR-2.4–2.6, ADR 010. Code: compliant.
+- **Evidence:** FR-2.4–2.6, ADR 010. Code: compliant. Threats: T-009.
 - **Verification:** Cookie attributes in an HTTP test; the database holds no plaintext token; a logged-out cookie returns 401.
 
 **SC-017 - Ending other sessions**
 - **Status:** ACTIVE
 - **Rule:** The events in FR-2.13, FR-2.14, FR-5.4, and FR-30.2 MUST delete the affected session rows in the same transaction as the change. Disabling MFA does not end sessions.
 - **Enforcement:** `auth.ChangeOwnPassword`, the Admin account write in `registration`/`auth`, `accountmerge`.
-- **Evidence:** FR-2.13, FR-2.14, FR-5.4, FR-30.2, OD-001 (owner, 2026-10-22). Code: merge compliant; password and Admin changes **not compliant**.
+- **Evidence:** FR-2.13, FR-2.14, FR-5.4, FR-30.2, OD-001 (owner, 2026-10-22). Code: merge compliant; password and Admin changes **not compliant**. Threats: T-010.
 - **Verification:** After a password change, a second session cookie returns 401 and the current one still works.
 
 **SC-018 - Session lifetime**
 - **Status:** ACTIVE
 - **Rule:** A session MUST end 30 days after login at the latest, and MUST end earlier when it has not been used for 7 days. Each authenticated request resets the idle clock; updating the last-use time at most once per hour is enough.
 - **Enforcement:** `auth` session validation; a last-used timestamp on `sessions`.
-- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (owner, 2026-10-22). Code: 30-day maximum compliant; idle timeout **not built**.
+- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (owner, 2026-10-22). Code: 30-day maximum compliant; idle timeout **not built**. Threats: T-010.
 - **Verification:** A session unused for 7 days and 1 minute returns 401; a session used daily stays valid until day 30.
 
 **SC-019 - CSRF protection**
 - **Status:** ACTIVE
 - **Rule:** Every state-changing request (not GET, HEAD, OPTIONS) MUST carry an `X-CSRF-Token` header equal to the CSRF cookie, compared in constant time, whether or not it carries a session cookie, `Origin`, or `Sec-Fetch-Site`. This includes login, MFA verification, and registration. The token MUST be 32 bytes from `crypto/rand`.
 - **Enforcement:** `csrfProtection` middleware; `GET /api/v1/auth/csrf`; `web/src/api.ts`.
-- **Evidence:** FR-2.8, OD-009 (owner, 2026-10-22). Code: **not compliant** — requests without `Origin` and `Sec-Fetch-Site` skip the check. `web/src/api.ts` already sends the token on every non-GET request.
+- **Evidence:** FR-2.8, OD-009 (owner, 2026-10-22). Code: **not compliant** — requests without `Origin` and `Sec-Fetch-Site` skip the check. `web/src/api.ts` already sends the token on every non-GET request. Threats: T-007.
 - **Verification:** A POST with the session cookie, no CSRF header, and no `Origin` returns 403 `csrf_required`.
 
 ### Input, output, and API (V1, V2, V4)
@@ -185,21 +187,21 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** JSON bodies MUST be decoded with `DisallowUnknownFields` and a 1 MiB limit; path IDs MUST be positive integers; enums, roles, classes, specs, statuses, and recruitment slot values MUST be validated on the server.
 - **Enforcement:** `DecodeJSON`, `pathID`, `internal/validation`, domain services.
-- **Evidence:** NFR-4.1, FR-23.4. Code: compliant except recruitment slot values (FR-23.4, not built).
+- **Evidence:** NFR-4.1, FR-23.4. Code: compliant except recruitment slot values (FR-23.4, not built). Threats: T-018, T-027.
 - **Verification:** Unknown fields, a 1 MiB + 1 body, ID `0`, and an unknown enum each return 4xx.
 
 **SC-021 - Parameterised SQL only**
 - **Status:** ACTIVE
 - **Rule:** SQL MUST use Bun query builders or `?` parameter binding; user input MUST NOT be concatenated into SQL. Queries live in `repo.go` (DR-4).
 - **Enforcement:** repositories.
-- **Evidence:** ADR 002, V1. Code: compliant for binding; four files outside `repo.go` (DR-4).
+- **Evidence:** ADR 002, V1. Code: compliant for binding; four files outside `repo.go` (DR-4). Threats: T-027.
 - **Verification:** Review of every `NewRaw`, `Where(` with formatted strings, and `ExecContext` call.
 
 **SC-022 - Text-only rendering**
 - **Status:** ACTIVE
 - **Rule:** The client MUST render all user, addon, and Rising-Gods data as React text; `dangerouslySetInnerHTML`, `innerHTML`, and `eval` MUST NOT be used. Text written into addon formats MUST replace the format separators (`;` → `,`, `|` → `/`).
 - **Enforcement:** `web/src`; `internal/addonsync`, `internal/wishlist` exporters.
-- **Evidence:** ADR 070, TB-3, TB-5. Code: compliant.
+- **Evidence:** ADR 070, TB-3, TB-5. Code: compliant. Threats: T-009, T-018.
 - **Verification:** Code search finds none of the forbidden APIs; a name containing `;` round-trips without adding a field.
 
 **SC-023 - Safe errors**
@@ -215,21 +217,21 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Every response MUST carry `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, the restrictive `Permissions-Policy`, and a CSP with `default-src 'self'`, `script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`, `form-action 'self'`, `connect-src 'self'`. `img-src` MUST be `'self' data:` once the class icons are local (DQ-2). HSTS (`max-age=31536000; includeSubDomains`) MUST be sent in production.
 - **Enforcement:** `securityHeaders` middleware.
-- **Evidence:** ADR 046, `DESIGN.md`. Code: compliant; `img-src` still allows `https://wow.zamimg.com`; `style-src` allows `'unsafe-inline'`.
+- **Evidence:** ADR 046, `DESIGN.md`. Code: compliant; `img-src` still allows `https://wow.zamimg.com`; `style-src` allows `'unsafe-inline'`. Threats: T-009, T-024, T-027.
 - **Verification:** Header assertions in an HTTP test.
 
 **SC-025 - TLS at the edge only**
 - **Status:** ACTIVE
 - **Rule:** The public entry MUST be nginx with TLS (Let's Encrypt), redirecting HTTP to HTTPS; the Go process MUST listen on loopback only in production.
 - **Enforcement:** `deploy/nginx/`, `internal/config` (`LISTEN_ADDR` check).
-- **Evidence:** NFR-1.3, ADR 070. Code and templates: compliant.
+- **Evidence:** NFR-1.3, ADR 070. Code and templates: compliant. Threats: T-029.
 - **Verification:** Startup with a non-loopback `LISTEN_ADDR` and `ENV=production` fails.
 
 **SC-026 - HTTP server limits**
 - **Status:** ACTIVE
 - **Rule:** The Go server MUST set `ReadHeaderTimeout` 10 s, `ReadTimeout` 30 s, `WriteTimeout` 60 s, and `IdleTimeout` 120 s, and on SIGTERM MUST stop accepting connections and give running requests 25 s to finish (systemd stops the service after 30 s).
 - **Enforcement:** `cmd/server/main.go` (`http.Server`, `Shutdown`).
-- **Evidence:** NFR-4.2, ARCHITECTURE "Server lifecycle", OD-005 (owner, 2026-10-22). Code: **not compliant** — `http.ListenAndServe` without limits.
+- **Evidence:** NFR-4.2, ARCHITECTURE "Server lifecycle", OD-005 (owner, 2026-10-22). Code: **not compliant** — `http.ListenAndServe` without limits. Threats: T-017.
 - **Verification:** A client that sends headers slower than 10 s is disconnected; a request running during `systemctl restart` completes.
 
 ### External systems (V4, V12, V13)
@@ -238,21 +240,21 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Outbound requests MUST go only to `https://db.rising-gods.de` or the configured HTTPS Worker origin, with query values escaped, a 20-second timeout, and a 5 MiB response cap. Responses MUST be parsed as untrusted data, and a chosen profile MUST be reloaded and filtered before it is stored.
 - **Enforcement:** `internal/registration/rising_gods.go`.
-- **Evidence:** FR-7.1–7.4, ADR 044, ADR 048. Code: compliant; pasted URLs are accepted only for host `db.rising-gods.de`.
+- **Evidence:** FR-7.1–7.4, ADR 044, ADR 048. Code: compliant; pasted URLs are accepted only for host `db.rising-gods.de`. Threats: T-016.
 - **Verification:** A pasted URL with another host is rejected without an outbound request.
 
 **SC-028 - Visitor lookup limit**
 - **Status:** ACTIVE
 - **Rule:** For the requests that FR-7.6 limits, one client address (SC-006) MUST NOT start more than 10 in 10 minutes. Answers served from the cache MUST NOT count. Further requests get HTTP 429 with a stable code. The counter is in memory (DR-9).
 - **Enforcement:** `GET /api/v1/external/rising-gods/characters`, `POST /api/v1/auth/registration-requests`; counter in `registration` or the HTTP layer.
-- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: none.
+- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: none. Threats: T-016.
 - **Verification:** The eleventh uncached visitor search within 10 minutes returns 429 without an upstream request; a logged-in user is not limited.
 
 **SC-029 - Worker access**
 - **Status:** ACTIVE
 - **Rule:** The Worker MUST accept only `GET /` with the shared token header and forward only the query to the fixed origin. The token MUST live only in Cloudflare secrets and the server environment file, never in the repository or logs.
 - **Enforcement:** `workers/rising-gods-proxy.js`, `internal/config`.
-- **Evidence:** ADR 048, ADR 053, ADR 054. Code: compliant.
+- **Evidence:** ADR 048, ADR 053, ADR 054. Code: compliant. Threats: T-015.
 - **Verification:** Requests without the token or with another method or path are rejected.
 
 ### Data protection and logging (V14, V16)
@@ -268,7 +270,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Audit before and after snapshots (FR-26.3) MUST NOT contain passwords, password hashes, TOTP secrets, recovery codes, registration codes, or raw Rising-Gods profile data, and MUST record account changes only as "password changed: yes/no".
 - **Enforcement:** `audit` writers in each domain.
-- **Evidence:** FR-26.3, ADR 077. Code: compliant.
+- **Evidence:** FR-26.3, ADR 077. Code: compliant. Threats: T-019.
 - **Verification:** `audit_coverage_test` checks the account snapshot for the password and hash; the same check is needed for MFA, registration-code, and Rising-Gods snapshots.
 
 **SC-032 - Anonymisation**
@@ -289,7 +291,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** BLOCKED
 - **Rule:** The daily off-server copy MUST be encrypted before it leaves the host, and the key MUST NOT exist only on the host (NFR-2.3). Blocked on storage and key holder.
 - **Enforcement:** `deploy/` backup units.
-- **Evidence:** NFR-2.3, ADR 070. Depends on **OD-007** (OQ-14).
+- **Evidence:** NFR-2.3, ADR 070. Depends on **OD-007** (OQ-14). Threats: T-011, T-030.
 - **Verification:** A restore from the off-server copy on another machine succeeds every month (NFR-2.5).
 
 ### Platform, build, and supply chain (V13, V15)
@@ -298,15 +300,64 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** The application MUST run as the unprivileged `raidweb` user with the systemd restrictions in `deploy/systemd/raid-website.service` (`NoNewPrivileges`, `ProtectSystem=strict`, empty `CapabilityBoundingSet`, write access only to `/var/lib/raid-website`). Builds MUST run as `raiddeploy`, which may only start the fixed root-owned publish unit. SSH MUST NOT allow passwords.
 - **Enforcement:** `deploy/systemd/`, `deploy/sudoers.d/`, `deploy/sshd_config.d/`.
-- **Evidence:** ADR 070–073. Templates: compliant.
+- **Evidence:** ADR 070–073. Templates: compliant. Threats: T-011, T-029.
 - **Verification:** `systemd-analyze security raid-website` and a review of the installed units against the templates.
 
 **SC-036 - Dependencies and CI**
 - **Status:** ACTIVE
 - **Rule:** New Go or npm dependencies need owner approval (DR-11). Builds MUST use the committed lock files (`go.sum`, `npm ci`). CI workflows MUST declare minimal `permissions`. Every GitHub Action MUST be pinned to a full commit SHA with its version in a comment, and Dependabot MUST propose updates for GitHub Actions, Go modules, and npm as pull requests (Owner 2026-10-22, OD-006). Deploys come only from the protected `main` branch.
 - **Enforcement:** `.github/workflows/`, `deploy/`.
-- **Evidence:** ADR 071, ADR 072, DR-11, OD-006. Code: lock files and permissions compliant; actions are pinned by tag (**not compliant**); no Dependabot configuration.
+- **Evidence:** ADR 071, ADR 072, DR-11, OD-006. Code: lock files and permissions compliant; actions are pinned by tag (**not compliant**); no Dependabot configuration. Threats: T-012, T-014, T-028.
 - **Verification:** Workflow review; `npm ci` and `go build` fail on a lock-file mismatch.
+
+**SC-037 - Deployment scripts under review**
+- **Status:** ACTIVE
+- **Rule:** Every script that `deploy/README.md` installs (`raid-website-publish`, `-update`, `-backup`, `-configure-ufw`) MUST be committed under `deploy/bin/` and reviewed like code. `.gitignore` MUST NOT exclude `deploy/bin/`. The installed copies MUST match the committed ones.
+- **Enforcement:** `.gitignore`, `deploy/bin/`, `deploy/README.md`.
+- **Evidence:** ADR 071, ADR 072; `.gitignore` contains `bin/`, and `deploy/bin/` is missing from `main`. Code: **not compliant**. Threats: T-013, T-029.
+- **Verification:** `git ls-files deploy/bin` lists all four scripts; a diff of the installed scripts against the repository is empty.
+
+**SC-038 - Short-lived security records are deleted**
+- **Status:** ACTIVE
+- **Rule:** Login attempts MUST be deleted once they are older than the longest login-limit window that uses them (SC-008, SC-043). Expired sessions and expired or used MFA challenges MUST be deleted. Deletion runs during normal requests or at startup, not as a background job.
+- **Enforcement:** `auth` repository (`DeleteExpired` exists but is never called).
+- **Evidence:** FR-30.6, ARCHITECTURE "No background jobs". Code: **not compliant** — nothing is ever pruned. Threats: T-022.
+- **Verification:** After the window, no login attempt, expired session, or old challenge row remains.
+
+**SC-039 - Protected main branch and CI gates**
+- **Status:** BLOCKED
+- **Rule:** Because production deploys `main` automatically, `main` MUST be protected against direct pushes, force pushes, and deletion, and merges MUST pass CI. The review and vulnerability-scan requirements are not decided.
+- **Enforcement:** GitHub branch protection or ruleset on `main`; `.github/workflows/`.
+- **Evidence:** ADR 071, ADR 072; GitHub on 2026-10-22: `main` unprotected, ruleset "Protect" disabled. Depends on **OD-011**. Threats: T-012, T-028.
+- **Verification:** A direct push to `main` is rejected; a pull request with a failing check cannot merge.
+
+**SC-040 - MFA for privileged roles**
+- **Status:** BLOCKED
+- **Rule:** Whether Admin (and other staff) accounts must use MFA is not decided.
+- **Enforcement:** `auth` login and role assignment.
+- **Evidence:** FR-3.1 makes MFA optional for every account. Depends on **OD-012**. Threats: T-020.
+- **Verification:** Defined by OD-012.
+
+**SC-041 - Security event logging**
+- **Status:** BLOCKED
+- **Rule:** Which security events are logged, where, and for how long is not decided. Logged events MUST NOT contain passwords, codes, or tokens (SC-030).
+- **Enforcement:** `auth`, `csrfProtection`, rate limiters.
+- **Evidence:** FR-26.4 keeps logins out of the audit log; `internal/auth` logs nothing. Depends on **OD-013**. Threats: T-021.
+- **Verification:** Defined by OD-013.
+
+**SC-042 - Account recovery verification**
+- **Status:** BLOCKED
+- **Rule:** Before an Admin sets a new password for someone who lost theirs, the requester's identity MUST be verified. The method is not decided.
+- **Enforcement:** Admin account workflow (FR-5.1).
+- **Evidence:** no recovery workflow is specified. Depends on **OD-014**. Threats: T-026.
+- **Verification:** Defined by OD-014.
+
+**SC-043 - Login limits per account and per address**
+- **Status:** BLOCKED
+- **Rule:** Besides SC-008, failed logins MUST be limited per account across all addresses and per client address across all usernames. Blocked on the values.
+- **Enforcement:** `auth.StartLogin`, `login_attempts`.
+- **Evidence:** FR-2.3; today only per username and address. Depends on **OD-010**. Threats: T-002, T-003.
+- **Verification:** Defined by OD-010.
 
 ## Open Security Decisions
 
@@ -325,4 +376,22 @@ cite them. IDs are not reused.
 - **OD-007** DEFERRED. Off-server backup storage and key holder (SC-034).
   - Missing: storage location and who holds the encryption key. Same decision as OQ-14 in `REQUIREMENTS.md`.
   - Affected: SC-034, NFR-2.3. Owner: owner.
+
+Open decisions from the threat model (`THREAT_MODEL.md`):
+
+- **OD-010** Login limits per account and per address (SC-043; T-002, T-003).
+  - Missing: how many failures per account across all addresses, and per address across all usernames, in which window; and whether the account limit locks the account or only slows it.
+  - Owner: owner.
+- **OD-011** Branch protection and CI gates for `main` (SC-039; T-012, T-028).
+  - Choice: require a pull request with passing CI only (works for one maintainer), or also an approving review by a second person; and whether CI runs a vulnerability scan (`govulncheck`, `npm audit`).
+  - Owner: owner.
+- **OD-012** MFA for privileged roles (SC-040; T-020).
+  - Choice: required for ADMIN, for all staff, or optional for everyone as today.
+  - Owner: owner.
+- **OD-013** Security event logging (SC-041; T-021).
+  - Choice: which events (failed logins, lockouts, MFA failures, CSRF rejections, role and credential changes), where (journal or a table), and how long they are kept.
+  - Owner: owner.
+- **OD-014** Account recovery (SC-042; T-026).
+  - Choice: how an Admin verifies a person who lost their password (for example a code sent in game to their main character, as for registration) before setting a new one.
+  - Owner: owner.
 

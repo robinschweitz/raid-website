@@ -18,6 +18,7 @@ below. This file adds only how to work; it defines no behaviour or architecture.
 | `DESIGN.md` | Look, components, accessibility, rendering safety (`DQ-*`) |
 | `ARCHITECTURE.md` | Components, data ownership, flows, trust boundaries (`DR-*`, `AQ-*`) |
 | `SECURITY.md` | Secure-coding rules and security decisions (`SC-*`, `OD-*`) |
+| `THREAT_MODEL.md` | Threats, evidence, and coverage (`T-*`) |
 | `CODING_RULES.md` | Code conventions (German) |
 | `REQUIREMENT_TEMPLATE.md` | Body of every leaf implementation issue |
 | `docs/decisions/*.md` | Decision history (ADRs): why a rule exists |

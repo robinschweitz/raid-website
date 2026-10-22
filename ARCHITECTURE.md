@@ -157,10 +157,13 @@ and similar notes say which specified parts the code does not have yet. All rows
   writes, and is applied only through the ordinary validated paths (FR-20.3, FR-20.6).
 - **TB-6 Application → SQLite file and snapshots.** Local file permissions of the service account;
   snapshots leave the host encrypted (NFR-2.3).
-- **TB-7 Build and deploy.** Code from the protected `main` branch is built by an unprivileged
-  build account; a fixed root-owned publisher installs it (ADR 071, ADR 072).
+- **TB-7 Build and deploy.** Code from `main` is built by an unprivileged build account; a fixed
+  root-owned publisher installs it (ADR 071, ADR 072). The design depends on a protected `main`
+  (SC-039) and on committed, reviewed deploy scripts in `deploy/bin/` (SC-037); neither holds today
+  (T-012, T-013).
 
-Controls at each boundary are defined in `SECURITY.md`.
+Controls at each boundary are defined in `SECURITY.md`; the threats that cross each boundary are
+in `THREAT_MODEL.md` ("Trust boundaries to threats").
 
 ```mermaid
 flowchart LR

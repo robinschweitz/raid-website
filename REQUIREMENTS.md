@@ -4,25 +4,27 @@ This file owns WHAT the system must do. It describes the behaviour of version 1.
 (2026-10-22), derived from `AGENTS.md`, `docs/decisions/*.md`, and the code. The text in
 parentheses after a requirement names its source decision. The ADRs keep the reasons; this
 file keeps the current rule. If code and an ADR disagree, the item is in `## Open Questions`.
+A requirement marked "Owner 2026-10-22" is a decision from the first question pass. It is not
+implemented yet when it differs from the code.
 
 ## Required Requirement Inputs
 
 - Project purpose: Manage the raids of the World of Warcraft (WotLK 3.3.5a) guild "Bratwurst des Schicksals" on the Rising-Gods realm: raid planning and signups, rosters, loot, Enhance Points (EP), item locks, armor tokens, wishlists, polls, and the Shadowmourne questline.
 - Primary users / actors: Visitor (no session); GUEST; MEMBER; RAIDASSISTENT; RAIDLEADER; ADMIN; the in-game addons RaidLedger and RaidWishlist (through copy and paste); the Rising-Gods profiler (external system).
 - Core workflows: Register with a code; sign up for a raid or report an absence; build the raid roster; record loot during or after the raid; archive the raid (award EP, expire locks, schedule the successor); correct history with an audit trail; maintain a wishlist and export it to RaidWishlist; exchange invite, roster, and loot data with RaidLedger.
-- Business objects / data entities: Player (account); Character (Charakter); Guild rank; Raid group; Raid series; Raid; Signup (Anmeldung); Absence (Absage / Unsicher); Attendance row (Aufstellung, Ersatzbank); Loot award; Unclaimed loot; EP transaction; Item lock; Wishlist item; Poll and vote; Registration request and code; Shadowmourne entry and raid task; Recruitment template (Gesuchtext); Boss order; Audit entry; Loot catalog (bundled, read-only).
+- Business objects / data entities: Player (account); Character (Charakter); Guild rank; Raid group; Raid series; Raid; Signup (Anmeldung); Absence (Absage / Unsicher); Attendance row (Aufstellung, Ersatzbank); Loot award; Unclaimed loot; EP transaction; Item lock; Wishlist item; Poll and vote; Registration request and code; Shadowmourne entry and raid task; Recruitment template (Gesuchtext); Boss order; Boss kill; Audit entry; Loot catalog (bundled, read-only).
 - External integrations: Rising-Gods profiler `db.rising-gods.de` (character lookup), optionally through a guild-owned Cloudflare Worker; RaidLedger and RaidWishlist addons (text formats RS1, RS2, WL2; bundled downloads).
 - Authentication / roles: Local accounts with password; optional TOTP, recovery codes, and WebAuthn security keys; cookie session. Roles in ascending order GUEST < MEMBER < RAIDASSISTENT < RAIDLEADER < ADMIN. A higher role has all powers of a lower role. "Staff" means RAIDASSISTENT and higher.
-- Regulatory or privacy constraints: UNKNOWN (see OQ-9).
+- Regulatory or privacy constraints: The owner treats the EU GDPR (DSGVO) as applicable. A legal review is UNKNOWN (see OQ-12).
 
 ## Functional Requirements
 
 ### 1. Access and roles
 
 - **FR-1.1** The system MUST enforce every permission on the server. Hidden UI controls MUST NOT be the only check. (ADR 010)
-- **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044)
+- **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the statistics, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044; (Owner 2026-10-22, OQ-6))
 - **FR-1.3** The public player list MUST show only ID, name, guild rank, and active state. It MUST NOT show login names. (ADR 067, 084)
-- **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, and `/addons` without a session. (ADR 083, 085)
+- **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/statistics`, and the privacy page without a session. (ADR 083, 085; Owner 2026-10-22, OQ-6 and OQ-9)
 - **FR-1.5** The system MUST require a session for all other reads. (ADR 067)
 - **FR-1.6** The system MUST reject a request with a role that is too low with HTTP 403. It MUST reject a request without a session on a protected endpoint with HTTP 401. (ADR 010)
 - **FR-1.7** These reads MUST require RAIDASSISTENT or higher: the archive preview, the recruitment template, and the wishlist interests of a raid. (ADR 068, 069)
@@ -38,7 +40,7 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 - **FR-2.5** The system MUST treat an unknown or expired session as no session, not as an error. (ADR 010, 020)
 - **FR-2.6** Logout MUST end the session. (ADR 010)
 - **FR-2.7** A logged-in user MUST be able to change the own password. (ADR 046)
-- **FR-2.8** The system MUST reject a state-changing browser request that has no valid CSRF token. (ADR 046; see OQ-5)
+- **FR-2.8** The system MUST reject every state-changing request that carries a session cookie and has no valid CSRF token. Missing `Origin` and `Sec-Fetch-Site` headers MUST NOT skip this check. (ADR 046; (Owner 2026-10-22, OQ-5))
 - **FR-2.9** An inactive account MUST NOT log in. (ADR 020)
 - **FR-2.10** At startup, the system MUST create the first ADMIN from the configured bootstrap credentials if the account does not exist. It MUST NOT change an existing account. (ADR 020)
 - **FR-2.11** The `/login` page MUST send a logged-in user to the overview. (ADR 081)
@@ -60,11 +62,12 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 - **FR-4.2** The system MUST reject a registration or claim request with HTTP 409 `registration_request_exists` when a request for the same profile is PENDING, APPROVED, or CONSUMED. A REJECTED request MUST NOT block a new request. (ADR 055)
 - **FR-4.3** An ADMIN MUST be able to list requests, reject a request, create a single-use code for a request, mark a code as sent, and revoke an unused code. (ADR 040)
 - **FR-4.4** A registration code MUST expire 14 days after creation. (ADR 040)
-- **FR-4.5** Redeeming a new-account code MUST create a GUEST account, create or link the character, start a session, and consume the code. (ADR 040; see OQ-3)
+- **FR-4.5** Redeeming a new-account code MUST create a MEMBER account, create or link the character, start a session, and consume the code. (ADR 040; (Owner 2026-10-22, OQ-3))
 - **FR-4.6** A logged-in user MUST be able to request a claim for a Rising-Gods character. Redeeming a claim code MUST link or move the character to the user. (ADR 040)
 - **FR-4.7** A claim MUST NOT change existing raid roster snapshots. (ADR 040)
 - **FR-4.8** The first Rising-Gods talent build MUST become the main spec. The second build MUST become the second spec when it exists. (ADR 040)
 - **FR-4.9** The admin request list MUST show the linked player, login, and date after a code is redeemed. (ADR 084)
+- **FR-4.10** The system MUST NOT change the role of existing GUEST accounts automatically. An ADMIN promotes them (FR-1.9). (Owner 2026-10-22, OQ-3)
 
 ### 5. Players and accounts
 
@@ -125,7 +128,7 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 - **FR-10.1** Staff MUST be able to create a raid with an instance, a size, an optional series, and an optional scheduled start. (ADR 021)
 - **FR-10.2** With a series, the system MUST take the raid name from the series template and MUST ignore a sent name. Without a series, the name MUST be given, else `name_required`. (ADR 035)
 - **FR-10.3** A raid MUST have one status: PLANNED, OPEN, COMPLETED, or CANCELLED. (AGENTS.md)
-- **FR-10.4** Staff MUST be able to cancel a raid that is not archived, completed, or cancelled. A cancelled raid MUST NOT get EP. (ADR 015)
+- **FR-10.4** Staff MUST be able to cancel a raid that is not archived, completed, or cancelled. A cancelled raid MUST NOT get EP. Cancelling MUST expire the active item locks of the raid (FR-17.6). (ADR 015; (Owner 2026-10-22, OQ-2))
 - **FR-10.5** Staff MUST be able to set the series and scheduled start of an active raid. The name MUST be editable only for a raid without a series. (ADR 021)
 - **FR-10.6** "Archivieren" MUST be the only final action. It MUST set COMPLETED, the completion time, and the archive time together. (ADR 021)
 - **FR-10.7** Archiving MUST be rejected when the raid has no series, no scheduled start, or an incomplete roster. Then no record MUST change. (ADR 021, 022)
@@ -144,7 +147,7 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 - **FR-11.1** "Aktueller Raid" MUST open the newest non-cancelled raid whose real or scheduled start is not in the future, else the next raid. With no raid, the answer MUST be HTTP 404 `no_current_raid`. (ADR 088)
 - **FR-11.2** The dashboard MUST show an active raid with a start time in the past as "Läuft" until staff archives it. This MUST NOT be a stored status. (ADR 034)
 - **FR-11.3** For MEMBER and higher, the overview MUST show the next four raids that have not started, with the user's status and actions to sign up with the main character, to decline, and to take back a decline. (ADR 081)
-- **FR-11.4** The dashboard MUST show the encounters of the configured instance. It MUST NOT show kill counts or a current boss. (ADR 030)
+- **FR-11.4** The dashboard MUST show the encounters of the configured instance. It MAY show kills only from recorded boss kills (FR-29.4). (ADR 030; (Owner 2026-10-22, OQ-7))
 - **FR-11.5** The UI MUST NOT show invented data: progression, RSVP rates, notifications, or performance numbers. (ADR 026)
 
 ### 12. Signups and absences
@@ -188,7 +191,7 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 - **FR-14.6** A new ENHANCED award MUST carry a nonblank `request_id`. An identical retry MUST return the stored award. The same key with other content MUST give a conflict. (ADR 024)
 - **FR-14.7** When an active item lock matches the item, the award MUST go to the lock owner as MAIN for 0 EP, and the lock MUST become USED. (ADR 012, 017)
 - **FR-14.8** A correction that keeps an ENHANCED recipient and method MUST keep the original cost. A change away from ENHANCED MUST refund the cost. A change of the ENHANCED recipient MUST refund the old winner and charge min(new balance, 50). (ADR 024)
-- **FR-14.9** Staff MUST be able to withdraw a manual loot award with a reason. The award MUST stay stored as withdrawn. (code; see OQ-1)
+- **FR-14.9** Staff MUST be able to withdraw a manual loot award. A reason MUST be required only for an archived raid (FR-26.5). The award MUST stay stored as withdrawn. (ADR 032; (Owner 2026-10-22, OQ-1))
 - **FR-14.10** Cancelled raids MUST reject loot writes. (ADR 032)
 - **FR-14.11** The UI MUST mark an item that was already awarded in the raid. It MUST allow a second award of the same item. (ADR 069)
 
@@ -216,7 +219,8 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 - **FR-17.3** A player MAY hold locks on different items. A raid MUST have at most one active lock for the same item. A competing lock MUST be rejected. (ADR 012, 017)
 - **FR-17.4** Item identity MUST use the trimmed item ID when both records have one, else the trimmed item name. (ADR 017)
 - **FR-17.5** Completed, cancelled, and archived raids MUST reject new locks. (ADR 017)
-- **FR-17.6** Archiving MUST expire each unused lock of the raid without EP loss. (ADR 012, 021; see OQ-2)
+- **FR-17.6** Archiving or cancelling a raid MUST expire each unused lock of the raid without EP loss. (ADR 012, 021; (Owner 2026-10-22, OQ-2))
+- **FR-17.7** Locks of raids cancelled before 2026-10-22 MUST NOT be changed. (Owner 2026-10-22, OQ-2)
 
 ### 18. Armor tokens
 
@@ -269,8 +273,9 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 ### 23. Recruitment text
 
 - **FR-23.1** Staff MUST be able to read and save a recruitment template for a planned or open raid: one per series, else one per raid. (ADR 068)
-- **FR-23.2** The template text MUST have at most 2000 characters and a 5×5 target setup. (ADR 068; see OQ-4)
+- **FR-23.2** The template text MUST have at most 2000 characters and a 5×5 target setup. (ADR 068)
 - **FR-23.3** The text MUST support `{{SETUP}}`, `{{SETUP_KURZ}}`, `{{TANK_SPECS}}`, `{{HEAL_SPECS}}`, `{{MDD_SPECS}}`, and `{{RDD_SPECS}}`, computed from the saved roster. (ADR 080)
+- **FR-23.4** The server MUST reject a target-setup slot value that is not a known class-and-spec value or "Irgendein" placeholder. (Owner 2026-10-22, OQ-4)
 
 ### 24. Polls
 
@@ -279,6 +284,7 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 - **FR-24.3** A MEMBER or higher MUST have one vote per poll and MAY change it while the poll is open. (code)
 - **FR-24.4** A vote on a closed poll or after its closing time MUST give HTTP 409 `poll_closed`. (code)
 - **FR-24.5** A CHOICE vote MUST reference only configured options. Duplicate or too many selections MUST be rejected. (ADR 039)
+- **FR-24.6** A poll write without a session MUST give HTTP 401 `login_required`, like every other protected endpoint. (Owner 2026-10-22, OQ-10)
 
 ### 25. Loot catalog
 
@@ -298,7 +304,8 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 
 ### 27. Statistics
 
-- **FR-27.1** The statistics page MUST show raids by status, class distribution, historical roles, loot distribution, most attendances, and most loot entries. (code; see OQ-6)
+- **FR-27.1** The statistics page MUST show raids by status, class distribution, historical roles, loot distribution, most attendances, and most loot entries. (Owner 2026-10-22, OQ-6)
+- **FR-27.2** Visitors without a session MUST be able to see the statistics, including loot totals per player. The public statistics MUST NOT show item lists or EP balances. (Owner 2026-10-22, OQ-6)
 
 ### 28. Guide, version, and language
 
@@ -306,6 +313,21 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 - **FR-28.2** The navigation MUST show the application version. A changelog page MUST list user-facing changes in German. (ADR 056)
 - **FR-28.3** All user-facing text MUST be German. (AGENTS.md)
 - **FR-28.4** The UI MUST show times in the user's local timezone. (ADR 003)
+
+### 29. Boss kills
+
+- **FR-29.1** A raid MUST have a list of killed bosses. Each entry MUST name a boss of the raid instance and the difficulty of that kill. (Owner 2026-10-22, OQ-7)
+- **FR-29.2** Difficulty MUST be recorded per boss, not per raid. (Owner 2026-10-22, OQ-7)
+- **FR-29.3** A new loot award of a boss MUST take its difficulty from the kill entry of that boss. (Owner 2026-10-22, OQ-7)
+- **FR-29.4** The dashboard MAY show progress from recorded kills. It MUST NOT show kills that were not recorded. (Owner 2026-10-22, OQ-7)
+- **FR-29.5** Who records kills, the allowed difficulty values, and the behaviour for loot without a kill entry are TO BE DECIDED (OQ-11).
+
+### 30. Privacy
+
+- **FR-30.1** The system MUST provide a German privacy page (Datenschutzerklärung) that is readable without login. Its content is TO BE DECIDED (OQ-12). (Owner 2026-10-22, OQ-9)
+- **FR-30.2** An ADMIN MUST be able to anonymise a player. Anonymisation MUST delete the login, password, sessions, MFA data, and Rising-Gods profile data, and MUST replace the player name. (Owner 2026-10-22, OQ-9)
+- **FR-30.3** Anonymisation MUST keep raid rosters, loot, EP transactions, and character names in raid history. (Owner 2026-10-22, OQ-9)
+- **FR-30.4** Audit entries MUST stay. They MUST NOT show the name of an anonymised player. (Owner 2026-10-22, OQ-9)
 
 ## Non-Functional Requirements
 
@@ -323,13 +345,9 @@ file keeps the current rule. If code and an ADR disagree, the item is in `## Ope
 
 ## Open Questions
 
-- **OQ-1** Loot withdrawal always requires a reason in the code. ADR 032 requires a reason only for archived raids. Which rule is correct for unarchived raids?
-- **OQ-2** Cancelling a raid does not expire its active item locks. ADR 012 says locks expire "at raid completion/end". Must cancellation expire locks too?
-- **OQ-3** Registration creates a GUEST account, but signups, wishlists, locks, and votes need MEMBER. Who promotes a new player to MEMBER, and is this manual step intended?
-- **OQ-4** The server checks only the shape and length of the recruitment target setup; slot values are checked in the browser only (ADR 068). Must the server also check slot values?
-- **OQ-5** The CSRF check accepts a state-changing request that has neither an `Origin` nor a `Sec-Fetch-Site` header. Is this intended for non-browser clients? (To resolve in `SECURITY.md`.)
-- **OQ-6** The statistics page has no decision record. Which figures are required, and who may see them?
-- **OQ-7** Raids do not store difficulty (normal or heroic), so the addon cannot set it (ADR 045). Is difficulty out of scope?
-- **OQ-8** ADR 070 requires an off-server backup but defines no provider, frequency, recovery point objective, or recovery time objective. What are these values?
-- **OQ-9** The system stores personal data (logins, Rising-Gods profiles, audit snapshots) and the guild is German. Does GDPR (DSGVO) apply, and what are the retention and deletion rules, including for the audit log?
-- **OQ-10** Poll endpoints still return the message "X-Actor-ID header required" for a missing session, although that header was removed. Must the message change? (Code `missing_actor` is stable.)
+The first question pass on 2026-10-22 resolved OQ-1 to OQ-7, OQ-9, and OQ-10. Their answers are
+in the requirements marked "Owner 2026-10-22". IDs are not reused.
+
+- **OQ-8** DEFERRED. ADR 070 requires an off-server backup but defines no location, frequency, recovery point objective, or recovery time objective. Blocks only NFR-2.3.
+- **OQ-11** Boss kills (FR-29): Which role records a kill? Which difficulty values apply (NORMAL, HEROIC, and Ulduar HARDMODE)? What happens to loot of a boss without a kill entry, and to existing loot? Can RaidLedger export kills?
+- **OQ-12** Privacy (FR-30): What does the privacy page say, and who is the responsible person? What replaces the name of an anonymised player? Who may request anonymisation, and how? Does the audit log need a retention period? A legal review is recommended.

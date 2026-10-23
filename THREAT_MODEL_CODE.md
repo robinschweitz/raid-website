@@ -118,7 +118,7 @@ No numeric risk scores; the **Impact** line says in words what an attacker gains
 sessions; validation checks only the 30-day expiry.
 - **Status:** CONFIRMED. **Response:** Mitigate. **Rules:** SC-017, SC-018.
 
-**CT-024 — MFA not enforced for Admins** — **Status:** CONFIRMED. **Rules:** SC-040.
+**CT-024 — MFA not enforced for Admins** — **Status:** FIX PENDING (#69). **Rules:** SC-040.
 
 **CT-025 — Admins reset passwords directly** — no reset-code flow. **Status:** CONFIRMED.
 **Rules:** SC-042.
@@ -411,7 +411,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-021 | CONFIRMED | Mitigate | App | SC-007 | T-008 |
 | CT-022 | CONFIRMED | Mitigate | App | SC-005 | — |
 | CT-023 | CONFIRMED | Mitigate | App | SC-041 | T-021 |
-| CT-024 | CONFIRMED | Mitigate | App | SC-040 | T-020 |
+| CT-024 | FIX PENDING | Mitigate | App | SC-040 | T-020 |
 | CT-025 | CONFIRMED | Mitigate | App | SC-042 | T-026 |
 | CT-026 | CONFIRMED | Mitigate | App | SC-043 | T-003 |
 | CT-027 | FIXED | Mitigate | App | SC-006 | T-001 |

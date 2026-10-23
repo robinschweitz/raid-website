@@ -9,6 +9,19 @@ import (
 
 type playerCtxKey struct{}
 
+type adminMFACtxKey struct{}
+
+// WithAdminSecondFactor records whether the authenticated ADMIN has a second factor
+// (SC-040). The auth middleware sets it only for ADMIN sessions.
+func WithAdminSecondFactor(ctx context.Context, has bool) context.Context {
+	return context.WithValue(ctx, adminMFACtxKey{}, has)
+}
+
+func adminHasSecondFactor(r *http.Request) bool {
+	has, _ := r.Context().Value(adminMFACtxKey{}).(bool)
+	return has
+}
+
 // WithActor stores the authenticated player on the context.
 func WithActor(ctx context.Context, p *player.Player) context.Context {
 	return context.WithValue(ctx, playerCtxKey{}, p)

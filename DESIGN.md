@@ -40,11 +40,11 @@ colors:
 typography:
   display:
     fontFamily: "Georgia, 'Times New Roman', serif"
-    fontSize: clamp(28px, 4vw, 42px)
+    fontSize: 42px
     fontWeight: 400
   headline-lg:
     fontFamily: "Georgia, 'Times New Roman', serif"
-    fontSize: clamp(1.65rem, 3vw, 2.2rem)
+    fontSize: 2.2rem
     fontWeight: 400
     letterSpacing: 0.01em
   brand:
@@ -316,6 +316,9 @@ One dark theme only (`color-scheme: dark`); there is no light mode.
 
 - **Serif for identity:** Georgia for the brand name, page titles (`headline-lg`) and the raid
   banner title (`display`), weight 400, slight letter spacing.
+- **Fluid title sizes:** the token sizes are the maximum. In CSS, `display` is
+  `clamp(28px, 4vw, 42px)` and `headline-lg` is `clamp(1.65rem, 3vw, 2.2rem)`, so titles shrink on
+  narrow screens.
 - **System sans for data:** `system-ui` stack for everything else. Body is 14px with 1.55 line
   height; tables, forms and badges step down to `label-md`, `body-sm` and `label-sm`.
 - **Caption:** sidebar captions and eyebrows are 12px, weight 650, uppercase, letter spacing

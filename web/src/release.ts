@@ -1,4 +1,4 @@
-export const appVersion = '1.0.32'
+export const appVersion = '1.0.33'
 
 export const changelog = [
   {
@@ -6,6 +6,13 @@ export const changelog = [
     title: 'Aktueller Raid führt zum nächsten Termin',
     changes: [
       '„Aktueller Raid“ öffnet einen noch laufenden Raid oder den nächsten anstehenden Termin. Abgeschlossene, abgesagte und archivierte Raids werden nicht mehr als aktuell angezeigt.',
+    ],
+  },
+  {
+    version: '1.0.32',
+    title: 'RaidLedger 2.5.1',
+    changes: [
+      'Neue RaidLedger-Version zum Herunterladen unter „Addons“. Behält der Plündermeister ein Item für den Gewinner eines Wurfs, nennt die Ansage im Raid jetzt den Gewinner („geht an Alice – Main-Spec (bei Tester bis zum Handel)“) statt den Plündermeister. Für den Gewinner gezählt wurde es schon vorher sofort.',
     ],
   },
   {

@@ -401,6 +401,13 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Evidence:** FR-4.5, OD-016 (owner, 2026-10-23); `THREAT_MODEL_CODE.md` CT-005: redeem falls back to `FindByName` without any confirmation. Code: **not compliant**. Threats: T-043.
 - **Verification:** A request whose name matches an imported player cannot get a code until the Admin chooses; with "new player" the redeem creates a new player even though the name matches.
 
+**SC-050 - Only the profile fields the site uses are stored**
+- **Status:** ACTIVE
+- **Rule:** From a Rising-Gods profile the system MUST store only character name, class, specs, and gear score. The raw response MUST NOT be stored; existing raw copies on registration requests and characters MUST be removed by a migration.
+- **Enforcement:** `registration` and `characters` repositories; a database migration that drops or empties `raw_profile_json` and `external_profile_json`.
+- **Evidence:** FR-30.6, OD-017 (owner, 2026-10-23); `THREAT_MODEL_CODE.md` CT-030: the full response is stored and never read. Code: **not compliant**. Threats: T-047.
+- **Verification:** After registration and after the migration, no row holds a raw profile; the four fields are still shown.
+
 ## Open Security Decisions
 
 The owner decided OD-001 to OD-006, OD-008, and OD-009 on 2026-10-22; the answers are in the rules that
@@ -428,10 +435,5 @@ Decided by the owner on 2026-10-23 (threat model):
 - **OD-014** Password reset with an in-game code that also removes MFA → SC-042.
 - **OD-015** Written incident plan, no in-app button; the owner stays the only key holder → SC-044.
 - **OD-016** A match by character name is attached only after the Admin confirms it when creating the code → SC-049, FR-4.5.
-
-Open decision from the code threat model (`THREAT_MODEL_CODE.md`):
-
-- **OD-017** Keeping the raw Rising-Gods profile (FR-30.6; CT-030, T-047).
-  - Choice: keep the full profile response on registration requests and characters; keep only the fields the site uses (name, class, specs, gear score) and drop the raw copy; or drop the raw copy from finished registration requests only.
-  - Owner: owner.
+- **OD-017** Only name, class, specs, and gear score are kept from a Rising-Gods profile; raw copies are dropped → SC-050, FR-30.6.
 

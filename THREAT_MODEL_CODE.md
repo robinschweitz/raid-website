@@ -194,7 +194,7 @@ then fails and the error surfaces through CT-007. **Status:** CONFIRMED. **Rules
 - **Evidence:** the full profile response is stored on every registration request (also rejected
   and consumed ones) and every linked character; only name, class, specs, and gear score are used.
   The data is public on Rising-Gods, so sensitivity is low; anonymisation deletes it (FR-30.2).
-- **Status:** DECISION — OD-017. **Response:** Eliminate or Accept.
+- **Status:** CONFIRMED. **Response:** Eliminate (OD-017). **Rules:** SC-050.
 
 ## Checked without a finding
 
@@ -416,7 +416,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-027 | FIX PENDING | Mitigate | App | SC-006 | T-001 |
 | CT-028 | CONFIRMED | Mitigate | App | SC-018 | T-010 |
 | CT-029 | CONFIRMED | Eliminate | App | SC-038 | T-022 |
-| CT-030 | DECISION | — | App | OD-017 | T-047 |
+| CT-030 | CONFIRMED | Eliminate | App | SC-050, FR-30.6 | T-047 |
 
 CT-002 found nothing and has no row.
 

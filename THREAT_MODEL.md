@@ -370,7 +370,7 @@ threats that cross each boundary.
 - **Category:** Information disclosure (privacy: data minimisation). **Actor:** anyone with a copy of the database.
 - **Scenario:** The spec says what anonymisation deletes (FR-30.2) but not how much of a Rising-Gods
   profile may be stored in the first place, or for how long a finished registration request keeps it.
-- **Status:** PARTLY COVERED — OD-017; the data is public on Rising-Gods and is deleted on anonymisation.
+- **Status:** COVERED — FR-30.6, SC-050 (owner, 2026-10-23, OD-017).
 
 ## Implementation
 
@@ -596,7 +596,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-044 | COVERED | Mitigate | App | FR-5.9, SC-047 |
 | T-045 | COVERED | Mitigate | App | SC-048 |
 | T-046 | COVERED | Mitigate | Ops | SC-045, SC-039 |
-| T-047 | PARTLY COVERED | Mitigate | App | FR-30.6, OD-017 |
+| T-047 | COVERED | Eliminate | App | FR-30.6, SC-050 |
 
 ### Trust boundaries to threats
 

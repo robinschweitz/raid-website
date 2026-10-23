@@ -60,6 +60,7 @@ implemented yet when it differs from the code.
 - **FR-3.8** If the account has a security key and the browser supports WebAuthn, the UI MUST offer the security key first. Code login MUST stay available as a fallback only when the account has TOTP or recovery codes. (ADR 047)
 - **FR-3.9** After too many wrong codes in one MFA challenge (SC-011), the user MUST start again with the password. (Owner 2026-10-22, OD-002)
 - **FR-3.10** An ADMIN without MFA MUST set up TOTP or a security key before using any Admin function (SC-040). (Owner 2026-10-23, OD-012)
+- **FR-3.11** Losing an MFA factor MUST be handled as follows, for every role: a user who still has another factor or an unused recovery code (FR-3.3) MUST log in with it and MAY replace the lost factor; a user who has none MUST get a password reset (FR-5.8), which removes all MFA; an ADMIN after such a reset falls under FR-3.10 again. Getting the ADMIN role, by role change or bootstrap, also falls under FR-3.10. When the only ADMIN loses access, the recovery path is OD-019.
 
 ### 4. Registration and character claiming
 
@@ -318,6 +319,7 @@ implemented yet when it differs from the code.
 
 - **FR-27.1** The statistics page MUST show raids by status, class distribution, historical roles, loot distribution, most attendances, and most loot entries. (Owner 2026-10-22, OQ-6)
 - **FR-27.2** Visitors without a session MUST be able to see the statistics, including loot totals per player. The public statistics MUST NOT show item lists or EP balances. (Owner 2026-10-22, OQ-6)
+- **FR-27.3** The statistics response MUST contain only counts, statuses, classes, roles, and player and character names (for an anonymised player, the replacement name of FR-30.2). It MUST NOT contain item IDs or names, EP values, notes, absence reasons, logins, or roles of accounts. The field list is owned by `ARCHITECTURE.md`.
 
 ### 28. Guide, version, and language
 
@@ -339,16 +341,20 @@ implemented yet when it differs from the code.
 - **FR-29.9** Removal of a kill MUST be rejected while the raid has loot of that boss that is not withdrawn. (Owner 2026-10-22, OQ-11)
 - **FR-29.10** The system MUST NOT create kills for loot recorded before this feature. Such raids MUST show that no kills are recorded. (Owner 2026-10-22, OQ-11)
 - **FR-29.11** RaidLedger MUST NOT be changed for kills now. A kill export is out of scope. (Owner 2026-10-22, OQ-11)
+- **FR-29.12** If FR-29.7 or FR-29.8 meets a kill of that boss that already exists (recorded meanwhile by someone else), the write MUST use the existing kill when the difficulty is the same, and MUST otherwise be rejected with `409 kill_difficulty_conflict` without storing any loot or kill.
+- **FR-29.13** If any part of a loot write that creates a kill fails, neither the loot nor the kill MUST be stored; an addon import MUST be all-or-nothing in the same way.
+- **FR-29.14** A wrong difficulty MUST be corrected by changing the kill's difficulty. The change MUST be rejected while loot of that boss in the raid is not withdrawn (as FR-29.9), MUST follow FR-29.5, and MUST be audited with old and new difficulty.
 
 ### 30. Privacy
 
 - **FR-30.1** The system MUST provide a German privacy page (Datenschutzerklärung) that is readable without login. It MUST name the owner as the responsible person with a contact address (where the values come from: SC-033). (Owner 2026-10-22, OQ-9 and OQ-12)
 - **FR-30.2** An ADMIN MUST be able to anonymise a player. Anonymisation MUST delete the login, password, sessions, MFA data, and Rising-Gods profile data, and MUST replace the player name with the name of the player's main character. With several main characters, the oldest main MUST be used; with none, the oldest character; with no character, "Ehemaliges Mitglied #<player ID>". (Owner 2026-10-22, OQ-9, OQ-12 and OQ-13)
 - **FR-30.3** Anonymisation MUST keep raid rosters, loot, EP transactions, and character names in raid history. (Owner 2026-10-22, OQ-9)
-- **FR-30.4** Audit entries MUST stay without a time limit. They MUST NOT show the name of an anonymised player. (Owner 2026-10-22, OQ-9 and OQ-12)
+- **FR-30.4** Audit entries MUST stay without a time limit. They MUST NOT show the name of an anonymised player. Rationale for the privacy page: a traceable, contestable loot and EP record is a legitimate interest of the guild (GDPR Art. 6(1)(f)); only ADMINs can read the audit log (FR-1.8); on erasure requests audit entries are kept but the name is hidden (FR-30.2). A legal review stays recommended (THREAT_MODEL T-039). (Owner 2026-10-22, OQ-9 and OQ-12)
 - **FR-30.5** A person MUST ask for anonymisation through the contact on the privacy page. Only an ADMIN MUST be able to do it. Members MUST NOT get a self-service delete. (Owner 2026-10-22, OQ-12)
 - **FR-30.6** Login attempts (failed and successful), expired sessions, and expired MFA challenges MUST be deleted once no rule needs them (SC-038). From a Rising-Gods profile only character name, class, specs, and gear score MUST be stored; the raw response MUST NOT be kept (SC-050). (THREAT_MODEL T-022, T-047; Owner 2026-10-23, OD-017)
 - **FR-30.7** On a person's request through the privacy contact, an ADMIN MUST be able to download one machine-readable file with all data stored about that player: account (without secrets), characters, signups, absences, roster rows, loot, EP transactions, item locks, wishlist, votes, and audit entries about them. Members get no self-service export. (Owner 2026-10-23, OQ-15)
+- **FR-30.8** "Anonymisation" in FR-30.2 is pseudonymisation in GDPR terms: character names stay in raid history (FR-30.3) and are public in game, so a former member can still be recognised by people who know their characters. The privacy page MUST describe it this way and MUST NOT promise that the data becomes anonymous. (THREAT_MODEL T-048)
 
 ### 31. History and bulk changes
 

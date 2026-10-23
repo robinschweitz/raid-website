@@ -372,6 +372,28 @@ threats that cross each boundary.
   profile may be stored in the first place, or for how long a finished registration request keeps it.
 - **Status:** COVERED — FR-30.6, SC-050 (owner, 2026-10-23, OD-017).
 
+### Found through the external review (2026-10-23)
+
+**T-048 — Former members stay recognisable after "anonymisation" (LINDDUN Identifying, Linking)**
+- **Category:** Information disclosure (privacy). **Actor:** anyone who knows a member's characters.
+- **Scenario:** FR-30.2 replaces the player name with a main character's name and FR-30.3 keeps
+  character names in history, so the result is pseudonymous, not anonymous.
+- **Status:** ACCEPTED — owner decision OQ-9 (history stays complete); FR-30.8 requires the privacy
+  page to say so.
+
+**T-049 — Account recovery is the weakest path to an account**
+- **Category:** Spoofing, Elevation of privilege. **Actor:** someone who gets a reset code.
+- **Scenario:** A reset removes MFA (FR-5.8); a long-lived or repeatable code, unlimited guessing,
+  or an unlogged reset would make it a quiet way around MFA, and the only Admin has no one to ask.
+- **Status:** PARTLY COVERED — SC-042 (single-use, revokes older codes, rate-limited, logged, ends
+  sessions), FR-3.11; open: OD-018, OD-019.
+
+**T-050 — Concurrent or failed kill-and-loot writes leave inconsistent difficulties**
+- **Category:** Tampering (integrity).
+- **Scenario:** Two staff record loot of the same boss at once with different difficulties, or a
+  loot write fails after the kill was created.
+- **Status:** COVERED — FR-29.6, FR-29.12 to FR-29.14.
+
 ## Implementation
 
 The Manicode playbook expects an empty repository and asks stage 06 to record that no
@@ -597,6 +619,9 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-045 | COVERED | Mitigate | App | SC-048 |
 | T-046 | COVERED | Mitigate | Ops | SC-045, SC-039 |
 | T-047 | COVERED | Eliminate | App | FR-30.6, SC-050 |
+| T-048 | ACCEPTED | Accept | App | FR-30.8, OQ-9 |
+| T-049 | PARTLY COVERED | Mitigate | App | SC-042, FR-3.11, OD-018, OD-019 |
+| T-050 | COVERED | Mitigate | App | FR-29.12 to FR-29.14 |
 
 ### Trust boundaries to threats
 
@@ -604,10 +629,10 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | --- | --- |
 | TB-1 Internet → proxy | T-001, T-003, T-016, T-017 |
 | TB-2 Proxy → application | T-001, T-008 |
-| TB-3 Browser → API | T-002 to T-007, T-009, T-010, T-019, T-020, T-023, T-026, T-027, T-031 to T-036, T-038, T-042 to T-045 |
+| TB-3 Browser → API | T-002 to T-007, T-009, T-010, T-019, T-020, T-023, T-026, T-027, T-031 to T-036, T-038, T-042 to T-045, T-049, T-050 |
 | TB-4 Application → Rising-Gods | T-015, T-016, T-025 |
 | TB-5 Addon text → application | T-018 |
-| TB-6 Application → database and snapshots | T-011, T-021, T-022, T-030, T-047 |
+| TB-6 Application → database and snapshots | T-011, T-021, T-022, T-030, T-047, T-048 |
 | TB-7 Build and deploy | T-012, T-013, T-014, T-028, T-029, T-046 |
 | Organisation (no technical boundary) | T-037, T-039, T-040, T-041 |
 

@@ -17,7 +17,7 @@ and open security decisions. All security controls are written here; other files
   `db.rising-gods.de`, optionally via a Cloudflare Worker; personal data under GDPR (FR-30);
   production sets `ENV=production`, `COOKIE_SECURE=true`, `TRUST_PROXY_HEADERS=true`,
   `PUBLIC_ORIGIN` (deploy/README.md).
-- **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (specification, T-001 to T-047) and `THREAT_MODEL_CODE.md` (implementation, CT-001 to CT-030).
+- **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (specification, T-001 to T-050) and `THREAT_MODEL_CODE.md` (implementation, CT-001 to CT-030).
 - **Material gaps:** off-server backup storage and key holder (OQ-14, OD-007).
 - **Conflicts found:** the client address can be forged behind nginx (SC-006, fixed in PR #44);
   production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007); `main` is
@@ -347,10 +347,10 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-042 - Password reset with an in-game code**
 - **Status:** ACTIVE
-- **Rule:** A password reset MUST use a single-use reset code that an Admin creates for a player and sends in game to that player's main character, with the same randomness, hashing, lifetime, and revocation as registration codes (SC-013). Redeeming it MUST set a new password (SC-005), MUST remove the player's TOTP settings, recovery codes, and security keys, and MUST end all sessions of the player (SC-017), in one audited transaction. An Admin MUST NOT set another player's password directly for a reset.
+- **Rule:** A password reset MUST use a single-use reset code that an Admin creates for a player and sends in game to that player's main character, with the same randomness, hashing, lifetime, and revocation as registration codes (SC-013). Redeeming it MUST set a new password (SC-005), MUST remove the player's TOTP settings, recovery codes, and security keys, and MUST end all sessions of the player (SC-017), in one audited transaction. An Admin MUST NOT set another player's password directly for a reset. Creating a reset code MUST revoke any earlier unused reset code of the same player. The code lifetime is OD-018. Failed redemptions of reset and registration codes MUST count against the per-address limit of SC-043. Creating and redeeming a reset code MUST be logged as security events (SC-041). The in-game message is the only notification channel; a player who did not ask for the reset notices because their old password stops working (accepted: the site stores no e-mail). A reset of an ADMIN is followed by SC-040.
 - **Enforcement:** reset-code workflow (`registration` code infrastructure, PROPOSED); `auth`.
 - **Evidence:** FR-5.8, OD-014 (owner, 2026-10-23). Code: **not compliant** — not built; Admins set passwords directly. Threats: T-026.
-- **Verification:** A redeemed code works once; afterwards old sessions return 401, MFA is off, and the new password logs in.
+- **Verification:** A redeemed code works once; afterwards old sessions return 401, MFA is off, and the new password logs in; a second code revokes the first; the 31st failed redemption from one address in 15 minutes is rejected.
 
 **SC-043 - Login limit per client address**
 - **Status:** ACTIVE
@@ -422,7 +422,7 @@ cite them. IDs are not reused.
 - **OD-008** 7-day idle timeout → SC-018.
 - **OD-009** CSRF token also for requests without a session cookie (login, MFA, registration) → SC-019, FR-2.8. Found during ownership reconciliation.
 
-- **OD-007** DEFERRED. Off-server backup storage and key holder (SC-034).
+- **OD-007** DEFERRED. Off-server backup storage and key holder (SC-034). Owner: owner. Done when SC-034's rule and verification are met: an encrypted daily copy off the host, a key that also exists off the host, and a monthly restore test on another machine. Revisit date: see OD-020.
   - Missing: storage location and who holds the encryption key. Same decision as OQ-14 in `REQUIREMENTS.md`.
   - Affected: SC-034, NFR-2.3. Owner: owner.
 
@@ -436,4 +436,10 @@ Decided by the owner on 2026-10-23 (threat model):
 - **OD-015** Written incident plan, no in-app button; the owner stays the only key holder → SC-044.
 - **OD-016** A match by character name is attached only after the Admin confirms it when creating the code → SC-049, FR-4.5.
 - **OD-017** Only name, class, specs, and gear score are kept from a Rising-Gods profile; raw copies are dropped → SC-050, FR-30.6.
+
+Open decisions from the external review of 2026-10-23:
+
+- **OD-018** Lifetime of a password reset code (SC-042). Choice: the registration lifetime of 14 days (SC-013), or a shorter one such as 72 hours. Owner: owner.
+- **OD-019** Recovery when the only ADMIN loses password and MFA (FR-3.11). Choice: a command run on the server by the operator that creates a reset code for a named player (audited); or manual database repair with a written procedure; or always keep a second ADMIN. Owner: owner.
+- **OD-020** Revisit date for OD-007. Owner: owner.
 

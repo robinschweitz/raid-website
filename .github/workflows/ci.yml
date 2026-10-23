@@ -29,6 +29,8 @@ jobs:
       - name: Test frontend
         working-directory: web
         run: npm test
+      - name: Lint DESIGN.md
+        run: npx --yes @google/design.md@0.4.0 lint DESIGN.md
       - uses: actions/setup-go@v5
         with:
           go-version: 1.26.x

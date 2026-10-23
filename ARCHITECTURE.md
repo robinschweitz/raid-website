@@ -64,6 +64,12 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
 - **Statistics.** A public `GET /api/v1/statistics` returns only server-computed aggregates
   (FR-27.2); the statistics page reads only this endpoint (Owner 2026-10-22, AQ-2). Not built: the
   page now computes figures in the browser from login-only and per-raid loot endpoints.
+  Response contract (FR-27.3), all counts integers:
+  `raids_by_status` (`[{status, count}]`), `class_distribution` (`[{class, count}]`),
+  `role_history` (`[{role, count}]`), `loot_by_class` (`[{class, count}]`),
+  `top_attendance` and `top_loot` (`[{player_id, player_name, count}]`, at most 10 each).
+  A contract test MUST check, without a session, that the response has exactly these fields and
+  that no item, EP, note, or login field appears.
 - **Privacy.** `accountmerge` gains an Admin-only anonymise operation (FR-30.2–30.5). The privacy
   page is a static frontend page; its contact name and address come from two new configuration
   values, read by `internal/config`, and reach the page through a public read endpoint, PROPOSED

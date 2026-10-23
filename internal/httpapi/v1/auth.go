@@ -383,7 +383,11 @@ func (a *API) changeOwnPassword(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	if err := a.Auth.ChangeOwnPassword(r.Context(), actor.ID, req.CurrentPassword, req.NewPassword); err != nil {
+	currentToken := ""
+	if c, err := r.Cookie(auth.CookieName); err == nil {
+		currentToken = c.Value
+	}
+	if err := a.Auth.ChangeOwnPassword(r.Context(), actor.ID, currentToken, req.CurrentPassword, req.NewPassword); err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			WriteError(w, http.StatusUnauthorized, "invalid_credentials", "current password is invalid")
 			return

@@ -167,7 +167,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** The events in FR-2.13, FR-2.14, FR-5.4, and FR-30.2 MUST delete the affected session rows in the same transaction as the change. Disabling MFA does not end sessions.
 - **Enforcement:** `auth.ChangeOwnPassword`, the Admin account write in `registration`/`auth`, `accountmerge`.
-- **Evidence:** FR-2.13, FR-2.14, FR-5.4, FR-30.2, OD-001 (owner, 2026-10-22). Code: merge compliant; password and Admin changes **not compliant**. Threats: T-010.
+- **Evidence:** FR-2.13, FR-2.14, FR-5.4, FR-30.2, OD-001 (owner, 2026-10-22). Code: compliant since #66 — `ChangeOwnPassword` deletes the user's other sessions and keeps the current one, and `SetCredentials` deletes all sessions of the player when password, login name, or role changes (unchanged saves keep them), each in the same transaction as the change. Threats: T-010.
 - **Verification:** After a password change, a second session cookie returns 401 and the current one still works.
 
 **SC-018 - Session lifetime**

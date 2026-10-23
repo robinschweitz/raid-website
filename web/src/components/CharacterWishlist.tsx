@@ -3,6 +3,7 @@ import { api, ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
 import { Link } from '../router'
 import type { WishlistAddonExport, WishlistSpec, WishlistWish } from '../types'
+import { ErrorMessage } from './ErrorMessage'
 
 interface Props {
   characterID: number
@@ -91,7 +92,7 @@ export function CharacterWishlist({ characterID, canEdit }: Props) {
 
   return <section className="card character-wishlist" aria-label="Wunschliste">
     <div className="section-heading"><div><h2>Wunschliste</h2><p className="muted">Reihenfolge, Spec und Enhanced gelten für das Wunschlisten-Addon. Enhanced würfelt 1+X bis 100+X mit X = EP-Stand, höchstens 50.</p></div><span className="badge info">{rows.length}</span></div>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {wishes === null && !error && <p className="muted">Lade Wunschliste…</p>}
     {wishes !== null && rows.length > 0 && <div className="addon-export-box" aria-label="Addon-Export">
       <h3>Ins Wunschlisten-Addon übernehmen</h3>

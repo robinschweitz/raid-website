@@ -1,4 +1,4 @@
-export const appVersion = '1.0.34'
+export const appVersion = '1.0.35'
 
 export const changelog = [
   {
@@ -6,6 +6,13 @@ export const changelog = [
     title: 'Absage gibt Item-Sperren frei',
     changes: [
       'Wird ein Raid abgesagt, laufen seine noch nicht eingelösten Item-Sperren jetzt ab. Dabei gehen keine Enhance Points verloren. Sperren früher abgesagter Raids bleiben unverändert.',
+    ],
+  },
+  {
+    version: '1.0.34',
+    title: 'Fehlermeldungen werden vorgelesen',
+    changes: [
+      'Alle Fehlermeldungen nutzen jetzt dieselbe Darstellung und werden von Screenreadern angesagt.',
     ],
   },
   {

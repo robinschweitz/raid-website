@@ -43,6 +43,8 @@ func registrationError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusBadRequest, "registration_invalid", "Bitte einen aktiven Rising-Gods-Charakter auswählen.")
 	case errors.Is(err, auth.ErrWeakPassword):
 		WriteError(w, http.StatusUnprocessableEntity, "password_too_short", "Das Passwort muss mindestens 12 Zeichen lang sein.")
+	case errors.Is(err, auth.ErrPasswordTooLong):
+		WriteError(w, http.StatusUnprocessableEntity, "password_too_long", passwordTooLongMessage)
 	default:
 		WriteError(w, http.StatusInternalServerError, "internal", "Registrierung konnte nicht verarbeitet werden.")
 	}

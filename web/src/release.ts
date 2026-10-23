@@ -1,8 +1,15 @@
-export const appVersion = '1.0.33'
+export const appVersion = '1.0.34'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Passwörter höchstens 72 Bytes',
+    changes: [
+      'Passwörter, die länger als 72 Bytes sind, werden abgelehnt statt gekürzt. Umlaute und Sonderzeichen zählen mehrfach. Das gilt bei Registrierung, Passwortänderung und Kontodaten durch Admins.',
+    ],
+  },
+  {
+    version: '1.0.33',
     title: 'Aktueller Raid führt zum nächsten Termin',
     changes: [
       '„Aktueller Raid“ öffnet einen noch laufenden Raid oder den nächsten anstehenden Termin. Abgeschlossene, abgesagte und archivierte Raids werden nicht mehr als aktuell angezeigt.',
@@ -74,7 +81,7 @@ export const changelog = [
     ],
   },
   {
-    version: appVersion,
+    version: '1.0.24',
     title: 'Schattengram im Raid: freie Auswahl aus der Aufstellung',
     changes: [
       'Bei „Schattengram im Raid“ kann die Raidleitung jetzt auch Krieger, Paladine und Todesritter aus der Aufstellung einteilen, die nicht auf der Schattengram-Liste stehen.',

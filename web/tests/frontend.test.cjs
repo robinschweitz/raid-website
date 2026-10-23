@@ -1115,6 +1115,14 @@ test('login has a synchronous guard and German network failure feedback', async 
   assert.equal(nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit' && text(n) === 'Anmelden')[0].props.disabled, false)
 })
 
+test('registration password field states the 72-byte limit in German (REQ-AUTH-023)', () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/Login.tsx').LoginPage)
+  button(view, 'Registrieren').props.onClick()
+  view.render()
+  assert.match(text(view.tree), /höchstens 72 Bytes/)
+})
+
 test('login goes back to the password step after too many wrong MFA codes', async () => {
   const s = setup()
   const { ApiError } = s.load('api.ts')

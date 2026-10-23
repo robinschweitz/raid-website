@@ -129,7 +129,7 @@ issue #60). **Rules:** SC-043.
 ### Request handling
 
 **CT-013 — CSRF check skipped without browser headers** — `csrfProtection` passes requests that
-carry neither `Origin` nor `Sec-Fetch-Site`. **Status:** CONFIRMED. **Rules:** SC-019.
+carry neither `Origin` nor `Sec-Fetch-Site`. **Status:** CONFIRMED.  Fixed in #68. **Rules:** SC-019.
 
 **CT-014 — No HTTP server timeouts** — `http.ListenAndServe` in `cmd/server/main.go`; also leaves
 GO-2026-6089 (HTTP/2 check without `ReadHeaderTimeout`) more exposed. **Status:** CONFIRMED.

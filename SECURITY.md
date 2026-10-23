@@ -181,7 +181,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Every state-changing request (not GET, HEAD, OPTIONS) MUST carry an `X-CSRF-Token` header equal to the CSRF cookie, compared in constant time, whether or not it carries a session cookie, `Origin`, or `Sec-Fetch-Site`. This includes login, MFA verification, and registration. The token MUST be 32 bytes from `crypto/rand`.
 - **Enforcement:** `csrfProtection` middleware; `GET /api/v1/auth/csrf`; `web/src/api.ts`.
-- **Evidence:** FR-2.8, OD-009 (owner, 2026-10-22). Code: **not compliant** — requests without `Origin` and `Sec-Fetch-Site` skip the check. `web/src/api.ts` already sends the token on every non-GET request. Threats: T-007.
+- **Evidence:** FR-2.8, OD-009 (owner, 2026-10-22). Code: compliant since #68 — `csrfProtection` checks every non-GET/HEAD/OPTIONS request, with or without a session cookie, `Origin`, or `Sec-Fetch-Site` (`TestReqAuth019_*`). `web/src/api.ts` sends the token on every non-GET request. Threats: T-007.
 - **Verification:** A POST with the session cookie, no CSRF header, and no `Origin` returns 403 `csrf_required`.
 
 ### Input, output, and API (V1, V2, V4)

@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/uptrace/bun"
+	"golang.org/x/crypto/bcrypt"
 
 	"raid-website/internal/audit"
 	"raid-website/internal/auth"
@@ -35,19 +38,13 @@ func setupServer(t *testing.T) (*httptest.Server, *bun.DB) {
 func setupServerWithOptions(t *testing.T, opts httpapi.Options) (*httptest.Server, *bun.DB) {
 	t.Helper()
 	ctx := context.Background()
-	dsn := "file:" + filepath.Join(t.TempDir(), "api.db") + "?_pragma=foreign_keys(1)"
-	bdb, err := db.Open(ctx, dsn)
+	path := filepath.Join(t.TempDir(), "api.db")
+	copyMigratedDatabase(t, path)
+	bdb, err := db.Open(ctx, "file:"+path+"?_pragma=foreign_keys(1)")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { _ = bdb.Close() })
-	m, err := migrations.NewMigrator(bdb.DB)
-	if err != nil {
-		t.Fatalf("migrator: %v", err)
-	}
-	if _, err := m.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
 	handler, err := httpapi.New(bdb.DB, opts)
 	if err != nil {
 		t.Fatalf("create handler: %v", err)
@@ -55,6 +52,52 @@ func setupServerWithOptions(t *testing.T, opts httpapi.Options) (*httptest.Serve
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 	return srv, bdb.DB
+}
+
+// migratedTemplate is a database file with every migration applied, built once per
+// test binary. Each test gets its own copy, which is much faster than migrating
+// a fresh database for every test.
+var migratedTemplate struct {
+	once sync.Once
+	data []byte
+	err  error
+}
+
+func copyMigratedDatabase(t *testing.T, dst string) {
+	t.Helper()
+	migratedTemplate.once.Do(func() {
+		dir, err := os.MkdirTemp("", "httpapi-template-")
+		if err != nil {
+			migratedTemplate.err = err
+			return
+		}
+		defer os.RemoveAll(dir)
+		path := filepath.Join(dir, "template.db")
+		ctx := context.Background()
+		bdb, err := db.Open(ctx, "file:"+path+"?_pragma=foreign_keys(1)")
+		if err != nil {
+			migratedTemplate.err = fmt.Errorf("open template: %w", err)
+			return
+		}
+		m, err := migrations.NewMigrator(bdb.DB)
+		if err == nil {
+			_, err = m.Migrate(ctx)
+		}
+		if closeErr := bdb.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			migratedTemplate.err = fmt.Errorf("migrate template: %w", err)
+			return
+		}
+		migratedTemplate.data, migratedTemplate.err = os.ReadFile(path)
+	})
+	if migratedTemplate.err != nil {
+		t.Fatalf("migrated template: %v", migratedTemplate.err)
+	}
+	if err := os.WriteFile(dst, migratedTemplate.data, 0o600); err != nil {
+		t.Fatalf("copy template: %v", err)
+	}
 }
 
 type fakeRegistrationFeed struct {
@@ -89,7 +132,8 @@ func (f fakeRegistrationFeed) LoadCharacter(ctx context.Context, profileID strin
 
 func seedAccount(t *testing.T, bdb *bun.DB, username, password string, role validation.Role) int64 {
 	t.Helper()
-	hash, err := auth.HashPassword(password)
+	// Minimum bcrypt cost keeps test logins fast; production hashing is tested in internal/auth.
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 	if err != nil {
 		t.Fatalf("hash password: %v", err)
 	}
@@ -98,7 +142,7 @@ func seedAccount(t *testing.T, bdb *bun.DB, username, password string, role vali
 	p := &player.Player{
 		Name:         username,
 		Username:     &uname,
-		PasswordHash: hash,
+		PasswordHash: string(hash),
 		Role:         role,
 		Active:       true,
 		CreatedAt:    now,

@@ -5,6 +5,7 @@ import { Link } from '../router'
 import { CharacterWishlist } from '../components/CharacterWishlist'
 import { characterClassName } from '../characterTheme'
 import type { Character } from '../types'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 // WishlistPage is the member's own wishlist with the addon export, reachable
 // from the navigation instead of only via the character page (ADR 081).
@@ -33,7 +34,7 @@ export function WishlistPage() {
   return <div>
     <div className="page-heading"><div><p className="eyebrow">Beute & Addon</p><h1>Meine Wunschliste</h1></div><Link to="/loot-catalog">Items im Beute-Katalog hinzufügen &rarr;</Link></div>
     <p className="muted">Items fügst du im <Link to="/loot-catalog">Beute-Katalog</Link> hinzu (Klick auf deinen Charakter beim Item). Hier legst du Spec und Enhanced fest und kopierst die Liste fürs Addon.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {characters === null && !error && <p className="muted">Lade Charaktere…</p>}
     {characters && characters.length === 0 && <p className="muted">Deinem Account sind noch keine Charaktere zugeordnet. Bitte wende dich an die Gildenleitung.</p>}
     {characters && characters.length > 1 && <div className="wishlist-character-picker" role="group" aria-label="Charakter wählen">

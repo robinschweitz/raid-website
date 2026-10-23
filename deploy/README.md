@@ -144,3 +144,109 @@ Keep the SSH configuration key-only; retain console access or a tested SSH key
 before applying it. APT fetches and installs updates daily, but does not reboot
 the host immediately. The separate reboot timer restarts only when required at
 03:00 Europe/Berlin.
+
+## Incident plan and secret rotation
+
+Use this plan when you suspect a compromise: unknown logins or role changes in
+the audit log, security events in the journal, a leaked secret, or a bad
+deployment. The owner is the only person who acts. There is no in-app "log
+everyone out" button (SC-044, OD-015). Run the commands as root on the host.
+Never write a secret into this repository or a chat; generate it on the host
+and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
+
+1. **Detect.** Look at what happened before you change anything:
+
+   ```sh
+   journalctl -u raid-website.service --since "7 days ago" --no-pager
+   journalctl -u raid-website-update.service --since "7 days ago" --no-pager
+   cat /opt/raid-website/current-revision
+   ```
+
+   The Admin audit log in the app shows data changes. The journal keeps
+   security events for 30 days (SC-041, not built yet: until then it holds only
+   request logs).
+
+2. **Contain: pause automatic deploys.** Stop the hourly update so a changed
+   `main` is not installed while you work:
+
+   ```sh
+   systemctl disable --now raid-website-update.timer
+   ```
+
+   Start it again with `systemctl enable --now raid-website-update.timer`
+   once the incident is closed.
+
+3. **Contain: end all sessions.** Every session lives in the `sessions` table.
+   Deleting every row logs everyone out, including you; the first request
+   after that returns 401 (SC-016). Snapshot first, then delete:
+
+   ```sh
+   systemctl start raid-website-backup.service
+   python3 -c "import sqlite3; c = sqlite3.connect('/var/lib/raid-website/raid.db'); c.execute('PRAGMA busy_timeout=5000'); print(c.execute('DELETE FROM sessions').rowcount, 'sessions deleted'); c.commit()"
+   ```
+
+   The service may keep running; SQLite serializes the write. Pending MFA
+   challenges expire after 5 minutes (SC-010) and need no action.
+
+4. **Rotate secrets.** Do this for every secret that may be exposed. After each
+   change to `/etc/raid-website.env`, run `systemctl restart raid-website.service`
+   and `curl --fail http://127.0.0.1:8080/api/v1/health`.
+
+   - **`ADMIN_PASSWORD`.** The server only creates the bootstrap Admin when the
+     account does not exist and never changes an existing one (FR-2.10).
+     Changing the variable alone therefore does not change the live password.
+     Set a new strong value in `/etc/raid-website.env` (so a rebuilt database
+     gets it), then change the live password: log in as an Admin and change the
+     own password in the app, which ends all other sessions (FR-2.13). If you
+     are locked out, use the server-side reset code command `cmd/reset-code`
+     (SC-051, not built yet); until it exists, restore access from a verified
+     snapshot (step 5). Any other Admin whose password may be known gets a new
+     password in the app (FR-2.14).
+   - **Worker token (`RISING_GODS_PROXY_TOKEN`).** The token exists twice and
+     both must match: the Worker secret `UPSTREAM_AUTH_TOKEN` in Cloudflare and
+     `RISING_GODS_PROXY_TOKEN` in `/etc/raid-website.env`. Generate a value with
+     `openssl rand -hex 32`, set the Worker secret first
+     (`cd workers && npx wrangler secret put UPSTREAM_AUTH_TOKEN`, paste the
+     value), then update the env file and restart. Lookups through the Worker
+     fail between the two steps (502 `rising_gods_unavailable`); registration
+     and login are unaffected.
+   - **Cloudflare API token (GitHub secret `CLOUDFLARE_API_TOKEN`).** It is used
+     only by `.github/workflows/deploy-rising-gods-proxy.yml` to deploy the
+     Worker. In the Cloudflare dashboard roll or delete the old token and create
+     a new one with only the Workers edit permission for this account, then
+     replace the GitHub repository secret of the same name. Check with a manual
+     run of that workflow (`workflow_dispatch`).
+   - **TOTP key (`TOTP_ENCRYPTION_KEY`).** SC-014 specifies the key and its
+     rotation (`TOTP_ENCRYPTION_KEYS_PREVIOUS`, re-encryption at startup), but it
+     is **not built**: TOTP secrets are still stored as plaintext and the
+     variable is not read. Until SC-014 is implemented there is no key to
+     rotate. If the database file or a snapshot leaked, treat every TOTP secret
+     as exposed: ask each user to disable and set up TOTP again (users with a
+     lost second factor get a password reset, FR-3.11). Once SC-014 is built,
+     rotate as it describes and keep the old key with the backup key material
+     until the last snapshot that uses it has expired.
+   - **Deploy keys.** The updater fetches the public repository over HTTPS and
+     uses no deploy key or token (see "Deployment safety"). If you later add
+     one, add its rotation step here. SSH access is key-only: remove unknown
+     keys from `~/.ssh/authorized_keys` of every account that can log in
+     (SC-035), and rotate the host-side Cloudflare or GitHub account passwords
+     and 2FA if they may be exposed.
+
+5. **Restore from a verified snapshot** if data or the binary may have been
+   tampered with. Pick a snapshot from before the incident, confirm it with
+   the SHA-256 sidecar next to it (`sha256sum -c <sidecar file>` inside
+   `/var/backups/raid-website`), and follow "Database recovery" above:
+
+   ```sh
+   ls -l /var/backups/raid-website/
+   systemctl start raid-website-backup-verify.service
+   ```
+
+   A restored database brings back old sessions and secrets; repeat step 3
+   (delete all sessions) and step 4 afterwards. Rebuild the binary only from a
+   reviewed commit of `main`, then check `cat /opt/raid-website/current-revision`.
+
+6. **Review and close.** Write down what happened, how it was found, and what
+   was rotated. Check the audit log for changes made during the incident and
+   correct them as Admin. Re-enable `raid-website-update.timer`. Record any
+   spec gap you found in `SECURITY.md` or `THREAT_MODEL.md`.

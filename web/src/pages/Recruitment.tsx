@@ -3,6 +3,7 @@ import { api, ApiError } from '../api'
 import type { Attendance } from '../types'
 import { defaultRecruitmentTemplate, recruitmentRoles, recruitmentStorageKey, renderRecruitmentText } from '../recruitmentText'
 import { iccIdealSetup, matchRaidSetup, renderSetupPlaceholders, setupOptions, type RaidSetup } from '../raidSetup'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 interface Props {
   raidID: number
@@ -118,7 +119,7 @@ export function RaidRecruitment({ raidID, seriesID, attendance: initialAttendanc
     <p className="muted">Die Zahlen werden aus der gespeicherten Raidaufstellung berechnet und alle 15 Sekunden aktualisiert. Ersatzbank-Spieler zählen nicht als besetzte Plätze.</p>
     <p className="muted">Vorlage und Soll-Besetzung gelten {seriesID ? 'für die ganze Raidserie' : 'für diesen Raid'} und werden mit „Vorlage speichern“ für alle Raidleiter gespeichert.{savedAt ? ` Zuletzt gespeichert: ${savedAt}.` : ''}</p>
     {fromBrowser && <p className="field-hint">Diese Vorlage stammt aus diesem Browser und ist noch nicht für andere gespeichert.</p>}
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     <section className="card">
       <h2>Raid und Soll-Besetzung</h2>
       <p className="muted">Das ICC-Idealsetup ist vorbelegt. Jede Gruppe hat fünf Positionen; „Leer“ deaktiviert einen Platz. Jeder aufgestellte Charakter kann nur einen Platz erfüllen.</p>

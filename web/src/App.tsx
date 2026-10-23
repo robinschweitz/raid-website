@@ -29,6 +29,7 @@ import { PrivacyPage } from './pages/Privacy'
 import { MFAReminderBanner } from './components/MFAReminderBanner'
 import { CurrentRaidPage } from './pages/CurrentRaid'
 import { appVersion } from './release'
+import { ErrorMessage } from './components/ErrorMessage'
 
 // After signing in from the login link the address is still /login.
 function RedirectHome() {
@@ -134,7 +135,7 @@ function Layout() {
       </header>
       {path !== '/kontosicherheit' && <MFAReminderBanner isSignedIn={player !== null} adminID={player?.role === 'ADMIN' ? player.id : undefined} path={path} />}
       <main id="main-content" className={path === '/' ? undefined : 'secondary-page'} tabIndex={-1}>
-        {error && <p className="error" role="alert">{error}</p>}
+        {error && <ErrorMessage>{error}</ErrorMessage>}
         <Routes />
       </main>
       </div>
@@ -168,7 +169,7 @@ function Gate() {
     return (
       <div className="login-wrap">
         <div className="card login-card">
-          <p className="error" role="alert">{error}</p>
+          <ErrorMessage>{error}</ErrorMessage>
           <button onClick={() => void refresh()}>Erneut versuchen</button>
         </div>
       </div>

@@ -38,27 +38,16 @@ type Template struct {
 	UpdatedAt time.Time  `json:"updated_at"`
 }
 
-type row struct {
-	bun.BaseModel `bun:"table:raid_recruitment_templates"`
-	ID            int64 `bun:"id,pk,autoincrement"`
-	SeriesID      *int64
-	RaidID        *int64
-	Text          string
-	SetupJSON     string
-	UpdatedBy     int64
-	UpdatedAt     time.Time
-}
-
 // Service reads and saves templates with an audit trail.
 type Service struct {
-	db    bun.IDB
+	repo  *Repo
 	raids *raid.Repo
 	audit *audit.Repo
 	now   func() time.Time
 }
 
 func NewService(db bun.IDB) *Service {
-	return &Service{db: db, raids: raid.NewRepo(db), audit: audit.NewRepo(db), now: func() time.Time { return time.Now().UTC() }}
+	return &Service{repo: NewRepo(db), raids: raid.NewRepo(db), audit: audit.NewRepo(db), now: func() time.Time { return time.Now().UTC() }}
 }
 
 func (s *Service) scope(ctx context.Context, raidID int64) (col string, id int64, err error) {
@@ -89,13 +78,12 @@ func (s *Service) Get(ctx context.Context, raidID int64) (*Template, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := new(row)
-	err = s.db.NewSelect().Model(r).Where(col+" = ?", id).Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
+	r, err := s.repo.find(ctx, col, id)
 	if err != nil {
 		return nil, err
+	}
+	if r == nil {
+		return nil, nil
 	}
 	return toTemplate(r)
 }
@@ -126,8 +114,8 @@ func (s *Service) Save(ctx context.Context, raidID, actor int64, text string, se
 		return nil, err
 	}
 	var saved *Template
-	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		txs := &Service{db: tx, raids: raid.NewRepo(tx), audit: audit.NewRepo(tx), now: s.now}
+	err := s.repo.runInTx(ctx, func(ctx context.Context, tx bun.Tx) error {
+		txs := &Service{repo: NewRepo(tx), raids: raid.NewRepo(tx), audit: audit.NewRepo(tx), now: s.now}
 		col, id, err := txs.scope(ctx, raidID)
 		if err != nil {
 			return err
@@ -141,8 +129,7 @@ func (s *Service) Save(ctx context.Context, raidID, actor int64, text string, se
 			return err
 		}
 		now := s.now()
-		_, err = tx.ExecContext(ctx, "INSERT INTO raid_recruitment_templates ("+col+", text, setup_json, updated_by, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT("+col+") WHERE "+col+" IS NOT NULL DO UPDATE SET text = excluded.text, setup_json = excluded.setup_json, updated_by = excluded.updated_by, updated_at = excluded.updated_at", id, text, string(setupJSON), actor, now)
-		if err != nil {
+		if err = txs.repo.upsert(ctx, col, id, text, string(setupJSON), actor, now); err != nil {
 			return err
 		}
 		saved = &Template{Text: text, Setup: setup, UpdatedBy: actor, UpdatedAt: now}

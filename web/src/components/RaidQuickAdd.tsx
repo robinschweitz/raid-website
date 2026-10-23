@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api'
 import type { Attendance, AttendanceRole, ExternalCharacter, Player } from '../types'
+import { ErrorMessage } from './ErrorMessage'
 
 interface Props {
   raidID: number
@@ -69,7 +70,7 @@ export function RaidQuickAdd({ raidID, players, options, needsReason, onAdded, o
   }
   return <form className="subcard" onSubmit={save} aria-label="Neuen Charakter zum Raid hinzufügen">
     <h3>Neuen Charakter anlegen</h3>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     <fieldset disabled={pending || uncertain} className="inline-form">
       <label>Rising-Gods-Charakter<input required autoFocus={initialQuery !== ''} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
       <button type="button" disabled={pending || query.trim().length < 3} onClick={() => void search()}>{searching ? 'Suche…' : 'Suchen'}</button>

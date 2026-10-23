@@ -298,7 +298,7 @@ implemented yet when it differs from the code.
 - **FR-24.3** A MEMBER or higher MUST have one vote per poll and MAY change it while the poll is open. (code; Owner 2026-10-22, review)
 - **FR-24.4** A vote on a closed poll or after its closing time MUST give HTTP 409 `poll_closed`. (code)
 - **FR-24.5** A CHOICE vote MUST reference only configured options. Duplicate or too many selections MUST be rejected. (ADR 039)
-- **FR-24.6** A poll write without a session MUST give HTTP 401 `login_required`, like every other protected endpoint. (Owner 2026-10-22, OQ-10)
+- **FR-24.6** A poll write without a session MUST give HTTP 401 `unauthenticated`, like every other protected endpoint. (Owner 2026-10-22, OQ-10; amended by ADR 095)
 
 ### 25. Loot catalog
 
@@ -401,7 +401,7 @@ done and was removed. IDs are not reused.
 - **OQ-7** Difficulty is tracked per boss through a kill log → FR-29.
 - **OQ-8** Daily encrypted off-server copy, monthly restore test → NFR-2.3, NFR-2.5.
 - **OQ-9** GDPR applies: privacy page and Admin anonymisation → FR-30.
-- **OQ-10** Poll writes without a session answer `login_required` → FR-24.6.
+- **OQ-10** Poll writes without a session answer `unauthenticated` (superseded: first answered `login_required`, see ADR 095) → FR-24.6.
 - **OQ-11** Kill log details → FR-29.5–29.11.
 - **OQ-12** Privacy details → FR-30.1–30.5.
 - **OQ-13** Anonymised name: oldest main, else oldest character → FR-30.2.

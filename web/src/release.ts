@@ -1,4 +1,4 @@
-export const appVersion = '1.0.34'
+export const appVersion = '1.0.35'
 
 export const changelog = [
   {
@@ -6,6 +6,13 @@ export const changelog = [
     title: 'Datenschutzerklärung',
     changes: [
       'Neue Seite „Datenschutz“, auch ohne Anmeldung lesbar (Link unten in der Seitenleiste). Sie nennt die verantwortliche Person mit Kontakt, erklärt welche Daten gespeichert werden, dass das Änderungsprotokoll unbegrenzt bleibt und dass eine Löschung Konten pseudonymisiert, aber nicht anonymisiert.',
+    ],
+  },
+  {
+    version: '1.0.34',
+    title: 'Fehlermeldungen werden vorgelesen',
+    changes: [
+      'Alle Fehlermeldungen nutzen jetzt dieselbe Darstellung und werden von Screenreadern angesagt.',
     ],
   },
   {

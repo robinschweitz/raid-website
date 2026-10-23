@@ -3,6 +3,7 @@ import { Bar, BarChart, Cell, Legend, Pie, PieChart, ResponsiveContainer, Toolti
 import { api, ApiError } from '../api'
 import { Link } from '../router'
 import type { Attendance, Character, LootAward, Player, Raid } from '../types'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 type RaidDetails = Record<number, { attendance: Attendance[]; loot: LootAward[] }>
 
@@ -125,8 +126,8 @@ export function StatisticsPage() {
 
   return <div className="statistics-page">
     <div className="page-heading"><div><p className="eyebrow">Gildenverlauf</p><h1>Statistiken</h1></div><Link to="/raids">Raid-Historie ansehen &rarr;</Link></div>
-    {error && <p className="error" role="alert">{error}</p>}
-    {detailsError && <p className="error" role="alert">{detailsError}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
+    {detailsError && <ErrorMessage>{detailsError}</ErrorMessage>}
     {(loading || detailsLoading) && <p className="muted" role="status">Statistiken werden aus gespeicherten Daten berechnet&hellip;</p>}
 
     <section className="statistics-summary" aria-label="Kennzahlen">

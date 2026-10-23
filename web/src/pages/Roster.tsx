@@ -4,6 +4,7 @@ import { useAuth } from '../auth'
 import { atLeast, type GuildRank, type RaidGroup } from '../types'
 import { useSubmission } from '../useSubmission'
 import { Link } from '../router'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 export function RosterPage() {
   const { pending, submit, isActive } = useSubmission()
@@ -93,7 +94,7 @@ export function RosterPage() {
     <div>
       <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Gildenkonfiguration</h1></div></div>
       {isAdmin && <div className="actions"><Link to="/raid-series">Raidserien konfigurieren</Link><Link to="/loot-catalog">Beute anzeigen</Link><Link to="/registration-requests">Registrierungsanfragen</Link></div>}
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
       <div className="configuration-grid"><section className="card">

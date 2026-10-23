@@ -347,10 +347,10 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-042 - Password reset with an in-game code**
 - **Status:** ACTIVE
-- **Rule:** A password reset MUST use a single-use reset code that an Admin creates for a player and sends in game to that player's main character, with the same randomness, hashing, lifetime, and revocation as registration codes (SC-013). Redeeming it MUST set a new password (SC-005), MUST remove the player's TOTP settings, recovery codes, and security keys, and MUST end all sessions of the player (SC-017), in one audited transaction. An Admin MUST NOT set another player's password directly for a reset. Creating a reset code MUST revoke any earlier unused reset code of the same player. The code lifetime is OD-018. Failed redemptions of reset and registration codes MUST count against the per-address limit of SC-043. Creating and redeeming a reset code MUST be logged as security events (SC-041). The in-game message is the only notification channel; a player who did not ask for the reset notices because their old password stops working (accepted: the site stores no e-mail). A reset of an ADMIN is followed by SC-040.
+- **Rule:** A password reset MUST use a single-use reset code that an Admin creates for a player and sends in game to that player's main character, with the same randomness, hashing, and revocation as registration codes (SC-013) and a lifetime of 72 hours. Redeeming it MUST set a new password (SC-005), MUST remove the player's TOTP settings, recovery codes, and security keys, and MUST end all sessions of the player (SC-017), in one audited transaction. An Admin MUST NOT set another player's password directly for a reset. Creating a reset code MUST revoke any earlier unused reset code of the same player. Failed redemptions of reset and registration codes MUST count against the per-address limit of SC-043. Creating and redeeming a reset code MUST be logged as security events (SC-041). The in-game message is the only notification channel; a player who did not ask for the reset notices because their old password stops working (accepted: the site stores no e-mail). A reset of an ADMIN is followed by SC-040.
 - **Enforcement:** reset-code workflow (`registration` code infrastructure, PROPOSED); `auth`.
-- **Evidence:** FR-5.8, OD-014 (owner, 2026-10-23). Code: **not compliant** — not built; Admins set passwords directly. Threats: T-026.
-- **Verification:** A redeemed code works once; afterwards old sessions return 401, MFA is off, and the new password logs in; a second code revokes the first; the 31st failed redemption from one address in 15 minutes is rejected.
+- **Evidence:** FR-5.8, OD-014, OD-018 (owner, 2026-10-23). Code: **not compliant** — not built; Admins set passwords directly. Threats: T-026.
+- **Verification:** A redeemed code works once; afterwards old sessions return 401, MFA is off, and the new password logs in; a second code revokes the first; the 31st failed redemption from one address in 15 minutes is rejected; a code older than 72 hours is rejected.
 
 **SC-043 - Login limit per client address**
 - **Status:** ACTIVE
@@ -436,10 +436,10 @@ Decided by the owner on 2026-10-23 (threat model):
 - **OD-015** Written incident plan, no in-app button; the owner stays the only key holder → SC-044.
 - **OD-016** A match by character name is attached only after the Admin confirms it when creating the code → SC-049, FR-4.5.
 - **OD-017** Only name, class, specs, and gear score are kept from a Rising-Gods profile; raw copies are dropped → SC-050, FR-30.6.
+- **OD-018** A password reset code lasts 72 hours → SC-042.
 
 Open decisions from the external review of 2026-10-23:
 
-- **OD-018** Lifetime of a password reset code (SC-042). Choice: the registration lifetime of 14 days (SC-013), or a shorter one such as 72 hours. Owner: owner.
 - **OD-019** Recovery when the only ADMIN loses password and MFA (FR-3.11). Choice: a command run on the server by the operator that creates a reset code for a named player (audited); or manual database repair with a written procedure; or always keep a second ADMIN. Owner: owner.
 - **OD-020** Revisit date for OD-007. Owner: owner.
 

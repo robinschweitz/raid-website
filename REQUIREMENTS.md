@@ -84,7 +84,7 @@ implemented yet when it differs from the code.
 - **FR-5.5** An account merge MUST move all records of the source, including EP transactions, to the target. Then it MUST delete the source permanently. (ADR 056)
 - **FR-5.6** An account merge MUST be rejected when both players have an active lock for the same item in the same raid. (ADR 050)
 - **FR-5.7** For a duplicate poll vote or quick-add request key, the merge MUST keep the entry of the target. (ADR 056)
-- **FR-5.8** A player who lost their password MUST get a one-time reset code from an ADMIN, sent in game to their main character. Redeeming it MUST let them set a new password and MUST remove their MFA so they can set it up again (SC-042). (Owner 2026-10-23, OD-014)
+- **FR-5.8** A player who lost their password MUST get a one-time reset code from an ADMIN, sent in game to their main character, valid for 72 hours. Redeeming it MUST let them set a new password and MUST remove their MFA so they can set it up again (SC-042). (Owner 2026-10-23, OD-014)
 - **FR-5.9** The system MUST keep at least one active ADMIN: a change that would remove the last one MUST be rejected (SC-047). (THREAT_MODEL T-044)
 
 ### 6. Characters

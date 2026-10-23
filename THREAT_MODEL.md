@@ -386,7 +386,7 @@ threats that cross each boundary.
 - **Scenario:** A reset removes MFA (FR-5.8); a long-lived or repeatable code, unlimited guessing,
   or an unlogged reset would make it a quiet way around MFA, and the only Admin has no one to ask.
 - **Status:** PARTLY COVERED — SC-042 (single-use, revokes older codes, rate-limited, logged, ends
-  sessions), FR-3.11; open: OD-018, OD-019.
+  sessions, 72-hour lifetime per OD-018), FR-3.11; open: OD-019.
 
 **T-050 — Concurrent or failed kill-and-loot writes leave inconsistent difficulties**
 - **Category:** Tampering (integrity).
@@ -620,7 +620,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-046 | COVERED | Mitigate | Ops | SC-045, SC-039 |
 | T-047 | COVERED | Eliminate | App | FR-30.6, SC-050 |
 | T-048 | ACCEPTED | Accept | App | FR-30.8, OQ-9 |
-| T-049 | PARTLY COVERED | Mitigate | App | SC-042, FR-3.11, OD-018, OD-019 |
+| T-049 | PARTLY COVERED | Mitigate | App | SC-042, FR-3.11, OD-019 |
 | T-050 | COVERED | Mitigate | App | FR-29.12 to FR-29.14 |
 
 ### Trust boundaries to threats

@@ -68,7 +68,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 **SC-004 - Public data stays minimal**
 - **Status:** ACTIVE
 - **Rule:** Only the reads in FR-1.2 may be served without a session (paths: `ARCHITECTURE.md` "Public interface"). Unauthenticated responses MUST be built from dedicated public DTOs that contain only the fields FR-1.3, FR-27.2, and FR-30.1 allow, never from the authenticated DTOs.
-- **Enforcement:** DTOs of the public endpoints; `GET /api/v1/statistics` (not built).
+- **Enforcement:** DTOs of the public endpoints; `GET /api/v1/statistics`.
 - **Evidence:** FR-1.2, FR-1.3, FR-27.2, ADR 067. Code: compliant for existing endpoints. Threats: T-023.
 - **Verification:** HTTP tests compare the exact field set of each public response.
 

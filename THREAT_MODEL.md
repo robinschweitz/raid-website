@@ -609,7 +609,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-035 | COVERED | Mitigate | App | SC-028 |
 | T-036 | ACCEPTED | Accept | App | FR-16.6, FR-16.8 |
 | T-037 | COVERED | Mitigate | App | FR-30.1 |
-| T-038 | COVERED | Mitigate | App | OQ-15 |
+| T-038 | COVERED | Mitigate | App | FR-30.7, OQ-15 |
 | T-039 | ACCEPTED | Accept | Ops | FR-30.4 |
 | T-040 | ACCEPTED | Accept | Ops | OD-015 |
 | T-041 | COVERED | Mitigate | Ops | SC-044, OD-015 |

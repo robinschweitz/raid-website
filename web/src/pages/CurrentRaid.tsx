@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import type { Raid } from '../types'
 
-// "Aktueller Raid" (ADR 088): the server picks the newest raid that has begun,
-// else the next one; this page only forwards to it. The forward replaces the
+// "Aktueller Raid" (ADR 094): the server picks the running raid, otherwise
+// the next upcoming raid; this page only forwards to it. The forward replaces the
 // history entry, so the back button does not land here again.
 export function CurrentRaidPage() {
   const [message, setMessage] = useState('Aktueller Raid wird gesucht …')

@@ -62,13 +62,13 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Handlers MUST take the actor from the request context set by the session middleware and MUST NOT read an actor from headers or bodies. The removed `X-Actor-ID` header MUST NOT return.
 - **Enforcement:** `internal/httpapi/v1/actor.go`, `authenticate` middleware.
-- **Evidence:** ADR 010, FR-24.6. Code: compliant (poll handlers still mention the header in an error message, FR-24.6).
+- **Evidence:** ADR 010, FR-24.6. Code: compliant. Poll writes answer a missing session with `unauthenticated` (ADR 095) and no longer mention the header (`internal/httpapi/v1/polls.go`; test `TestReqRaid013_AC01`).
 - **Verification:** Sending `X-Actor-ID` changes nothing; code search finds no header read.
 
 **SC-004 - Public data stays minimal**
 - **Status:** ACTIVE
 - **Rule:** Only the reads in FR-1.2 may be served without a session (paths: `ARCHITECTURE.md` "Public interface"). Unauthenticated responses MUST be built from dedicated public DTOs that contain only the fields FR-1.3, FR-27.2, and FR-30.1 allow, never from the authenticated DTOs.
-- **Enforcement:** DTOs of the public endpoints; `GET /api/v1/statistics` (not built).
+- **Enforcement:** DTOs of the public endpoints; `GET /api/v1/statistics`.
 - **Evidence:** FR-1.2, FR-1.3, FR-27.2, ADR 067. Code: compliant for existing endpoints. Threats: T-023.
 - **Verification:** HTTP tests compare the exact field set of each public response.
 
@@ -234,7 +234,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** The Go server MUST set `ReadHeaderTimeout` 10 s, `ReadTimeout` 30 s, `WriteTimeout` 60 s, and `IdleTimeout` 120 s, and on SIGTERM MUST stop accepting connections and give running requests 25 s to finish (systemd stops the service after 30 s).
 - **Enforcement:** `cmd/server/main.go` (`http.Server`, `Shutdown`).
-- **Evidence:** NFR-4.2, ARCHITECTURE "Server lifecycle", OD-005 (owner, 2026-10-22). Code: **not compliant** — `http.ListenAndServe` without limits. Threats: T-017.
+- **Evidence:** NFR-4.2, ARCHITECTURE "Server lifecycle", OD-005 (owner, 2026-10-22). Code: compliant — `cmd/server` builds an `http.Server` with these limits and shuts down on SIGTERM/SIGINT. Threats: T-017.
 - **Verification:** A client that sends headers slower than 10 s is disconnected; a request running during `systemctl restart` completes.
 
 ### External systems (V4, V12, V13)
@@ -310,7 +310,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** New Go or npm dependencies need owner approval (DR-11). Builds MUST use the committed lock files (`go.sum`, `npm ci`). CI workflows MUST declare minimal `permissions`. Every GitHub Action MUST be pinned to a full commit SHA with its version in a comment, and Dependabot MUST propose updates for GitHub Actions, Go modules, and npm as pull requests (Owner 2026-10-22, OD-006). Deploys come only from the protected `main` branch.
 - **Enforcement:** `.github/workflows/`, `deploy/`.
-- **Evidence:** ADR 071, ADR 072, DR-11, OD-006. Code: lock files and permissions compliant; actions are pinned by tag (**not compliant**); no Dependabot configuration. Threats: T-012, T-014, T-028.
+- **Evidence:** ADR 071, ADR 072, DR-11, OD-006. Code: lock files and permissions compliant; every `uses:` in `.github/workflows/` is pinned to a full commit SHA with the tag as a comment, and `.github/dependabot.yml` proposes weekly updates for GitHub Actions, Go modules, and npm (`/web`). Test: `internal/ciconfig` (`TestReqPlatform014_AC01`, `TestReqPlatform014_AC02`). Threats: T-012, T-014, T-028.
 - **Verification:** Workflow review; `npm ci` and `go build` fail on a lock-file mismatch.
 
 **SC-037 - Deployment scripts under review**
@@ -366,7 +366,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** `deploy/README.md` MUST contain an incident plan with these steps: end all sessions (the documented database command that deletes every session row), rotate `ADMIN_PASSWORD`, the Worker token, the Cloudflare API token, and the TOTP key, pause automatic deploys (stop `raid-website-update.timer`), and restore from a verified snapshot. There is no in-app "log everyone out" action. The owner is the only person who acts (T-040 accepted).
 - **Enforcement:** `deploy/README.md`.
-- **Evidence:** OD-015 (owner, 2026-10-23). Code: **not compliant** — no plan or rotation steps documented. Threats: T-040, T-041.
+- **Evidence:** OD-015 (owner, 2026-10-23). Code: plan written in `deploy/README.md` ("Incident plan and secret rotation", #108): detection, containment, rotation, restore, review. The TOTP key step says SC-014 is not built, and the Admin password step notes that the env variable does not change an existing account (FR-2.10) and refers to `cmd/reset-code` (SC-051, not built). Owner dry run still pending. Threats: T-040, T-041.
 - **Verification:** Each step was carried out once on a test setup and old session cookies returned 401 afterwards.
 
 **SC-045 - Patched Go toolchain**
@@ -380,7 +380,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Public endpoints that take a registration or reset code MUST validate the code before they reveal anything about accounts; with an invalid code they MUST answer `registration_code_invalid` whatever the username. The username check MUST run inside the code transaction, and a duplicate username there MUST map to `409 username_taken`, not to a server error.
 - **Enforcement:** `registration.RedeemNewAccount`; the reset-code flow (SC-042).
-- **Evidence:** `THREAT_MODEL_CODE.md` CT-003: the username check runs before the code check. Code: **not compliant**. Threats: T-042.
+- **Evidence:** `THREAT_MODEL_CODE.md` CT-003. Code: compliant for `registration.RedeemNewAccount` since #75 — the username check runs inside the code transaction after the code is validated, and a duplicate answers `409 username_taken` (`TestReqAccount010_*`); the reset-code flow still has to follow (SC-042). Threats: T-042.
 - **Verification:** With an invalid code, a taken and a free username get the same answer.
 
 **SC-047 - The last Admin stays an Admin**

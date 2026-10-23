@@ -35,7 +35,7 @@ func (a *API) listPolls(w http.ResponseWriter, r *http.Request) {
 func (a *API) createPoll(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "login required")
 		return
 	}
 	var req createPollRequest
@@ -118,7 +118,7 @@ func (a *API) getPoll(w http.ResponseWriter, r *http.Request) {
 func (a *API) votePoll(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "login required")
 		return
 	}
 	id, ok := pathID(r, "id")
@@ -183,7 +183,7 @@ func (a *API) listPollVotes(w http.ResponseWriter, r *http.Request) {
 func (a *API) closePoll(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {
-		WriteError(w, http.StatusUnauthorized, "missing_actor", "X-Actor-ID header required")
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "login required")
 		return
 	}
 	id, ok := pathID(r, "id")

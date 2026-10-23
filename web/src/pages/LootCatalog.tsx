@@ -7,6 +7,7 @@ import { useSubmission } from '../useSubmission'
 import { useAuth } from '../auth'
 import { NavIcon } from '../components/NavIcon'
 import { BossOrderEditor } from '../components/BossOrderEditor'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 const qualityClasses: Record<number, string> = {
   2: 'uncommon',
@@ -230,7 +231,7 @@ export function LootCatalogPage() {
     </div>}
     <section className="card"><h2>Beute finden</h2>
       <p className="muted">Truhenbeute ist direkt der Begegnung zugeordnet, etwa dem Luftschiffkampf oder Valithria. Suche nach Gegenstand oder Item-ID.</p>
-      {error && <p className="error" role="alert">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
       {loading ? <p className="muted" role="status">Beute wird geladen…</p> : catalog && <>
         <div className="catalog-filters">
           <label>Instanz<select value={instanceID} onChange={(e) => { setInstanceID(e.target.value); setBossID(''); setPage(0) }}><option value="">Alle Instanzen</option>{catalog.instances.map((instance) => <option key={instance.id} value={instance.id}>{instance.name}</option>)}</select></label>

@@ -3,6 +3,7 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { atLeast, type Poll, type Player, type PollType, type Vote } from '../types'
 import { useSubmission } from '../useSubmission'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 export function PollsPage() {
   const { pending, submit, isActive } = useSubmission()
@@ -105,7 +106,7 @@ export function PollsPage() {
   return (
     <div>
       <div className="page-heading"><div><p className="eyebrow">Gemeinsam entscheiden</p><h1>Umfragen</h1></div></div>
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
       {canManage && (

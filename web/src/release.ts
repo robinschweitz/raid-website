@@ -1,4 +1,4 @@
-export const appVersion = '1.0.34'
+export const appVersion = '1.0.35'
 
 export const changelog = [
   {
@@ -7,6 +7,13 @@ export const changelog = [
     changes: [
       'Ändert jemand sein Passwort, werden alle anderen Geräte abgemeldet; das aktuelle Gerät bleibt angemeldet.',
       'Ändert ein Admin Passwort, Benutzernamen oder Rolle eines Spielers, wird dieser Spieler überall abgemeldet.',
+    ],
+  },
+  {
+    version: '1.0.34',
+    title: 'Fehlermeldungen werden vorgelesen',
+    changes: [
+      'Alle Fehlermeldungen nutzen jetzt dieselbe Darstellung und werden von Screenreadern angesagt.',
     ],
   },
   {

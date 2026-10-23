@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api, ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
 import type { AddonLootImportResult, AddonLootPreview, AddonLootPreviewRow, AwardMethod } from '../types'
+import { ErrorMessage } from './ErrorMessage'
 
 interface Props {
   raidID: number
@@ -90,9 +91,9 @@ export function AddonLootImport({ raidID, onImported }: Props) {
     <div className="actions">
       <button type="button" disabled={pending || !payload.trim()} onClick={() => void runPreview()}>Vorschau</button>
     </div>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {preview && <>
-      {preview.warnings.map((warning) => <p key={warning} className="error" role="alert">{warning}</p>)}
+      {preview.warnings.map((warning) => <ErrorMessage key={warning}>{warning}</ErrorMessage>)}
       <p className="muted">Aufgezeichnet von {preview.recorder || 'unbekannt'} · {preview.rows.length} Zeilen</p>
       <div className="table-scroll">
         <table className="table small">
@@ -124,7 +125,7 @@ export function AddonLootImport({ raidID, onImported }: Props) {
                   </select>
                   : '—'}</td>
                 <td className="addon-hints">{row.errors.length > 0
-                  ? row.errors.map((text) => <div key={text} className="addon-hint-error">{text}</div>)
+                  ? row.errors.map((text) => <ErrorMessage key={text}>{text}</ErrorMessage>)
                   : row.warnings.map((text) => <div key={text} className="muted">{text}</div>)}</td>
               </tr>
             })}

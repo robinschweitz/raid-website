@@ -1,8 +1,16 @@
-export const appVersion = '1.0.30'
+export const appVersion = '1.0.31'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Höchstens fünf falsche Codes',
+    changes: [
+      'Bei der Anmeldung mit zweitem Faktor sind höchstens fünf falsche Codes erlaubt. Danach meldest du dich erneut mit deinem Passwort an.',
+      'Ein falscher Code wird jetzt auf Deutsch gemeldet.',
+    ],
+  },
+  {
+    version: '1.0.30',
     title: 'Schutz vor Passwort-Raten',
     changes: [
       'Nach 30 fehlgeschlagenen Anmeldungen von derselben Internetadresse innerhalb von 15 Minuten sind weitere Anmeldeversuche von dort vorübergehend gesperrt, egal für welchen Benutzernamen. Erfolgreiche Anmeldungen zählen nicht mit.',

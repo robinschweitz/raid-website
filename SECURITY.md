@@ -120,7 +120,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** One MFA challenge MUST accept at most 5 wrong TOTP or recovery codes. The fifth wrong code MUST invalidate the challenge, so the user starts again at the password step, which SC-008 limits.
 - **Enforcement:** `auth.VerifyMFAChallenge`; the challenge row counts failures.
-- **Evidence:** FR-3.9, V6, OD-002 (owner, 2026-10-22). Code: **not compliant** — no limit today. Threats: T-005.
+- **Evidence:** FR-3.9, V6, OD-002 (owner, 2026-10-22). Code: compliant since #62 — `mfa_login_challenges.failed_attempts` (migration 077) counts wrong codes; the fifth deletes the challenge and answers `401 mfa_challenge_invalid`, and the login page returns to the password step. Wrong WebAuthn assertions do not count. Threats: T-005.
 - **Verification:** After 5 wrong codes, the correct code for that challenge is rejected and a new password login is needed.
 
 **SC-012 - TOTP codes used once**

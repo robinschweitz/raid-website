@@ -98,7 +98,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
 - **Security events and account recovery.** Security events are written as structured lines to
   the systemd journal, which keeps them 30 days (SC-041). Password-reset codes reuse the
   registration-code infrastructure in `registration` (owner 2026-10-23, backlog #48), and the personal-data export
-  (FR-30.7) lives in `accountmerge` next to anonymisation (PROPOSED). (Owner 2026-10-23.) Not built.
+  (FR-30.7) lives in `accountmerge` next to anonymisation (owner 2026-10-23, backlog #50). (Owner 2026-10-23.) Not built.
 - **No background jobs.** Deadlines (signup close, MFA expiry) are evaluated on each request.
   Planning ahead runs on series save and archive (FR-9.7). The only periodic work is on the host
   (backups, updates, reboots; see `deploy/`).

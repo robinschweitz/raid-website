@@ -385,7 +385,7 @@ The owner's question and review passes on 2026-10-22 and 2026-10-23 resolved OQ-
 the requirements marked "Owner 2026-10-22". NFR-2.4 (delete the pre-migration-066 backup) is
 done and was removed. IDs are not reused.
 
-- **OQ-14** DEFERRED. Off-server backup (NFR-2.3): Which storage, and who holds the encryption key? Blocks only NFR-2.3.
+- **OQ-14** DEFERRED until 2026-11-30 (OD-020). Off-server backup (NFR-2.3): Which storage, and who holds the encryption key? Blocks only NFR-2.3.
 
 ### Resolved (2026-10-22)
 

@@ -429,7 +429,7 @@ cite them. IDs are not reused.
 - **OD-008** 7-day idle timeout → SC-018.
 - **OD-009** CSRF token also for requests without a session cookie (login, MFA, registration) → SC-019, FR-2.8. Found during ownership reconciliation.
 
-- **OD-007** DEFERRED. Off-server backup storage and key holder (SC-034). Owner: owner. Done when SC-034's rule and verification are met: an encrypted daily copy off the host, a key that also exists off the host, and a monthly restore test on another machine. Revisit date: see OD-020.
+- **OD-007** DEFERRED. Off-server backup storage and key holder (SC-034). Owner: owner. Done when SC-034's rule and verification are met: an encrypted daily copy off the host, a key that also exists off the host, and a monthly restore test on another machine. Decide by 2026-11-30 (OD-020).
   - Missing: storage location and who holds the encryption key. Same decision as OQ-14 in `REQUIREMENTS.md`.
   - Affected: SC-034, NFR-2.3. Owner: owner.
 
@@ -445,8 +445,4 @@ Decided by the owner on 2026-10-23 (threat model):
 - **OD-017** Only name, class, specs, and gear score are kept from a Rising-Gods profile; raw copies are dropped → SC-050, FR-30.6.
 - **OD-018** A password reset code lasts 72 hours → SC-042.
 - **OD-019** A locked-out only Admin gets a reset code from a server command → SC-051, FR-3.11.
-
-Open decisions from the external review of 2026-10-23:
-
-- **OD-020** Revisit date for OD-007. Owner: owner.
-
+- **OD-020** OD-007 (off-server backup) is decided by 2026-11-30.

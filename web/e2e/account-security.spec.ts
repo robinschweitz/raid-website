@@ -1,10 +1,13 @@
 import { expect, test } from '@playwright/test'
-import { admin, signIn, snapshot } from './fixtures'
+import { admin, apiAs, createMember, signIn, snapshot } from './fixtures'
 
 // ADR 092: players without a second factor see a thin reminder that leads to the
 // account-security explainer and from there straight to their account tab.
-test('MFA-Hinweis führt zur Erklärung und ins eigene Konto', async ({ page }, testInfo) => {
-  await signIn(page, admin)
+const reader = { username: 'e2e-sicherheit', password: 'sicherheit-password', name: 'Sicherheit', character: 'Wachsam', characterClass: 'Priester', mainSpec: 'Heilig', secondSpec: 'Disziplin' }
+
+test('MFA-Hinweis führt zur Erklärung und ins eigene Konto', async ({ page, request }, testInfo) => {
+  await createMember(request, reader)
+  await signIn(page, reader)
   const reminder = page.getByRole('note', { name: 'Hinweis zur Kontosicherheit' })
   await expect(reminder).toContainText('nur mit einem Passwort geschützt')
   await snapshot(page, testInfo, 'mfa-hinweis')
@@ -35,4 +38,24 @@ test('Kontosicherheit ist ohne Login lesbar', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Warum ein zweiter Faktor?', level: 1 })).toBeVisible()
   await expect(page.getByText('Melde dich an, um zu sehen')).toBeVisible()
   await expect(page.getByRole('note', { name: 'Hinweis zur Kontosicherheit' })).toHaveCount(0)
+})
+
+// FR-3.10, SC-040: an Admin without a second factor lands on the account tab, sees a
+// notice that cannot be hidden, and Admin pages say why they are locked.
+test('Admin ohne zweiten Faktor wird zur Einrichtung geschickt', async ({ page, request }, testInfo) => {
+  const newAdmin = { username: 'e2e-admin-ohne-mfa', password: 'admin-ohne-mfa-password', name: 'Neuer Admin', character: 'Wachturm', characterClass: 'Krieger', mainSpec: 'Schutz', secondSpec: 'Waffen' }
+  const { playerID } = await createMember(request, newAdmin)
+  const api = await apiAs(request, admin)
+  await api.put(`/api/v1/players/${playerID}/account`, { username: newAdmin.username, password: newAdmin.password, role: 'ADMIN' })
+
+  await signIn(page, newAdmin)
+  const notice = page.getByRole('alert').filter({ hasText: 'Als Admin brauchst du einen zweiten Faktor' })
+  await expect(notice).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`#/players/${playerID}/konto$`))
+  await expect(page.getByRole('button', { name: 'Authenticator einrichten' })).toBeVisible()
+  await expect(notice.getByRole('button')).toHaveCount(0)
+  await snapshot(page, testInfo, 'admin-mfa-pflicht')
+
+  await page.goto('/#/audit-log')
+  await expect(page.getByText('Als Admin musst du zuerst einen zweiten Faktor')).toBeVisible()
 })

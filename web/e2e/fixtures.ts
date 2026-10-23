@@ -1,5 +1,6 @@
 import { expect, type APIRequestContext, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { DatabaseSync } from 'node:sqlite'
+import { createHmac } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 
@@ -9,12 +10,50 @@ export const member = { username: 'e2e-mitglied', password: 'mitglied-password' 
 
 const databasePath = path.join(import.meta.dirname, '..', '.e2e', 'raid.db')
 
+// Admin functions need a second factor (FR-3.10, SC-040), so the e2e Admin has an
+// authenticator secret and logs in with a code, like a real Admin.
+const adminTOTPSecret = 'JBSWY3DPEHPK3PXP'
+
+function base32Decode(value: string): Buffer {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  let bits = ''
+  for (const char of value.replace(/=+$/, '').toUpperCase()) bits += alphabet.indexOf(char).toString(2).padStart(5, '0')
+  const bytes: number[] = []
+  for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2))
+  return Buffer.from(bytes)
+}
+
+/** The current RFC 6238 code for a base32 secret, as an authenticator app shows it. */
+export function totpCode(secret = adminTOTPSecret): string {
+  const counter = Buffer.alloc(8)
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 1000 / 30)))
+  const sum = createHmac('sha1', base32Decode(secret)).update(counter).digest()
+  const offset = sum[sum.length - 1] & 0x0f
+  return String((sum.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0')
+}
+
+/** Gives the e2e Admin its authenticator secret (idempotent). */
+function ensureAdminTOTP() {
+  const db = new DatabaseSync(databasePath)
+  const now = new Date().toISOString().replace('T', ' ').replace('Z', '+00:00')
+  db.prepare(`INSERT INTO player_mfa_settings (player_id, totp_secret, totp_enabled_at, created_at, updated_at)
+    SELECT id, ?, ?, ?, ? FROM players WHERE username = ?
+    ON CONFLICT(player_id) DO UPDATE SET totp_secret = excluded.totp_secret, totp_enabled_at = excluded.totp_enabled_at`).run(adminTOTPSecret, now, now, now, admin.username)
+  db.close()
+}
+
 /** Signs in through the API and returns a request context that sends the CSRF token. */
 export async function apiAs(request: APIRequestContext, user: { username: string; password: string }) {
   const csrf = async () => (await (await request.get('/api/v1/auth/csrf')).json()).data.token as string
+  if (user.username === admin.username) ensureAdminTOTP()
   const token = await csrf()
   const login = await request.post('/api/v1/auth/login', { data: user, headers: { 'X-CSRF-Token': token } })
   expect(login.ok(), await login.text()).toBeTruthy()
+  const started = (await login.json()).data
+  if (started?.mfa_required) {
+    const verified = await request.post('/api/v1/auth/mfa/verify', { data: { challenge: started.challenge, code: totpCode() }, headers: { 'X-CSRF-Token': await csrf() } })
+    expect(verified.ok(), await verified.text()).toBeTruthy()
+  }
   const send = async (method: 'post' | 'put' | 'patch', url: string, data: unknown) => {
     const response = await request[method](url, { data, headers: { 'X-CSRF-Token': await csrf() } })
     expect(response.ok(), `${method.toUpperCase()} ${url}: ${await response.text()}`).toBeTruthy()
@@ -78,10 +117,16 @@ export async function createPlannedSeries(request: APIRequestContext, name: stri
 }
 
 export async function signIn(page: Page, user: { username: string; password: string }) {
+  const usesTOTP = user.username === admin.username
+  if (usesTOTP) ensureAdminTOTP()
   await page.goto('/#/login')
   await page.getByLabel('Benutzername').fill(user.username)
   await page.getByLabel('Passwort').fill(user.password)
   await page.locator('form').getByRole('button', { name: 'Anmelden' }).click()
+  if (usesTOTP) {
+    await page.getByLabel('MFA-Code').fill(totpCode())
+    await page.locator('form').getByRole('button', { name: 'Anmelden' }).click()
+  }
   await expect(page.getByRole('button', { name: 'Abmelden' })).toBeVisible()
 }
 

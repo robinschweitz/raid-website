@@ -3,8 +3,13 @@ package httpapi_test
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base32"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -151,24 +156,63 @@ func seedAccount(t *testing.T, bdb *bun.DB, username, password string, role vali
 	if err := player.NewRepo(bdb).Create(context.Background(), p); err != nil {
 		t.Fatalf("seed account %s: %v", username, err)
 	}
+	if role == validation.RoleAdmin {
+		enableTestTOTP(t, bdb, p.ID)
+	}
 	return p.ID
+}
+
+// testTOTPSecret is the authenticator secret of every seeded ADMIN: Admin-only
+// routes require a second factor (SC-040), so test Admins log in with a TOTP code.
+const testTOTPSecret = "JBSWY3DPEHPK3PXP"
+
+func enableTestTOTP(t *testing.T, bdb *bun.DB, playerID int64) {
+	t.Helper()
+	now := time.Now().UTC()
+	if err := auth.NewRepo(bdb).UpsertMFASettings(context.Background(), &auth.MFASettings{PlayerID: playerID, TOTPSecret: testTOTPSecret, TOTPEnabledAt: &now, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatalf("enable test TOTP: %v", err)
+	}
+}
+
+// testTOTPCode computes the current RFC 6238 code for secret, as an authenticator app does.
+func testTOTPCode(t *testing.T, secret string) string {
+	t.Helper()
+	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
+	if err != nil {
+		t.Fatalf("decode TOTP secret: %v", err)
+	}
+	var msg [8]byte
+	binary.BigEndian.PutUint64(msg[:], uint64(time.Now().Unix()/30))
+	mac := hmac.New(sha1.New, key)
+	mac.Write(msg[:])
+	sum := mac.Sum(nil)
+	offset := sum[len(sum)-1] & 0x0f
+	bin := (uint32(sum[offset])&0x7f)<<24 | uint32(sum[offset+1])<<16 | uint32(sum[offset+2])<<8 | uint32(sum[offset+3])
+	return fmt.Sprintf("%06d", bin%1000000)
 }
 
 func login(t *testing.T, client *http.Client, srv *httptest.Server, username, password string) string {
 	t.Helper()
-	body, _ := json.Marshal(map[string]any{"username": username, "password": password})
-	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/auth/login", bytes.NewReader(body))
-	if err != nil {
-		t.Fatalf("new login request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("login: %v", err)
-	}
+	resp := postJSON(t, client, srv.URL+"/api/v1/auth/login", map[string]any{"username": username, "password": password})
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("login %s: status %d", username, resp.StatusCode)
+	}
+	var started struct {
+		Data struct {
+			MFARequired bool   `json:"mfa_required"`
+			Challenge   string `json:"challenge"`
+		} `json:"data"`
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	_ = json.Unmarshal(raw, &started)
+	if started.Data.MFARequired {
+		verified := postJSON(t, client, srv.URL+"/api/v1/auth/mfa/verify", map[string]any{"challenge": started.Data.Challenge, "code": testTOTPCode(t, testTOTPSecret)})
+		defer verified.Body.Close()
+		if verified.StatusCode != http.StatusOK {
+			t.Fatalf("login %s: MFA status %d", username, verified.StatusCode)
+		}
+		resp = verified
 	}
 	for _, c := range resp.Cookies() {
 		if c.Name == auth.CookieName {
@@ -177,6 +221,21 @@ func login(t *testing.T, client *http.Client, srv *httptest.Server, username, pa
 	}
 	t.Fatalf("login %s: no session cookie", username)
 	return ""
+}
+
+func postJSON(t *testing.T, client *http.Client, url string, payload any) *http.Response {
+	t.Helper()
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("POST %s: %v", url, err)
+	}
+	return resp
 }
 
 func do(t *testing.T, client *http.Client, method, url, token string, body any) (int, []byte) {

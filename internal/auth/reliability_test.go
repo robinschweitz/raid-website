@@ -355,3 +355,36 @@ func TestDeleteWebAuthnCredentialRejectsOtherOwner(t *testing.T) {
 		t.Fatalf("credential was removed or became unreadable: %v", err)
 	}
 }
+
+// A security-key account with recovery codes but no TOTP row must be able to log in
+// with a recovery code; before, the missing TOTP row returned a server error.
+func TestRecoveryCodeLoginWithoutTOTPRow(t *testing.T) {
+	ctx := context.Background()
+	bdb := reliabilityDB(t)
+	repo := NewRepo(bdb.DB)
+	svc := NewService(player.NewRepo(bdb.DB), repo)
+	if err := svc.BootstrapAdmin(ctx, "owner", "valid-password"); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := player.NewRepo(bdb.DB).FindByUsername(ctx, "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if err := repo.CreateWebAuthnCredential(ctx, &WebAuthnCredential{PlayerID: owner.ID, CredentialIDHash: "credential-hash", Name: "YubiKey", CredentialJSON: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateRecoveryCode(ctx, &MFARecoveryCode{PlayerID: owner.ID, CodeHash: hashToken("RECOVERY1"), CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := svc.StartLogin(ctx, "owner", "valid-password", "")
+	if err != nil || result.MFAChallenge == "" {
+		t.Fatalf("start login: %+v, %v", result, err)
+	}
+	if _, _, err := svc.VerifyMFAChallenge(ctx, result.MFAChallenge, "123456"); !errors.Is(err, ErrInvalidMFA) {
+		t.Fatalf("wrong code without TOTP row = %v, want ErrInvalidMFA", err)
+	}
+	if token, _, err := svc.VerifyMFAChallenge(ctx, result.MFAChallenge, "recovery1"); err != nil || token == "" {
+		t.Fatalf("recovery code without TOTP row: token %q, err %v", token, err)
+	}
+}

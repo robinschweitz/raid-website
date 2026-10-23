@@ -1,16 +1,15 @@
 # Coding Rules
 
-Regeln für Code in diesem Repository. Dieses Dokument erklärt die Anforderungen aus `AGENTS.md`
-und die akzeptierten Entscheidungen aus `docs/decisions/*.md` für den Alltag des Schreibens.
+Regeln für Code in diesem Repository: die Code-Konventionen für den Alltag des Schreibens.
+`AGENTS.md` importiert dieses Dokument.
 
-Vorrang: `AGENTS.md` → `docs/decisions/*.md` → `ARCHITECTURE.md` → dieses Dokument.
-Widersprüche werden nicht stillschweigend aufgelöst; der Owner entscheidet, bei
-verhaltensrelevanten Fragen mit einer neuen ADR. Alte Entscheidungen sind zu befolgen, solange sie
-aktuell sind. Wenn der Owner eine alte Entscheidung ändert oder verwirft, wird das aktiv als neue,
-supersedende oder ergänzende ADR dokumentiert, statt die alte Entscheidung weiter zu erzwingen
-(ADR-043).
+Zuständigkeit: Verhalten steht in `REQUIREMENTS.md`, Gestaltung in `DESIGN.md`, Aufbau und
+Abhängigkeitsregeln in `ARCHITECTURE.md`, Sicherheitsregeln in `SECURITY.md`, die Arbeitsweise in
+`AGENTS.md`. Dieses Dokument wiederholt deren Inhalte nicht, sondern verweist auf ihre IDs.
+`docs/decisions/*.md` ist die Entscheidungshistorie.
+Widersprüche, Rückfragen und ADRs: Arbeitsregeln 1 bis 3 in `AGENTS.md`.
 
-Die MUSS-Regeln sind nicht verhandelbar. Bei Zweifel gilt §1.4: **nicht raten, fragen.**
+Die MUSS-Regeln sind nicht verhandelbar.
 
 ---
 
@@ -19,61 +18,44 @@ Die MUSS-Regeln sind nicht verhandelbar. Bei Zweifel gilt §1.4: **nicht raten, 
 1.1 **Langweilig, explizit, vorhersagbar.** Keine cleveren Abstraktionen, kein verstecktes
 Verhalten, keine spekulative Generizität. Lieber lang und offensichtlich als kurz und klug.
 
-1.2 **Domain-first.** Fachlogik liegt in `internal/<domain>`, niemals im HTTP-Handler. Handler
-dekodieren, delegieren, kodieren.
+1.2 **Domain-first.** DR-6.
 
-1.3 **Repository-Besitz.** Bun und SQL erscheinen ausschließlich in den Repositories der
-jeweiligen Domain (ADR-002). Kein `db.NewSelect()`, kein Bun-Model außerhalb von
-`internal/<domain>/repo.go`.
+1.3 **Repository-Besitz.** SQL und Bun-Query-Builder erscheinen ausschließlich in
+`internal/<domain>/repo.go`; Modelle dürfen Bun-Struct-Tags tragen (`ARCHITECTURE.md` DR-4,
+ADR-002).
 
-1.4 **Nicht raten.** Ist eine Fachregel unklar, wird gefragt. Keine erfundenen Zahlen,
-Schwellen, Status, Rollen oder Workflows.
+1.4 **Nicht raten.** `AGENTS.md` Arbeitsregel 1.
 
-1.5 **Nie still überschreiben.** Legacy-Import und jeder Massenwrite erzeugen einen Report und
-überschreiben keinen Bestand (ADR-008).
+1.5 **Nie still überschreiben.** Massenwrites erzeugen einen Report (`REQUIREMENTS.md` FR-31.3).
 
-1.6 **Archiv statt Löschen.** Historie-beeinflussende Datensätze werden archiviert. Hard Delete
-nur auf ausdrückliche Anforderung eines Menschen und nur als Admin (ADR-007).
+1.6 **Archiv statt Löschen.** Siehe FR-31.1 und die abschließende Liste der Hard Deletes in FR-31.2.
 
-1.7 **Änderungen sind auditiert.** Eingriffe in Historie (Loot, Anwesenheit, Umbenennungen) brauchen
-einen Actor und schreiben einen Audit-Eintrag. Eine Reason ist nur für Änderungen an archivierten
-Raids erforderlich (ADR-032 ersetzt diese Anforderung aus ADR-006). Zahlenkorrekturen sind neue
-Ausgleichstransaktionen im Ledger, kein `UPDATE` auf einem Saldo.
+1.7 **Änderungen sind auditiert.** Jeder Write schreibt seinen Audit-Eintrag in derselben
+Transaktion (FR-26.1, FR-26.2, DR-5); Reason-Pflicht nach FR-26.5. Zahlenkorrekturen sind neue
+Ausgleichstransaktionen im Ledger, kein `UPDATE` auf einem Saldo (FR-16.1).
 
-1.8 **UTC speichern, lokal anzeigen.** Alle Zeitstempel werden in UTC persistiert; das Frontend
-formatiert in der Zeitzone des Nutzers (ADR-003).
+1.8 **UTC speichern, lokal anzeigen.** `ARCHITECTURE.md` „Persistence“, FR-28.4.
 
-1.9 **Autorisierung ist serverseitig.** Jede Mutation prüft die Rolle des Aufrufers. Ein versteckter
-Button ist keine Zugriffskontrolle (ADR-010).
+1.9 **Autorisierung ist serverseitig.** `SECURITY.md` SC-001 bis SC-003.
 
-1.10 **Konfiguration ist explizit.** Guild-Ranks und Raid-Groups sind DB-Zeilen, die ein Admin
-ändert (ADR-009). Nichts davon in Code oder Migrationen fest verdrahten.
+1.10 **Konfiguration ist explizit.** Admin-änderbare Werte sind DB-Zeilen, keine Konstanten oder
+Migrationen (FR-8.1, FR-9.2); Umgebung nur über `internal/config` (DR-7).
 
 1.11 **Fehler sind explizit.** Domain-Pakete liefern typisierte Fehler; Handler bilden sie auf
 HTTP-Status und einen stabilen, maschinenlesbaren `code` ab. Kein stilles `nil`-Schlucken.
 
-1.12 **Neues Verhalten braucht Tests.** Definition of Done in `AGENTS.md` §10.
+1.12 **Neues Verhalten braucht Tests.** Definition of Done in `AGENTS.md`.
 
 1.13 **Idiomatisches Go.** Die Konventionen aus *Effective Go* und der Standard Library sind der
 Massstab. Eine Dependency, deren Aufgabe die Standard Library bereits erledigt, wird nicht
-eingeführt — Ausnahme nach 11.4.
+eingeführt; jede neue Dependency braucht die Freigabe des Owners (DR-11).
 
 ---
 
 ## 2. Gates
 
-Vor "fertig" müssen alle Gates laufen. Ein Gate, das nicht laufen kann, wird nicht übersprungen,
-sondern gemeldet.
-
-| Gate | Befehl | Anmerkung |
-| --- | --- | --- |
-| Formatierung | `gofmt -l cmd internal` | muss keine Ausgabe liefern; Korrektur mit `gofmt -w cmd internal` |
-| Statik | `go vet ./...` | |
-| Build | `go build ./...` | |
-| Tests | `go test ./...` | |
-| Lint | `golangci-lint run` | Konfiguration in `.golangci.yml` |
-| Frontend Build | `cd web && npm run build` | erzeugt `internal/webui/dist` |
-| Frontend Lint | `cd web && npm run lint` | |
+Die Gates und ihre Befehle stehen in `AGENTS.md` „Commands“. Formatierungsfehler korrigiert
+`gofmt -w cmd internal`.
 
 `golangci-lint` nutzt ausschließlich die Linter aus `.golangci.yml`: `gofmt`, `govet`,
 `errcheck`, `staticcheck`, `gosimple`, `ineffassign`, `unused`. Keine Linter hinzufügen oder
@@ -192,24 +174,12 @@ sondern:  internal/enhancepoints/completion.go
 
 ## 6. Schichten und Abhängigkeiten
 
-6.1 Import-Richtung:
+6.1 Import-Richtung und Schichten: `ARCHITECTURE.md` DR-1, DR-2 und DR-6.
 
-```text
-cmd/server → internal/httpapi → internal/<domain> → internal/db | internal/validation
-```
+6.2 Jede Domain mit Repository erhält `NewRepo(db bun.IDB)` und `WithTx(tx bun.Tx)`;
+Multi-Table-Writes laufen in `BeginTx` und werden über `WithTx` gereicht (DR-5).
 
-Domain-Pakete importieren keine HTTP- oder Handler-Pakete. `httpapi` kennt Fachlogik nur über
-die Domain-APIs.
-
-6.2 Handler dekodieren, delegieren, kodieren. Keine Fachlogik, keine Ledger-Berechnung, keine
-Statusableitung im Handler.
-
-6.3 Jede Domain mit Repository erhält `NewRepo(db bun.IDB)` und `WithTx(tx bun.Tx)`. Jeder Write,
-der mehr als eine Zeile oder mehr als eine Tabelle betrifft, läuft in `BeginTx` und wird über
-`WithTx` gereicht.
-
-6.4 Der Actor kommt aus dem Kontext der Middleware, nicht aus einem Request-Header
-(`internal/httpapi/v1/actor.go`).
+6.3 Der Actor kommt aus dem Kontext der Middleware (`internal/httpapi/v1/actor.go`, SC-003).
 
 ---
 
@@ -258,7 +228,8 @@ Concurrency-Dependency. Reihenfolge ist fast immer die einfachere und korrektere
 
 ## 9. Datenbank und Migrationen
 
-9.1 Migrationen sind nummerierte Datei-Paare in `internal/migrations`:
+9.1 Migrationen sind nummerierte Datei-Paare in `internal/migrations` (Dateinamen-Regex
+`^(\d{1,14})_([0-9a-z_\-]+)\.`):
 
 ```text
 001_init.up.sql
@@ -269,46 +240,30 @@ Eingebettet per `go:embed`, Reihenfolge wird nur ergänzt.
 
 9.2 Bereits angewandte Migrationen werden nicht geändert. Eine Korrektur ist eine neue Datei.
 
-9.3 Schema mit Indizes und Defaults definieren; Zeitstempel als UTC.
+9.3 Schema mit Indizes und Defaults definieren; Zeitstempel als UTC (`ARCHITECTURE.md` „Persistence“).
 
-9.4 Jede Query liegt im Repository, ausschließlich mit Parameterbindung (`?`), nie mit
-String-Konkatenation aus Benutzereingaben.
-
-9.5 Multi-Table-Writes sind atomar (`BeginTx` … `Commit`), inklusive Audit-Eintrag und
-abgeleiteter Ledger-Buchungen.
+9.4 Queries: `SECURITY.md` SC-021 und DR-4.
 
 ---
 
 ## 10. JSON und API (Go-Seitig)
 
-10.1 DTOs liegen in `internal/httpapi/v1`, `snake_case` in den JSON-Tags, und decken exakt die
-akzeptierten Felder ab, weil das Decoding `DisallowUnknownFields` verwendet.
+API-Vertrag (Envelope, `snake_case`, RFC3339, `[]` statt `null`, Versionierung):
+`ARCHITECTURE.md` „API style“. Strenges Decoding: SC-020. Umsetzung im Code:
 
-10.2 Zeitstempel sind RFC3339-UTC-Strings.
+10.1 DTOs liegen in `internal/httpapi/v1` und decken exakt die akzeptierten Felder ab.
 
-10.3 Listen werden immer als `[]` kodiert, nie als `null` — dafür `writeListJSON` bzw. `nonNil`
-verwenden. Kein rohes `WriteJSON` auf Slices.
+10.2 Listen über `writeListJSON` bzw. `nonNil` schreiben, nie rohes `WriteJSON` auf Slices;
+abgesichert durch `TestListEndpointsReturnEmptyArrays`.
 
-10.4 Antwortformat: Erfolg `{"data": ...}`, Fehler `{"error": {"code": "...", "message": "..."}}`.
-`code` ist stabil und wird nicht lokalisiert.
-
-10.5 Neue Routen nur unter `/api/v1`. Eine Versionierung kommt als neues Package, nicht durch
-Ändern bestehender Verträge.
+10.3 Fehler über `WriteError` mit stabilem `code` (SC-023).
 
 ---
 
 ## 11. Konfiguration und Abhängigkeiten
 
-11.1 Umgebung wird ausschließlich in `internal/config` gelesen und an die Komponenten gereicht.
-
-11.2 Keine fachlichen Werte als Konstanten, wenn sie ein Admin ändern können soll.
-
-11.3 Default-Zugangsdaten für Entwicklung sind erlaubt, aber `ENV=production` startet nicht mit
-den eingebauten Defaults oder ohne gesetztes `ADMIN_PASSWORD`. Siehe `internal/config` und
-`AGENTS.md` §5.
-
-11.4 Eine neue Dependency — Go oder npm — ist eine Entscheidung des Owners und wird vorher
-gefragt.
+11.1 Konfiguration und Dependencies: DR-7, DR-11 und SC-033; Admin-änderbare Werte siehe §1.10.
+Default-Zugangsdaten sind nur für die Entwicklung erlaubt.
 
 ---
 
@@ -316,7 +271,7 @@ gefragt.
 
 12.1 Kommentare und Doc-Strings auf Englisch.
 
-12.2 Nutzertexte auf Deutsch: Frontend, Item-Namen, Hinweise an Nutzer.
+12.2 Nutzertexte auf Deutsch (FR-28.3), auch Item-Namen und Hinweise an Nutzer.
 
 12.3 Ein Kommentar erklärt, warum etwas so gemacht ist, nicht was die Zeile tut. Offensichtlicher
 Code bleibt ohne Kommentar.
@@ -355,17 +310,13 @@ zwischen `go test`-Paketen.
 14.1 TypeScript strict. Kein `any`, außer an bewusst dokumentanten Grenzen. `web/src/types.ts`
 ist die Quelle der API-Typen.
 
-14.2 Alle API-Aufrufe laufen über `web/src/api.ts` und damit mit `credentials: 'include'`.
+14.2 API-Aufrufe nur über `web/src/api.ts` (DR-10); Autorisierung bleibt beim Server (SC-001);
+keine neue Router-, State- oder HTTP-Library (DR-11).
 
-14.3 Die UI darf bedienerliche Aktionen verstecken; die Prüfung bleibt beim Server.
+14.3 Seiten liegen unter `web/src/pages`, gemeinsame Infrastruktur in `api.ts`, `auth.tsx`,
+`router.tsx`. Nutzertexte auf Deutsch (FR-28.3).
 
-14.4 Keine neue Router-, State- oder HTTP-Library ohne Freigabe. Der Hash-Router in
-`web/src/router.tsx` und der Fetch-Wrapper bleiben die Basis.
-
-14.5 Seiten liegen unter `web/src/pages`, gemeinsame Infrastruktur in `api.ts`, `auth.tsx`,
-`router.tsx`. Nutzertexte auf Deutsch.
-
-14.6 `npm run lint` muss laufen. Die bekannten React-Fast-Refresh-Warnungen werden nicht
+14.4 `npm run lint` muss laufen. Die bekannten React-Fast-Refresh-Warnungen werden nicht
 wegkonfiguriert; sie weisen auf Komponenten hin, die nicht in eigene Dateien gehören.
 
 ---
@@ -374,10 +325,9 @@ wegkonfiguriert; sie weisen auf Komponenten hin, die nicht in eigene Dateien geh
 
 15.1 Eine fachliche Änderung pro Commit, Commits klein, Messages im Stil der Historie.
 
-15.2 Keine Secrets. `ADMIN_PASSWORD` und Session-Tokens gehören nie ins Repository.
+15.2 Keine Secrets im Repository (SC-033).
 
-15.3 Eine Verhaltensänderung wird in einer **neuen** ADR festgehalten. Akzeptierte ADRs werden
-nicht umformuliert.
+15.3 ADRs: `AGENTS.md` Arbeitsregel 3.
 
 15.4 Kein Force-Push, kein Rewrite der Historie ohne ausdrückliche Freigabe.
 
@@ -385,6 +335,5 @@ nicht umformuliert.
 
 ## 16. Wenn etwas unklar ist
 
-Eine Regel, die hier nicht steht, ist keine bekannte Regel. Vor dem Implementieren nachfragen
-und die Antwort in `AGENTS.md`, einer ADR oder in diesem Dokument festhalten, damit sie beim
-nächsten Mal vorhanden ist.
+Eine Regel, die weder hier noch in den Spezifikationsdateien steht, ist keine bekannte Regel.
+Vorgehen: `AGENTS.md` Arbeitsregeln 1 und 2 (fragen, dann in der zuständigen Datei festhalten).

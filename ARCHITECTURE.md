@@ -62,8 +62,8 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   shuts down gracefully on SIGTERM, finishing running requests (Owner 2026-10-22, AQ-3); the values
   are owned by `SECURITY.md`. Not built: the code calls `http.ListenAndServe` without them.
 - **Statistics.** A public `GET /api/v1/statistics` returns only server-computed aggregates
-  (FR-27.2); the statistics page reads only this endpoint (Owner 2026-10-22, AQ-2). Not built: the
-  page now computes figures in the browser from login-only and per-raid loot endpoints.
+  (FR-27.2); the statistics page reads only this endpoint (Owner 2026-10-22, AQ-2). The endpoint is built; the
+  page still computes figures in the browser until REQ-STATS-011 (#88).
   Response contract (FR-27.3), all counts integers:
   `raids_by_status` (`[{status, count}]`), `class_distribution` (`[{class, count}]`),
   `role_history` (`[{role, count}]`), `loot_by_class` (`[{class, count}]`),
@@ -87,8 +87,8 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   missing kill and the loot in one transaction (FR-29.7, FR-29.8) (Owner 2026-10-22, AQ-5). Not built.
 - **Public interface.** Without a session, only these reads answer (FR-1.2): `GET /api/v1/raids`,
   `/players`, `/polls`, `/raids/{id}/attendance`, `/addons`, `/addons/{name}/download`,
-  `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, and, not
-  built, `/statistics` and `/privacy-contact`. Login, MFA, and registration writes are public too.
+  `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/statistics`, and, not
+  built, `/privacy-contact`. Login, MFA, and registration writes are public too.
 - **API notes.** Catalog reads: `GET /api/v1/loot-catalog` and its `/instances`, `/bosses`,
   `/items`; there are no catalog write endpoints. Raid series: `weekdays` are 0 (Sunday) to 6
   (Saturday), `start_time` is `HH:MM`, `timezone` an IANA name. `PATCH /api/v1/raids/{id}` takes

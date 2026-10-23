@@ -2,7 +2,6 @@
 function germanGuardMessage(code: string, message?: string): string | undefined {
   if (code === 'forbidden' && message === 'insufficient permissions') return 'Dafür fehlt dir die Berechtigung.'
   if (code === 'unauthenticated' && message === 'login required') return 'Bitte melde dich an.'
-  if (code === 'login_required' && message === 'login required') return 'Bitte melde dich an.'
   if (code === 'mfa_setup_required') return 'Als Admin musst du zuerst einen zweiten Faktor (Authenticator-App oder Sicherheitsschlüssel) einrichten.'
   return message
 }

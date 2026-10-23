@@ -12,7 +12,7 @@ import (
 	"raid-website/internal/validation"
 )
 
-// TestReqRaid013_AC01: a poll write without a session answers 401 login_required
+// TestReqRaid013_AC01: a poll write without a session answers 401 unauthenticated
 // and the error text never mentions the removed X-Actor-ID header (FR-24.6, SC-003).
 func TestReqRaid013_AC01(t *testing.T) {
 	srv, bdb := setupServer(t)
@@ -85,8 +85,8 @@ func TestReqRaid013_AC01(t *testing.T) {
 			if err := json.Unmarshal(raw, &out); err != nil {
 				t.Fatalf("decode error body: %v", err)
 			}
-			if out.Error.Code != "login_required" {
-				t.Fatalf("want code login_required got %q body %s", out.Error.Code, raw)
+			if out.Error.Code != "unauthenticated" {
+				t.Fatalf("want code unauthenticated got %q body %s", out.Error.Code, raw)
 			}
 			if strings.Contains(string(raw), "X-Actor-ID") {
 				t.Fatalf("error body mentions X-Actor-ID: %s", raw)

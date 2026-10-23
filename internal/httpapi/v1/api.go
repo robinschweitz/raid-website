@@ -173,11 +173,11 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/raid-groups/{id}", RequireRole(validation.RoleAdmin, a.updateRaidGroup))
 
 	mux.HandleFunc("GET /api/v1/polls", a.listPolls)
-	mux.HandleFunc("POST /api/v1/polls", requirePollRole(validation.RoleRaidassistent, a.createPoll))
+	mux.HandleFunc("POST /api/v1/polls", RequireRole(validation.RoleRaidassistent, a.createPoll))
 	mux.HandleFunc("GET /api/v1/polls/{id}", RequireAuth(a.getPoll))
-	mux.HandleFunc("POST /api/v1/polls/{id}/vote", requirePollRole(validation.RoleMember, a.votePoll))
+	mux.HandleFunc("POST /api/v1/polls/{id}/vote", RequireRole(validation.RoleMember, a.votePoll))
 	mux.HandleFunc("GET /api/v1/polls/{id}/votes", RequireAuth(a.listPollVotes))
-	mux.HandleFunc("POST /api/v1/polls/{id}/close", requirePollRole(validation.RoleRaidassistent, a.closePoll))
+	mux.HandleFunc("POST /api/v1/polls/{id}/close", RequireRole(validation.RoleRaidassistent, a.closePoll))
 
 	WishlistHandlers{Wishlist: wishlist.NewService(a.DB)}.Register(mux)
 

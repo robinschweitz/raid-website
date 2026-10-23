@@ -42,7 +42,7 @@ func currentTOTPCode() string {
 }
 
 // wrongTOTPCode returns a six-digit code that matches none of the time steps
-// verifyTOTP accepts right now.
+// matchTOTP accepts right now.
 func wrongTOTPCode() string {
 	step := time.Now().UTC().Unix() / totpPeriodSeconds
 	for _, candidate := range []string{"000000", "111111", "222222", "333333"} {

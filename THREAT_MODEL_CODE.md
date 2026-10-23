@@ -108,8 +108,8 @@ No numeric risk scores; the **Impact** line says in words what an attacker gains
 **CT-009 — MFA codes can be guessed without limit** — `VerifyMFAChallenge` had no failure counter.
 - **Status:** FIXED (PR #121, issue #62). **Response:** Mitigate. **Rules:** SC-011.
 
-**CT-010 — TOTP codes can be replayed** — no last-used time step is stored.
-- **Status:** CONFIRMED. **Response:** Mitigate. **Rules:** SC-012.
+**CT-010 — TOTP codes can be replayed** — no last-used time step was stored.
+- **Status:** FIXED (PR #122, issue #63). **Response:** Mitigate. **Rules:** SC-012.
 
 **CT-011 — TOTP secrets stored in plaintext** — `mfa_settings.totp_secret`.
 - **Status:** CONFIRMED. **Response:** Mitigate. **Rules:** SC-014.
@@ -397,7 +397,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-007 | CONFIRMED | Mitigate | App | SC-023 | — |
 | CT-008 | CONFIRMED | Mitigate | App | SC-048 | T-045 |
 | CT-009 | FIXED | Mitigate | App | SC-011 | T-005 |
-| CT-010 | CONFIRMED | Mitigate | App | SC-012 | T-006 |
+| CT-010 | FIXED | Mitigate | App | SC-012 | T-006 |
 | CT-011 | CONFIRMED | Mitigate | App | SC-014 | T-011 |
 | CT-012 | CONFIRMED | Mitigate | App | SC-017, SC-018 | T-010 |
 | CT-013 | CONFIRMED | Mitigate | App | SC-019 | T-007 |

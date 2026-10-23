@@ -32,13 +32,17 @@ export function totpCode(secret = adminTOTPSecret): string {
   return String((sum.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0')
 }
 
-/** Gives the e2e Admin its authenticator secret (idempotent). */
+/**
+ * Gives the e2e Admin its authenticator secret (idempotent). It also forgets
+ * the last used TOTP step, so tests can sign the Admin in several times within
+ * one 30-second step; the replay rule (SC-012) is covered by Go tests.
+ */
 function ensureAdminTOTP() {
   const db = new DatabaseSync(databasePath)
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '+00:00')
   db.prepare(`INSERT INTO player_mfa_settings (player_id, totp_secret, totp_enabled_at, created_at, updated_at)
     SELECT id, ?, ?, ?, ? FROM players WHERE username = ?
-    ON CONFLICT(player_id) DO UPDATE SET totp_secret = excluded.totp_secret, totp_enabled_at = excluded.totp_enabled_at`).run(adminTOTPSecret, now, now, now, admin.username)
+    ON CONFLICT(player_id) DO UPDATE SET totp_secret = excluded.totp_secret, totp_enabled_at = excluded.totp_enabled_at, totp_last_step = NULL`).run(adminTOTPSecret, now, now, now, admin.username)
   db.close()
 }
 

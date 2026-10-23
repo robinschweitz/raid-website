@@ -118,6 +118,22 @@ func (r *Repo) UpsertMFASettings(ctx context.Context, s *MFASettings) error {
 	return err
 }
 
+// ClaimTOTPStep records step as the last accepted TOTP step when it is later
+// than the stored one. It reports false when the step was already used, so of
+// two requests with the same code exactly one succeeds (SC-012).
+func (r *Repo) ClaimTOTPStep(ctx context.Context, playerID, step int64) (bool, error) {
+	result, err := r.db.NewUpdate().Model((*MFASettings)(nil)).
+		Set("totp_last_step = ?", step).
+		Where("player_id = ?", playerID).
+		Where("totp_last_step IS NULL OR totp_last_step < ?", step).
+		Exec(ctx)
+	if err != nil {
+		return false, err
+	}
+	affected, err := result.RowsAffected()
+	return affected == 1, err
+}
+
 func (r *Repo) DeleteRecoveryCodes(ctx context.Context, playerID int64) error {
 	_, err := r.db.NewDelete().Model((*MFARecoveryCode)(nil)).Where("player_id = ?", playerID).Exec(ctx)
 	return err

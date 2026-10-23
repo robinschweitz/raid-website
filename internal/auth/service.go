@@ -41,6 +41,18 @@ const (
 // a rate-limited attempt never reaches bcrypt (SC-008, SC-043).
 var comparePassword = bcrypt.CompareHashAndPassword
 
+// dummyPasswordHash is a bcrypt hash (DefaultCost) of a random secret that was
+// discarded after hashing. Logins for unknown usernames and accounts without a
+// password compare against it, so they take as long as a wrong password and
+// response time does not reveal which usernames exist (SC-009).
+const dummyPasswordHash = "$2a$10$K2Drynp35mJ6iuIp7vjpQuCh996s6qZFXqBeKpnRNVPIQ.11SHWxa"
+
+// rejectWithoutAccount spends the time of one password comparison and fails.
+func rejectWithoutAccount(password string) error {
+	_ = comparePassword([]byte(dummyPasswordHash), []byte(password))
+	return ErrInvalidCredentials
+}
+
 var (
 	// ErrInvalidCredentials is returned when a username/password pair does not match.
 	ErrInvalidCredentials = errors.New("invalid credentials")
@@ -283,13 +295,13 @@ func (s *Service) StartLogin(ctx context.Context, username, password, clientIP s
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.recordLoginAttempt(ctx, uname, clientIP, false, now)
-			return nil, ErrInvalidCredentials
+			return nil, rejectWithoutAccount(password)
 		}
 		return nil, fmt.Errorf("find login player: %w", err)
 	}
 	if p.PasswordHash == "" {
 		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
-		return nil, ErrInvalidCredentials
+		return nil, rejectWithoutAccount(password)
 	}
 	if err := comparePassword([]byte(p.PasswordHash), []byte(password)); err != nil {
 		s.recordLoginAttempt(ctx, uname, clientIP, false, now)

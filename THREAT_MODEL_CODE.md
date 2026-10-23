@@ -65,7 +65,7 @@ No numeric risk scores; the **Impact** line says in words what an attacker gains
 
 **CT-004 — Username probing through login timing**
 - **Evidence:** `auth.StartLogin` returns before any bcrypt comparison for unknown usernames.
-- **Status:** CONFIRMED. **Response:** Mitigate. **Rules:** SC-009.
+- **Status:** FIXED (PR #120, issue #61). **Response:** Mitigate. **Rules:** SC-009.
 
 **CT-005 — A new login can attach to another player by character name**
 - **Category:** Spoofing, Elevation of privilege. **Component:** `RedeemNewAccount`.
@@ -391,7 +391,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | --- | --- | --- | --- | --- | --- |
 | CT-001 | FIX PENDING | Mitigate | Ops + App | SC-045, SC-039 | T-046 |
 | CT-003 | CONFIRMED | Mitigate | App | SC-046 | T-042 |
-| CT-004 | CONFIRMED | Mitigate | App | SC-009 | T-004 |
+| CT-004 | FIXED | Mitigate | App | SC-009 | T-004 |
 | CT-005 | CONFIRMED | Mitigate | App | SC-049, FR-4.5 | T-043 |
 | CT-006 | CONFIRMED | Mitigate | App | SC-047 | T-044 |
 | CT-007 | CONFIRMED | Mitigate | App | SC-023 | — |

@@ -106,8 +106,8 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Login for an unknown username, an account without a password, and a wrong password MUST return the same error and MUST take comparable time (run a bcrypt comparison against a fixed dummy hash when no hash exists).
 - **Enforcement:** `auth.StartLogin`.
-- **Evidence:** V6. Code: **not compliant** — unknown usernames return without a bcrypt comparison, so response time reveals which usernames exist. Threats: T-003, T-004.
-- **Verification:** Median response time for an unknown and a known username differ by less than the bcrypt cost.
+- **Evidence:** V6. Code: compliant since #61 — unknown usernames and accounts without a password compare against `dummyPasswordHash` (DefaultCost) and return the same `invalid_credentials`; inactive accounts run the normal comparison first. Threats: T-003, T-004.
+- **Verification:** Median response time for an unknown and a known username differ by less than the bcrypt cost; `TestReqAuth012_*` checks that each path runs exactly one bcrypt comparison.
 
 **SC-010 - MFA challenge**
 - **Status:** ACTIVE

@@ -1,4 +1,4 @@
-export const appVersion = '1.0.35'
+export const appVersion = '1.0.36'
 
 export const changelog = [
   {
@@ -6,6 +6,14 @@ export const changelog = [
     title: 'Absage gibt Item-Sperren frei',
     changes: [
       'Wird ein Raid abgesagt, laufen seine noch nicht eingelösten Item-Sperren jetzt ab. Dabei gehen keine Enhance Points verloren. Sperren früher abgesagter Raids bleiben unverändert.',
+    ],
+  },
+  {
+    version: '1.0.35',
+    title: 'Andere Geräte nach Passwortänderung abgemeldet',
+    changes: [
+      'Ändert jemand sein Passwort, werden alle anderen Geräte abgemeldet; das aktuelle Gerät bleibt angemeldet.',
+      'Ändert ein Admin Passwort, Benutzernamen oder Rolle eines Spielers, wird dieser Spieler überall abgemeldet.',
     ],
   },
   {

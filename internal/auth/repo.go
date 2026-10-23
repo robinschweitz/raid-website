@@ -29,6 +29,25 @@ func (r *Repo) InTransaction(ctx context.Context, fn func(*player.Repo) error) e
 	})
 }
 
+// InAccountTransaction runs account changes and session deletion in one
+// transaction using transaction-bound repositories.
+func (r *Repo) InAccountTransaction(ctx context.Context, fn func(*player.Repo, *Repo) error) error {
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		return fn(player.NewRepo(tx), NewRepo(tx))
+	})
+}
+
+// DeleteSessionsOfPlayer deletes all sessions of a player except the one with
+// keepTokenHash; an empty keepTokenHash keeps none (SC-017).
+func (r *Repo) DeleteSessionsOfPlayer(ctx context.Context, playerID int64, keepTokenHash string) error {
+	q := r.db.NewDelete().Model((*Session)(nil)).Where("player_id = ?", playerID)
+	if keepTokenHash != "" {
+		q = q.Where("token_hash <> ?", keepTokenHash)
+	}
+	_, err := q.Exec(ctx)
+	return err
+}
+
 // AuditSecurity records an account-security change the player made for
 // themselves. details never contain secrets, hashes or codes (ADR 077).
 func (r *Repo) AuditSecurity(ctx context.Context, playerID int64, action string, details map[string]any) error {

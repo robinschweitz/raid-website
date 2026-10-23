@@ -1,8 +1,15 @@
-export const appVersion = '1.0.33'
+export const appVersion = '1.0.34'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Fehlermeldungen werden vorgelesen',
+    changes: [
+      'Alle Fehlermeldungen nutzen jetzt dieselbe Darstellung und werden von Screenreadern angesagt.',
+    ],
+  },
+  {
+    version: '1.0.33',
     title: 'Aktueller Raid führt zum nächsten Termin',
     changes: [
       '„Aktueller Raid“ öffnet einen noch laufenden Raid oder den nächsten anstehenden Termin. Abgeschlossene, abgesagte und archivierte Raids werden nicht mehr als aktuell angezeigt.',

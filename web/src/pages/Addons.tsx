@@ -3,6 +3,7 @@ import { api } from '../api'
 import { NavIcon } from '../components/NavIcon'
 import { Link } from '../router'
 import type { AddonDownload } from '../types'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 // The addons pages (ADR 085): a showcase per addon with downloads served by the
 // website itself. Screenshots in public/addons are cropped from live test runs
@@ -116,7 +117,7 @@ function Overview({ addons, error }: { addons: AddonDownload[], error: string })
       </div>
     </div>
     <p className="guide-lead">Zwei Addons verbinden das Spiel mit dieser Website: Die Raidleitung lädt mit <strong>RaidLedger</strong> ein und verteilt den Loot, jeder Raider würfelt mit <strong>RaidWishlist</strong> auf seine Wunschliste. Alles läuft über Kopieren und Einfügen. Die Addons verbinden sich nie selbst mit dem Internet.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     <div className="addon-cards">
       <article className="card addon-card ledger">
         <div className="addon-card-shot"><img src="/addons/raidledger-fenster.webp" alt="Das RaidLedger-Fenster im Spiel" width={709} height={448} /></div>
@@ -172,7 +173,7 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
       pitch="Das Werkzeug für den Raidabend: Aufstellung von der Website einladen, Kalender-Termin anlegen, Loot nach unseren Regeln auswürfeln, vergeben, nachhalten und am Ende Teilnahme und Loot zurück auf die Website bringen."
       shot={<Shot name="raidledger-fenster" caption="RaidLedger, Reiter BEUTE: das Item, seine Würfe mit BISHER und der Gewinner" width={709} height={448} />}
     />
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     <Contents entries={[
       { id: 'ledger-funktionen', title: 'Funktionen' },
       { id: 'ledger-website', title: 'Zusammenspiel mit der Website' },
@@ -348,7 +349,7 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
       pitch="Deine Wunschliste im Spiel: Wenn die Raidleitung ein Item von deiner Liste auswürfelt, würfelst du mit einem Klick den richtigen Bereich, auch mit Enhanced. Oder das Addon würfelt automatisch für dich."
       shot={<Shot name="raidwishlist-fenster" caption="RaidWishlist, Reiter WUNSCHLISTE: das Item ist ERHALTEN" width={466} height={409} />}
     />
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     <Contents entries={[
       { id: 'wish-funktionen', title: 'Funktionen' },
       { id: 'wish-website', title: 'Zusammenspiel mit der Website' },

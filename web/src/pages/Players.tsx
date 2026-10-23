@@ -5,6 +5,7 @@ import { Link } from '../router'
 import { characterClassName } from '../characterTheme'
 import { atLeast, type Player, type PlayerAccount, type PlayerSummary, type Role } from '../types'
 import { useSubmission } from '../useSubmission'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 const ROLES: Role[] = ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN']
 
@@ -89,7 +90,7 @@ export function PlayersPage() {
   return (
     <div>
       <div className="page-heading"><div><p className="eyebrow">Unsere Gemeinschaft</p><h1>Spieler</h1></div>{isAdmin && <Link to="/roster">Gildenkonfiguration →</Link>}</div>
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
       {isAdmin && (
         <details className="card editor-disclosure"><summary>Neuer Spieler</summary>
         <form className="card inline-form" onSubmit={onCreate}>

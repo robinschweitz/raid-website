@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
 import type { CatalogBoss } from '../types'
+import { ErrorMessage } from './ErrorMessage'
 
 // Loot that went to nobody (ADR 089): disenchanted, for the guild bank, or
 // nobody wanted it. It counts for no player and costs no EP.
@@ -81,7 +82,7 @@ export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }
   return <section className="subcard unclaimed-loot" aria-label="Beute ohne Empfänger">
     <h3>Beute ohne Empfänger</h3>
     <p className="muted">Entzaubert, für die Gildenbank oder von niemandem gewollt. Zählt für keinen Spieler und kostet keine EP.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {canWrite && needsReason && <label className="unclaimed-reason">Grund (Pflicht im archivierten Raid)<input value={reason} onChange={(e) => setReason(e.target.value)} /></label>}
     {entries.length === 0 ? <p className="muted">Noch nichts eingetragen.</p>
       : <div className="table-scroll"><table className="table small">

@@ -330,3 +330,47 @@ func TestBundleCopiesAndInvalidSource(t *testing.T) {
 		}
 	}
 }
+
+func TestBossModesFollowDropsOfInstanceAndSize(t *testing.T) {
+	s := NewService(NewRepo(nil))
+	ctx := context.Background()
+	catalog, err := s.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bossID string
+	for _, boss := range catalog.Bosses {
+		if boss.InstanceID == "631" {
+			bossID = boss.ID
+			break
+		}
+	}
+	boss, modes, err := s.BossModes(ctx, "631", bossID, 25)
+	if err != nil || boss.ID != bossID || boss.Name == "" {
+		t.Fatalf("boss %q: %+v %v", bossID, boss, err)
+	}
+	want := map[Mode]bool{}
+	for _, drop := range catalog.Drops {
+		if drop.BossID == bossID && drop.RaidSize == 25 {
+			mode, _, err := sourceGameMode(drop)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want[mode] = true
+		}
+	}
+	if len(modes) != len(want) || len(modes) == 0 {
+		t.Fatalf("modes %v, drops evidence %v", modes, want)
+	}
+	for _, mode := range modes {
+		if !want[mode] {
+			t.Fatalf("mode %s has no drop", mode)
+		}
+	}
+	if _, modes, err := s.BossModes(ctx, "631", bossID, 40); err != nil || len(modes) != 0 {
+		t.Fatalf("a size without drops offers nothing: %v %v", modes, err)
+	}
+	if _, _, err := s.BossModes(ctx, "603", bossID, 25); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("a boss outside the instance is invalid: %v", err)
+	}
+}

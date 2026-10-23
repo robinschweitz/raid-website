@@ -802,6 +802,7 @@ func TestListEndpointsReturnEmptyArrays(t *testing.T) {
 		fmt.Sprintf("/api/v1/players/%d/loot", adminID),
 		fmt.Sprintf("/api/v1/raids/%d/attendance", raidID),
 		fmt.Sprintf("/api/v1/raids/%d/loot", raidID),
+		fmt.Sprintf("/api/v1/raids/%d/kills", raidID),
 	} {
 		assertEmptyArray(path)
 	}

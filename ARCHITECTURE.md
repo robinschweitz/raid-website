@@ -68,8 +68,11 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   `raids_by_status` (`[{status, count}]`), `class_distribution` (`[{class, count}]`),
   `role_history` (`[{role, count}]`), `loot_by_class` (`[{class, count}]`),
   `top_attendance` and `top_loot` (`[{player_id, player_name, count}]`, at most 10 each).
+  Order and inclusion: FR-27.4 and FR-27.5 (computed in SQL `ORDER BY count DESC, name, id`
+  with SQLite's default `BINARY` collation, which is UTF-8 byte order).
   A contract test MUST check, without a session, that the response has exactly these fields and
-  that no item, EP, note, or login field appears.
+  that no item, EP, note, or login field appears, and that two players with the same count are
+  ordered by name and then ID.
 - **Operator reset command.** A new `cmd/reset-code` opens the database with the server's
   configuration and calls the `registration` reset-code service directly, like `cmd/sync-addons`
   calls `internal/addons`; it has no HTTP surface (SC-051, OD-019). Not built.

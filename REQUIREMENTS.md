@@ -319,7 +319,9 @@ implemented yet when it differs from the code.
 
 - **FR-27.1** The statistics page MUST show raids by status, class distribution, historical roles, loot distribution, most attendances, and most loot entries. (Owner 2026-10-22, OQ-6)
 - **FR-27.2** Visitors without a session MUST be able to see the statistics, including loot totals per player. The public statistics MUST NOT show item lists or EP balances. (Owner 2026-10-22, OQ-6)
-- **FR-27.3** The statistics response MUST contain only counts, statuses, classes, roles, and player and character names (for an anonymised player, the replacement name of FR-30.2). It MUST NOT contain item IDs or names, EP values, notes, absence reasons, logins, or roles of accounts. The field list is owned by `ARCHITECTURE.md`.
+- **FR-27.3** The statistics response MUST contain only counts, statuses, classes, roles, and player and character names. It MUST NOT contain item IDs or names, EP values, notes, absence reasons, logins, or roles of accounts. The field list is owned by `ARCHITECTURE.md`.
+- **FR-27.4** Every list in the statistics MUST have one defined order: raid statuses in the order of FR-10.3 (each status listed, also with 0); other count lists by count descending, then by name ascending in byte order of the UTF-8 text, then by ID ascending. Entries with count 0 MUST be left out except for raid statuses. Top lists MUST keep at most 10 entries after this ordering, so a tie at place 10 is cut by the tie-breakers.
+- **FR-27.5** The statistics MUST include every player with matching data, also inactive ones. An anonymised player MUST appear under the replacement name of FR-30.2 and keep the same player ID.
 
 ### 28. Guide, version, and language
 

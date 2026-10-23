@@ -139,10 +139,13 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-014 - TOTP secrets encrypted at rest**
 - **Status:** ACTIVE
-- **Rule:** TOTP secrets MUST be stored encrypted with a 256-bit key that comes only from the environment file (`TOTP_ENCRYPTION_KEY`), never from the database or repository. PROPOSED algorithm: AES-256-GCM from the Go standard library with a random nonce per secret. Existing plaintext secrets MUST be encrypted once at startup. With TOTP in use, production MUST NOT start without the key.
+- **Rule:** TOTP secrets MUST be stored encrypted with a 256-bit key that comes only from the environment file (`TOTP_ENCRYPTION_KEY`), never from the database or repository. PROPOSED algorithm: AES-256-GCM from the Go standard library with a random nonce per secret and the player ID as additional authenticated data, so a value copied to another row does not decrypt. With TOTP in use, production MUST NOT start without the key.
+- **Stored format:** `v1:<key-id>:<base64 nonce and ciphertext>`, where `<key-id>` is the first 8 hex characters of the SHA-256 of the key. A value without the `v1:` prefix is plaintext.
+- **Startup migration:** At startup, before the server accepts requests, every value that is plaintext or uses a key other than the current one MUST be re-encrypted with the current key, all in one database transaction. If any row fails, the transaction MUST roll back and the server MUST exit with an error that names the count of failed rows but no secret. The migration MUST be safe to run again: it touches only rows not yet under the current key. After it, the server MUST check that no such row remains and MUST refuse to start otherwise.
+- **Key rotation:** `TOTP_ENCRYPTION_KEY` is the current key; `TOTP_ENCRYPTION_KEYS_PREVIOUS` MAY hold earlier keys, comma-separated. Decryption picks the key by `<key-id>`. A stored value whose key is in neither variable MUST stop startup. To rotate, the operator sets the new key, moves the old one to the previous list, and restarts; the migration re-encrypts every row; the old key MAY be removed after the next successful start. Old database snapshots still need the old key, so it MUST be kept with the backup key material until the last snapshot that uses it has expired (NFR-2.2, SC-034).
 - **Enforcement:** `auth` MFA settings repository; `internal/config`.
 - **Evidence:** V11, V14, OD-003 (owner, 2026-10-22). Code: **not compliant** — stored as plaintext. Threats: T-011.
-- **Verification:** The `totp_secret` column holds no base32 secret; a login with a valid code still works; startup without the key fails while a TOTP setup exists.
+- **Verification:** The `totp_secret` column holds no base32 secret; a login with a valid code still works; startup without the key fails while a TOTP setup exists; a migration that fails on one row leaves every row unchanged and the server stopped, and a second start completes it; after a rotation every row carries the new key ID and logins still work; a value copied to another player's row fails to decrypt.
 
 **SC-015 - Re-authentication for security changes**
 - **Status:** ACTIVE

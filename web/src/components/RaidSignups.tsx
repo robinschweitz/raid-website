@@ -7,6 +7,7 @@ import { atLeast, type Attendance, type Character, type Player, type Raid, type 
 
 import { canonicalClass } from '../characterOptions'
 import { myRaidStatus } from '../myRaids'
+import { ErrorMessage } from './ErrorMessage'
 
 interface Props {
   raid: Raid
@@ -120,7 +121,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
   return <section className="card" aria-label="Raidanmeldungen">
     <h2>Anmeldungen</h2>
     <p className="muted">Melde einen oder mehrere eigene Charaktere mit deinem gewünschten Spec an. Die Raidleitung übernimmt einen Charakter pro Spieler in die Aufstellung.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {message && <p className="success-message" role="status"><span>{message}</span><button type="button" aria-label="Meldung schließen" onClick={() => setMessage('')}>Schließen</button></p>}
     {pending && <p role="status">Wird gespeichert…</p>}
     <button type="button" disabled={pending} onClick={() => { void submit(async () => {

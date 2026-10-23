@@ -6,6 +6,7 @@ import { useAuth } from '../auth'
 import { useSubmission } from '../useSubmission'
 import { CharacterWishlist } from '../components/CharacterWishlist'
 import { atLeast, type Character, type LootAward, type NameHistory, type Player } from '../types'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 const LOOT_METHOD_LABELS = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
 const LOOT_METHOD_CLASSES = { MAIN: 'main', SECOND: 'second', ENHANCED: 'enhanced', BOE: 'boe' }
@@ -61,7 +62,7 @@ function CharacterDetail({ characterID }: Props) {
   }, [characterID])
 
   if (!character) {
-    return <div><p><Link to="/players">← Spieler</Link></p>{error ? <p className="error">{error}</p> : <p className="muted">Lade Charakter…</p>}</div>
+    return <div><p><Link to="/players">← Spieler</Link></p>{error ? <ErrorMessage>{error}</ErrorMessage> : <p className="muted">Lade Charakter…</p>}</div>
   }
 
   const exactLoot = loot.filter((row) => row.awarded_to_character_id === character.id)
@@ -134,7 +135,7 @@ function CharacterDetail({ characterID }: Props) {
       </div>
     </header>
 
-    {error && <p className="error">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {status && <p className="muted" role="status">{status}</p>}
 
     <section className="card character-facts">

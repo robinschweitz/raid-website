@@ -31,6 +31,7 @@ import (
 	"raid-website/internal/registration"
 	"raid-website/internal/roster"
 	"raid-website/internal/shadowmourne"
+	"raid-website/internal/statistics"
 	"raid-website/internal/unclaimedloot"
 	"raid-website/internal/webui"
 )
@@ -112,6 +113,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	api.Register(mux)
 	v1.CatalogHandlers{Catalog: catalog}.Register(mux)
 	v1.AddonHandlers{Addons: bundledAddons}.Register(mux)
+	v1.StatisticsHandlers{Statistics: statistics.NewService(statistics.NewRepo(db))}.Register(mux)
 	unclaimed := unclaimedloot.NewService(unclaimedloot.NewRepo(db), raids, catalog)
 	v1.UnclaimedHandlers{Unclaimed: unclaimed}.Register(mux)
 	v1.BossKillHandlers{Kills: bosskill.NewService(bosskill.NewRepo(db)), Corrections: corrections}.Register(mux)

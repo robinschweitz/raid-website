@@ -3,6 +3,7 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
 import { atLeast, type AuditLogEntry } from '../types'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 type AuditSnapshot = Record<string, unknown> | null
 
@@ -218,7 +219,7 @@ export function AuditLogPage() {
     <p><Link to="/roster">← Gildenkonfiguration</Link></p>
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Audit-Protokoll</h1></div></div>
     <p className="muted">Änderungen sind lesbar zusammengefasst. Die technischen Rohdaten bleiben in den Details für die Fehlersuche verfügbar.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     <label className="audit-search">Protokoll durchsuchen<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Akteur, Aktion, Objekt oder Grund" /></label>
     <p className="muted" role="status">{visibleEntries.length} von {entries.length} Einträgen</p>
     {visibleEntries.length > 0 && <div className="audit-table-wrap"><table className="table audit-table">

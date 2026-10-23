@@ -21,6 +21,7 @@ import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
 import { browserSupportsWebAuthn, createWebAuthnCredential, type WebAuthnBeginResponse } from '../webauthn'
 import { announceMFAChange, type MFAStatus } from '../accountSecurity'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 const CLASSES = [
   'Todesritter',
@@ -584,7 +585,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
         <p>
           <Link to="/players">← Spieler</Link>
         </p>
-        {error ? <p className="error">{error}</p> : <p className="muted">Lade…</p>}
+        {error ? <ErrorMessage>{error}</ErrorMessage> : <p className="muted">Lade…</p>}
       </div>
     )
   }
@@ -601,7 +602,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
           {player.guild_rank_id != null && <p className="muted">Gildenrang: {ranks.find((r) => r.id === player.guild_rank_id)?.name ?? (rankError || (rankLoading ? 'Wird geladen…' : 'Nicht verfügbar'))}</p>}
         </div>
       </header>
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
       <nav className="workspace-tabs" aria-label="Profilbereiche">
@@ -648,7 +649,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
 
         {isAdmin && (
           <details className="editor-disclosure"><summary>Charakter hinzufügen</summary>
-          {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
+          {optionsError && <ErrorMessage>{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></ErrorMessage>}
           <form className="inline-form" onSubmit={createCharacter}>
             <label>Rising-Gods-Charakter<input value={charQuery} onChange={(e) => setCharQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
             <button type="button" disabled={pending || charQuery.trim().length < 3} onClick={() => void searchNewCharacters()}>{charSearching ? 'Suche…' : 'Suchen'}</button>
@@ -723,7 +724,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
                   <label className="check"><input type="checkbox" disabled={pending} checked={characterDraft.active} onChange={(e) => changeCharacter({ active: e.target.checked })} />Aktiv</label>
                   <button type="submit" disabled={pending || !characterDraft.name.trim()}>Charakter speichern</button>
                   <button type="button" disabled={pending} onClick={() => editCharacter(null)}>Bearbeitung abbrechen</button>
-                  {error && <p className="error" role="alert">{error}</p>}
+                  {error && <ErrorMessage>{error}</ErrorMessage>}
                 </form></td> : transferCharacter?.id === c.id ? <td colSpan={7}><form className="inline-form in-place-editor" onSubmit={transferCharacterOwner}>
                   <p className="muted"><strong>{c.name}</strong> gehört danach zum ausgewählten Spieler. Raid-Aufstellungen werden zugeordnet; Loot und EP bleiben unverändert.</p>
                   <label>Neuer Spieler<select autoFocus required disabled={pending} value={transferPlayerID} onChange={(e) => setTransferPlayerID(e.target.value)}>
@@ -732,7 +733,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
                   </select></label>
                   <button type="submit" disabled={pending || !transferPlayerID}>Charakter verschieben</button>
                   <button type="button" disabled={pending} onClick={() => setTransferCharacter(null)}>Abbrechen</button>
-                  {error && <p className="error" role="alert">{error}</p>}
+                  {error && <ErrorMessage>{error}</ErrorMessage>}
                 </form></td> : <>
                 <td><Link className="character-name" to={`/characters/${c.id}`}>{c.name}</Link></td>
                 <td>{c.class}</td>

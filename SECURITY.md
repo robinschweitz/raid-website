@@ -85,7 +85,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** With `TRUST_PROXY_HEADERS=true`, the client address MUST come from `X-Real-IP`, which nginx overwrites with `$remote_addr`. The leftmost `X-Forwarded-For` entry MUST NOT be used, because nginx appends to a client-supplied value. Without trusted proxy mode, `RemoteAddr` is used.
 - **Enforcement:** `clientAddress` in `internal/httpapi/v1/security.go`; `deploy/nginx/raid-website.conf`.
-- **Evidence:** FR-2.3, FR-7.6, ADR 046. Code: **not compliant** on `main` — it returns the first `X-Forwarded-For` entry, so any visitor can choose their own address and bypass the login rate limit. Fixed in PR #44. Threats: T-001.
+- **Evidence:** FR-2.3, FR-7.6, ADR 046. Code: compliant since PR #44 (issue #59): `X-Real-IP` first, then the last `X-Forwarded-For` entry. Threats: T-001.
 - **Verification:** Six failed logins with six different forged `X-Forwarded-For` values from one connection are blocked at the sixth.
 
 **SC-007 - WebAuthn relying party from configuration**
@@ -99,7 +99,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** After 5 failed logins for the same normalised username and client address within 15 minutes, further attempts MUST be rejected without checking the password. Failures MUST be recorded in the database.
 - **Enforcement:** `auth.StartLogin`, `login_attempts` table.
-- **Evidence:** FR-2.3. Code: compliant, but bypassable until SC-006 is fixed. Threats: T-001, T-002.
+- **Evidence:** FR-2.3. Code: compliant (SC-006 fixed in PR #44). Threats: T-001, T-002.
 - **Verification:** The sixth attempt in the window returns the rate-limit error even with the correct password.
 
 **SC-009 - No username probing**
@@ -331,7 +331,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** `main` MUST accept changes only through pull requests whose required CI checks pass; direct pushes, force pushes, and deletion MUST be blocked. No approving review is required (one maintainer). Required checks MUST include the Go and frontend gates and a vulnerability scan: `govulncheck` for Go and `npm audit --omit=dev` for the frontend; a known vulnerability blocks the merge until it is fixed.
 - **Enforcement:** GitHub ruleset on `main`; `.github/workflows/ci.yml`.
-- **Evidence:** ADR 071, ADR 072, NFR-5.1, OD-011 (owner, 2026-10-23). Code: **not compliant** — ruleset "Protect" disabled, no required checks, no vulnerability scan. Threats: T-012, T-028.
+- **Evidence:** ADR 071, ADR 072, NFR-5.1, OD-011 (owner, 2026-10-23). Code: ruleset "Protect" active since 2026-10-23 (pull requests only, squash, required checks `quality` and `e2e`, no bypass); `quality` runs `govulncheck` and `npm audit --omit=dev --audit-level=high` (#102). Threats: T-012, T-028.
 - **Verification:** A direct push to `main` is rejected; a pull request with a failing test or a known vulnerable dependency cannot merge.
 
 **SC-040 - MFA required for Admins**
@@ -373,7 +373,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** `go.mod` MUST name a `toolchain` at least as new as the newest Go patch release that fixes every reachable `govulncheck` finding (today `go1.26.10`), so that CI and the production build use it even when the host's Go is older. The vulnerability scan of SC-039 MUST run with that toolchain.
 - **Enforcement:** `go.mod`; `.github/workflows/ci.yml`; the host update script (SC-037).
-- **Evidence:** `THREAT_MODEL_CODE.md` CT-001: 29 reachable standard-library vulnerabilities with `go1.26.0`, all fixed in `go1.26.10`; `go.mod` has no `toolchain` line. Code: **not compliant**. Threats: T-046.
+- **Evidence:** `THREAT_MODEL_CODE.md` CT-001: 29 reachable standard-library vulnerabilities with `go1.26.0`, all fixed in `go1.26.10`; `go.mod` now names `toolchain go1.26.10`, CI checks that its Go is at least that version, and the update service sets `GOTOOLCHAIN=auto` (#102). Code: compliant in the repository; production compliant once the updated unit is installed (`deploy/README.md`). Threats: T-046.
 - **Verification:** `govulncheck ./...` with the toolchain from `go.mod` reports no reachable vulnerability; `go version -m` of the production binary shows that toolchain.
 
 **SC-046 - No account hints before a valid code**

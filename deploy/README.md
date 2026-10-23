@@ -120,6 +120,17 @@ Push the production listener hardening (`LISTEN_ADDR`) before a newer GitHub
 revision is available; the updater intentionally refuses a revision that lacks
 this guard.
 
+The build uses the Go toolchain named in `go.mod` (`toolchain` line, SC-045):
+`GOTOOLCHAIN=auto` in `raid-website-update.service` lets Go download that
+version into `/var/lib/raiddeploy/go` even when the installed Go is older.
+After changing the unit, reinstall it and check the running binary:
+
+```sh
+install -m 0644 deploy/systemd/raid-website-update.service /etc/systemd/system/raid-website-update.service
+systemctl daemon-reload
+go version /opt/raid-website/server   # shows go1.26.10 or newer
+```
+
 ```sh
 systemctl start raid-website-update.service
 journalctl -u raid-website-update.service -n 100 --no-pager

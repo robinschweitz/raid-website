@@ -70,6 +70,9 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   `top_attendance` and `top_loot` (`[{player_id, player_name, count}]`, at most 10 each).
   A contract test MUST check, without a session, that the response has exactly these fields and
   that no item, EP, note, or login field appears.
+- **Operator reset command.** A new `cmd/reset-code` opens the database with the server's
+  configuration and calls the `registration` reset-code service directly, like `cmd/sync-addons`
+  calls `internal/addons`; it has no HTTP surface (SC-051, OD-019). Not built.
 - **Privacy.** `accountmerge` gains an Admin-only anonymise operation (FR-30.2–30.5). The privacy
   page is a static frontend page; its contact name and address come from two new configuration
   values, read by `internal/config`, and reach the page through a public read endpoint, PROPOSED

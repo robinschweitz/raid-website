@@ -60,7 +60,7 @@ implemented yet when it differs from the code.
 - **FR-3.8** If the account has a security key and the browser supports WebAuthn, the UI MUST offer the security key first. Code login MUST stay available as a fallback only when the account has TOTP or recovery codes. (ADR 047)
 - **FR-3.9** After too many wrong codes in one MFA challenge (SC-011), the user MUST start again with the password. (Owner 2026-10-22, OD-002)
 - **FR-3.10** An ADMIN without MFA MUST set up TOTP or a security key before using any Admin function (SC-040). (Owner 2026-10-23, OD-012)
-- **FR-3.11** Losing an MFA factor MUST be handled as follows, for every role: a user who still has another factor or an unused recovery code (FR-3.3) MUST log in with it and MAY replace the lost factor; a user who has none MUST get a password reset (FR-5.8), which removes all MFA; an ADMIN after such a reset falls under FR-3.10 again. Getting the ADMIN role, by role change or bootstrap, also falls under FR-3.10. When the only ADMIN loses access, the recovery path is OD-019.
+- **FR-3.11** Losing an MFA factor MUST be handled as follows, for every role: a user who still has another factor or an unused recovery code (FR-3.3) MUST log in with it and MAY replace the lost factor; a user who has none MUST get a password reset (FR-5.8), which removes all MFA; an ADMIN after such a reset falls under FR-3.10 again. Getting the ADMIN role, by role change or bootstrap, also falls under FR-3.10. When the only ADMIN loses access, the server operator MUST be able to create a reset code for that player with a command on the server (SC-051). (Owner 2026-10-23, OD-019)
 
 ### 4. Registration and character claiming
 

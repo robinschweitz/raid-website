@@ -408,6 +408,13 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Evidence:** FR-30.6, OD-017 (owner, 2026-10-23); `THREAT_MODEL_CODE.md` CT-030: the full response is stored and never read. Code: **not compliant**. Threats: T-047.
 - **Verification:** After registration and after the migration, no row holds a raw profile; the four fields are still shown.
 
+**SC-051 - Server-side reset code for a locked-out Admin**
+- **Status:** ACTIVE
+- **Rule:** A command `cmd/reset-code`, run on the server as the application user, MUST create a reset code (SC-042) for a named player and print it once. It MUST open the database directly, MUST NOT be reachable over HTTP, MUST write an audit entry with the actor "server operator", and MUST be logged as a security event (SC-041). It MUST NOT set a password or remove MFA itself; that happens only when the code is redeemed.
+- **Enforcement:** `cmd/reset-code` (new) using the `registration` reset-code service.
+- **Evidence:** FR-3.11, OD-019 (owner, 2026-10-23). Code: **not built**. Threats: T-049.
+- **Verification:** Running the command for the only Admin prints a code that works once within 72 hours; the audit log shows the operator entry; no HTTP route reaches the command.
+
 ## Open Security Decisions
 
 The owner decided OD-001 to OD-006, OD-008, and OD-009 on 2026-10-22; the answers are in the rules that
@@ -437,9 +444,9 @@ Decided by the owner on 2026-10-23 (threat model):
 - **OD-016** A match by character name is attached only after the Admin confirms it when creating the code → SC-049, FR-4.5.
 - **OD-017** Only name, class, specs, and gear score are kept from a Rising-Gods profile; raw copies are dropped → SC-050, FR-30.6.
 - **OD-018** A password reset code lasts 72 hours → SC-042.
+- **OD-019** A locked-out only Admin gets a reset code from a server command → SC-051, FR-3.11.
 
 Open decisions from the external review of 2026-10-23:
 
-- **OD-019** Recovery when the only ADMIN loses password and MFA (FR-3.11). Choice: a command run on the server by the operator that creates a reset code for a named player (audited); or manual database repair with a written procedure; or always keep a second ADMIN. Owner: owner.
 - **OD-020** Revisit date for OD-007. Owner: owner.
 

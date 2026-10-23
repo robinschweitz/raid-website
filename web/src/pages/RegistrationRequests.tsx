@@ -156,7 +156,7 @@ export function RegistrationRequestsPage() {
   return <div className="registration-requests">
     <p><Link to="/roster">← Gildenkonfiguration</Link></p>
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Registrierungsanfragen</h1></div></div>
-    <p className="muted">Codes werden nur einmal angezeigt. Die aktive Ansicht enthält nur offene Anfragen und aktive Codes.</p>
+    <p className="muted">Bereits erstellte Codes können nicht erneut angezeigt werden, weil nur ihr sicherer Hash gespeichert wird. Hat ein anderer Admin einen Code nicht weitergegeben, öffne „Details“: Du kannst einen neuen Code ausstellen und den alten widerrufen. Der neue Code wird einmalig angezeigt und kann direkt kopiert werden.</p>
     {error && <p className="error" role="alert">{error}</p>}
     {addonCodes && <section className="card">
       <h2>Addon-Export</h2>
@@ -183,15 +183,15 @@ export function RegistrationRequestsPage() {
           <td>{linkedPlayerCell(request)}</td>
           <td><button type="button" className="registration-details" aria-expanded={openRequestID === request.id} onClick={() => toggleDetails(request)}>{openRequestID === request.id ? 'Schließen' : 'Details'}</button></td>
           <td className="actions">
-            <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void createCode(request)}>Code erstellen</button>
+            <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void createCode(request)}>{request.status === 'APPROVED' ? 'Neuen Code ausstellen' : 'Code erstellen'}</button>
             <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void reject(request)}>Ablehnen</button>
           </td>
         </tr>
         {openRequestID === request.id && <tr className="registration-details-row"><td colSpan={6}>
           <div className="registration-details-content">
             <p><a href={request.external_profile_url} target="_blank" rel="noreferrer">Rising-Gods-Profil öffnen</a></p>
-            {generated[request.id] && <p role="status"><strong>Neuer Code: {generated[request.id].code}</strong></p>}
-            {codes[request.id] ? <div className="registration-codes"><strong>Codes</strong>{codes[request.id].length === 0 ? <p className="muted">Noch keine Codes erstellt.</p> : codes[request.id].map((code) => <div key={code.id}><span>#{code.id} · gültig bis {new Date(code.expires_at).toLocaleDateString('de-DE')} · {code.used_at ? `verwendet${code.used_by_username ? ` von @${code.used_by_username}` : ''}` : code.revoked_at ? 'widerrufen' : code.sent_at ? 'gesendet' : 'offen'}</span>{!code.used_at && !code.revoked_at && !code.sent_at && <button disabled={pending} onClick={() => void markSent(code)}>Als gesendet markieren</button>}{!code.used_at && !code.revoked_at && <button disabled={pending} onClick={() => void revoke(code)}>Widerrufen</button>}</div>)}</div> : <p className="muted">Codes werden geladen…</p>}
+            {generated[request.id] && <p role="status"><strong>Neuer Code: <code>{generated[request.id].code}</code></strong> <button type="button" onClick={() => void navigator.clipboard.writeText(generated[request.id].code)}>Code kopieren</button></p>}
+            {codes[request.id] ? <div className="registration-codes"><strong>Code-Verlauf (für alle Admins sichtbar)</strong><p className="muted">Hier stehen Status und Gültigkeit. Der Code selbst ist nach dem Erstellen nicht mehr abrufbar. Für einen verlorenen Code oben „Neuen Code ausstellen“ verwenden und den bisherigen unten widerrufen.</p>{codes[request.id].length === 0 ? <p className="muted">Noch keine Codes erstellt.</p> : codes[request.id].map((code) => <div key={code.id}><span>#{code.id} · gültig bis {new Date(code.expires_at).toLocaleDateString('de-DE')} · {code.used_at ? `verwendet${code.used_by_username ? ` von @${code.used_by_username}` : ''}` : code.revoked_at ? 'widerrufen' : code.sent_at ? 'gesendet' : 'offen'}</span>{!code.used_at && !code.revoked_at && !code.sent_at && <button disabled={pending} onClick={() => void markSent(code)}>Als gesendet markieren</button>}{!code.used_at && !code.revoked_at && <button disabled={pending} onClick={() => void revoke(code)}>Widerrufen</button>}</div>)}</div> : <p className="muted">Codes werden geladen…</p>}
           </div>
         </td></tr>}
       </Fragment>)}</tbody>

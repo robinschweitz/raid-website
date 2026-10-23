@@ -123,7 +123,7 @@ sessions; validation checks only the 30-day expiry.
 **CT-025 — Admins reset passwords directly** — no reset-code flow. **Status:** CONFIRMED.
 **Rules:** SC-042.
 
-**CT-026 — No per-address login limit** — only per username and address. **Status:** FIXED (PR #118,
+**CT-026 — No per-address login limit** — only per username and address. **Status:** FIXED (PR #119,
 issue #60). **Rules:** SC-043.
 
 ### Request handling

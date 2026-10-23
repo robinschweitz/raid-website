@@ -366,6 +366,12 @@ threats that cross each boundary.
   production host builds with whatever Go it has.
 - **Status:** COVERED — SC-045, SC-039.
 
+**T-047 — More profile data kept than the site uses**
+- **Category:** Information disclosure (privacy: data minimisation). **Actor:** anyone with a copy of the database.
+- **Scenario:** The spec says what anonymisation deletes (FR-30.2) but not how much of a Rising-Gods
+  profile may be stored in the first place, or for how long a finished registration request keeps it.
+- **Status:** PARTLY COVERED — OD-017; the data is public on Rising-Gods and is deleted on anonymisation.
+
 ## Implementation
 
 The Manicode playbook expects an empty repository and asks stage 06 to record that no
@@ -590,6 +596,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-044 | COVERED | Mitigate | App | FR-5.9, SC-047 |
 | T-045 | COVERED | Mitigate | App | SC-048 |
 | T-046 | COVERED | Mitigate | Ops | SC-045, SC-039 |
+| T-047 | PARTLY COVERED | Mitigate | App | FR-30.6, OD-017 |
 
 ### Trust boundaries to threats
 
@@ -600,7 +607,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | TB-3 Browser → API | T-002 to T-007, T-009, T-010, T-019, T-020, T-023, T-026, T-027, T-031 to T-036, T-038, T-042 to T-045 |
 | TB-4 Application → Rising-Gods | T-015, T-016, T-025 |
 | TB-5 Addon text → application | T-018 |
-| TB-6 Application → database and snapshots | T-011, T-021, T-022, T-030 |
+| TB-6 Application → database and snapshots | T-011, T-021, T-022, T-030, T-047 |
 | TB-7 Build and deploy | T-012, T-013, T-014, T-028, T-029, T-046 |
 | Organisation (no technical boundary) | T-037, T-039, T-040, T-041 |
 
@@ -656,5 +663,5 @@ sequenceDiagram
 
 ## Appendix: implementation observations
 
-Code, dependency, and repository findings are owned by `THREAT_MODEL_CODE.md` (CT-001 to CT-027).
-Four of them exposed rules the specification lacked; those became T-042 to T-046 above.
+Code, dependency, and repository findings are owned by `THREAT_MODEL_CODE.md` (CT-001 to CT-030).
+Some of them exposed rules the specification lacked; those became T-042 to T-047 above.

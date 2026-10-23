@@ -17,7 +17,7 @@ and open security decisions. All security controls are written here; other files
   `db.rising-gods.de`, optionally via a Cloudflare Worker; personal data under GDPR (FR-30);
   production sets `ENV=production`, `COOKIE_SECURE=true`, `TRUST_PROXY_HEADERS=true`,
   `PUBLIC_ORIGIN` (deploy/README.md).
-- **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (specification, T-001 to T-046) and `THREAT_MODEL_CODE.md` (implementation, CT-001 to CT-027).
+- **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (specification, T-001 to T-047) and `THREAT_MODEL_CODE.md` (implementation, CT-001 to CT-030).
 - **Material gaps:** off-server backup storage and key holder (OQ-14, OD-007).
 - **Conflicts found:** the client address can be forged behind nginx (SC-006, fixed in PR #44);
   production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007); `main` is
@@ -169,9 +169,9 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-018 - Session lifetime**
 - **Status:** ACTIVE
-- **Rule:** A session MUST end 30 days after login at the latest, and MUST end earlier when it has not been used for 7 days. Each authenticated request resets the idle clock; updating the last-use time at most once per hour is enough.
+- **Rule:** A session MUST end 30 days after login at the latest, and MUST end earlier when it has not been used for 7 days. Each authenticated request resets the idle clock; the last-use time MUST be written at most once per hour, so that ordinary reads do not write to the database.
 - **Enforcement:** `auth` session validation; a last-used timestamp on `sessions`.
-- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (owner, 2026-10-22). Code: 30-day maximum compliant; idle timeout **not built**. Threats: T-010.
+- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (owner, 2026-10-22). Code: 30-day maximum compliant; idle timeout **not built**; `last_seen_at` is written on every request (`THREAT_MODEL_CODE.md` CT-028). Threats: T-010.
 - **Verification:** A session unused for 7 days and 1 minute returns 401; a session used daily stays valid until day 30.
 
 **SC-019 - CSRF protection**
@@ -319,9 +319,9 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-038 - Short-lived security records are deleted**
 - **Status:** ACTIVE
-- **Rule:** Login attempts MUST be deleted once they are older than the longest login-limit window that uses them (SC-008, SC-043). Expired sessions and expired or used MFA challenges MUST be deleted. Deletion runs during normal requests or at startup, not as a background job.
+- **Rule:** Login attempts, failed or successful, MUST be deleted once they are older than the longest login-limit window that uses them (SC-008, SC-043); a successful login MUST NOT be kept as an activity history. Expired sessions and expired or used MFA challenges MUST be deleted. Deletion runs during normal requests or at startup, not as a background job.
 - **Enforcement:** `auth` repository (`DeleteExpired` exists but is never called).
-- **Evidence:** FR-30.6, ARCHITECTURE "No background jobs". Code: **not compliant** — nothing is ever pruned. Threats: T-022.
+- **Evidence:** FR-30.6, ARCHITECTURE "No background jobs". Code: **not compliant** — nothing is ever pruned, and every successful login is stored with its address (`THREAT_MODEL_CODE.md` CT-016, CT-029). Threats: T-022.
 - **Verification:** After the window, no login attempt, expired session, or old challenge row remains.
 
 **SC-039 - Protected main branch and CI gates**
@@ -425,5 +425,8 @@ Open decision from the code threat model (`THREAT_MODEL_CODE.md`):
 
 - **OD-016** Attaching a new login by character name (FR-4.5; CT-005, T-043).
   - Choice: keep the character-name fallback for players imported before logins existed (ADR 084); require the Admin to confirm the matched player before the code is issued; or attach only by Rising-Gods profile and never by name.
+  - Owner: owner.
+- **OD-017** Keeping the raw Rising-Gods profile (FR-30.6; CT-030, T-047).
+  - Choice: keep the full profile response on registration requests and characters; keep only the fields the site uses (name, class, specs, gear score) and drop the raw copy; or drop the raw copy from finished registration requests only.
   - Owner: owner.
 

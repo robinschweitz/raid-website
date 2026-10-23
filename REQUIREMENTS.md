@@ -347,7 +347,7 @@ implemented yet when it differs from the code.
 - **FR-30.3** Anonymisation MUST keep raid rosters, loot, EP transactions, and character names in raid history. (Owner 2026-10-22, OQ-9)
 - **FR-30.4** Audit entries MUST stay without a time limit. They MUST NOT show the name of an anonymised player. (Owner 2026-10-22, OQ-9 and OQ-12)
 - **FR-30.5** A person MUST ask for anonymisation through the contact on the privacy page. Only an ADMIN MUST be able to do it. Members MUST NOT get a self-service delete. (Owner 2026-10-22, OQ-12)
-- **FR-30.6** Login attempts, expired sessions, and expired MFA challenges MUST be deleted once no rule needs them (SC-038). (THREAT_MODEL T-022)
+- **FR-30.6** Login attempts (failed and successful), expired sessions, and expired MFA challenges MUST be deleted once no rule needs them (SC-038). How much of a Rising-Gods profile is stored is under review (OD-017). (THREAT_MODEL T-022, T-047)
 - **FR-30.7** On a person's request through the privacy contact, an ADMIN MUST be able to download one machine-readable file with all data stored about that player: account (without secrets), characters, signups, absences, roster rows, loot, EP transactions, item locks, wishlist, votes, and audit entries about them. Members get no self-service export. (Owner 2026-10-23, OQ-15)
 
 ### 31. History and bulk changes

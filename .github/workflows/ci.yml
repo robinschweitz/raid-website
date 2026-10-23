@@ -1,7 +1,10 @@
 name: Application CI
 
+# Pull requests get one run (not one for the push and one for the pull request);
+# main is checked again after each merge.
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
@@ -56,6 +59,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,16 +67,22 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
+      # No Go cache here: this job only builds the server, and restoring the ~400 MB
+      # cache counts against the account's Actions cache download limit.
       - uses: actions/setup-go@v5
         with:
           go-version: 1.26.x
-          cache: true
+          cache: false
       - name: Install frontend dependencies
         working-directory: web
         run: npm ci
-      - name: Install Chromium
+      # The runner image already has the system libraries Chromium needs (it ships Google
+      # Chrome), so skip `--with-deps`: its apt download from the Ubuntu mirror sometimes
+      # took over 10 minutes. Only the headless shell is used (headless tests); it downloads
+      # from Playwright's CDN in seconds, so it is not cached.
+      - name: Install Chromium headless shell
         working-directory: web
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --only-shell chromium
       - name: Run end-to-end tests
         working-directory: web
         run: npm run e2e

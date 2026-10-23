@@ -1,8 +1,15 @@
-export const appVersion = '1.0.31'
+export const appVersion = '1.0.32'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Aktueller Raid führt zum nächsten Termin',
+    changes: [
+      '„Aktueller Raid“ öffnet einen noch laufenden Raid oder den nächsten anstehenden Termin. Abgeschlossene, abgesagte und archivierte Raids werden nicht mehr als aktuell angezeigt.',
+    ],
+  },
+  {
+    version: '1.0.31',
     title: 'Höchstens fünf falsche Codes',
     changes: [
       'Bei der Anmeldung mit zweitem Faktor sind höchstens fünf falsche Codes erlaubt. Danach meldest du dich erneut mit deinem Passwort an.',

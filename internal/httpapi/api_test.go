@@ -56,7 +56,27 @@ func setupServerWithOptions(t *testing.T, opts httpapi.Options) (*httptest.Serve
 	}
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
+	testServerDBs.Store(srv.URL, bdb.DB)
+	t.Cleanup(func() { testServerDBs.Delete(srv.URL) })
 	return srv, bdb.DB
+}
+
+// testServerDBs maps a test server URL to its database, so login can act like
+// a fresh authenticator for every seeded Admin login.
+var testServerDBs sync.Map
+
+// forgetUsedTOTPSteps clears the last accepted TOTP step, so a test may log the
+// same Admin in several times within one 30-second step. The replay rule
+// itself (SC-012) is covered by the auth package tests.
+func forgetUsedTOTPSteps(t *testing.T, srv *httptest.Server) {
+	t.Helper()
+	stored, ok := testServerDBs.Load(srv.URL)
+	if !ok {
+		t.Fatalf("no test database registered for %s", srv.URL)
+	}
+	if _, err := stored.(*bun.DB).ExecContext(context.Background(), "UPDATE player_mfa_settings SET totp_last_step = NULL"); err != nil {
+		t.Fatalf("forget used TOTP steps: %v", err)
+	}
 }
 
 // migratedTemplate is a database file with every migration applied, built once per
@@ -207,6 +227,7 @@ func login(t *testing.T, client *http.Client, srv *httptest.Server, username, pa
 	raw, _ := io.ReadAll(resp.Body)
 	_ = json.Unmarshal(raw, &started)
 	if started.Data.MFARequired {
+		forgetUsedTOTPSteps(t, srv)
 		verified := postJSON(t, client, srv.URL+"/api/v1/auth/mfa/verify", map[string]any{"challenge": started.Data.Challenge, "code": testTOTPCode(t, testTOTPSecret)})
 		defer verified.Body.Close()
 		if verified.StatusCode != http.StatusOK {

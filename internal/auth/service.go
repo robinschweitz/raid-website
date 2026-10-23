@@ -436,7 +436,11 @@ func (s *Service) EnableTOTP(ctx context.Context, playerID int64, code string) (
 	if err != nil {
 		return nil, fmt.Errorf("get totp settings: %w", err)
 	}
-	if !verifyTOTP(settings.TOTPSecret, code, time.Now().UTC()) {
+	accepted, err := s.acceptTOTP(ctx, settings, code, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	if !accepted {
 		return nil, ErrInvalidMFA
 	}
 	recovery, err := newRecoveryCodes(10)
@@ -577,7 +581,14 @@ func (s *Service) VerifyMFAChallenge(ctx context.Context, challenge, code string
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", nil, fmt.Errorf("get mfa settings: %w", err)
 	}
-	if settings == nil || !verifyTOTP(settings.TOTPSecret, code, now) {
+	accepted := false
+	if settings != nil {
+		accepted, err = s.acceptTOTP(ctx, settings, code, now)
+		if err != nil {
+			return "", nil, err
+		}
+	}
+	if !accepted {
 		used, err := s.useRecoveryCode(ctx, p.ID, code, now)
 		if err != nil {
 			return "", nil, err
@@ -645,17 +656,34 @@ func newTOTPSecret() (string, error) {
 	return strings.TrimRight(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b), "="), nil
 }
 
-func verifyTOTP(secret, code string, at time.Time) bool {
+// acceptTOTP checks a TOTP code and claims its time step, so each code works
+// at most once per account (SC-012).
+func (s *Service) acceptTOTP(ctx context.Context, settings *MFASettings, code string, at time.Time) (bool, error) {
+	step, ok := matchTOTP(settings.TOTPSecret, code, at)
+	if !ok {
+		return false, nil
+	}
+	claimed, err := s.sessions.ClaimTOTPStep(ctx, settings.PlayerID, step)
+	if err != nil {
+		return false, fmt.Errorf("claim totp step: %w", err)
+	}
+	return claimed, nil
+}
+
+// matchTOTP returns the time step whose code equals code, allowing one step
+// of drift in either direction.
+func matchTOTP(secret, code string, at time.Time) (int64, bool) {
 	code = normalizeMFACode(code)
 	if len(code) != 6 {
-		return false
+		return 0, false
 	}
+	current := at.Unix() / totpPeriodSeconds
 	for offset := int64(-1); offset <= 1; offset++ {
-		if generateTOTP(secret, at.Unix()/totpPeriodSeconds+offset) == code {
-			return true
+		if generateTOTP(secret, current+offset) == code {
+			return current + offset, true
 		}
 	}
-	return false
+	return 0, false
 }
 
 func generateTOTP(secret string, counter int64) string {

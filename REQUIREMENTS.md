@@ -28,14 +28,14 @@ implemented yet when it differs from the code.
 - **FR-1.5** The system MUST require a session for all other reads. (ADR 067)
 - **FR-1.6** The system MUST reject a request with a role that is too low with HTTP 403. It MUST reject a request without a session on a protected endpoint with HTTP 401. (ADR 010)
 - **FR-1.7** These reads MUST require RAIDASSISTENT or higher: the archive preview, the recruitment template, and the wishlist interests of a raid. (ADR 068, 069)
-- **FR-1.8** These reads MUST require ADMIN: the audit log, the registration requests and codes, and the player-account overview. (ADR 074, 084)
+- **FR-1.8** These reads MUST require ADMIN: the audit log, the registration requests and codes, the player-account overview, and the personal-data export (FR-30.7). (ADR 074, 084)
 - **FR-1.9** The system MUST store the role of each player. Only an ADMIN can change a role. (ADR 010)
 
 ### 2. Authentication and sessions
 
 - **FR-2.1** A user MUST log in with a username and a password. (ADR 010)
 - **FR-2.2** The system MUST reject a new or changed password that does not meet the password policy (SC-005). (ADR 046)
-- **FR-2.3** The system MUST temporarily block login for a username and client address after repeated failed attempts (limits: SC-008). (ADR 046)
+- **FR-2.3** The system MUST temporarily block login for a username and client address after repeated failed attempts, and a client address after too many attempts for any usernames (limits: SC-008, SC-043). (ADR 046; Owner 2026-10-23, OD-010)
 - **FR-2.4** A successful login MUST start a session. The session MUST end at its maximum lifetime (SC-018). (ADR 010)
 - **FR-2.5** The system MUST treat an unknown or expired session as no session, not as an error. (ADR 010, 020)
 - **FR-2.6** Logout MUST end the session. (ADR 010)
@@ -59,6 +59,7 @@ implemented yet when it differs from the code.
 - **FR-3.7** The login response MUST list only the factors that the account has configured. The UI MUST show only these factors. (ADR 047)
 - **FR-3.8** If the account has a security key and the browser supports WebAuthn, the UI MUST offer the security key first. Code login MUST stay available as a fallback only when the account has TOTP or recovery codes. (ADR 047)
 - **FR-3.9** After too many wrong codes in one MFA challenge (SC-011), the user MUST start again with the password. (Owner 2026-10-22, OD-002)
+- **FR-3.10** An ADMIN without MFA MUST set up TOTP or a security key before using any Admin function (SC-040). (Owner 2026-10-23, OD-012)
 
 ### 4. Registration and character claiming
 
@@ -82,6 +83,7 @@ implemented yet when it differs from the code.
 - **FR-5.5** An account merge MUST move all records of the source, including EP transactions, to the target. Then it MUST delete the source permanently. (ADR 056)
 - **FR-5.6** An account merge MUST be rejected when both players have an active lock for the same item in the same raid. (ADR 050)
 - **FR-5.7** For a duplicate poll vote or quick-add request key, the merge MUST keep the entry of the target. (ADR 056)
+- **FR-5.8** A player who lost their password MUST get a one-time reset code from an ADMIN, sent in game to their main character. Redeeming it MUST let them set a new password and MUST remove their MFA so they can set it up again (SC-042). (Owner 2026-10-23, OD-014)
 
 ### 6. Characters
 
@@ -345,11 +347,12 @@ implemented yet when it differs from the code.
 - **FR-30.4** Audit entries MUST stay without a time limit. They MUST NOT show the name of an anonymised player. (Owner 2026-10-22, OQ-9 and OQ-12)
 - **FR-30.5** A person MUST ask for anonymisation through the contact on the privacy page. Only an ADMIN MUST be able to do it. Members MUST NOT get a self-service delete. (Owner 2026-10-22, OQ-12)
 - **FR-30.6** Login attempts, expired sessions, and expired MFA challenges MUST be deleted once no rule needs them (SC-038). (THREAT_MODEL T-022)
+- **FR-30.7** On a person's request through the privacy contact, an ADMIN MUST be able to download one machine-readable file with all data stored about that player: account (without secrets), characters, signups, absences, roster rows, loot, EP transactions, item locks, wishlist, votes, and audit entries about them. Members get no self-service export. (Owner 2026-10-23, OQ-15)
 
 ### 31. History and bulk changes
 
 - **FR-31.1** Records that affect history MUST be archived (`archived_at`, `removed_at`, `withdrawn_at`), not deleted. (ADR 007)
-- **FR-31.2** The only hard deletes MUST be: the merge source (FR-5.5, FR-6.10), a roster row of a planned or open raid (FR-13.7), a revoked absence (FR-12.9), a removed wishlist item (FR-19.1), and the account data that anonymisation deletes (FR-30.2). Each MUST write an audit entry with the removed data, without secrets (FR-26.3). (ADR 056, 069, 076; Owner 2026-10-22, OQ-9)
+- **FR-31.2** The only hard deletes MUST be: the merge source (FR-5.5, FR-6.10), a roster row of a planned or open raid (FR-13.7), a revoked absence (FR-12.9), a removed wishlist item (FR-19.1), the account data that anonymisation deletes (FR-30.2), and the MFA data that a password reset removes (FR-5.8). Each MUST write an audit entry with the removed data, without secrets (FR-26.3). (ADR 056, 069, 076; Owner 2026-10-22, OQ-9)
 - **FR-31.3** A bulk write MUST report what it created, skipped, and rejected, and MUST NOT overwrite existing records. (ADR 008)
 - **FR-31.4** The system MUST NOT have a Google Sheets integration. Data imported from the old sheet stays authoritative. A future historical import MUST be a one-time offline operation with a database backup, a dry run, and a report, not a web feature. (ADR 066)
 
@@ -371,12 +374,11 @@ implemented yet when it differs from the code.
 
 ## Open Questions
 
-The owner's question and review pass on 2026-10-22 resolved OQ-1 to OQ-13. Their answers are in
+The owner's question and review passes on 2026-10-22 and 2026-10-23 resolved OQ-1 to OQ-13 and OQ-15. Their answers are in
 the requirements marked "Owner 2026-10-22". NFR-2.4 (delete the pre-migration-066 backup) is
 done and was removed. IDs are not reused.
 
 - **OQ-14** DEFERRED. Off-server backup (NFR-2.3): Which storage, and who holds the encryption key? Blocks only NFR-2.3.
-- **OQ-15** Access to one's own data (THREAT_MODEL T-038): May a member see, or download, the data the site stores about them (account, characters, signups, loot, EP history), and how: a page, a download, or on request to the Admin?
 
 ### Resolved (2026-10-22)
 
@@ -393,4 +395,5 @@ done and was removed. IDs are not reused.
 - **OQ-11** Kill log details → FR-29.5–29.11.
 - **OQ-12** Privacy details → FR-30.1–30.5.
 - **OQ-13** Anonymised name: oldest main, else oldest character → FR-30.2.
+- **OQ-15** Access to one's own data: on request, Admin download → FR-30.7 (2026-10-23).
 - Owner review: EP stops at zero with a warning → FR-16.6, FR-16.8; visitor search limit → FR-7.6; pre-066 backup deleted (former NFR-2.4).

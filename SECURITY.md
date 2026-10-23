@@ -325,46 +325,46 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Verification:** After the window, no login attempt, expired session, or old challenge row remains.
 
 **SC-039 - Protected main branch and CI gates**
-- **Status:** BLOCKED
-- **Rule:** Because production deploys `main` automatically, `main` MUST be protected against direct pushes, force pushes, and deletion, and merges MUST pass CI. The review and vulnerability-scan requirements are not decided.
-- **Enforcement:** GitHub branch protection or ruleset on `main`; `.github/workflows/`.
-- **Evidence:** ADR 071, ADR 072; GitHub on 2026-10-22: `main` unprotected, ruleset "Protect" disabled. Depends on **OD-011**. Threats: T-012, T-028.
-- **Verification:** A direct push to `main` is rejected; a pull request with a failing check cannot merge.
+- **Status:** ACTIVE
+- **Rule:** `main` MUST accept changes only through pull requests whose required CI checks pass; direct pushes, force pushes, and deletion MUST be blocked. No approving review is required (one maintainer). Required checks MUST include the Go and frontend gates and a vulnerability scan: `govulncheck` for Go and `npm audit --omit=dev` for the frontend; a known vulnerability blocks the merge until it is fixed.
+- **Enforcement:** GitHub ruleset on `main`; `.github/workflows/ci.yml`.
+- **Evidence:** ADR 071, ADR 072, NFR-5.1, OD-011 (owner, 2026-10-23). Code: **not compliant** — ruleset "Protect" disabled, no required checks, no vulnerability scan. Threats: T-012, T-028.
+- **Verification:** A direct push to `main` is rejected; a pull request with a failing test or a known vulnerable dependency cannot merge.
 
-**SC-040 - MFA for privileged roles**
-- **Status:** BLOCKED
-- **Rule:** Whether Admin (and other staff) accounts must use MFA is not decided.
-- **Enforcement:** `auth` login and role assignment.
-- **Evidence:** FR-3.1 makes MFA optional for every account. Depends on **OD-012**. Threats: T-020.
-- **Verification:** Defined by OD-012.
+**SC-040 - MFA required for Admins**
+- **Status:** ACTIVE
+- **Rule:** An ADMIN account without enabled TOTP or a security key MUST be sent to MFA setup after login, and every other Admin-only request MUST be rejected with HTTP 403 `mfa_setup_required` until MFA is enabled. This includes the bootstrap Admin and a player who is newly given the ADMIN role. Other roles stay optional (FR-3.1).
+- **Enforcement:** `auth` login flow; `RequireRole(ADMIN)` route guard.
+- **Evidence:** FR-3.10, OD-012 (owner, 2026-10-23). Code: **not compliant** — not built. Threats: T-020.
+- **Verification:** An Admin without MFA gets 403 `mfa_setup_required` on `GET /api/v1/audit-log` and succeeds after enabling TOTP.
 
 **SC-041 - Security event logging**
-- **Status:** BLOCKED
-- **Rule:** Which security events are logged, where, and for how long is not decided. Logged events MUST NOT contain passwords, codes, or tokens (SC-030).
-- **Enforcement:** `auth`, `csrfProtection`, rate limiters.
-- **Evidence:** FR-26.4 keeps logins out of the audit log; `internal/auth` logs nothing. Depends on **OD-013**. Threats: T-021.
-- **Verification:** Defined by OD-013.
+- **Status:** ACTIVE
+- **Rule:** The server MUST write one structured journal line for each failed login, login or lookup rate-limit rejection, wrong MFA code, invalidated MFA challenge, CSRF rejection, password change or reset, Admin change of a player's credentials or role, and MFA enable or disable. Each line MUST contain time, event name, player ID or normalised username, client address (SC-006), and request ID, and MUST NOT contain passwords, codes, or tokens (SC-030). The journal MUST keep these lines for 30 days.
+- **Enforcement:** `auth`, `csrfProtection`, rate limiters; journald retention in `deploy/`.
+- **Evidence:** FR-26.4 (logins stay out of the audit log), OD-013 (owner, 2026-10-23). Code: **not compliant** — `internal/auth` logs nothing. Threats: T-021.
+- **Verification:** Five wrong logins produce five journal lines without the password; journald keeps them 30 days.
 
-**SC-042 - Account recovery verification**
-- **Status:** BLOCKED
-- **Rule:** Before an Admin sets a new password for someone who lost theirs, the requester's identity MUST be verified. The method is not decided.
-- **Enforcement:** Admin account workflow (FR-5.1).
-- **Evidence:** no recovery workflow is specified. Depends on **OD-014**. Threats: T-026.
-- **Verification:** Defined by OD-014.
+**SC-042 - Password reset with an in-game code**
+- **Status:** ACTIVE
+- **Rule:** A password reset MUST use a single-use reset code that an Admin creates for a player and sends in game to that player's main character, with the same randomness, hashing, lifetime, and revocation as registration codes (SC-013). Redeeming it MUST set a new password (SC-005), MUST remove the player's TOTP settings, recovery codes, and security keys, and MUST end all sessions of the player (SC-017), in one audited transaction. An Admin MUST NOT set another player's password directly for a reset.
+- **Enforcement:** reset-code workflow (`registration` code infrastructure, PROPOSED); `auth`.
+- **Evidence:** FR-5.8, OD-014 (owner, 2026-10-23). Code: **not compliant** — not built; Admins set passwords directly. Threats: T-026.
+- **Verification:** A redeemed code works once; afterwards old sessions return 401, MFA is off, and the new password logs in.
 
-**SC-043 - Login limits per account and per address**
-- **Status:** BLOCKED
-- **Rule:** Besides SC-008, failed logins MUST be limited per account across all addresses and per client address across all usernames. Blocked on the values.
+**SC-043 - Login limit per client address**
+- **Status:** ACTIVE
+- **Rule:** Besides SC-008, one client address (SC-006) MUST NOT make more than 30 login attempts, for any usernames, in 15 minutes; further attempts are rejected with the rate-limit error before any password check. There is no separate per-account limit across addresses (T-002 accepted).
 - **Enforcement:** `auth.StartLogin`, `login_attempts`.
-- **Evidence:** FR-2.3; today only per username and address. Depends on **OD-010**. Threats: T-002, T-003.
-- **Verification:** Defined by OD-010.
+- **Evidence:** FR-2.3, OD-010 (owner, 2026-10-23). Code: **not compliant** — only per username and address. Threats: T-002, T-003.
+- **Verification:** The 31st login attempt from one address within 15 minutes is rejected without a bcrypt comparison.
 
-**SC-044 - Emergency revocation and secret rotation**
-- **Status:** BLOCKED
-- **Rule:** An Admin MUST be able to end all sessions (of one player or of everyone) in one step, and `deploy/README.md` MUST describe how to rotate `ADMIN_PASSWORD`, the Worker token, the Cloudflare API token, and the TOTP key. Who acts, and what the incident steps are, is not decided.
-- **Enforcement:** `auth`; `deploy/README.md`.
-- **Evidence:** only account merge revokes sessions (`accountmerge.RevokeSourceAuth`); no rotation steps documented. Depends on **OD-015**. Threats: T-040, T-041.
-- **Verification:** After the emergency action every old session cookie returns 401; each rotation step was carried out once on a test setup.
+**SC-044 - Incident plan and secret rotation**
+- **Status:** ACTIVE
+- **Rule:** `deploy/README.md` MUST contain an incident plan with these steps: end all sessions (the documented database command that deletes every session row), rotate `ADMIN_PASSWORD`, the Worker token, the Cloudflare API token, and the TOTP key, pause automatic deploys (stop `raid-website-update.timer`), and restore from a verified snapshot. There is no in-app "log everyone out" action. The owner is the only person who acts (T-040 accepted).
+- **Enforcement:** `deploy/README.md`.
+- **Evidence:** OD-015 (owner, 2026-10-23). Code: **not compliant** — no plan or rotation steps documented. Threats: T-040, T-041.
+- **Verification:** Each step was carried out once on a test setup and old session cookies returned 401 afterwards.
 
 ## Open Security Decisions
 
@@ -384,24 +384,12 @@ cite them. IDs are not reused.
   - Missing: storage location and who holds the encryption key. Same decision as OQ-14 in `REQUIREMENTS.md`.
   - Affected: SC-034, NFR-2.3. Owner: owner.
 
-Open decisions from the threat model (`THREAT_MODEL.md`):
+Decided by the owner on 2026-10-23 (threat model):
 
-- **OD-010** Login limits per account and per address (SC-043; T-002, T-003).
-  - Missing: how many failures per account across all addresses, and per address across all usernames, in which window; and whether the account limit locks the account or only slows it.
-  - Owner: owner.
-- **OD-011** Branch protection and CI gates for `main` (SC-039; T-012, T-028).
-  - Choice: require a pull request with passing CI only (works for one maintainer), or also an approving review by a second person; and whether CI runs a vulnerability scan (`govulncheck`, `npm audit`).
-  - Owner: owner.
-- **OD-012** MFA for privileged roles (SC-040; T-020).
-  - Choice: required for ADMIN, for all staff, or optional for everyone as today.
-  - Owner: owner.
-- **OD-013** Security event logging (SC-041; T-021).
-  - Choice: which events (failed logins, lockouts, MFA failures, CSRF rejections, role and credential changes), where (journal or a table), and how long they are kept.
-  - Owner: owner.
-- **OD-014** Account recovery (SC-042; T-026).
-  - Choice: how an Admin verifies a person who lost their password (for example a code sent in game to their main character, as for registration) before setting a new one.
-  - Owner: owner.
-- **OD-015** Incident response and continuity (SC-044; T-040, T-041).
-  - Missing: who besides the owner can act in an emergency (a second Admin or a sealed copy of the keys), and the steps when a compromise is suspected (end sessions, rotate secrets, stop deploys, restore).
-  - Owner: owner.
+- **OD-010** Per-address login limit of 30 attempts in 15 minutes; no per-account limit → SC-043.
+- **OD-011** `main` only through pull requests with passing CI and a blocking vulnerability scan; no second approver → SC-039.
+- **OD-012** MFA required for Admins → SC-040.
+- **OD-013** Security events to the server journal, kept 30 days → SC-041.
+- **OD-014** Password reset with an in-game code that also removes MFA → SC-042.
+- **OD-015** Written incident plan, no in-app button; the owner stays the only key holder → SC-044.
 

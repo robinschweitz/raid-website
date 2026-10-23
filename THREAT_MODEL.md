@@ -101,14 +101,14 @@ threats that cross each boundary.
 - **Category:** Spoofing. **Actor:** visitor with many addresses. **Asset:** A-1.
 - **Scenario:** FR-2.3 and SC-008 limit failures per username *and* address; with many addresses
   the same account can be guessed without limit. Only the password policy (SC-005) slows it.
-- **Status:** GAP — OD-010. **Controls:** SC-008, SC-043.
+- **Status:** ACCEPTED — owner decision OD-010: only a per-address limit (SC-043); distributed guessing against one account is slowed only by the password policy (SC-005).
 
 **T-003 — Login CPU exhaustion**
 - **Category:** Denial of service. **Actor:** visitor. **Asset:** A-7.
 - **Scenario:** Every login runs bcrypt (SC-005), and SC-009 adds a dummy bcrypt for unknown
   names. The spec limits failures per username and address, not per address across usernames, so
   one client rotating usernames can keep the CPU busy.
-- **Status:** GAP — OD-010. **Controls:** SC-009, SC-043.
+- **Status:** COVERED — SC-043 (30 attempts per address in 15 minutes).
 
 **T-004 — Username probing**
 - **Category:** Information disclosure. **Asset:** A-4.
@@ -151,13 +151,13 @@ threats that cross each boundary.
 - **Category:** Elevation of privilege. **Asset:** all.
 - **Scenario:** Admins control roles, credentials, merges, and configuration (FR-5, FR-6, FR-8),
   but FR-3.1 makes MFA optional for every account, Admin included.
-- **Status:** GAP — OD-012. **Controls:** SC-040.
+- **Status:** COVERED — SC-040 (MFA required for Admins).
 
 **T-026 — Account recovery by social engineering**
 - **Category:** Spoofing. **Actor:** someone pretending to be a member. **Asset:** A-1.
 - **Scenario:** The spec has no self-service reset; an Admin may set any password (FR-5.1), and no
   rule says how the Admin checks who is asking.
-- **Status:** GAP — OD-014. **Controls:** SC-042.
+- **Status:** COVERED — SC-042 (reset only with an in-game code).
 
 ### Registration and external lookups (TB-4)
 
@@ -241,7 +241,7 @@ threats that cross each boundary.
 - **Scenario:** FR-26.4 keeps logins and MFA out of the audit log, and no rule requires logging
   failed logins, lockouts, MFA failures, or CSRF rejections; an attack cannot be noticed or
   reconstructed.
-- **Status:** GAP — OD-013. **Controls:** SC-041.
+- **Status:** COVERED — SC-041 (security events in the journal, 30 days).
 
 **T-022 — Short-lived security records kept forever**
 - **Category:** Information disclosure (privacy: data retention). **Asset:** A-4.
@@ -267,7 +267,7 @@ threats that cross each boundary.
 **T-038 — Members cannot see or get their own data (LINDDUN Unintervenability)**
 - **Scenario:** FR-30 lets a member ask for anonymisation but specifies no way to see or export
   the data stored about them, which GDPR gives as a right of access and portability.
-- **Status:** GAP — OQ-15.
+- **Status:** COVERED — FR-30.7 (Admin export on request).
 
 **T-039 — Retention conflicts with storage limitation (LINDDUN Non-compliance)**
 - **Scenario:** FR-30.4 keeps audit entries with personal data without a time limit; no legal review
@@ -283,7 +283,7 @@ threats that cross each boundary.
 - **Scenario:** NFR-5.1 and ADR 072 deploy the newest `main` every hour without a person in the
   loop. TB-7 therefore depends on `main` accepting only reviewed, tested changes, but the rule
   for that (SC-039) is `BLOCKED`, and the spec does not say whether a second person must approve.
-- **Status:** GAP — OD-011. **Controls:** SC-036, SC-039.
+- **Status:** COVERED — SC-039 (pull requests with passing CI only).
 
 **T-013 — Deployment tooling outside review**
 - **Category:** Tampering, Elevation of privilege. **Asset:** A-5.
@@ -305,7 +305,7 @@ threats that cross each boundary.
 - **Category:** Tampering, Elevation of privilege.
 - **Scenario:** SC-036 requires Dependabot update proposals, but no rule requires a vulnerability
   scan before merge, and automatic deployment (T-012) ships whatever is merged.
-- **Status:** PARTLY COVERED — OD-011. **Controls:** SC-036, SC-039.
+- **Status:** COVERED — SC-039 (blocking vulnerability scan), SC-036.
 
 **T-029 — Host compromise**
 - **Category:** Elevation of privilege. **Spec basis:** SC-025 (loopback, TLS at the edge), SC-035
@@ -325,13 +325,13 @@ threats that cross each boundary.
 - **Scenario:** The spec names the owner as the only maintainer, responsible person (FR-30.1), and
   key holder (OQ-14, SC-014). Nothing specifies who can act if that person is unavailable or their
   accounts are compromised.
-- **Status:** GAP — OD-015.
+- **Status:** ACCEPTED — owner decision OD-015: the owner stays the only key holder for now.
 
 **T-041 — No plan for a suspected compromise**
 - **Category:** Repudiation, Elevation (process). **Asset:** all.
 - **Scenario:** The spec ends sessions only for specific events (SC-017) and has no emergency
   "end all sessions" action, no secret-rotation steps, and no incident procedure.
-- **Status:** GAP — OD-015. **Controls:** SC-044.
+- **Status:** COVERED — SC-044 (written incident plan and rotation steps).
 
 ## Implementation
 
@@ -344,9 +344,6 @@ through the backlog.
 
 ## Conflicts and evidence gaps
 
-- **Spec dependency without a rule:** TB-7 and NFR-5.1 rely on a protected `main`, but SC-039 is
-  blocked (T-012).
-- **Gap:** no incident procedure or secret-rotation steps are specified (T-041).
 - **Gap:** host snapshots are not specified as encrypted at rest (T-011).
 - **Gap:** the hosting provider's snapshot policy is not specified (OD-007).
 
@@ -386,13 +383,13 @@ flowchart TD
   G1["Goal 1: control an Admin account"] --> O1{OR}
   O1 --> A1["Guess the password"] --> O1a{OR}
   O1a --> A1a["Forge the client address — T-001, blocked by SC-006"]
-  O1a --> A1b["Spread guesses over many addresses — T-002, GAP OD-010"]
+  O1a --> A1b["Spread guesses over many addresses — T-002, accepted"]
   O1 --> A2["Pass MFA too"] --> O2{OR}
-  O2 --> A2a["Admin has no MFA — T-020, GAP OD-012"]
+  O2 --> A2a["Admin has no MFA — T-020, blocked by SC-040"]
   O2 --> A2b["Guess the code — T-005, blocked by SC-011"]
   O2 --> A2c["Replay a code — T-006, blocked by SC-012"]
   O1 --> A3["Steal a session — T-009, T-010, blocked by SC-016 to SC-018, SC-022"]
-  O1 --> A4["Talk an Admin into a reset — T-026, GAP OD-014"]
+  O1 --> A4["Talk an Admin into a reset — T-026, blocked by SC-042"]
   O1 --> A5["Ship code that grants it — Goal 3"]
 ```
 
@@ -411,9 +408,9 @@ flowchart TD
 flowchart TD
   G3["Goal 3: run code on the production host"] --> O{OR}
   O --> C1["Get a commit onto main"] --> OC{OR}
-  OC --> C1a["Push without review — T-012, GAP OD-011"]
+  OC --> C1a["Push without passing CI — T-012, blocked by SC-039"]
   OC --> C1b["Take over the owner's GitHub account — T-012, T-040"]
-  OC --> C1c["Malicious dependency or action — T-014 covered, T-028 partly"]
+  OC --> C1c["Malicious dependency or action — T-014, T-028, covered"]
   C1 --> W["…then wait at most one hour for the automatic deploy (NFR-5.1)"]
   O --> C2["Tamper with host scripts — T-013, covered by SC-037"]
   O --> C3["Break into the host — T-029, covered"]
@@ -423,10 +420,10 @@ flowchart TD
 flowchart TD
   G4["Goal 4: take the site down on raid night"] --> O{OR}
   O --> D1["Hold connections open — T-017, covered"]
-  O --> D2["Burn CPU with logins — T-003, GAP OD-010"]
+  O --> D2["Burn CPU with logins — T-003, blocked by SC-043"]
   O --> D3["Get the guild blocked by Rising-Gods — T-016, T-035, covered"]
   O --> D4["Destroy the host without an off-server copy — T-030, OD-007"]
-  O --> D5["Deploy a broken build — T-012, GAP OD-011"]
+  O --> D5["Deploy a broken build — T-012, blocked by SC-039"]
 ```
 
 ## Misuse and abuse cases
@@ -467,7 +464,8 @@ unintended result. Findings are T-031 to T-036:
 2. **Technical scope:** [Scope](#scope) and `ARCHITECTURE.md`.
 3. **Decomposition:** [DFD elements](#dfd-elements).
 4. **Threat analysis:** the goals in [Attack trees](#attack-trees).
-5. **Weakness analysis:** the `GAP` and `PARTLY COVERED` threats in [Coverage](#coverage).
+5. **Weakness analysis:** the `PARTLY COVERED` threats in [Coverage](#coverage); all `GAP`s were
+   decided on 2026-10-23.
 6. **Attack modeling:** [Attack trees](#attack-trees).
 7. **Business impact (in words, no scores):**
    - Losing the fairness record or trust in it (Goal 2, T-012, T-030) would undermine the loot
@@ -487,8 +485,9 @@ unintended result. Findings are T-031 to T-036:
   identity check (T-026); automatic deployment without a specified review rule (T-012).
 - **Practices the spec already requires:** unattended upgrades and scheduled reboots (NFR-5.1),
   sandboxed services (SC-035), verified snapshots (NFR-2.1, NFR-2.2), ADRs and the audit log.
-- **Strategy:** close the deployment-path gap first (OD-011), then Admin accounts (OD-012, OD-010),
-  then recovery and continuity (OD-007, OD-014, OD-015).
+- **Strategy:** the owner closed the deployment-path gap (SC-039), Admin accounts (SC-040, SC-043),
+  and recovery (SC-042, SC-044) on 2026-10-23; continuity rests on one person (T-040, accepted) and
+  the off-server copy is still deferred (OD-007).
 
 ## Brainstorming
 
@@ -502,7 +501,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | --- | --- |
 | Does the DFD match the system? | It matches `ARCHITECTURE.md`, the system as specified. |
 | Are all threats identified? | All cheat-sheet techniques were applied to every spec file. |
-| Does every threat have an agreed response? | Yes — `Response` column; `GAP` items wait for the owner's decision. |
+| Does every threat have an agreed response? | Yes — `Response` column; every gap was decided on 2026-10-23, only OD-007 stays deferred. |
 | Are mitigations testable and measurable? | Yes — every `SC-*` rule has a **Verification** field. |
 | Is the model kept up to date? | `AGENTS.md` names this file as the owner of threats; spec changes add or update `T-*` entries. |
 
@@ -513,8 +512,8 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | Threat | Status | Response | VAST | Controls and decisions |
 | --- | --- | --- | --- | --- |
 | T-001 | COVERED | Mitigate | App | SC-006, SC-008 |
-| T-002 | GAP | Mitigate | App | SC-008, SC-043, OD-010 |
-| T-003 | GAP | Mitigate | App | SC-009, SC-043, OD-010 |
+| T-002 | ACCEPTED | Accept | App | SC-008, SC-043, OD-010 |
+| T-003 | COVERED | Mitigate | App | SC-009, SC-043, OD-010 |
 | T-004 | COVERED | Mitigate | App | SC-009 |
 | T-005 | COVERED | Mitigate | App | SC-010, SC-011 |
 | T-006 | COVERED | Mitigate | App | SC-012 |
@@ -523,7 +522,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-009 | COVERED | Mitigate | App | SC-016, SC-022, SC-024 |
 | T-010 | COVERED | Mitigate | App | SC-017, SC-018 |
 | T-011 | PARTLY COVERED | Mitigate | App + Ops | SC-014, SC-034, SC-035, OD-007 |
-| T-012 | GAP | Mitigate | Ops | SC-036, SC-039, OD-011 |
+| T-012 | COVERED | Mitigate | Ops | SC-036, SC-039, OD-011 |
 | T-013 | COVERED | Mitigate | Ops | SC-037 |
 | T-014 | COVERED | Mitigate | Ops | SC-036 |
 | T-015 | COVERED | Mitigate | Ops | SC-029 |
@@ -531,15 +530,15 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-017 | COVERED | Mitigate | App | SC-026 |
 | T-018 | COVERED | Mitigate | App | SC-020, SC-022 |
 | T-019 | ACCEPTED | Accept | App | SC-031 |
-| T-020 | GAP | Mitigate | App | SC-040, OD-012 |
-| T-021 | GAP | Mitigate | App + Ops | SC-041, OD-013 |
+| T-020 | COVERED | Mitigate | App | SC-040, OD-012 |
+| T-021 | COVERED | Mitigate | App + Ops | SC-041, OD-013 |
 | T-022 | COVERED | Eliminate | App | SC-038 |
 | T-023 | ACCEPTED | Accept | App | SC-004 |
 | T-024 | COVERED | Eliminate | App | SC-024 |
 | T-025 | ACCEPTED | Accept | App | SC-013 |
-| T-026 | GAP | Mitigate | Ops | SC-042, OD-014 |
+| T-026 | COVERED | Mitigate | Ops | SC-042, OD-014 |
 | T-027 | COVERED | Mitigate | App | SC-020, SC-021, SC-024 |
-| T-028 | PARTLY COVERED | Mitigate | Ops | SC-036, SC-039, OD-011 |
+| T-028 | COVERED | Mitigate | Ops | SC-036, SC-039, OD-011 |
 | T-029 | COVERED | Mitigate | Ops | SC-025, SC-035, SC-037 |
 | T-030 | PARTLY COVERED | Transfer or Mitigate | Ops | SC-034, OD-007 |
 | T-031 | ACCEPTED | Accept | App | FR-17.2, FR-17.3 |
@@ -549,10 +548,10 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-035 | COVERED | Mitigate | App | SC-028 |
 | T-036 | ACCEPTED | Accept | App | FR-16.6, FR-16.8 |
 | T-037 | COVERED | Mitigate | App | FR-30.1 |
-| T-038 | GAP | Mitigate | App | OQ-15 |
+| T-038 | COVERED | Mitigate | App | OQ-15 |
 | T-039 | ACCEPTED | Accept | Ops | FR-30.4 |
-| T-040 | GAP | Mitigate | Ops | OD-015 |
-| T-041 | GAP | Mitigate | Ops | SC-044, OD-015 |
+| T-040 | ACCEPTED | Accept | Ops | OD-015 |
+| T-041 | COVERED | Mitigate | Ops | SC-044, OD-015 |
 
 ### Trust boundaries to threats
 
@@ -610,7 +609,7 @@ sequenceDiagram
   S-->>B: CSRF token (SC-019)
   B->>N: POST /login + X-CSRF-Token
   N->>S: X-Real-IP = client (SC-006)
-  S->>S: limits per username + address (SC-008), per account and address (SC-043, OD-010)
+  S->>S: limits per username + address (SC-008) and per address (SC-043)
   S->>S: bcrypt or dummy bcrypt, same error (SC-005, SC-009)
   S-->>B: MFA challenge, 5 min, single use (SC-010)
   B->>S: code (at most 5 wrong: SC-011; each code once: SC-012)
@@ -638,7 +637,7 @@ named rule's **Evidence** field and goes into the backlog.
 | No visitor lookup limit | SC-028 |
 | `.gitignore` (`bin/`) excludes `deploy/bin/`; the host scripts are not in the repository | SC-037 |
 | Expired sessions, challenges, and login attempts are never deleted (`DeleteExpired` unused) | SC-038 |
-| `main` unprotected; ruleset "Protect" disabled (GitHub API) | SC-039 (blocked on OD-011) |
+| `main` unprotected; ruleset "Protect" disabled (GitHub API) | SC-039 |
 | Actions pinned by tag; no Dependabot configuration | SC-036 |
 | Class icons loaded from `wow.zamimg.com` | SC-024 |
-| No action to end all sessions | SC-044 (blocked on OD-015) |
+| No incident plan or rotation steps in `deploy/README.md` | SC-044 |

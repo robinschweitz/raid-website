@@ -401,7 +401,8 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
   clipboard is blocked, the text is shown selected for manual copying (ADR 081).
 
 - **New screens:** the boss kill list and difficulty prompt (FR-29), the privacy page and the
-  anonymise action (FR-30), and the EP-floor warning (FR-16.8) are designed in their own
+  anonymise action (FR-30), the EP-floor warning (FR-16.8), the forced Admin MFA setup (FR-3.10), and the password reset
+  with a code (FR-5.8) are designed in their own
   implementation issue, built only from the components above, and reviewed through the
   screenshots in the pull request (Owner 2026-10-22, DQ-4).
 

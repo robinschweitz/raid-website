@@ -62,7 +62,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Handlers MUST take the actor from the request context set by the session middleware and MUST NOT read an actor from headers or bodies. The removed `X-Actor-ID` header MUST NOT return.
 - **Enforcement:** `internal/httpapi/v1/actor.go`, `authenticate` middleware.
-- **Evidence:** ADR 010, FR-24.6. Code: compliant (poll handlers still mention the header in an error message, FR-24.6).
+- **Evidence:** ADR 010, FR-24.6. Code: compliant. Poll writes answer a missing session with `unauthenticated` (ADR 095) and no longer mention the header (`internal/httpapi/v1/polls.go`; test `TestReqRaid013_AC01`).
 - **Verification:** Sending `X-Actor-ID` changes nothing; code search finds no header read.
 
 **SC-004 - Public data stays minimal**

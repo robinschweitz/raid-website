@@ -60,7 +60,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   assumes exactly one application process (DR-9).
 - **Server lifecycle.** The HTTP server sets read-header, read, write, and idle timeouts and
   shuts down gracefully on SIGTERM, finishing running requests (Owner 2026-10-22, AQ-3); the values
-  are owned by `SECURITY.md`. Not built: the code calls `http.ListenAndServe` without them.
+  are owned by `SECURITY.md` (SC-026).
 - **Statistics.** A public `GET /api/v1/statistics` returns only server-computed aggregates
   (FR-27.2); the statistics page reads only this endpoint (Owner 2026-10-22, AQ-2). Not built: the
   page now computes figures in the browser from login-only and per-raid loot endpoints.
@@ -113,7 +113,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | Component | Responsibility | Business rules enforced | Data owned | Requirements | Status |
 | --- | --- | --- | --- | --- | --- |
 | Web client (`web/src`) | Pages, forms, hash routing, German UI, local drafts | None authoritative; convenience checks only | Browser drafts (`localStorage`) | FR-28, `DESIGN.md` | SUPPORTED |
-| HTTP layer (`httpapi`, `httpapi/v1`) | Middleware chain, route guards, DTOs, error mapping, SPA and health, server timeouts | Role matrix, session presence, CSRF, body size | None | FR-1, FR-2.8, NFR-4.1, NFR-4.2 | SUPPORTED (timeouts not built) |
+| HTTP layer (`httpapi`, `httpapi/v1`) | Middleware chain, route guards, DTOs, error mapping, SPA and health, server timeouts | Role matrix, session presence, CSRF, body size | None | FR-1, FR-2.8, NFR-4.1, NFR-4.2 | SUPPORTED |
 | `auth` | Login, sessions, passwords, TOTP, recovery codes, WebAuthn, bootstrap admin | Password length, login rate limit, MFA challenge expiry | sessions, login attempts, MFA secrets and credentials, password hash | FR-2, FR-3 | SUPPORTED |
 | `registration` | Rising-Gods client and cache; registration requests, codes, claims; visitor search counter | Alliance level-80 filter, request deduplication, code expiry, visitor search limit | registration requests, codes, external profiles | FR-4, FR-7 | SUPPORTED (search limit not built; unused warmer to delete) |
 | `player` | Players, roles, public player view | Public field subset | players | FR-1.3, FR-1.9, FR-5.1–5.2 | SUPPORTED |

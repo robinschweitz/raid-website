@@ -50,12 +50,13 @@ type MFARecoveryCode struct {
 type MFAChallenge struct {
 	bun.BaseModel `bun:"table:mfa_login_challenges"`
 
-	ID            int64      `bun:"id,pk,autoincrement" json:"id"`
-	ChallengeHash string     `bun:"challenge_hash,notnull,unique" json:"-"`
-	PlayerID      int64      `bun:"player_id,notnull" json:"player_id"`
-	CreatedAt     time.Time  `bun:"created_at,notnull" json:"created_at"`
-	ExpiresAt     time.Time  `bun:"expires_at,notnull" json:"expires_at"`
-	UsedAt        *time.Time `bun:"used_at" json:"used_at,omitempty"`
+	ID             int64      `bun:"id,pk,autoincrement" json:"id"`
+	ChallengeHash  string     `bun:"challenge_hash,notnull,unique" json:"-"`
+	PlayerID       int64      `bun:"player_id,notnull" json:"player_id"`
+	CreatedAt      time.Time  `bun:"created_at,notnull" json:"created_at"`
+	ExpiresAt      time.Time  `bun:"expires_at,notnull" json:"expires_at"`
+	UsedAt         *time.Time `bun:"used_at" json:"used_at,omitempty"`
+	FailedAttempts int        `bun:"failed_attempts,notnull,default:0" json:"failed_attempts"`
 }
 
 type WebAuthnCredential struct {

@@ -338,7 +338,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** An ADMIN account without enabled TOTP or a security key MUST be sent to MFA setup after login, and every other Admin-only request MUST be rejected with HTTP 403 `mfa_setup_required` until MFA is enabled. This includes the bootstrap Admin and a player who is newly given the ADMIN role. Other roles stay optional (FR-3.1).
 - **Enforcement:** `auth` login flow; `RequireRole(ADMIN)` route guard.
-- **Evidence:** FR-3.10, OD-012 (owner, 2026-10-23). Code: **not compliant** — not built. Threats: T-020.
+- **Evidence:** FR-3.10, OD-012 (owner, 2026-10-23). Code: compliant after #69 — the session middleware records whether an ADMIN has TOTP or a security key, `RequireRole(ADMIN)` answers 403 `mfa_setup_required` without one, and the web client sends such an Admin to the account tab. Threats: T-020.
 - **Verification:** An Admin without MFA gets 403 `mfa_setup_required` on `GET /api/v1/audit-log` and succeeds after enabling TOTP.
 
 **SC-041 - Security event logging**

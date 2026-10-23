@@ -3565,6 +3565,40 @@ test('MFA reminder can be hidden and follows MFA changes from the profile (ADR 0
   assert.equal(hideView.tree, null)
 })
 
+test('an Admin without a second factor must set one up: fixed notice and account tab (REQ-AUTH-020, FR-3.10)', async () => {
+  const s = setup({ id: 7, role: 'ADMIN' })
+  const { MFAReminderBanner } = s.load('components/MFAReminderBanner.tsx')
+  const view = s.mount(MFAReminderBanner, { isSignedIn: true, adminID: 7, path: '/' })
+  s.requests.find((r) => r.url === '/api/v1/auth/mfa').resolve({ totp_enabled: false, recovery_codes: true, security_keys: [] })
+  await flush(view)
+  assert.equal(view.tree.props.role, 'alert')
+  assert.match(text(view.tree), /Als Admin brauchst du einen zweiten Faktor/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'a')[0].props.to, '/players/7/konto')
+  assert.equal(nodes(view.tree, (n) => n.type === 'button').length, 0, 'the Admin notice cannot be hidden')
+  assert.deepEqual(s.navigations, ['/players/7/konto'], 'the first page after login is the account tab')
+  view.render()
+  assert.deepEqual(s.navigations, ['/players/7/konto'], 'redirects only once')
+
+  const protectedAdmin = setup({ id: 8, role: 'ADMIN' })
+  const protectedView = protectedAdmin.mount(protectedAdmin.load('components/MFAReminderBanner.tsx').MFAReminderBanner, { isSignedIn: true, adminID: 8, path: '/' })
+  protectedAdmin.requests[0].resolve({ totp_enabled: true, security_keys: [] })
+  await flush(protectedView)
+  assert.equal(protectedView.tree, null)
+  assert.deepEqual(protectedAdmin.navigations, [])
+})
+
+test('the mfa_setup_required error is shown in German (REQ-AUTH-020)', async () => {
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async () => ({ ok: false, status: 403, statusText: 'Forbidden', headers: { get: () => 'application/json' }, json: async () => ({ error: { code: 'mfa_setup_required', message: 'admin requires a second factor' } }), text: async () => '{"error":{"code":"mfa_setup_required","message":"admin requires a second factor"}}' })
+  try {
+    const s = setup({ id: 7, role: 'ADMIN' })
+    const real = s.load('api.ts')
+    await assert.rejects(real.api.get('/api/v1/audit-log'), (err) => err.code === 'mfa_setup_required' && /zweiten Faktor/.test(err.message))
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
 test('the account-security deep link opens the profile account tab (ADR 092)', async () => {
   const s = setup({ id: 2, role: 'MEMBER' })
   const { PlayerDetailPage } = s.load('pages/PlayerDetail.tsx')

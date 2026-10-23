@@ -1941,9 +1941,16 @@ input[type='checkbox'] {
   background: rgba(255, 210, 122, 0.12);
 }
 
+/* Admins without a second factor (FR-3.10): same line, stronger edge, cannot be hidden. */
+.mfa-reminder-required {
+  border-color: #c99a3d;
+  border-left-width: 4px;
+}
+
 @media (max-width: 600px) {
   .mfa-reminder-link span { display: none; }
   .mfa-reminder-link strong::after { content: ' Warum? →'; font-weight: 400; color: #9eafc3; }
+  .mfa-reminder-required .mfa-reminder-link strong::after { content: ' Einrichten →'; }
 }
 .boss-order-list { margin: 12px 0; padding-left: 26px; display: grid; gap: 4px; max-width: 520px; }
 .boss-order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px; border: 1px solid var(--card-border); border-radius: 4px; }

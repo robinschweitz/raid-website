@@ -12,6 +12,7 @@ import (
 
 	"raid-website/internal/auth"
 	v1 "raid-website/internal/httpapi/v1"
+	"raid-website/internal/validation"
 )
 
 const csrfCookieName = "raid_csrf"
@@ -86,7 +87,17 @@ func authenticate(svc *auth.Service) func(http.Handler) http.Handler {
 					return
 				}
 				if p != nil {
-					r = r.WithContext(v1.WithActor(r.Context(), p))
+					ctx := v1.WithActor(r.Context(), p)
+					if p.Role == validation.RoleAdmin {
+						has, err := svc.HasSecondFactor(r.Context(), p.ID)
+						if err != nil {
+							log.Printf("authenticate: second factor: %v", err)
+							v1.WriteError(w, http.StatusInternalServerError, "internal", "could not authenticate session")
+							return
+						}
+						ctx = v1.WithAdminSecondFactor(ctx, has)
+					}
+					r = r.WithContext(ctx)
 				}
 			}
 			next.ServeHTTP(w, r)

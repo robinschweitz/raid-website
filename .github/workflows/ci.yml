@@ -23,6 +23,9 @@ jobs:
       - name: Install frontend dependencies
         working-directory: web
         run: npm ci
+      - name: Audit frontend dependencies
+        working-directory: web
+        run: npm audit --omit=dev --audit-level=high
       - name: Build frontend
         working-directory: web
         run: npm run build
@@ -38,6 +41,16 @@ jobs:
         with:
           go-version: 1.26.x
           cache: true
+      - name: Check Go toolchain
+        shell: bash
+        run: |
+          want="$(awk '/^toolchain /{print $2}' go.mod)"
+          have="$(go env GOVERSION)"
+          echo "go.mod toolchain: $want, CI Go: $have"
+          if ! printf '%s\n%s\n' "$want" "$have" | sort -V -C; then
+            echo "CI Go $have is older than the go.mod toolchain $want (SC-045)."
+            exit 1
+          fi
       - name: Check Go formatting
         shell: bash
         run: |
@@ -54,6 +67,9 @@ jobs:
         run: $(go env GOPATH)/bin/golangci-lint run
       - name: Build Go
         run: go build ./...
+      # Blocks on any known vulnerability that the code can reach (SC-039, SC-045).
+      - name: Scan Go vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
       - name: Test Go
         run: go test ./...
 

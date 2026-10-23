@@ -24,7 +24,8 @@ from its own angle, together with code-specific techniques:
 | Pattern search and manual secure code review | SQL, error text, URL and HTML sinks, parser indexing, secrets in JSON; every ID-taking write; auth flows; account administration; CI | [Register](#register), [Checked without a finding](#checked-without-a-finding) |
 | OWASP Top 10:2021 | Checklist | [OWASP Top 10 checklist](#owasp-top-10-checklist) |
 
-Status values: `CONFIRMED` (seen in the code), `FIX PENDING` (a fix is open), `ACCEPTED` (owner
+Status values: `CONFIRMED` (seen in the code), `FIX PENDING` (a fix is open), `FIXED` (the fix is
+on `main`; the issue or pull request is named), `ACCEPTED` (owner
 decision or design), `DECISION` (needs an owner decision). Each threat has a Shostack response.
 No numeric risk scores; the **Impact** line says in words what an attacker gains.
 
@@ -44,7 +45,7 @@ No numeric risk scores; the **Impact** line says in words what an attacker gains
   the newest `1.26.x`. 19 further findings in modules are not reachable.
 - **Impact:** a remote visitor can crash or slow the server; certificate checks in WebAuthn are
   weaker than intended.
-- **Status:** CONFIRMED. **Response:** Mitigate. **Rules:** SC-045, SC-039.
+- **Status:** FIX PENDING (#102; production after reinstalling the update unit). **Response:** Mitigate. **Rules:** SC-045, SC-039.
 
 **CT-002 — Frontend dependencies**
 - **Evidence:** `npm audit` reports 0 vulnerabilities (runtime and dev).
@@ -142,7 +143,7 @@ CONFIRMED. **Rules:** SC-028.
 **Rules:** SC-007.
 
 **CT-027 — Client address from the first `X-Forwarded-For` entry** — bypasses the login limit.
-**Status:** FIX PENDING (PR #44). **Rules:** SC-006.
+**Status:** FIXED (PR #44, issue #59). **Rules:** SC-006.
 
 ### Data, logging, and privacy
 
@@ -161,7 +162,7 @@ CONFIRMED. **Rules:** SC-024.
 **Status:** CONFIRMED. **Rules:** SC-037.
 
 **CT-018 — `main` unprotected** — GitHub API: `protected: false`; ruleset "Protect" disabled.
-**Status:** CONFIRMED. **Rules:** SC-039.
+**Status:** FIXED (ruleset "Protect" active 2026-10-23, #107). **Rules:** SC-039.
 
 **CT-019 — Actions pinned by tag; no Dependabot** — `.github/workflows/*.yml`. **Status:**
 CONFIRMED. **Rules:** SC-036.
@@ -388,7 +389,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 
 | Code threat | Status | Response | VAST | Rule | Spec threat |
 | --- | --- | --- | --- | --- | --- |
-| CT-001 | CONFIRMED | Mitigate | Ops + App | SC-045, SC-039 | T-046 |
+| CT-001 | FIX PENDING | Mitigate | Ops + App | SC-045, SC-039 | T-046 |
 | CT-003 | CONFIRMED | Mitigate | App | SC-046 | T-042 |
 | CT-004 | CONFIRMED | Mitigate | App | SC-009 | T-004 |
 | CT-005 | CONFIRMED | Mitigate | App | SC-049, FR-4.5 | T-043 |
@@ -404,7 +405,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-015 | CONFIRMED | Mitigate | App | SC-028 | T-016, T-035 |
 | CT-016 | CONFIRMED | Eliminate | App | SC-038 | T-022 |
 | CT-017 | CONFIRMED | Mitigate | Ops | SC-037 | T-013 |
-| CT-018 | CONFIRMED | Mitigate | Ops | SC-039 | T-012 |
+| CT-018 | FIXED | Mitigate | Ops | SC-039 | T-012 |
 | CT-019 | CONFIRMED | Mitigate | Ops | SC-036 | T-014 |
 | CT-020 | CONFIRMED | Eliminate | App | SC-024 | T-024 |
 | CT-021 | CONFIRMED | Mitigate | App | SC-007 | T-008 |
@@ -413,7 +414,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-024 | CONFIRMED | Mitigate | App | SC-040 | T-020 |
 | CT-025 | CONFIRMED | Mitigate | App | SC-042 | T-026 |
 | CT-026 | CONFIRMED | Mitigate | App | SC-043 | T-003 |
-| CT-027 | FIX PENDING | Mitigate | App | SC-006 | T-001 |
+| CT-027 | FIXED | Mitigate | App | SC-006 | T-001 |
 | CT-028 | CONFIRMED | Mitigate | App | SC-018 | T-010 |
 | CT-029 | CONFIRMED | Eliminate | App | SC-038 | T-022 |
 | CT-030 | CONFIRMED | Eliminate | App | SC-050, FR-30.6 | T-047 |

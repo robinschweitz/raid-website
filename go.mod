@@ -2,6 +2,8 @@ module raid-website
 
 go 1.26.0
 
+toolchain go1.26.10
+
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect

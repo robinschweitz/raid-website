@@ -17,7 +17,7 @@ and open security decisions. All security controls are written here; other files
   `db.rising-gods.de`, optionally via a Cloudflare Worker; personal data under GDPR (FR-30);
   production sets `ENV=production`, `COOKIE_SECURE=true`, `TRUST_PROXY_HEADERS=true`,
   `PUBLIC_ORIGIN` (deploy/README.md).
-- **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (T-001 to T-041, all OWASP cheat-sheet techniques).
+- **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (specification, T-001 to T-046) and `THREAT_MODEL_CODE.md` (implementation, CT-001 to CT-027).
 - **Material gaps:** off-server backup storage and key holder (OQ-14, OD-007).
 - **Conflicts found:** the client address can be forged behind nginx (SC-006, fixed in PR #44);
   production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007); `main` is
@@ -366,6 +366,34 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Evidence:** OD-015 (owner, 2026-10-23). Code: **not compliant** — no plan or rotation steps documented. Threats: T-040, T-041.
 - **Verification:** Each step was carried out once on a test setup and old session cookies returned 401 afterwards.
 
+**SC-045 - Patched Go toolchain**
+- **Status:** ACTIVE
+- **Rule:** `go.mod` MUST name a `toolchain` at least as new as the newest Go patch release that fixes every reachable `govulncheck` finding (today `go1.26.10`), so that CI and the production build use it even when the host's Go is older. The vulnerability scan of SC-039 MUST run with that toolchain.
+- **Enforcement:** `go.mod`; `.github/workflows/ci.yml`; the host update script (SC-037).
+- **Evidence:** `THREAT_MODEL_CODE.md` CT-001: 29 reachable standard-library vulnerabilities with `go1.26.0`, all fixed in `go1.26.10`; `go.mod` has no `toolchain` line. Code: **not compliant**. Threats: T-046.
+- **Verification:** `govulncheck ./...` with the toolchain from `go.mod` reports no reachable vulnerability; `go version -m` of the production binary shows that toolchain.
+
+**SC-046 - No account hints before a valid code**
+- **Status:** ACTIVE
+- **Rule:** Public endpoints that take a registration or reset code MUST validate the code before they reveal anything about accounts; with an invalid code they MUST answer `registration_code_invalid` whatever the username. The username check MUST run inside the code transaction, and a duplicate username there MUST map to `409 username_taken`, not to a server error.
+- **Enforcement:** `registration.RedeemNewAccount`; the reset-code flow (SC-042).
+- **Evidence:** `THREAT_MODEL_CODE.md` CT-003: the username check runs before the code check. Code: **not compliant**. Threats: T-042.
+- **Verification:** With an invalid code, a taken and a free username get the same answer.
+
+**SC-047 - The last Admin stays an Admin**
+- **Status:** ACTIVE
+- **Rule:** A role change, deactivation, merge, or anonymisation that would leave no active ADMIN MUST be rejected with `409 last_admin`.
+- **Enforcement:** `auth.SetCredentials`, `accountmerge`, the anonymise operation.
+- **Evidence:** FR-5.9; `THREAT_MODEL_CODE.md` CT-006. Code: **not compliant**. Threats: T-044.
+- **Verification:** Demoting the only Admin returns 409 and changes nothing.
+
+**SC-048 - Cloned security keys are rejected**
+- **Status:** ACTIVE
+- **Rule:** When the WebAuthn library reports a clone warning (the signature counter did not increase), the login MUST be rejected, the event logged (SC-041), and the counter left unchanged.
+- **Enforcement:** `auth.FinishWebAuthnMFA`.
+- **Evidence:** `THREAT_MODEL_CODE.md` CT-008: the warning is never checked. Code: **not compliant**. Threats: T-045.
+- **Verification:** An assertion with a lower counter than stored fails.
+
 ## Open Security Decisions
 
 The owner decided OD-001 to OD-006, OD-008, and OD-009 on 2026-10-22; the answers are in the rules that
@@ -392,4 +420,10 @@ Decided by the owner on 2026-10-23 (threat model):
 - **OD-013** Security events to the server journal, kept 30 days → SC-041.
 - **OD-014** Password reset with an in-game code that also removes MFA → SC-042.
 - **OD-015** Written incident plan, no in-app button; the owner stays the only key holder → SC-044.
+
+Open decision from the code threat model (`THREAT_MODEL_CODE.md`):
+
+- **OD-016** Attaching a new login by character name (FR-4.5; CT-005, T-043).
+  - Choice: keep the character-name fallback for players imported before logins existed (ADR 084); require the Admin to confirm the matched player before the code is issued; or attach only by Rising-Gods profile and never by name.
+  - Owner: owner.
 

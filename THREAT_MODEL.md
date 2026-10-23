@@ -333,6 +333,39 @@ threats that cross each boundary.
   "end all sessions" action, no secret-rotation steps, and no incident procedure.
 - **Status:** COVERED — SC-044 (written incident plan and rotation steps).
 
+### Found through the code review (`THREAT_MODEL_CODE.md`)
+
+**T-042 — Account hints before a valid code**
+- **Category:** Information disclosure. **Actor:** visitor.
+- **Scenario:** The spec did not say in which order a public code endpoint checks the code and the
+  username, so an implementation may reveal which usernames exist to anyone with a made-up code.
+- **Status:** COVERED — SC-046.
+
+**T-043 — A new login lands on another player by character name**
+- **Category:** Spoofing, Elevation of privilege. **Actor:** someone whose character has the name of
+  an imported character.
+- **Scenario:** FR-4.5 and ADR 084 attach a new login to an existing player by Rising-Gods profile
+  or, as a fallback, by character name; names are not unique (FR-6.3).
+- **Status:** PARTLY COVERED — OD-016; the Admin issues each code (FR-4.3) and sees the linked
+  player afterwards (FR-4.9).
+
+**T-044 — Losing the last Admin**
+- **Category:** Denial of service (administration).
+- **Scenario:** Nothing in the spec stopped the last Admin from being demoted, deactivated,
+  merged, or anonymised; the bootstrap never changes an existing account (FR-2.10).
+- **Status:** COVERED — FR-5.9, SC-047.
+
+**T-045 — A cloned security key keeps working**
+- **Category:** Spoofing.
+- **Scenario:** The spec required WebAuthn but no handling of the authenticator's clone signal.
+- **Status:** COVERED — SC-048.
+
+**T-046 — The production binary is built with a vulnerable Go**
+- **Category:** Denial of service, Spoofing (supply chain).
+- **Scenario:** The spec required dependency updates (SC-036) but not a minimum Go toolchain, and the
+  production host builds with whatever Go it has.
+- **Status:** COVERED — SC-045, SC-039.
+
 ## Implementation
 
 The Manicode playbook expects an empty repository and asks stage 06 to record that no
@@ -552,6 +585,11 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-039 | ACCEPTED | Accept | Ops | FR-30.4 |
 | T-040 | ACCEPTED | Accept | Ops | OD-015 |
 | T-041 | COVERED | Mitigate | Ops | SC-044, OD-015 |
+| T-042 | COVERED | Mitigate | App | SC-046 |
+| T-043 | PARTLY COVERED | Mitigate | App | FR-4.5, OD-016 |
+| T-044 | COVERED | Mitigate | App | FR-5.9, SC-047 |
+| T-045 | COVERED | Mitigate | App | SC-048 |
+| T-046 | COVERED | Mitigate | Ops | SC-045, SC-039 |
 
 ### Trust boundaries to threats
 
@@ -559,11 +597,11 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | --- | --- |
 | TB-1 Internet → proxy | T-001, T-003, T-016, T-017 |
 | TB-2 Proxy → application | T-001, T-008 |
-| TB-3 Browser → API | T-002 to T-007, T-009, T-010, T-019, T-020, T-023, T-026, T-027, T-031 to T-036, T-038 |
+| TB-3 Browser → API | T-002 to T-007, T-009, T-010, T-019, T-020, T-023, T-026, T-027, T-031 to T-036, T-038, T-042 to T-045 |
 | TB-4 Application → Rising-Gods | T-015, T-016, T-025 |
 | TB-5 Addon text → application | T-018 |
 | TB-6 Application → database and snapshots | T-011, T-021, T-022, T-030 |
-| TB-7 Build and deploy | T-012, T-013, T-014, T-028, T-029 |
+| TB-7 Build and deploy | T-012, T-013, T-014, T-028, T-029, T-046 |
 | Organisation (no technical boundary) | T-037, T-039, T-040, T-041 |
 
 ### Rules without a threat
@@ -618,26 +656,5 @@ sequenceDiagram
 
 ## Appendix: implementation observations
 
-Not threats of the specification: places where the code or repository settings did not follow the
-specification on 2026-10-22. They are listed so the information is not lost; each is tracked in the
-named rule's **Evidence** field and goes into the backlog.
-
-| Observation | Rule it breaks |
-| --- | --- |
-| Client address taken from the first `X-Forwarded-For` entry (fixed in PR #44) | SC-006 |
-| Production starts without `PUBLIC_ORIGIN` | SC-007 |
-| Unknown usernames skip bcrypt | SC-009 |
-| MFA challenge has no failure counter | SC-011 |
-| TOTP codes reusable within the window | SC-012 |
-| TOTP secrets stored as plaintext | SC-014 |
-| Password and Admin changes keep other sessions | SC-017 |
-| No idle timeout | SC-018 |
-| CSRF check skipped without `Origin` and `Sec-Fetch-Site` | SC-019 |
-| No HTTP server timeouts | SC-026 |
-| No visitor lookup limit | SC-028 |
-| `.gitignore` (`bin/`) excludes `deploy/bin/`; the host scripts are not in the repository | SC-037 |
-| Expired sessions, challenges, and login attempts are never deleted (`DeleteExpired` unused) | SC-038 |
-| `main` unprotected; ruleset "Protect" disabled (GitHub API) | SC-039 |
-| Actions pinned by tag; no Dependabot configuration | SC-036 |
-| Class icons loaded from `wow.zamimg.com` | SC-024 |
-| No incident plan or rotation steps in `deploy/README.md` | SC-044 |
+Code, dependency, and repository findings are owned by `THREAT_MODEL_CODE.md` (CT-001 to CT-027).
+Four of them exposed rules the specification lacked; those became T-042 to T-046 above.

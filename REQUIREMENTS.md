@@ -67,7 +67,7 @@ implemented yet when it differs from the code.
 - **FR-4.2** The system MUST reject a registration or claim request with HTTP 409 `registration_request_exists` when a request for the same profile is PENDING, APPROVED, or CONSUMED. A REJECTED request MUST NOT block a new request. (ADR 055)
 - **FR-4.3** An ADMIN MUST be able to list requests, reject a request, create a single-use code for a request, mark a code as sent, and revoke an unused code. (ADR 040)
 - **FR-4.4** A registration code MUST expire after its lifetime (SC-013). (ADR 040)
-- **FR-4.5** Redeeming a new-account code MUST create a MEMBER account, create or link the character, start a session, and consume the code. (ADR 040; Owner 2026-10-22, OQ-3)
+- **FR-4.5** Redeeming a new-account code MUST create a MEMBER account, create or link the character, start a session, and consume the code. A login is attached to an existing player who has none when that player owns the requested Rising-Gods profile or, as a fallback, a character with the same name (ADR 084; fallback under review: OD-016). (ADR 040; Owner 2026-10-22, OQ-3)
 - **FR-4.6** A logged-in user MUST be able to request a claim for a Rising-Gods character. Redeeming a claim code MUST link or move the character to the user. (ADR 040)
 - **FR-4.7** A claim MUST NOT change existing raid roster snapshots. (ADR 040)
 - **FR-4.8** The first Rising-Gods talent build MUST become the main spec. The second build MUST become the second spec when it exists. (ADR 040)
@@ -84,6 +84,7 @@ implemented yet when it differs from the code.
 - **FR-5.6** An account merge MUST be rejected when both players have an active lock for the same item in the same raid. (ADR 050)
 - **FR-5.7** For a duplicate poll vote or quick-add request key, the merge MUST keep the entry of the target. (ADR 056)
 - **FR-5.8** A player who lost their password MUST get a one-time reset code from an ADMIN, sent in game to their main character. Redeeming it MUST let them set a new password and MUST remove their MFA so they can set it up again (SC-042). (Owner 2026-10-23, OD-014)
+- **FR-5.9** The system MUST keep at least one active ADMIN: a change that would remove the last one MUST be rejected (SC-047). (THREAT_MODEL T-044)
 
 ### 6. Characters
 

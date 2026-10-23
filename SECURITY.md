@@ -357,10 +357,10 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-043 - Login limit per client address**
 - **Status:** ACTIVE
-- **Rule:** Besides SC-008, one client address (SC-006) MUST NOT make more than 30 login attempts, for any usernames, in 15 minutes; further attempts are rejected with the rate-limit error before any password check. There is no separate per-account limit across addresses (T-002 accepted).
+- **Rule:** Besides SC-008, one client address (SC-006) MUST NOT make more than 30 failed login attempts, for any usernames, in 15 minutes; further attempts are rejected with the rate-limit error before any password check. Successful logins do not count (owner 2026-10-23, ADR 093). There is no separate per-account limit across addresses (T-002 accepted).
 - **Enforcement:** `auth.StartLogin`, `login_attempts`.
-- **Evidence:** FR-2.3, OD-010 (owner, 2026-10-23). Code: **not compliant** — only per username and address. Threats: T-002, T-003.
-- **Verification:** The 31st login attempt from one address within 15 minutes is rejected without a bcrypt comparison.
+- **Evidence:** FR-2.3, OD-010 (owner, 2026-10-23), ADR 093. Code: compliant since #60 — `auth.StartLogin` counts failed attempts per address (`CountFailedLoginAttemptsFromAddress`, index from migration 076) before the per-username check and before bcrypt. Threats: T-002, T-003.
+- **Verification:** After 30 failed logins from one address within 15 minutes, the next attempt is rejected without a bcrypt comparison (`TestReqAuth011_*`).
 
 **SC-044 - Incident plan and secret rotation**
 - **Status:** ACTIVE
@@ -438,7 +438,7 @@ cite them. IDs are not reused.
 
 Decided by the owner on 2026-10-23 (threat model):
 
-- **OD-010** Per-address login limit of 30 attempts in 15 minutes; no per-account limit → SC-043.
+- **OD-010** Per-address login limit of 30 failed attempts in 15 minutes (successful logins do not count, ADR 093); no per-account limit → SC-043.
 - **OD-011** `main` only through pull requests with passing CI and a blocking vulnerability scan; no second approver → SC-039.
 - **OD-012** MFA required for Admins → SC-040.
 - **OD-013** Security events to the server journal, kept 30 days → SC-041.

@@ -108,7 +108,7 @@ threats that cross each boundary.
 - **Scenario:** Every login runs bcrypt (SC-005), and SC-009 adds a dummy bcrypt for unknown
   names. The spec limits failures per username and address, not per address across usernames, so
   one client rotating usernames can keep the CPU busy.
-- **Status:** COVERED — SC-043 (30 attempts per address in 15 minutes).
+- **Status:** COVERED — SC-043 (30 failed attempts per address in 15 minutes; rotating usernames are failures).
 
 **T-004 — Username probing**
 - **Category:** Information disclosure. **Asset:** A-4.

@@ -35,7 +35,7 @@ implemented yet when it differs from the code.
 
 - **FR-2.1** A user MUST log in with a username and a password. (ADR 010)
 - **FR-2.2** The system MUST reject a new or changed password that does not meet the password policy (SC-005). (ADR 046)
-- **FR-2.3** The system MUST temporarily block login for a username and client address after repeated failed attempts, and a client address after too many attempts for any usernames (limits: SC-008, SC-043). (ADR 046; Owner 2026-10-23, OD-010)
+- **FR-2.3** The system MUST temporarily block login for a username and client address after repeated failed attempts, and a client address after too many failed attempts for any usernames (limits: SC-008, SC-043). (ADR 046, 093; Owner 2026-10-23, OD-010)
 - **FR-2.4** A successful login MUST start a session. The session MUST end at its maximum lifetime (SC-018). (ADR 010)
 - **FR-2.5** The system MUST treat an unknown or expired session as no session, not as an error. (ADR 010, 020)
 - **FR-2.6** Logout MUST end the session. (ADR 010)

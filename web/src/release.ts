@@ -1,8 +1,17 @@
-export const appVersion = '1.0.27'
+export const appVersion = '1.0.28'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Hinweis zur Kontosicherheit',
+    changes: [
+      'Wer noch keinen zweiten Faktor (Authenticator-App oder Sicherheitsschlüssel) eingerichtet hat, sieht oben einen schmalen Hinweis. Er verschwindet, sobald einer eingerichtet ist, und lässt sich für die laufende Sitzung ausblenden.',
+      'Ein Klick führt zur neuen Seite „Kontosicherheit“: Sie erklärt mit Zahlen von Microsoft, Google, Verizon und dem BSI, warum ein zweiter Faktor so viel bringt, und wie du ihn in zwei Minuten einrichtest. Alle Quellen sind verlinkt.',
+      'Von dort führt „Jetzt einrichten“ direkt in den Reiter „Konto“ deines Profils.',
+    ],
+  },
+  {
+    version: '1.0.27',
     title: 'RaidLedger 2.5.0 und RaidWishlist 2.0.0',
     changes: [
       'Neue Addon-Versionen zum Herunterladen unter „Addons“. RaidLedger hat jetzt fünf Reiter (Beute, Vergaben, Spieler, Raid, Einstellungen): alles geht per Klick, jeder Knopf hat einen Tooltip.',

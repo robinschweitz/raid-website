@@ -255,7 +255,7 @@ export function GuidePage() {
       <p>Reiter <strong>Item-Locks</strong> öffnen, Raid-ID, Item, Item-ID und Boss eintragen, <strong>Lock anlegen</strong>. Die Raid-ID ist die Zahl am Ende der Adresse eines Raids, z. B. <code>…/raids/2</code>.</p>
       <Shot name="20-item-locks" caption="Item-Locks: aktiver Lock und Formular" />
       <h3>Konto</h3>
-      <p>Im Reiter <strong>Konto</strong> änderst du dein Passwort. Freiwillig kannst du eine Authenticator-App oder einen Sicherheitsschlüssel als zweiten Faktor einrichten.</p>
+      <p>Im Reiter <strong>Konto</strong> änderst du dein Passwort. Freiwillig kannst du eine Authenticator-App oder einen Sicherheitsschlüssel als zweiten Faktor einrichten. Warum sich das lohnt, steht unter <Link to="/kontosicherheit">Kontosicherheit</Link>.</p>
       <Shot name="21-konto" caption="Konto: Passwort und Zwei-Faktor" />
       <h3>Umfragen</h3>
       <p>Unter <Link to="/polls">Umfragen</Link> Antwort wählen und <strong>Abstimmen</strong> klicken.</p>

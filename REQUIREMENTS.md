@@ -24,7 +24,7 @@ implemented yet when it differs from the code.
 - **FR-1.1** Every permission in this file MUST be enforced by the server (SC-001). (ADR 010)
 - **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the statistics, the privacy contact, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044; Owner 2026-10-22, OQ-6)
 - **FR-1.3** The public player list MUST show only ID, name, guild rank, and active state. It MUST NOT show login names. (ADR 067, 084)
-- **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/statistics`, and the privacy page without a session. (ADR 083, 085; Owner 2026-10-22, OQ-6 and OQ-9)
+- **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/kontosicherheit`, `/statistics`, and the privacy page without a session. (ADR 083, 085, 092; Owner 2026-10-22, OQ-6 and OQ-9)
 - **FR-1.5** The system MUST require a session for all other reads. (ADR 067)
 - **FR-1.6** The system MUST reject a request with a role that is too low with HTTP 403. It MUST reject a request without a session on a protected endpoint with HTTP 401. (ADR 010)
 - **FR-1.7** These reads MUST require RAIDASSISTENT or higher: the archive preview, the recruitment template, and the wishlist interests of a raid. (ADR 068, 069)
@@ -61,6 +61,7 @@ implemented yet when it differs from the code.
 - **FR-3.9** After too many wrong codes in one MFA challenge (SC-011), the user MUST start again with the password. (Owner 2026-10-22, OD-002)
 - **FR-3.10** An ADMIN without MFA MUST set up TOTP or a security key before using any Admin function (SC-040). (Owner 2026-10-23, OD-012)
 - **FR-3.11** Losing an MFA factor MUST be handled as follows, for every role: a user who still has another factor or an unused recovery code (FR-3.3) MUST log in with it and MAY replace the lost factor; a user who has none MUST get a password reset (FR-5.8), which removes all MFA; an ADMIN after such a reset falls under FR-3.10 again. Getting the ADMIN role, by role change or bootstrap, also falls under FR-3.10. When the only ADMIN loses access, the server operator MUST be able to create a reset code for that player with a command on the server (SC-051). (Owner 2026-10-23, OD-019)
+- **FR-3.12** A signed-in user without TOTP or a security key MUST see a thin reminder under the top bar that links to the public page `/kontosicherheit`; recovery codes alone do not count. The reminder MUST disappear as soon as a factor is enabled, MAY be hidden for the browser session, and MUST show nothing when the MFA status cannot be loaded. Every figure on `/kontosicherheit` MUST cite a published source. `/players/{id}/konto` MUST open the account tab of that profile. (ADR 092)
 
 ### 4. Registration and character claiming
 

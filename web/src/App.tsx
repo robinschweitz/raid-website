@@ -24,6 +24,8 @@ import { WishlistPage } from './pages/Wishlist'
 import { GuidePage } from './pages/Guide'
 import { ShadowmournePage } from './pages/Shadowmourne'
 import { AddonsPage } from './pages/Addons'
+import { AccountSecurityPage } from './pages/AccountSecurity'
+import { MFAReminderBanner } from './components/MFAReminderBanner'
 import { CurrentRaidPage } from './pages/CurrentRaid'
 import { appVersion } from './release'
 
@@ -47,7 +49,7 @@ function Routes() {
   }
   if (parts[0] === 'raids') return <RaidsPage />
   if (parts[0] === 'players' && parts[1]) {
-    return <PlayerDetailPage playerID={Number(parts[1])} />
+    return <PlayerDetailPage playerID={Number(parts[1])} initialView={parts[2] === 'konto' ? 'account' : undefined} />
   }
   if (parts[0] === 'players') {
     return <PlayersPage />
@@ -70,6 +72,7 @@ function Routes() {
   if (parts[0] === 'anleitung') return <GuidePage />
   if (parts[0] === 'schattengram') return <ShadowmournePage />
   if (parts[0] === 'addons') return <AddonsPage addonID={parts[1]} />
+  if (parts[0] === 'kontosicherheit') return <AccountSecurityPage />
   return <p className="muted">Seite nicht gefunden.</p>
 }
 
@@ -126,6 +129,7 @@ function Layout() {
         <div className="user">{player ? <><Link to={`/players/${player.id}`}><NavIcon name="profile" />{player.name}</Link><span className="badge">{player.role}</span>
           <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button></> : <Link to="/login">Anmelden</Link>}</div>
       </header>
+      {path !== '/kontosicherheit' && <MFAReminderBanner isSignedIn={player !== null} />}
       <main id="main-content" className={path === '/' ? undefined : 'secondary-page'} tabIndex={-1}>
         {error && <p className="error" role="alert">{error}</p>}
         <Routes />
@@ -167,8 +171,9 @@ function Gate() {
       </div>
     )
   }
-  // The guide and the addons pages must be readable before an account exists (ADR 083, ADR 085).
-  if (!player && path !== '/' && path !== '/anleitung' && path !== '/addons' && !path.startsWith('/addons/')) {
+  // The guide, the addons pages and the account-security page must be readable before an
+  // account exists (ADR 083, ADR 085, ADR 092).
+  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/')) {
     return <LoginPage />
   }
   return <Layout />

@@ -1882,6 +1882,69 @@ input[type='checkbox'] {
 .my-raid-secondary { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; margin-top: auto; padding-top: 10px; border-top: 1px solid rgba(42, 64, 87, 0.6); }
 .my-raid-secondary button { width: 100%; min-height: 34px; font-size: 13px; }
 .my-raid-decline { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+
+/* Account-security reminder (ADR 092): one thin line under the top bar, in the `warning` status colours (DESIGN.md). */
+.mfa-reminder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -1rem 0 1.4rem;
+  padding: 7px 8px 7px 12px;
+  border: 1px solid rgba(255, 210, 122, 0.35);
+  border-left: 3px solid #ffd27a;
+  border-radius: 4px;
+  background: rgba(255, 210, 122, 0.07);
+  color: #e4eef7;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.mfa-reminder > svg {
+  flex: none;
+  color: #ffd27a;
+}
+
+.mfa-reminder-link {
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+}
+
+.mfa-reminder-link span {
+  color: #9eafc3;
+}
+
+.mfa-reminder-link:hover span,
+.mfa-reminder-link:focus-visible span {
+  color: #e4eef7;
+  text-decoration: underline;
+}
+
+.mfa-reminder-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9eafc3;
+  cursor: pointer;
+}
+
+.mfa-reminder-close:hover,
+.mfa-reminder-close:focus-visible {
+  color: #e4eef7;
+  background: rgba(255, 210, 122, 0.12);
+}
+
+@media (max-width: 600px) {
+  .mfa-reminder-link span { display: none; }
+  .mfa-reminder-link strong::after { content: ' Warum? →'; font-weight: 400; color: #9eafc3; }
+}
 .boss-order-list { margin: 12px 0; padding-left: 26px; display: grid; gap: 4px; max-width: 520px; }
 .boss-order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px; border: 1px solid var(--card-border); border-radius: 4px; }
 .boss-order-list .actions { margin: 0; }

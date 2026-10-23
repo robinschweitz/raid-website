@@ -20,6 +20,7 @@ import { characterClassName } from '../characterTheme'
 import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
 import { browserSupportsWebAuthn, createWebAuthnCredential, type WebAuthnBeginResponse } from '../webauthn'
+import { announceMFAChange, type MFAStatus } from '../accountSecurity'
 
 const CLASSES = [
   'Todesritter',
@@ -37,20 +38,19 @@ const CLASSES = [
 const ROLES: Role[] = ['GUEST', 'MEMBER', 'RAIDASSISTENT', 'RAIDLEADER', 'ADMIN']
 const LOOT_METHOD_LABELS = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
 
-interface MFAStatus {
-  totp_enabled: boolean
-  security_keys: { id: number; name: string; created_at: string; last_used_at?: string }[]
-}
+type ProfileView = 'points' | 'loot' | 'characters' | 'locks' | 'account'
 
 interface Props {
   playerID: number
+  initialView?: ProfileView
 }
 
-export function PlayerDetailPage({ playerID }: Props) {
-  return <PlayerDetail key={playerID} playerID={playerID} />
+// /players/{id}/konto opens the account tab directly, e.g. from the MFA reminder (ADR 092).
+export function PlayerDetailPage({ playerID, initialView }: Props) {
+  return <PlayerDetail key={`${playerID}:${initialView ?? ''}`} playerID={playerID} initialView={initialView} />
 }
 
-function PlayerDetail({ playerID }: Props) {
+function PlayerDetail({ playerID, initialView }: Props) {
   const { pending, submit, isActive, isPending } = useSubmission()
   const loadVersion = useRef(0)
   const { player: me } = useAuth()
@@ -63,7 +63,7 @@ function PlayerDetail({ playerID }: Props) {
   const [rankError, setRankError] = useState('')
   const [rankLoading, setRankLoading] = useState(true)
   const [error, setError] = useState('')
-  const [view, setView] = useState<'points' | 'loot' | 'characters' | 'locks' | 'account'>('points')
+  const [view, setView] = useState<ProfileView>(initialView ?? 'points')
   const [lootFilter, setLootFilter] = useState<'all' | 'tokens'>('all')
 
   const [charQuery, setCharQuery] = useState('')
@@ -487,6 +487,7 @@ function PlayerDetail({ playerID }: Props) {
         setTotpSecret('')
         setTotpURI('')
         await loadMFAStatus()
+        announceMFAChange()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'MFA-Code konnte nicht bestätigt werden')
       }
@@ -507,6 +508,7 @@ function PlayerDetail({ playerID }: Props) {
         setMfaPasswordPrompt('')
         setSecurityKeyStatus('Sicherheitsschlüssel wurde registriert.')
         await loadMFAStatus()
+        announceMFAChange()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Sicherheitsschlüssel konnte nicht registriert werden')
       }
@@ -524,6 +526,7 @@ function PlayerDetail({ playerID }: Props) {
         setMfaPasswordPrompt('')
         setRecoveryCodes([])
         await loadMFAStatus()
+        announceMFAChange()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Authenticator konnte nicht entfernt werden')
       }
@@ -540,6 +543,7 @@ function PlayerDetail({ playerID }: Props) {
         setMfaPassword('')
         setMfaPasswordPrompt('')
         await loadMFAStatus()
+        announceMFAChange()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Sicherheitsschlüssel konnte nicht entfernt werden')
       }
@@ -851,7 +855,7 @@ function PlayerDetail({ playerID }: Props) {
           </section>}
           {isOwnProfile && <section className="subcard">
             <h3>Multi-Faktor-Authentifizierung</h3>
-            <p className="muted">Optional: Richte einen Authenticator-Code oder YubiKey ein. Du wirst beim Start einer Änderung nach deinem aktuellen Passwort gefragt.</p>
+            <p className="muted">Optional: Richte einen Authenticator-Code oder YubiKey ein. Du wirst beim Start einer Änderung nach deinem aktuellen Passwort gefragt. <Link to="/kontosicherheit">Warum das wichtig ist</Link></p>
             <p className="muted">Authenticator-App: {mfaStatus.totp_enabled ? 'aktiv' : 'nicht aktiv'}</p>
             {!mfaStatus.totp_enabled && !totpSecret && <button type="button" disabled={pending} onClick={() => { setMfaPassword(''); setMfaPasswordPrompt('totp_setup') }}>Authenticator einrichten</button>}
             {mfaStatus.totp_enabled && <button type="button" disabled={pending} onClick={() => { setMfaPassword(''); setMfaPasswordPrompt('totp_disable') }}>Authenticator entfernen</button>}

@@ -55,7 +55,9 @@ systemctl reload ssh
 Create `/etc/raid-website.env` with mode `0600`, owned by root. Production
 requires `ENV=production`, `DATABASE_URL`, `ADMIN_USERNAME`, and
 `ADMIN_PASSWORD`; set `COOKIE_SECURE=true`, `TRUST_PROXY_HEADERS=true`, and
-the HTTPS `PUBLIC_ORIGIN`. Configure nginx and request the certificate before
+the HTTPS `PUBLIC_ORIGIN`. The privacy page needs `PRIVACY_CONTACT_NAME`
+(the responsible person) and `PRIVACY_CONTACT_ADDRESS` (a contact address);
+production does not start without them. Configure nginx and request the certificate before
 starting the service.
 
 The nginx templates start with HTTP only, use a webroot ACME challenge, and

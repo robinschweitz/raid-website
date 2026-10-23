@@ -53,12 +53,14 @@ func run() (err error) {
 	}
 	risingGods := registration.RisingGodsClient{ProxyURL: cfg.RisingGodsProxyURL, ProxyToken: cfg.RisingGodsProxyToken}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
-		CookieSecure:      cfg.CookieSecure,
-		TrustProxyHeaders: cfg.TrustProxyHeaders,
-		PublicOrigin:      cfg.PublicOrigin,
-		AdminUsername:     cfg.AdminUsername,
-		AdminPassword:     cfg.AdminPassword,
-		RegistrationFeed:  risingGods,
+		CookieSecure:          cfg.CookieSecure,
+		TrustProxyHeaders:     cfg.TrustProxyHeaders,
+		PublicOrigin:          cfg.PublicOrigin,
+		AdminUsername:         cfg.AdminUsername,
+		AdminPassword:         cfg.AdminPassword,
+		PrivacyContactName:    cfg.PrivacyContactName,
+		PrivacyContactAddress: cfg.PrivacyContactAddress,
+		RegistrationFeed:      risingGods,
 	})
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)

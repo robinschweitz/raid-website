@@ -37,12 +37,14 @@ import (
 
 // Options controls optional runtime behaviour of the HTTP layer.
 type Options struct {
-	CookieSecure      bool
-	TrustProxyHeaders bool
-	PublicOrigin      string
-	AdminUsername     string
-	AdminPassword     string
-	RegistrationFeed  registration.ExternalClient
+	CookieSecure          bool
+	TrustProxyHeaders     bool
+	PublicOrigin          string
+	AdminUsername         string
+	AdminPassword         string
+	PrivacyContactName    string
+	PrivacyContactAddress string
+	RegistrationFeed      registration.ExternalClient
 }
 
 // New constructs the HTTP handler tree with all v1 dependencies wired.
@@ -113,6 +115,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	v1.CatalogHandlers{Catalog: catalog}.Register(mux)
 	v1.AddonHandlers{Addons: bundledAddons}.Register(mux)
 	v1.StatisticsHandlers{Statistics: statistics.NewService(statistics.NewRepo(db))}.Register(mux)
+	v1.PrivacyHandlers{Contact: v1.PrivacyContact{Name: opts.PrivacyContactName, Address: opts.PrivacyContactAddress}}.Register(mux)
 	unclaimed := unclaimedloot.NewService(unclaimedloot.NewRepo(db), raids, catalog)
 	v1.UnclaimedHandlers{Unclaimed: unclaimed}.Register(mux)
 	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed)}.Register(mux)

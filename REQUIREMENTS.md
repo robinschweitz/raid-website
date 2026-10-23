@@ -24,7 +24,7 @@ implemented yet when it differs from the code.
 - **FR-1.1** Every permission in this file MUST be enforced by the server (SC-001). (ADR 010)
 - **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the statistics, the privacy contact, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044; Owner 2026-10-22, OQ-6)
 - **FR-1.3** The public player list MUST show only ID, name, guild rank, and active state. It MUST NOT show login names. (ADR 067, 084)
-- **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/kontosicherheit`, `/statistics`, and the privacy page without a session. (ADR 083, 085, 092; Owner 2026-10-22, OQ-6 and OQ-9)
+- **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/kontosicherheit`, `/statistics`, and the privacy page `/datenschutz` without a session. (ADR 083, 085, 092; Owner 2026-10-22, OQ-6 and OQ-9)
 - **FR-1.5** The system MUST require a session for all other reads. (ADR 067)
 - **FR-1.6** The system MUST reject a request with a role that is too low with HTTP 403. It MUST reject a request without a session on a protected endpoint with HTTP 401. (ADR 010)
 - **FR-1.7** These reads MUST require RAIDASSISTENT or higher: the archive preview, the recruitment template, and the wishlist interests of a raid. (ADR 068, 069)

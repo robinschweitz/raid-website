@@ -1,8 +1,15 @@
-export const appVersion = '1.0.35'
+export const appVersion = '1.0.36'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Datenschutzerklärung',
+    changes: [
+      'Neue Seite „Datenschutz“, auch ohne Anmeldung lesbar (Link unten in der Seitenleiste). Sie nennt die verantwortliche Person mit Kontakt, erklärt welche Daten gespeichert werden, dass das Änderungsprotokoll unbegrenzt bleibt und dass eine Löschung Konten pseudonymisiert, aber nicht anonymisiert.',
+    ],
+  },
+  {
+    version: '1.0.35',
     title: 'Andere Geräte nach Passwortänderung abgemeldet',
     changes: [
       'Ändert jemand sein Passwort, werden alle anderen Geräte abgemeldet; das aktuelle Gerät bleibt angemeldet.',

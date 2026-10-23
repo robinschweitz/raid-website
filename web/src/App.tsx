@@ -25,6 +25,7 @@ import { GuidePage } from './pages/Guide'
 import { ShadowmournePage } from './pages/Shadowmourne'
 import { AddonsPage } from './pages/Addons'
 import { AccountSecurityPage } from './pages/AccountSecurity'
+import { PrivacyPage } from './pages/Privacy'
 import { MFAReminderBanner } from './components/MFAReminderBanner'
 import { CurrentRaidPage } from './pages/CurrentRaid'
 import { appVersion } from './release'
@@ -74,6 +75,7 @@ function Routes() {
   if (parts[0] === 'schattengram') return <ShadowmournePage />
   if (parts[0] === 'addons') return <AddonsPage addonID={parts[1]} />
   if (parts[0] === 'kontosicherheit') return <AccountSecurityPage />
+  if (parts[0] === 'datenschutz') return <PrivacyPage />
   return <p className="muted">Seite nicht gefunden.</p>
 }
 
@@ -122,6 +124,7 @@ function Layout() {
         <div className="sidebar-footer">
           <Link to="/changelog">Version {appVersion}</Link>
           <span>Änderungen ansehen</span>
+          <Link to="/datenschutz">Datenschutz</Link>
         </div>
       </aside>
       <div className="main-shell">
@@ -174,7 +177,7 @@ function Gate() {
   }
   // The guide, the addons pages and the account-security page must be readable before an
   // account exists (ADR 083, ADR 085, ADR 092).
-  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/')) {
+  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/datenschutz' && path !== '/addons' && !path.startsWith('/addons/')) {
     return <LoginPage />
   }
   return <Layout />

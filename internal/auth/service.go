@@ -160,7 +160,9 @@ func (s *Service) auditSecurity(ctx context.Context, playerID int64, action stri
 	return nil
 }
 
-func (s *Service) ChangeOwnPassword(ctx context.Context, playerID int64, currentPassword, newPassword string) error {
+// ChangeOwnPassword sets a new password and ends every other session of the
+// player; the session identified by currentToken stays (FR-2.13, SC-017).
+func (s *Service) ChangeOwnPassword(ctx context.Context, playerID int64, currentToken, currentPassword, newPassword string) error {
 	if err := s.VerifyPassword(ctx, playerID, currentPassword); err != nil {
 		return err
 	}
@@ -171,16 +173,28 @@ func (s *Service) ChangeOwnPassword(ctx context.Context, playerID int64, current
 	if err != nil {
 		return fmt.Errorf("hash own password: %w", err)
 	}
-	p, err := s.players.Get(ctx, playerID)
-	if err != nil {
-		return fmt.Errorf("get own password player: %w", err)
+	keepHash := ""
+	if currentToken != "" {
+		keepHash = hashToken(currentToken)
 	}
-	p.PasswordHash = hash
-	p.UpdatedAt = time.Now().UTC()
-	if err := s.players.Update(ctx, p); err != nil {
-		return fmt.Errorf("update own password: %w", err)
-	}
-	return s.auditSecurity(ctx, playerID, "password_change", nil)
+	return s.sessions.InAccountTransaction(ctx, func(players *player.Repo, sessions *Repo) error {
+		p, err := players.Get(ctx, playerID)
+		if err != nil {
+			return fmt.Errorf("get own password player: %w", err)
+		}
+		p.PasswordHash = hash
+		p.UpdatedAt = time.Now().UTC()
+		if err := players.Update(ctx, p); err != nil {
+			return fmt.Errorf("update own password: %w", err)
+		}
+		if err := sessions.DeleteSessionsOfPlayer(ctx, playerID, keepHash); err != nil {
+			return fmt.Errorf("end other sessions: %w", err)
+		}
+		if err := sessions.AuditSecurity(ctx, playerID, "password_change", map[string]any{"name": p.Name}); err != nil {
+			return fmt.Errorf("record security audit: %w", err)
+		}
+		return nil
+	})
 }
 
 // BootstrapAdmin creates an initial account atomically without changing existing accounts.
@@ -220,7 +234,7 @@ func (s *Service) BootstrapAdmin(ctx context.Context, username, password string)
 // SetCredentials assigns login credentials and role to an existing player.
 func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, password string, role validation.Role, actorID int64) (*player.Player, error) {
 	var updated *player.Player
-	err := s.sessions.InTransaction(ctx, func(players *player.Repo) error {
+	err := s.sessions.InAccountTransaction(ctx, func(players *player.Repo, sessions *Repo) error {
 		p, err := players.Get(ctx, playerID)
 		if err != nil {
 			return fmt.Errorf("get credential player: %w", err)
@@ -243,12 +257,18 @@ func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, 
 				return fmt.Errorf("hash credential password: %w", err)
 			}
 		}
+		endSessions := password != "" || p.Role != role || p.Username == nil || *p.Username != uname
 		p.Username = &uname
 		p.PasswordHash = hash
 		p.Role = role
 		p.UpdatedAt = time.Now().UTC()
 		if err := players.Update(ctx, p); err != nil {
 			return fmt.Errorf("update player credentials: %w", err)
+		}
+		if endSessions {
+			if err := sessions.DeleteSessionsOfPlayer(ctx, playerID, ""); err != nil {
+				return fmt.Errorf("end player sessions: %w", err)
+			}
 		}
 		updated = p
 		return players.Audit(ctx, actorID, p.ID, "set_account", &before, player.AccountAudit{Player: p, PasswordChanged: password != ""})

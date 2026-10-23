@@ -126,8 +126,8 @@ chapter level only; requirement IDs are not cited until each is verified against
 **SC-012 - TOTP codes used once**
 - **Status:** ACTIVE
 - **Rule:** TOTP MUST use 6 digits, 30-second steps, and at most ±1 step of drift, and a code that was already accepted for an account MUST NOT be accepted again within its validity window.
-- **Enforcement:** `auth.verifyTOTP`; the MFA settings must store the last accepted time step.
-- **Evidence:** FR-3.2, V6. Code: **not compliant** for reuse — no last-used step is stored. Threats: T-006.
+- **Enforcement:** `auth.acceptTOTP` and `auth.Repo.ClaimTOTPStep`; `player_mfa_settings.totp_last_step` stores the last accepted time step.
+- **Evidence:** FR-3.2, V6. Code: compliant since #63 — login and TOTP enable claim the code's time step with one conditional update (migration 078), so a code for that step or an earlier one is rejected and of two simultaneous requests exactly one succeeds. Threats: T-006.
 - **Verification:** Logging in twice with the same code in the same 30 seconds fails the second time.
 
 **SC-013 - Recovery and registration codes**

@@ -33,8 +33,11 @@ type MFASettings struct {
 	PlayerID      int64      `bun:"player_id,pk" json:"player_id"`
 	TOTPSecret    string     `bun:"totp_secret,notnull" json:"-"`
 	TOTPEnabledAt *time.Time `bun:"totp_enabled_at" json:"totp_enabled_at,omitempty"`
-	CreatedAt     time.Time  `bun:"created_at,notnull" json:"created_at"`
-	UpdatedAt     time.Time  `bun:"updated_at,notnull" json:"updated_at"`
+	// TOTPLastStep is the last 30-second time step whose code was accepted;
+	// codes for it or an earlier step are rejected (SC-012).
+	TOTPLastStep *int64    `bun:"totp_last_step" json:"-"`
+	CreatedAt    time.Time `bun:"created_at,notnull" json:"created_at"`
+	UpdatedAt    time.Time `bun:"updated_at,notnull" json:"updated_at"`
 }
 
 type MFARecoveryCode struct {

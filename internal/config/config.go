@@ -9,17 +9,19 @@ import (
 )
 
 type Config struct {
-	Port                 string
-	ListenAddr           string
-	DatabaseURL          string
-	Env                  string
-	CookieSecure         bool
-	TrustProxyHeaders    bool
-	PublicOrigin         string
-	AdminUsername        string
-	AdminPassword        string
-	RisingGodsProxyURL   string
-	RisingGodsProxyToken string
+	Port                  string
+	ListenAddr            string
+	DatabaseURL           string
+	Env                   string
+	CookieSecure          bool
+	TrustProxyHeaders     bool
+	PublicOrigin          string
+	AdminUsername         string
+	AdminPassword         string
+	RisingGodsProxyURL    string
+	RisingGodsProxyToken  string
+	PrivacyContactName    string
+	PrivacyContactAddress string
 }
 
 func Load() (*Config, error) {
@@ -34,17 +36,19 @@ func Load() (*Config, error) {
 		}
 	}
 	c := &Config{
-		Port:                 port,
-		ListenAddr:           listenAddr,
-		DatabaseURL:          getEnv("DATABASE_URL", "file:raid.db?_pragma=journal_mode(WAL)"),
-		Env:                  env,
-		CookieSecure:         getEnv("COOKIE_SECURE", "") == "true" || env == "production",
-		TrustProxyHeaders:    getEnv("TRUST_PROXY_HEADERS", "") == "true",
-		PublicOrigin:         strings.TrimSpace(getEnv("PUBLIC_ORIGIN", "")),
-		AdminUsername:        getEnv("ADMIN_USERNAME", "Robin"),
-		AdminPassword:        getEnv("ADMIN_PASSWORD", "development-password"),
-		RisingGodsProxyURL:   strings.TrimRight(strings.TrimSpace(getEnv("RISING_GODS_PROXY_URL", "")), "/"),
-		RisingGodsProxyToken: strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
+		Port:                  port,
+		ListenAddr:            listenAddr,
+		DatabaseURL:           getEnv("DATABASE_URL", "file:raid.db?_pragma=journal_mode(WAL)"),
+		Env:                   env,
+		CookieSecure:          getEnv("COOKIE_SECURE", "") == "true" || env == "production",
+		TrustProxyHeaders:     getEnv("TRUST_PROXY_HEADERS", "") == "true",
+		PublicOrigin:          strings.TrimSpace(getEnv("PUBLIC_ORIGIN", "")),
+		AdminUsername:         getEnv("ADMIN_USERNAME", "Robin"),
+		AdminPassword:         getEnv("ADMIN_PASSWORD", "development-password"),
+		RisingGodsProxyURL:    strings.TrimRight(strings.TrimSpace(getEnv("RISING_GODS_PROXY_URL", "")), "/"),
+		RisingGodsProxyToken:  strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
+		PrivacyContactName:    strings.TrimSpace(os.Getenv("PRIVACY_CONTACT_NAME")),
+		PrivacyContactAddress: strings.TrimSpace(os.Getenv("PRIVACY_CONTACT_ADDRESS")),
 	}
 	if (c.RisingGodsProxyURL == "") != (c.RisingGodsProxyToken == "") {
 		return nil, errors.New("RISING_GODS_PROXY_URL and RISING_GODS_PROXY_TOKEN must be set together")
@@ -60,6 +64,9 @@ func Load() (*Config, error) {
 		password := os.Getenv("ADMIN_PASSWORD")
 		if username == "" || strings.EqualFold(username, "Robin") || strings.TrimSpace(password) == "" || password == "test" || password == "development-password" {
 			return nil, errors.New("production requires explicit nondefault ADMIN_USERNAME and ADMIN_PASSWORD")
+		}
+		if c.PrivacyContactName == "" || c.PrivacyContactAddress == "" {
+			return nil, errors.New("production requires PRIVACY_CONTACT_NAME and PRIVACY_CONTACT_ADDRESS for the privacy page")
 		}
 		host, _, err := net.SplitHostPort(c.ListenAddr)
 		if err != nil || host == "" {

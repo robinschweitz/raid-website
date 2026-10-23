@@ -76,19 +76,20 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
 - **Operator reset command.** A new `cmd/reset-code` opens the database with the server's
   configuration and calls the `registration` reset-code service directly, like `cmd/sync-addons`
   calls `internal/addons`; it has no HTTP surface (SC-051, OD-019). Not built.
-- **Privacy.** `accountmerge` gains an Admin-only anonymise operation (FR-30.2–30.5). The privacy
-  page is a static frontend page; its contact name and address come from two new configuration
-  values, read by `internal/config`, and reach the page through a public read endpoint
-  `GET /api/v1/privacy-contact` (Owner 2026-10-22, AQ-6; endpoint confirmed 2026-10-23, backlog #49).
-  Not built.
+- **Privacy.** `accountmerge` gains an Admin-only anonymise operation (FR-30.2–30.5; anonymise
+  not built). The privacy page `/datenschutz` is a static frontend page; its contact name and
+  address come from the configuration values `PRIVACY_CONTACT_NAME` and `PRIVACY_CONTACT_ADDRESS`,
+  read by `internal/config` (required in production), and reach the page through the public read
+  endpoint `GET /api/v1/privacy-contact`, which returns only `{"data": {"name", "address"}}`
+  (Owner 2026-10-22, AQ-6; endpoint confirmed 2026-10-23, backlog #49).
 - **Boss kills.** A new `bosskill` domain package owns `raid_boss_kills` (raid, catalog boss,
   difficulty; unique per raid and boss). `loot` reads the kill for the award difficulty.
   `raidcorrection` writes kills, so the manual loot path and the `addonsync` import create a
   missing kill and the loot in one transaction (FR-29.7, FR-29.8) (Owner 2026-10-22, AQ-5). Not built.
 - **Public interface.** Without a session, only these reads answer (FR-1.2): `GET /api/v1/raids`,
   `/players`, `/polls`, `/raids/{id}/attendance`, `/addons`, `/addons/{name}/download`,
-  `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, and, not
-  built, `/statistics` and `/privacy-contact`. Login, MFA, and registration writes are public too.
+  `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/privacy-contact`,
+  and, not built, `/statistics`. Login, MFA, and registration writes are public too.
 - **API notes.** Catalog reads: `GET /api/v1/loot-catalog` and its `/instances`, `/bosses`,
   `/items`; there are no catalog write endpoints. Raid series: `weekdays` are 0 (Sunday) to 6
   (Saturday), `start_time` is `HH:MM`, `timezone` an IANA name. `PATCH /api/v1/raids/{id}` takes
@@ -139,7 +140,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `audit` | Audit writer and Admin reader | Append-only, no secrets in snapshots | audit log | FR-26 | SUPPORTED |
 | Statistics (`GET /api/v1/statistics`) | Public aggregates computed on the server | Public field subset (FR-27.2) | none (derived, read-only) | FR-27 | SUPPORTED (not built) |
 | `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (not built) |
-| Privacy page | Static page with contact from configuration | None | none | FR-30.1 | SUPPORTED (not built) |
+| Privacy page | Static page with contact from configuration | None | none | FR-30.1 | SUPPORTED |
 | Infrastructure (`config`, `db`, `migrations`, `validation`, `webui`) | Environment config, DB open, schema, enums, embedded SPA | Production config rules, foreign keys, SPA present in production | schema | NFR-1 | SUPPORTED (SPA check not built) |
 | Rising-Gods Worker (`workers/`) | Authenticated fixed-origin GET proxy to `db.rising-gods.de` | Fixed origin and shared token (SC-029) | none | FR-7, ADR 048, ADR 053 | SUPPORTED |
 

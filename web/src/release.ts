@@ -1,8 +1,15 @@
-export const appVersion = '1.0.33'
+export const appVersion = '1.0.34'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Datenschutzerklärung',
+    changes: [
+      'Neue Seite „Datenschutz“, auch ohne Anmeldung lesbar (Link unten in der Seitenleiste). Sie nennt die verantwortliche Person mit Kontakt, erklärt welche Daten gespeichert werden, dass das Änderungsprotokoll unbegrenzt bleibt und dass eine Löschung Konten pseudonymisiert, aber nicht anonymisiert.',
+    ],
+  },
+  {
+    version: '1.0.33',
     title: 'Aktueller Raid führt zum nächsten Termin',
     changes: [
       '„Aktueller Raid“ öffnet einen noch laufenden Raid oder den nächsten anstehenden Termin. Abgeschlossene, abgesagte und archivierte Raids werden nicht mehr als aktuell angezeigt.',

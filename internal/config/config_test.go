@@ -23,6 +23,8 @@ func TestProductionCredentials(t *testing.T) {
 			t.Setenv("ADMIN_USERNAME", tc.username)
 			t.Setenv("ADMIN_PASSWORD", tc.password)
 			t.Setenv("COOKIE_SECURE", "false")
+			t.Setenv("PRIVACY_CONTACT_NAME", "Max Mustermann")
+			t.Setenv("PRIVACY_CONTACT_ADDRESS", "owner@example.org")
 			cfg, err := Load()
 			if (err == nil) != tc.valid {
 				t.Fatalf("Load error = %v, want valid %v", err, tc.valid)
@@ -68,6 +70,8 @@ func TestProductionListenAddress(t *testing.T) {
 			t.Setenv("ADMIN_USERNAME", "owner")
 			t.Setenv("ADMIN_PASSWORD", "unique-password")
 			t.Setenv("LISTEN_ADDR", tc.listenAddr)
+			t.Setenv("PRIVACY_CONTACT_NAME", "Max Mustermann")
+			t.Setenv("PRIVACY_CONTACT_ADDRESS", "owner@example.org")
 			_, err := Load()
 			if (err == nil) != tc.valid {
 				t.Fatalf("Load error = %v, want valid %v", err, tc.valid)
@@ -97,6 +101,34 @@ func TestRisingGodsProxyConfiguration(t *testing.T) {
 			}
 			if tc.valid && tc.proxyURL != "" && cfg.RisingGodsProxyURL != "https://proxy.example" {
 				t.Fatalf("unexpected normalized proxy URL %q", cfg.RisingGodsProxyURL)
+			}
+		})
+	}
+}
+
+func TestReqPrivacy010_AC03(t *testing.T) {
+	for _, tc := range []struct {
+		name, contactName, address string
+		valid                      bool
+	}{
+		{"both missing", "", "", false},
+		{"name missing", "", "owner@example.org", false},
+		{"address missing", "Max Mustermann", "", false},
+		{"blank values", " \t", " ", false},
+		{"both set", "Max Mustermann", "owner@example.org", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("ENV", "production")
+			t.Setenv("ADMIN_USERNAME", "owner")
+			t.Setenv("ADMIN_PASSWORD", "unique-password")
+			t.Setenv("PRIVACY_CONTACT_NAME", tc.contactName)
+			t.Setenv("PRIVACY_CONTACT_ADDRESS", tc.address)
+			cfg, err := Load()
+			if (err == nil) != tc.valid {
+				t.Fatalf("Load error = %v, want valid %v", err, tc.valid)
+			}
+			if tc.valid && (cfg.PrivacyContactName != "Max Mustermann" || cfg.PrivacyContactAddress != "owner@example.org") {
+				t.Fatalf("contact = %q / %q", cfg.PrivacyContactName, cfg.PrivacyContactAddress)
 			}
 		})
 	}

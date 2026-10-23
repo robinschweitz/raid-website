@@ -232,11 +232,12 @@ and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
 
 5. **Restore from a verified snapshot** if data or the binary may have been
    tampered with. Pick a snapshot from before the incident, confirm it with
-   its SHA-256 sidecar, and follow "Database recovery" above:
+   the SHA-256 sidecar next to it (`sha256sum -c <sidecar file>` inside
+   `/var/backups/raid-website`), and follow "Database recovery" above:
 
    ```sh
    ls -l /var/backups/raid-website/
-   cd /var/backups/raid-website && sha256sum -c raid.db-YYYYMMDDTHHMMSSZ.sqlite3.gz.sha256
+   systemctl start raid-website-backup-verify.service
    ```
 
    A restored database brings back old sessions and secrets; repeat step 3

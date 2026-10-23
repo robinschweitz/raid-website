@@ -394,6 +394,13 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Evidence:** `THREAT_MODEL_CODE.md` CT-008: the warning is never checked. Code: **not compliant**. Threats: T-045.
 - **Verification:** An assertion with a lower counter than stored fails.
 
+**SC-049 - The Admin confirms a match by character name**
+- **Status:** ACTIVE
+- **Rule:** When a registration request has no character linked to its Rising-Gods profile but a player without a login owns a character with the requested name, the Admin MUST see that player before creating the code and MUST choose either "attach to this player" or "new player". The choice MUST be stored with the code. Redeeming MUST follow the stored choice and MUST NOT match by name on its own.
+- **Enforcement:** `registration` code creation and `RedeemNewAccount`; the admin request list.
+- **Evidence:** FR-4.5, OD-016 (owner, 2026-10-23); `THREAT_MODEL_CODE.md` CT-005: redeem falls back to `FindByName` without any confirmation. Code: **not compliant**. Threats: T-043.
+- **Verification:** A request whose name matches an imported player cannot get a code until the Admin chooses; with "new player" the redeem creates a new player even though the name matches.
+
 ## Open Security Decisions
 
 The owner decided OD-001 to OD-006, OD-008, and OD-009 on 2026-10-22; the answers are in the rules that
@@ -420,12 +427,10 @@ Decided by the owner on 2026-10-23 (threat model):
 - **OD-013** Security events to the server journal, kept 30 days → SC-041.
 - **OD-014** Password reset with an in-game code that also removes MFA → SC-042.
 - **OD-015** Written incident plan, no in-app button; the owner stays the only key holder → SC-044.
+- **OD-016** A match by character name is attached only after the Admin confirms it when creating the code → SC-049, FR-4.5.
 
 Open decision from the code threat model (`THREAT_MODEL_CODE.md`):
 
-- **OD-016** Attaching a new login by character name (FR-4.5; CT-005, T-043).
-  - Choice: keep the character-name fallback for players imported before logins existed (ADR 084); require the Admin to confirm the matched player before the code is issued; or attach only by Rising-Gods profile and never by name.
-  - Owner: owner.
 - **OD-017** Keeping the raw Rising-Gods profile (FR-30.6; CT-030, T-047).
   - Choice: keep the full profile response on registration requests and characters; keep only the fields the site uses (name, class, specs, gear score) and drop the raw copy; or drop the raw copy from finished registration requests only.
   - Owner: owner.

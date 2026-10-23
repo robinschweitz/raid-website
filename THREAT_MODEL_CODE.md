@@ -76,7 +76,7 @@ No numeric risk scores; the **Impact** line says in words what an attacker gains
 - **Impact:** someone whose new character carries the name of an old imported character gets that
   player's history and EP. The Admin issues the code and can see the linked player afterwards
   (FR-4.9).
-- **Status:** DECISION — OD-016. **Rules:** FR-4.5.
+- **Status:** CONFIRMED. **Response:** Mitigate (OD-016: Admin confirms). **Rules:** FR-4.5, SC-049.
 
 **CT-006 — The last Admin can be demoted**
 - **Category:** Denial of service (administration). **Component:** `auth.SetCredentials`.
@@ -391,7 +391,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-001 | CONFIRMED | Mitigate | Ops + App | SC-045, SC-039 | T-046 |
 | CT-003 | CONFIRMED | Mitigate | App | SC-046 | T-042 |
 | CT-004 | CONFIRMED | Mitigate | App | SC-009 | T-004 |
-| CT-005 | DECISION | — | App | OD-016 | T-043 |
+| CT-005 | CONFIRMED | Mitigate | App | SC-049, FR-4.5 | T-043 |
 | CT-006 | CONFIRMED | Mitigate | App | SC-047 | T-044 |
 | CT-007 | CONFIRMED | Mitigate | App | SC-023 | — |
 | CT-008 | CONFIRMED | Mitigate | App | SC-048 | T-045 |

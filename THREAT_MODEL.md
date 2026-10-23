@@ -346,8 +346,8 @@ threats that cross each boundary.
   an imported character.
 - **Scenario:** FR-4.5 and ADR 084 attach a new login to an existing player by Rising-Gods profile
   or, as a fallback, by character name; names are not unique (FR-6.3).
-- **Status:** PARTLY COVERED — OD-016; the Admin issues each code (FR-4.3) and sees the linked
-  player afterwards (FR-4.9).
+- **Status:** COVERED — FR-4.5, SC-049 (owner, 2026-10-23, OD-016): the Admin confirms every name
+  match before the code exists.
 
 **T-044 — Losing the last Admin**
 - **Category:** Denial of service (administration).
@@ -592,7 +592,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-040 | ACCEPTED | Accept | Ops | OD-015 |
 | T-041 | COVERED | Mitigate | Ops | SC-044, OD-015 |
 | T-042 | COVERED | Mitigate | App | SC-046 |
-| T-043 | PARTLY COVERED | Mitigate | App | FR-4.5, OD-016 |
+| T-043 | COVERED | Mitigate | App | FR-4.5, SC-049 |
 | T-044 | COVERED | Mitigate | App | FR-5.9, SC-047 |
 | T-045 | COVERED | Mitigate | App | SC-048 |
 | T-046 | COVERED | Mitigate | Ops | SC-045, SC-039 |

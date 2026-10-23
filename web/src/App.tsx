@@ -129,7 +129,7 @@ function Layout() {
         <div className="user">{player ? <><Link to={`/players/${player.id}`}><NavIcon name="profile" />{player.name}</Link><span className="badge">{player.role}</span>
           <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button></> : <Link to="/login">Anmelden</Link>}</div>
       </header>
-      {path !== '/kontosicherheit' && <MFAReminderBanner isSignedIn={player !== null} />}
+      {path !== '/kontosicherheit' && <MFAReminderBanner isSignedIn={player !== null} adminID={player?.role === 'ADMIN' ? player.id : undefined} path={path} />}
       <main id="main-content" className={path === '/' ? undefined : 'secondary-page'} tabIndex={-1}>
         {error && <p className="error" role="alert">{error}</p>}
         <Routes />

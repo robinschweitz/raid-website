@@ -29,6 +29,12 @@ func RequireRole(min validation.Role, next http.HandlerFunc) http.HandlerFunc {
 			WriteError(w, http.StatusForbidden, "forbidden", "insufficient permissions")
 			return
 		}
+		// Admin-only routes need a second factor (FR-3.10, SC-040). MFA setup itself is
+		// behind RequireAuth, so an Admin without MFA can still set it up.
+		if min == validation.RoleAdmin && !adminHasSecondFactor(r) {
+			WriteError(w, http.StatusForbidden, "mfa_setup_required", "admin requires a second factor")
+			return
+		}
 		next(w, r)
 	}
 }

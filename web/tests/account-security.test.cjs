@@ -28,7 +28,7 @@ test('every statistic carries a source and sources are https links', () => {
 test('the page is routed, public, and the banner sits in the shell', () => {
   assert.match(app, /parts\[0\] === 'kontosicherheit'\) return <AccountSecurityPage \/>/)
   assert.match(app, /path !== '\/kontosicherheit' && path !== '\/addons'/)
-  assert.match(app, /<MFAReminderBanner isSignedIn=\{player !== null\} \/>/)
+  assert.match(app, /<MFAReminderBanner isSignedIn=\{player !== null\} adminID=\{player\?\.role === 'ADMIN' \? player\.id : undefined\} path=\{path\} \/>/)
   assert.match(app, /initialView=\{parts\[2\] === 'konto' \? 'account' : undefined\}/)
   assert.match(page, /to=\{`\/players\/\$\{player\.id\}\/konto`\}/)
 })

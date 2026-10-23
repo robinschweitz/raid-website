@@ -1,8 +1,17 @@
-export const appVersion = '1.0.28'
+export const appVersion = '1.0.29'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Admins brauchen einen zweiten Faktor',
+    changes: [
+      'Admin-Funktionen gehen nur noch mit Authenticator-App oder Sicherheitsschlüssel. Admins ohne zweiten Faktor landen nach dem Anmelden im Reiter „Konto“ und sehen oben einen Hinweis, der sich nicht ausblenden lässt.',
+      'Für alle anderen Rollen bleibt der zweite Faktor freiwillig.',
+      'Behoben: Wer nur einen Sicherheitsschlüssel und Wiederherstellungscodes hat, kann sich wieder mit einem Wiederherstellungscode anmelden.',
+    ],
+  },
+  {
+    version: '1.0.28',
     title: 'Hinweis zur Kontosicherheit',
     changes: [
       'Wer noch keinen zweiten Faktor (Authenticator-App oder Sicherheitsschlüssel) eingerichtet hat, sieht oben einen schmalen Hinweis. Er verschwindet, sobald einer eingerichtet ist, und lässt sich für die laufende Sitzung ausblenden.',

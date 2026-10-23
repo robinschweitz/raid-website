@@ -433,6 +433,23 @@ func (s *Service) EnableTOTP(ctx context.Context, playerID int64, code string) (
 	return recovery, nil
 }
 
+// HasSecondFactor reports whether the player has TOTP or at least one security key.
+// Recovery codes alone are a fallback, not a second factor (FR-3.12, SC-040).
+func (s *Service) HasSecondFactor(ctx context.Context, playerID int64) (bool, error) {
+	settings, err := s.sessions.GetMFASettings(ctx, playerID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, fmt.Errorf("get mfa settings: %w", err)
+	}
+	if settings != nil && settings.TOTPEnabledAt != nil && settings.TOTPSecret != "" {
+		return true, nil
+	}
+	keys, err := s.sessions.CountWebAuthnCredentials(ctx, playerID)
+	if err != nil {
+		return false, fmt.Errorf("count webauthn credentials: %w", err)
+	}
+	return keys > 0, nil
+}
+
 func (s *Service) MFAStatus(ctx context.Context, playerID int64) (*MFAStatus, error) {
 	status := &MFAStatus{SecurityKeys: []WebAuthnCredentialInfo{}}
 	settings, err := s.sessions.GetMFASettings(ctx, playerID)
@@ -521,11 +538,12 @@ func (s *Service) VerifyMFAChallenge(ctx context.Context, challenge, code string
 	if err != nil {
 		return "", nil, fmt.Errorf("get mfa player: %w", err)
 	}
+	// An account may have recovery codes or security keys but no TOTP row.
 	settings, err := s.sessions.GetMFASettings(ctx, p.ID)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", nil, fmt.Errorf("get mfa settings: %w", err)
 	}
-	if !verifyTOTP(settings.TOTPSecret, code, now) {
+	if settings == nil || !verifyTOTP(settings.TOTPSecret, code, now) {
 		used, err := s.useRecoveryCode(ctx, p.ID, code, now)
 		if err != nil {
 			return "", nil, err

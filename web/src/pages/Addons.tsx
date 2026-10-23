@@ -235,7 +235,7 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
         <ul>
           <li>Nach dem Wurf steht der Gewinner im Feld <strong>EMPFÄNGER</strong>. Klick auf einen Wurf macht diesen Spieler zum Empfänger, <strong>ALLE (n)</strong> zeigt den ganzen Raid nach Gruppen.</li>
           <li><strong>GEBEN + ERFASSEN</strong> gibt das Item per Plündermeister und trägt die Vergabe ein. <strong>DE</strong> und <strong>BANK</strong> geben ungewollte Items an den Verzauberer oder die Gildenbank. Sie zählen für niemanden.</li>
-          <li>Items, die du selbst behältst, folgt das Addon durch deine Handel bis zum Gewinner.</li>
+          <li>Behältst du ein Item für den Gewinner, zählt es sofort für ihn, und die Ansage nennt ihn: „geht an Alice – Main-Spec (bei dir bis zum Handel)“. Das Addon folgt dem Item durch deine Handel bis zum Gewinner.</li>
           <li>Im Reiter <strong>VERGABEN</strong> eine Vergabe auswählen: <strong>ZÄHLT ALS</strong> Main-Spec, Second-Spec oder nichts, <strong>EMPFÄNGER ÄNDERN</strong>, parken, DE, BANK oder <strong>ENTFERNEN</strong>. Darunter stehen ihre Würfe.</li>
           <li>Beim <strong>Plündern als Gruppe</strong> trägt RaidLedger die Gewinner („X gewinnt: …“) ohne Spec ein. Sie zählen erst, wenn du einen Spec setzt.</li>
         </ul>

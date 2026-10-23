@@ -18,7 +18,7 @@
     "recharts": "^3.10.1"
   },
   "devDependencies": {
-    "@eslint/js": "^9.13.0",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.56.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.12",

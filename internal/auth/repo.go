@@ -88,6 +88,17 @@ func (r *Repo) CountFailedLoginAttempts(ctx context.Context, username, clientIP 
 	return int(count), err
 }
 
+// CountFailedLoginAttemptsFromAddress counts failed logins from one client
+// address for any username since the given time (SC-043).
+func (r *Repo) CountFailedLoginAttemptsFromAddress(ctx context.Context, clientIP string, since time.Time) (int, error) {
+	count, err := r.db.NewSelect().Model((*LoginAttempt)(nil)).
+		Where("client_ip = ?", clientIP).
+		Where("success = 0").
+		Where("created_at >= ?", since).
+		Count(ctx)
+	return int(count), err
+}
+
 func (r *Repo) GetMFASettings(ctx context.Context, playerID int64) (*MFASettings, error) {
 	s := new(MFASettings)
 	err := r.db.NewSelect().Model(s).Where("player_id = ?", playerID).Scan(ctx)

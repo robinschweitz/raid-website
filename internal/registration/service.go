@@ -559,11 +559,6 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 	if err := auth.ValidatePassword(password); err != nil {
 		return "", nil, err
 	}
-	if _, err := s.players.FindByUsername(ctx, uname); err == nil {
-		return "", nil, ErrUsernameTaken
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return "", nil, err
-	}
 	var created *player.Player
 	err := s.consumeCode(ctx, codeValue, func(ctx context.Context, tx bun.Tx, req *Request, code *Code, now time.Time) (int64, error) {
 		if req.RequesterPlayerID != nil || req.Purpose != PurposeNewAccount {
@@ -575,6 +570,13 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 		}
 		players := s.players.WithTx(tx)
 		chars := s.characters.WithTx(tx)
+		// SC-046: the username is checked only after the code is valid, and inside
+		// the code transaction so a concurrent redeem cannot slip in between.
+		if _, err := players.FindByUsername(ctx, uname); err == nil {
+			return 0, ErrUsernameTaken
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return 0, err
+		}
 		if existing, err := chars.FindByExternalProfile(ctx, req.ExternalSource, req.ExternalProfileID); err == nil {
 			p, err := players.Get(ctx, existing.PlayerID)
 			if err != nil {

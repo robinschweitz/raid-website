@@ -310,7 +310,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** New Go or npm dependencies need owner approval (DR-11). Builds MUST use the committed lock files (`go.sum`, `npm ci`). CI workflows MUST declare minimal `permissions`. Every GitHub Action MUST be pinned to a full commit SHA with its version in a comment, and Dependabot MUST propose updates for GitHub Actions, Go modules, and npm as pull requests (Owner 2026-10-22, OD-006). Deploys come only from the protected `main` branch.
 - **Enforcement:** `.github/workflows/`, `deploy/`.
-- **Evidence:** ADR 071, ADR 072, DR-11, OD-006. Code: lock files and permissions compliant; actions are pinned by tag (**not compliant**); no Dependabot configuration. Threats: T-012, T-014, T-028.
+- **Evidence:** ADR 071, ADR 072, DR-11, OD-006. Code: lock files and permissions compliant; every `uses:` in `.github/workflows/` is pinned to a full commit SHA with the tag as a comment, and `.github/dependabot.yml` proposes weekly updates for GitHub Actions, Go modules, and npm (`/web`). Test: `internal/ciconfig` (`TestReqPlatform014_AC01`, `TestReqPlatform014_AC02`). Threats: T-012, T-014, T-028.
 - **Verification:** Workflow review; `npm ci` and `go build` fail on a lock-file mismatch.
 
 **SC-037 - Deployment scripts under review**

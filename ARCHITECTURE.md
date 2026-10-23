@@ -127,14 +127,14 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `attendance` | Roster rows with per-raid snapshots | Snapshot completeness | raid attendance | FR-13.2–13.4 | SUPPORTED |
 | `raidcorrection` | Roster and loot writes, corrections, withdrawal, quick-add | Raid-state rules, archived reason, EP eligibility delta, retry receipts | quick-add receipts (coordinator otherwise) | FR-13, FR-14.8–14.10, FR-16.5–16.6 | SUPPORTED |
 | `loot` | Loot awards, methods, enhanced cost, lock auto-award, token derivation | Roster recipient, request-ID idempotency, cost formula | loot awards | FR-14, FR-18 | SUPPORTED |
-| `unclaimedloot` | Items that went to nobody | No player effect | unclaimed loot | FR-15 | SUPPORTED (SQL to move, DR-4) |
+| `unclaimedloot` | Items that went to nobody | No player effect | unclaimed loot | FR-15 | SUPPORTED |
 | `enhancepoints` | EP ledger, balances, item locks | 150-EP lock threshold, competing locks, ownership | EP transactions, item locks | FR-16, FR-17 | SUPPORTED |
 | `raidcompletion` | Archive: EP award, lock expiry, successor, plan-ahead top-up, preview | Idempotent finalisation, exclusions, successor conflicts | (coordinator) | FR-10.6–10.15 | SUPPORTED |
 | `addonsync` | RS1/RS2 parsing, roster and loot import previews and applies, invite export | Raid-scoped request IDs, importable states | (coordinator) | FR-20 | SUPPORTED |
 | `addons` | Embedded addon bundles and download zips | Bundle completeness | embedded files | FR-21 | SUPPORTED |
 | `wishlist` | Wishlist items, raid interests, WL2 export | Owner-only writes | wishlist items | FR-19, FR-20.13 | SUPPORTED |
 | `shadowmourne` | Questline list and raid task choices | Eligible classes, stage choice rules | entries, raid tasks | FR-22 | SUPPORTED |
-| `recruitment` | Recruitment template per series or raid | Length, shape, slot values | recruitment templates | FR-23 | SUPPORTED (slot check and SQL move not built) |
+| `recruitment` | Recruitment template per series or raid | Length, shape, slot values | recruitment templates | FR-23 | SUPPORTED (slot check not built) |
 | `poll` | Polls and votes | Option validity, closed polls | polls, options, votes | FR-24 | SUPPORTED |
 | `audit` | Audit writer and Admin reader | Append-only, no secrets in snapshots | audit log | FR-26 | SUPPORTED |
 | Statistics (`GET /api/v1/statistics`) | Public aggregates computed on the server | Public field subset (FR-27.2) | none (derived, read-only) | FR-27 | SUPPORTED (not built) |
@@ -251,9 +251,8 @@ sequenceDiagram
 - **DR-3** Each table has exactly one owning domain package (the "Data owned" column). Only the
   owner's repository writes it; other components call the owner's repository or service.
 - **DR-4** SQL and Bun query builders appear only in `repo.go` files. Models may carry Bun struct
-  tags. There are no exceptions (Owner 2026-10-22, AQ-1). Not yet followed by
-  `internal/character/merge.go`, `internal/lootcatalog/order.go`, `internal/recruitment/service.go`
-  and `internal/unclaimedloot/unclaimed.go`; their queries move into `repo.go`.
+  tags. There are no exceptions (Owner 2026-10-22, AQ-1). `TestReqArch010_AC01` scans for query calls
+  outside `repo.go` in `character`, `lootcatalog`, `recruitment`, and `unclaimedloot`.
 - **DR-5** A write that touches more than one row or table, including its audit entry and ledger
   rows, runs in one transaction passed down with `WithTx`.
 - **DR-6** Business rules live in domain services, never in handlers, middleware, or the web

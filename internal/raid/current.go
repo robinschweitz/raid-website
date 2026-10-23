@@ -6,16 +6,13 @@ import (
 	"raid-website/internal/validation"
 )
 
-// Current picks the raid the "Aktueller Raid" link opens (ADR 088): the newest
-// raid that has begun (started, or its scheduled start is not in the future;
-// imported history without either counts from its completion), else the next
-// raid to come. Cancelled raids and raids without any time are skipped. It
-// returns nil when no raid qualifies.
+// Current picks a running raid first, otherwise the next upcoming raid.
+// Completed, cancelled and archived raids are never current (ADR 094).
 func Current(raids []Raid, now time.Time) *Raid {
-	var begun, next *Raid
+	var running, next *Raid
 	for i := range raids {
 		rd := &raids[i]
-		if rd.Status == validation.RaidStatusCancelled {
+		if rd.ArchivedAt != nil || (rd.Status != validation.RaidStatusOpen && rd.Status != validation.RaidStatusPlanned) {
 			continue
 		}
 		at := beginning(rd)
@@ -23,8 +20,8 @@ func Current(raids []Raid, now time.Time) *Raid {
 			continue
 		}
 		if !at.After(now) {
-			if begun == nil || later(rd, begun) {
-				begun = rd
+			if running == nil || later(rd, running) {
+				running = rd
 			}
 			continue
 		}
@@ -32,22 +29,18 @@ func Current(raids []Raid, now time.Time) *Raid {
 			next = rd
 		}
 	}
-	if begun != nil {
-		return begun
+	if running != nil {
+		return running
 	}
 	return next
 }
 
-// beginning is when a raid began: its real start, else its scheduled start,
-// else (imported history without either) when it was completed.
+// beginning prefers the actual start over the scheduled start.
 func beginning(rd *Raid) *time.Time {
 	if rd.StartedAt != nil {
 		return rd.StartedAt
 	}
-	if rd.ScheduledStart != nil {
-		return rd.ScheduledStart
-	}
-	return rd.CompletedAt
+	return rd.ScheduledStart
 }
 
 func later(a, b *Raid) bool {

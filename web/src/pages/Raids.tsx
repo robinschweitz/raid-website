@@ -5,6 +5,7 @@ import { Link, navigate } from '../router'
 import { atLeast, catalogRaidSizes, type LootCatalog, type Player, type Raid, type RaidSeries } from '../types'
 import { useSubmission } from '../useSubmission'
 import { CatalogAssociationFields } from '../components/CatalogAssociationFields'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 function statusClass(status: Raid['status']): string {
   switch (status) {
@@ -128,7 +129,7 @@ export function RaidsPage() {
   return (
     <div>
       <div className="page-heading"><div><p className="eyebrow">Planung & Historie</p><h1>Raids</h1></div><Link to="/">Zur Übersicht</Link></div>
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
       {canManage && (
         <details className="card editor-disclosure"><summary>Neuer Raid</summary>
         <form className="card inline-form" onSubmit={onCreate}>
@@ -143,9 +144,9 @@ export function RaidsPage() {
           <p className="muted">Die Serie übernimmt Raidleiter, Raidinstanz und Raidgröße; der Raidname wird aus der Namensvorlage abgeleitet. {selectedSeries && `Wiederholung: ${selectedSeries.start_time}, ${selectedSeries.timezone}, alle ${selectedSeries.interval_weeks} Wochen.`}</p>
           {series.length === 0 && <p className="muted">Keine Raidserie vorhanden — ein Raid ohne Serie benötigt einen eigenen Namen.</p>}
           <label>Raidleiter<select aria-label="Neuer Raidleiter" disabled={pending} required value={leaderID} onChange={(e) => setLeaderID(e.target.value)}><option value="">Raidleiter auswählen</option>{players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-          {catalogError && <p className="error" role="alert">{catalogError}</p>}
+          {catalogError && <ErrorMessage>{catalogError}</ErrorMessage>}
           <CatalogAssociationFields catalog={catalog} instanceID={instanceID} raidSize={raidSize} disabled={pending} existingInstanceID={selectedSeries?.catalog_instance_id ?? ''} existingRaidSize={selectedSeries?.raid_size == null ? '' : String(selectedSeries?.raid_size)} onChange={(instance, size) => { if (!isPending() && isActive()) { setInstanceID(instance); setRaidSize(size) } }} />
-          {!associationValid && <p className="error">Bitte eine verfügbare Raidgröße zur Raidinstanz auswählen.</p>}
+          {!associationValid && <ErrorMessage>Bitte eine verfügbare Raidgröße zur Raidinstanz auswählen.</ErrorMessage>}
           {selectedSeries ? (
             <p className="muted">Name wird aus der Namensvorlage abgeleitet: {previewSeriesName(selectedSeries, scheduled)}</p>
           ) : (

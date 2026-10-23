@@ -437,8 +437,7 @@ Target: WCAG 2.2 level AA.
   scrolling.
 - **Language:** `<html lang="de">`.
 - **Status changes:** success messages use `role="status"`; every error message uses the shared
-  error component with `role="alert"` (Owner 2026-10-22, DQ-5). Today 18 of 55 error elements are not
-  announced.
+  error component with `role="alert"` (Owner 2026-10-22, DQ-5; `web/src/components/ErrorMessage.tsx`).
 - **Decorative images:** class emblems and boss portraits next to a visible name use empty
   `alt` and `aria-hidden`; the guide and addon screenshots have German alt text.
 

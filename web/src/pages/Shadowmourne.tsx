@@ -5,6 +5,7 @@ import { Link } from '../router'
 import { defaultShardTarget, shadowmourneClasses, shadowmourneStageLabels, shadowmourneStages } from '../shadowmourne'
 import { atLeast, type Character, type ShadowmourneEntry, type ShadowmourneStage } from '../types'
 import { useSubmission } from '../useSubmission'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 function errorMessage(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Die Schattengram-Liste konnte nicht geladen werden.'
@@ -143,7 +144,7 @@ export function ShadowmournePage() {
   return <div className="shadowmourne-page">
     <div className="page-heading"><div><p className="eyebrow">Questreihe & Priorität</p><h1>Schattengram</h1></div></div>
     <p className="muted">Wer an Schattengram arbeitet, in welcher Reihenfolge und bei welchem Schritt. Seuche, Blut, Frost und Splitter kann pro Raid nur eine Person machen; bei Gleichstand hat der höhere Listenplatz Vorrang. Wer im jeweiligen Raid dran ist, steht im Raid unter „Schattengram im Raid“.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {pending && <p className="muted" role="status">Wird gespeichert&hellip;</p>}
 
     <section className="card">

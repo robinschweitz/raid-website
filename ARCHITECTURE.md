@@ -78,8 +78,9 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   calls `internal/addons`; it has no HTTP surface (SC-051, OD-019). Not built.
 - **Privacy.** `accountmerge` gains an Admin-only anonymise operation (FR-30.2–30.5). The privacy
   page is a static frontend page; its contact name and address come from two new configuration
-  values, read by `internal/config`, and reach the page through a public read endpoint, PROPOSED
-  `GET /api/v1/privacy-contact` (Owner 2026-10-22, AQ-6). Not built.
+  values, read by `internal/config`, and reach the page through a public read endpoint
+  `GET /api/v1/privacy-contact` (Owner 2026-10-22, AQ-6; endpoint confirmed 2026-10-23, backlog #49).
+  Not built.
 - **Boss kills.** A new `bosskill` domain package owns `raid_boss_kills` (raid, catalog boss,
   difficulty; unique per raid and boss). `loot` reads the kill for the award difficulty.
   `raidcorrection` writes kills, so the manual loot path and the `addonsync` import create a

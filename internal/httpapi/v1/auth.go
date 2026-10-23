@@ -122,6 +122,10 @@ func (a *API) verifyMFA(w http.ResponseWriter, r *http.Request) {
 	}
 	token, p, err := a.Auth.VerifyMFAChallenge(r.Context(), req.Challenge, req.Code)
 	if err != nil {
+		if errors.Is(err, auth.ErrMFAChallengeInvalid) {
+			WriteError(w, http.StatusUnauthorized, "mfa_challenge_invalid", "MFA challenge is no longer valid; log in again")
+			return
+		}
 		if errors.Is(err, auth.ErrInvalidMFA) {
 			WriteError(w, http.StatusUnauthorized, "invalid_mfa_code", "invalid MFA code")
 			return

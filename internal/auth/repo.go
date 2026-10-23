@@ -161,6 +161,23 @@ func (r *Repo) FindMFAChallenge(ctx context.Context, hash string, now time.Time)
 	return c, nil
 }
 
+// RecordMFAChallengeFailure counts one wrong code on a challenge and returns
+// the new number of wrong codes (SC-011).
+func (r *Repo) RecordMFAChallengeFailure(ctx context.Context, id int64) (int, error) {
+	var failedAttempts int
+	err := r.db.NewUpdate().Model((*MFAChallenge)(nil)).
+		Set("failed_attempts = failed_attempts + 1").
+		Where("id = ?", id).
+		Returning("failed_attempts").
+		Scan(ctx, &failedAttempts)
+	return failedAttempts, err
+}
+
+func (r *Repo) DeleteMFAChallenge(ctx context.Context, id int64) error {
+	_, err := r.db.NewDelete().Model((*MFAChallenge)(nil)).Where("id = ?", id).Exec(ctx)
+	return err
+}
+
 func (r *Repo) MarkMFAChallengeUsed(ctx context.Context, id int64, at time.Time) error {
 	_, err := r.db.NewUpdate().Model((*MFAChallenge)(nil)).Set("used_at = ?", at).Where("id = ?", id).Where("used_at IS NULL").Exec(ctx)
 	return err

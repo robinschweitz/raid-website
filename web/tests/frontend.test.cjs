@@ -1115,6 +1115,30 @@ test('login has a synchronous guard and German network failure feedback', async 
   assert.equal(nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit' && text(n) === 'Anmelden')[0].props.disabled, false)
 })
 
+test('login goes back to the password step after too many wrong MFA codes', async () => {
+  const s = setup()
+  const { ApiError } = s.load('api.ts')
+  s.auth.login = async () => ({ mfaRequired: true, challenge: 'challenge-1', factors: { totp_enabled: true, recovery_codes: false, webauthn: false } })
+  let verifyError = new ApiError(401, 'invalid_mfa_code', 'invalid MFA code')
+  s.auth.verifyMFA = async () => { throw verifyError }
+  const view = s.mount(s.load('pages/Login.tsx').LoginPage)
+  await form(view).props.onSubmit(event)
+  await flush(view)
+  const mfaInput = () => nodes(view.tree, (n) => n.type === 'input' && n.props.autoComplete === 'one-time-code')[0]
+  mfaInput().props.onChange(change('123456'))
+  view.render()
+  await form(view).props.onSubmit(event)
+  await flush(view)
+  assert.match(text(view.tree), /Der Code stimmt nicht/)
+  assert.ok(mfaInput())
+
+  verifyError = new ApiError(401, 'mfa_challenge_invalid', 'MFA challenge is no longer valid; log in again')
+  await form(view).props.onSubmit(event)
+  await flush(view)
+  assert.match(text(view.tree), /Bitte melde dich erneut mit deinem Passwort an/)
+  assert.equal(mfaInput(), undefined)
+})
+
 test('auth gate shows retry when session lookup fails and dashboard for anonymous visitors', () => {
   const s = setup(null)
   s.auth.error = 'Sitzung konnte nicht geladen werden.'

@@ -31,6 +31,7 @@ const (
 	loginFailureWindow        = 15 * time.Minute
 	addressFailureLimit       = 30
 	mfaChallengeTTL           = 5 * time.Minute
+	mfaFailureLimit           = 5
 	totpPeriodSeconds   int64 = 30
 
 	// CookieName is the name of the session cookie.
@@ -64,6 +65,10 @@ var (
 	ErrLoginRateLimited = errors.New("login rate limited")
 	ErrMFARequired      = errors.New("mfa required")
 	ErrInvalidMFA       = errors.New("invalid mfa code")
+	// ErrMFAChallengeInvalid is returned when an MFA challenge is unknown,
+	// expired, used, or invalidated after too many wrong codes (SC-011); the
+	// user has to start again with the password.
+	ErrMFAChallengeInvalid = errors.New("mfa challenge invalid")
 )
 
 type LoginStart struct {
@@ -555,9 +560,13 @@ func (s *Service) VerifyMFAChallenge(ctx context.Context, challenge, code string
 	c, err := s.sessions.FindMFAChallenge(ctx, hashToken(challenge), now)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", nil, ErrInvalidMFA
+			return "", nil, ErrMFAChallengeInvalid
 		}
 		return "", nil, fmt.Errorf("find mfa challenge: %w", err)
+	}
+	// A challenge whose deletion failed after the last wrong code stays closed.
+	if c.FailedAttempts >= mfaFailureLimit {
+		return "", nil, ErrMFAChallengeInvalid
 	}
 	p, err := s.players.Get(ctx, c.PlayerID)
 	if err != nil {
@@ -574,7 +583,7 @@ func (s *Service) VerifyMFAChallenge(ctx context.Context, challenge, code string
 			return "", nil, err
 		}
 		if !used {
-			return "", nil, ErrInvalidMFA
+			return "", nil, s.recordWrongMFACode(ctx, c.ID)
 		}
 	}
 	if err := s.sessions.MarkMFAChallengeUsed(ctx, c.ID, now); err != nil {
@@ -585,6 +594,22 @@ func (s *Service) VerifyMFAChallenge(ctx context.Context, challenge, code string
 		return "", nil, err
 	}
 	return token, p, nil
+}
+
+// recordWrongMFACode counts a wrong code and deletes the challenge at the
+// limit, so the user has to start again with the password (SC-011, FR-3.9).
+func (s *Service) recordWrongMFACode(ctx context.Context, challengeID int64) error {
+	failedAttempts, err := s.sessions.RecordMFAChallengeFailure(ctx, challengeID)
+	if err != nil {
+		return fmt.Errorf("record wrong mfa code: %w", err)
+	}
+	if failedAttempts < mfaFailureLimit {
+		return ErrInvalidMFA
+	}
+	if err := s.sessions.DeleteMFAChallenge(ctx, challengeID); err != nil {
+		return fmt.Errorf("delete mfa challenge: %w", err)
+	}
+	return ErrMFAChallengeInvalid
 }
 
 func (s *Service) useRecoveryCode(ctx context.Context, playerID int64, code string, now time.Time) (bool, error) {

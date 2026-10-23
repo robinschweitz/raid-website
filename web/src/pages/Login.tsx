@@ -54,7 +54,17 @@ export function LoginPage() {
       try {
         await verifyMFA(mfaChallenge, mfaCode)
       } catch (err) {
-        if (isActive()) setError(err instanceof ApiError ? err.message : 'MFA-Code konnte nicht geprüft werden.')
+        if (!isActive()) return
+        if (err instanceof ApiError && err.code === 'mfa_challenge_invalid') {
+          resetMFA()
+          setError('Zu viele falsche Codes oder die Anmeldung ist abgelaufen. Bitte melde dich erneut mit deinem Passwort an.')
+          return
+        }
+        if (err instanceof ApiError && err.code === 'invalid_mfa_code') {
+          setError('Der Code stimmt nicht. Bitte versuche es erneut.')
+          return
+        }
+        setError(err instanceof ApiError ? err.message : 'MFA-Code konnte nicht geprüft werden.')
       }
     })
   }

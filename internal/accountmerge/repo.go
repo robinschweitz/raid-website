@@ -114,6 +114,7 @@ func (r *Repo) MoveHistoricalReferences(ctx context.Context, sourceID, targetID 
 		{"poll_votes", "player_id"}, {"audit_log", "actor_id"},
 		{"raid_quick_add_requests", "actor_id"}, {"registration_requests", "requester_player_id"},
 		{"registration_codes", "created_by_player_id"}, {"registration_codes", "used_by_player_id"},
+		{"raid_boss_kills", "created_by_player_id"}, {"raid_boss_kills", "removed_by_player_id"},
 	}
 	for _, statement := range statements {
 		if _, err := r.db.NewUpdate().Table(statement.table).Set(statement.column+" = ?", targetID).Where(statement.column+" = ?", sourceID).Exec(ctx); err != nil {

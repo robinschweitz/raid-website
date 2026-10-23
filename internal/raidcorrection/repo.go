@@ -7,6 +7,7 @@ import (
 
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
+	"raid-website/internal/bosskill"
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
@@ -24,10 +25,11 @@ type Repo struct {
 	characters *character.Repo
 	points     *enhancepoints.Repo
 	audit      *audit.Repo
+	kills      *bosskill.Repo
 }
 
 func NewRepo(db bun.IDB) *Repo {
-	return &Repo{db: db, attendance: attendance.NewRepo(db), loot: loot.NewRepo(db), raids: raid.NewRepo(db), players: player.NewRepo(db), characters: character.NewRepo(db), points: enhancepoints.NewRepo(db), audit: audit.NewRepo(db)}
+	return &Repo{db: db, attendance: attendance.NewRepo(db), loot: loot.NewRepo(db), raids: raid.NewRepo(db), players: player.NewRepo(db), characters: character.NewRepo(db), points: enhancepoints.NewRepo(db), audit: audit.NewRepo(db), kills: bosskill.NewRepo(db)}
 }
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo { return NewRepo(tx) }

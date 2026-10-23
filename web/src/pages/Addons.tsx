@@ -119,7 +119,7 @@ function Overview({ addons, error }: { addons: AddonDownload[], error: string })
     {error && <p className="error" role="alert">{error}</p>}
     <div className="addon-cards">
       <article className="card addon-card ledger">
-        <div className="addon-card-shot"><img src="/addons/raidledger-fenster.webp" alt="Das RaidLedger-Fenster im Spiel" width={560} height={381} /></div>
+        <div className="addon-card-shot"><img src="/addons/raidledger-fenster.webp" alt="Das RaidLedger-Fenster im Spiel" width={709} height={448} /></div>
         <div className="addon-card-body">
           <p className="eyebrow">Für Raidleitung &amp; Plündermeister</p>
           <h2>RaidLedger</h2>
@@ -131,7 +131,7 @@ function Overview({ addons, error }: { addons: AddonDownload[], error: string })
         </div>
       </article>
       <article className="card addon-card wishlist">
-        <div className="addon-card-shot"><img src="/addons/raidwishlist-fenster.webp" alt="Das RaidWishlist-Fenster im Spiel" width={437} height={400} /></div>
+        <div className="addon-card-shot"><img src="/addons/raidwishlist-fenster.webp" alt="Das RaidWishlist-Fenster im Spiel" width={466} height={409} /></div>
         <div className="addon-card-body">
           <p className="eyebrow">Für jeden Raider</p>
           <h2>RaidWishlist</h2>
@@ -170,7 +170,7 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
       eyebrow="Für Raidleitung & Plündermeister"
       audience="Raidleitung"
       pitch="Das Werkzeug für den Raidabend: Aufstellung von der Website einladen, Kalender-Termin anlegen, Loot nach unseren Regeln auswürfeln, vergeben, nachhalten und am Ende Teilnahme und Loot zurück auf die Website bringen."
-      shot={<Shot name="raidledger-fenster" caption="RaidLedger mit der Beute, der Vergabe und den letzten Vergaben" width={560} height={381} />}
+      shot={<Shot name="raidledger-fenster" caption="RaidLedger, Reiter BEUTE: das Item, seine Würfe mit BISHER und der Gewinner" width={709} height={448} />}
     />
     {error && <p className="error" role="alert">{error}</p>}
     <Contents entries={[
@@ -182,20 +182,32 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
 
     <section className="card guide-section" id="ledger-funktionen" aria-labelledby="ledger-funktionen-title">
       <h2 id="ledger-funktionen-title">Funktionen</h2>
-      <p>Öffnen mit <code>/ledger</code> oder dem Minimap-Knopf (zum Verschieben ziehen, <code>/ledger minimap off</code> blendet ihn aus).</p>
+      <p>Öffnen mit <code>/ledger</code> oder dem Minimap-Knopf (zum Verschieben ziehen, <code>/ledger minimap off</code> blendet ihn aus). Das Fenster hat fünf Reiter, jeder mit der vollen Höhe, damit auch lange Beutelisten lesbar bleiben. Alles geht per Klick, jeder Knopf erklärt sich mit einem Tooltip; Chat-Befehle braucht man nicht mehr.</p>
+      <div className="table-scroll">
+        <table className="table">
+          <thead><tr><th>Reiter</th><th>Wofür</th></tr></thead>
+          <tbody>
+            <tr><td><strong>BEUTE</strong></td><td>Die Beute dieser Leiche, darunter die offenen Items, und das ausgewählte Item: würfeln, Würfe, Empfänger, vergeben</td></tr>
+            <tr><td><strong>VERGABEN</strong></td><td>Jede Vergabe dieses Raids: Empfänger ändern, Main-/Second-Spec, entfernen, Würfe; Export und neuer Raid</td></tr>
+            <tr><td><strong>SPIELER</strong></td><td>Items und Tokens pro Spieler und Spec, mit Korrekturen per − / +</td></tr>
+            <tr><td><strong>RAID</strong></td><td>Einladen, Gruppen, Teilnahme, Kalender-Termin</td></tr>
+            <tr><td><strong>EINSTELLUNGEN</strong></td><td>Wer ändern darf, wer welches Addon hat, Wurfzeiten, Minimap-Knopf, Fenster, Abgleich</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-      <Feature title="1. Raid aufstellen" shot={<Shot name="raidledger-aufstellung" caption="RAID: Einladungsliste mit Datum und Uhrzeit eingelesen" width={560} height={381} />}>
+      <Feature title="1. Raid aufstellen" shot={<Shot name="raidledger-aufstellung" caption="RAID: Einladungsliste mit Datum und Uhrzeit eingelesen" width={709} height={448} />}>
         <ol>
           <li>Auf der Website im Raid unter <strong>Aufstellung</strong> bei <em>Einladungen für Addon</em> auf <strong>Für Addon kopieren</strong> klicken.</li>
-          <li>Im Spiel <strong>RAID</strong> klicken (oder <code>/ledger setup</code>), mit <kbd>Strg</kbd>+<kbd>V</kbd> einfügen und <strong>EINLESEN</strong>.</li>
+          <li>Im Spiel den Reiter <strong>RAID</strong> öffnen (oder <code>/ledger setup</code>), mit <kbd>Strg</kbd>+<kbd>V</kbd> einfügen und <strong>EINLESEN</strong>.</li>
           <li><strong>ALLE EINLADEN</strong> lädt in der Reihenfolge der Website ein. Offline-Gildenmitglieder werden übersprungen, die Ersatzbank nur mit <strong>ERSATZBANK: JA</strong>.</li>
           <li><strong>FEHLENDE ERNEUT</strong> lädt nach, wer noch fehlt. <strong>GRUPPEN SORTIEREN</strong> stellt Tanks, Heiler und den Rest in Fünfergruppen.</li>
         </ol>
-        <p>Rechts steht jeder Charakter mit Rolle und Status: offen, eingeladen, im Raid, abgelehnt, offline, keine Antwort.</p>
+        <p>Jeder Charakter steht mit Rolle und Status in der Liste: offen, eingeladen, im Raid, abgelehnt, offline, keine Antwort.</p>
       </Feature>
 
       <Feature title="2. Kalender-Termin anlegen" shot={<>
-        <Shot name="raidledger-termin-erstellen" caption="Nach KALENDER-TERMIN: TERMIN ERSTELLEN legt den Termin an" width={560} height={381} />
+        <Shot name="raidledger-termin-erstellen" caption="Nach KALENDER-TERMIN: TERMIN ERSTELLEN legt den Termin an" width={709} height={448} />
         <Shot name="raidledger-termin-chat" caption="Der Chat meldet, dass der Server den Termin bestätigt hat" width={410} height={68} />
       </>}>
         <p>Die Einladungsliste enthält <strong>Datum und Startzeit</strong> des Raids. Daraus legt RaidLedger einen Raid-Termin im Spielkalender an und lädt alle ein, auch die Ersatzbank.</p>
@@ -207,38 +219,55 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
         <Tip><strong>Gut zu wissen:</strong> Datum und Uhrzeit stehen nur bei Raids aus einer <strong>Raidserie</strong> in der Liste, in der Zeitzone der Serie (Serverzeit). Der Spielkalender nimmt nur Termine in der Zukunft und Titel bis 100 Zeichen.</Tip>
       </Feature>
 
-      <Feature title="3. Würfeln nach unseren Regeln" shot={<Shot name="raidledger-wurf-chat" caption="Ansagen im Gruppenchat: Wurfstart, Countdown, Gewinner, Vergabe" width={410} height={116} />}>
-        <p>Item im Fenster auswählen und <code>/ledger start</code> eingeben: Der Raid hat 30 Sekunden (einstellbar mit <code>/ledger timer</code>). Zur Hälfte und zu einem Viertel der Zeit erinnert das Addon.</p>
+      <Feature title="3. Würfeln nach unseren Regeln" shot={<Shot name="raidledger-wurf-chat" caption="Ansagen im Gruppenchat: Wurfstart, Countdown, Gewinner mit bisherigen Items" width={380} height={116} />}>
+        <p>Im Reiter <strong>BEUTE</strong> das Item auswählen und <strong>WÜRFELN</strong> klicken (oder <code>/ledger start</code>): Der Raid hat 30 Sekunden, einstellbar unter <strong>EINSTELLUNGEN</strong>. Zur Hälfte und zu einem Viertel der Zeit erinnert das Addon.</p>
         <ul>
           <li><code>/rnd 100</code> ist <strong>Main-Spec</strong>, <code>/rnd 99</code> ist <strong>Second-Spec</strong>.</li>
           <li><strong>Enhanced:</strong> Main-Spec mit <strong>1+X bis 100+X</strong>, X = EP, höchstens 50. Die EP zieht die Website beim Loot-Import ab.</li>
           <li>Main-Spec schlägt immer Second-Spec. Innerhalb eines Specs gewinnt, <strong>wer in diesem Raid weniger Items hat</strong>, dann der Wurf. Tokens (Weiheabzeichen) zählen getrennt.</li>
           <li>Nur der erste Wurf zählt. Bei Gleichstand gibt es 15 Sekunden Stechen.</li>
+          <li>Gleiche Tokens von einer Leiche sind <strong>eine Zeile „3x“</strong> und ein Wurf: Die besten drei gewinnen.</li>
         </ul>
-        <p>Unter den Items steht die Wurfliste in Gewinner-Reihenfolge. <strong>Rechtsklick</strong> auf einen Wurf: <strong>PASST</strong> (der Nächste gewinnt), als <strong>MAIN-SPEC</strong>, <strong>SECOND-SPEC</strong>, <strong>ZÄHLT NICHT</strong> oder mit korrigierten Enhanced-Punkten werten. Jede Änderung wird im Raid angesagt.</p>
+        <p>Neben der Beute steht die Wurfliste in Gewinner-Reihenfolge, mit <strong>BISHER</strong>: wie viele Items der Würfler in diesem Spec schon hat. <strong>Rechtsklick</strong> auf einen Wurf: <strong>PASST</strong> (der Nächste gewinnt), als <strong>MAIN-SPEC</strong>, <strong>SECOND-SPEC</strong>, <strong>ZÄHLT NICHT</strong> oder mit korrigierten Enhanced-Punkten werten. Jede Änderung wird im Raid angesagt.</p>
       </Feature>
 
-      <Feature title="4. Vergeben und nachhalten">
+      <Feature title="4. Vergeben und nachhalten" shot={<Shot name="raidledger-vergaben" caption="VERGABEN: die ausgewählte Vergabe mit Spec, Empfänger und Würfen" width={709} height={448} />}>
         <ul>
-          <li><strong>GEBEN + ERFASSEN</strong> gibt das Item per Plündermeister und trägt die Vergabe ein. Ohne Beutefenster trägt <strong>ERFASSEN</strong> nur ein.</li>
-          <li>Unter dem Knopf stehen die Würfler, Gewinner zuerst. <strong>ALLE (n)</strong> zeigt den ganzen Raid nach Gruppen.</li>
-          <li><strong>DE</strong> und <strong>BANK</strong> geben ungewollte Items an den Verzauberer oder die Gildenbank. Sie zählen für niemanden.</li>
+          <li>Nach dem Wurf steht der Gewinner im Feld <strong>EMPFÄNGER</strong>. Klick auf einen Wurf macht diesen Spieler zum Empfänger, <strong>ALLE (n)</strong> zeigt den ganzen Raid nach Gruppen.</li>
+          <li><strong>GEBEN + ERFASSEN</strong> gibt das Item per Plündermeister und trägt die Vergabe ein. <strong>DE</strong> und <strong>BANK</strong> geben ungewollte Items an den Verzauberer oder die Gildenbank. Sie zählen für niemanden.</li>
           <li>Items, die du selbst behältst, folgt das Addon durch deine Handel bis zum Gewinner.</li>
-          <li>Klick auf eine Vergabe zeigt ihre Würfe. <strong>EMPFÄNGER ÄNDERN</strong> korrigiert den Empfänger.</li>
+          <li>Im Reiter <strong>VERGABEN</strong> eine Vergabe auswählen: <strong>ZÄHLT ALS</strong> Main-Spec, Second-Spec oder nichts, <strong>EMPFÄNGER ÄNDERN</strong>, parken, DE, BANK oder <strong>ENTFERNEN</strong>. Darunter stehen ihre Würfe.</li>
+          <li>Beim <strong>Plündern als Gruppe</strong> trägt RaidLedger die Gewinner („X gewinnt: …“) ohne Spec ein. Sie zählen erst, wenn du einen Spec setzt.</li>
         </ul>
-        <p>Alle RaidLedger-Nutzer in der Gruppe sehen dieselbe Liste, Korrekturen von Offizieren kommen zurück. Nach einem Absturz holt <code>/ledger sync</code> die Vergaben aus der Gruppe zurück.</p>
+        <p>Alle RaidLedger-Nutzer in der Gruppe sehen dieselbe Liste; angesagt wird jede Vergabe nur von dem Ledger, der sie eingetragen hat. Nach einem Absturz holt <strong>VERGABEN ABGLEICHEN</strong> (oder <code>/ledger sync</code>) die Vergaben aus der Gruppe zurück.</p>
       </Feature>
 
-      <Feature title="5. Später würfeln: PARKEN, Taschen, offene Items" shot={<Shot name="raidledger-offene-items" caption="Ein offenes Item bleibt in der Beuteliste: lila, OFFEN, bei Test" width={560} height={380} />}>
+      <Feature title="5. Items pro Spieler: SPIELER" shot={<Shot name="raidledger-spieler" caption="SPIELER: Items und Tokens pro Spieler, nach Main- und Second-Spec" width={709} height={448} />}>
+        <p>Der Reiter <strong>SPIELER</strong> zeigt jeden im Raid mit seinen Items und Tokens, je Main- und Second-Spec: genau die Zahlen, nach denen „wer weniger hat, gewinnt“ entscheidet.</p>
+        <ul>
+          <li>Spieler auswählen: <strong>−</strong> / <strong>+</strong> korrigiert die Zahlen, z. B. für Loot von vor dem Start des Addons. Korrigierte Werte stehen gold mit <strong>*</strong>.</li>
+          <li>Korrekturen zählen beim Würfeln, gehen an die anderen Ledger in der Gruppe, werden mit <strong>NEUER RAID</strong> zurückgesetzt und kommen nie in den Website-Export.</li>
+          <li>Darunter stehen die Vergaben des Spielers; ein Klick öffnet sie in VERGABEN.</li>
+        </ul>
+      </Feature>
+
+      <Feature title="6. Später würfeln: PARKEN, Taschen, offene Items" shot={<Shot name="raidledger-offene-items" caption="Ein offenes Item bleibt in der Beute unter OFFENE ITEMS, bei Test" width={709} height={448} />}>
         <ul>
           <li><strong>PARKEN</strong> gibt ein Item einem Raider (oder dir), der es hält, bis gewürfelt wird, z. B. bei einzigartigen Items.</li>
           <li><strong>Items aus deinen Taschen</strong> würfelst du mit <kbd>Alt</kbd>+Klick auf das Item aus (oder <code>/ledger roll</code>). Der Gewinner bekommt es per Handel.</li>
-          <li>Offene Items bleiben in der <strong>Beute des Plündermeisters</strong>, lila umrandet mit <strong>OFFEN</strong> und wer sie hat, bis sie ausgewürfelt sind. So geht nichts vergessen.</li>
-          <li>Klick auf ein offenes Item, dann heißt der Knopf <strong>WÜRFELN</strong>.</li>
+          <li>Offene Items bleiben im Reiter <strong>BEUTE</strong> unter <strong>OFFENE ITEMS</strong>, mit dem, der sie hat, bis sie ausgewürfelt sind. So geht nichts vergessen. Auswählen und <strong>WÜRFELN</strong>.</li>
         </ul>
       </Feature>
 
-      <Feature title="6. Wer will was? Die Wunschlisten im Blick">
+      <Feature title="7. Wer darf ändern? EINSTELLUNGEN">
+        <ul>
+          <li><strong>Bearbeiter:</strong> Nur der Plündermeister und die Namen auf dieser Liste ändern Würfe und Vergaben. Alle anderen RaidLedger schauen nur zu. Die Liste geht an die ganze Gruppe (auch <code>/ledger allow</code> / <code>/ledger deny</code>).</li>
+          <li><strong>Wer hat welches Addon:</strong> PRÜFEN fragt die Gruppe, wer RaidLedger oder RaidWishlist in welcher Version hat.</li>
+          <li>Dazu Wurfzeit und Stechen, Minimap-Knopf, Fenster zentrieren und <strong>VERGABEN ABGLEICHEN</strong>.</li>
+        </ul>
+      </Feature>
+
+      <Feature title="8. Wer will was? Die Wunschlisten im Blick">
         <p>Raider mit RaidWishlist teilen ihre Wunschliste mit deinem RaidLedger. Jeder Drop zeigt <strong>WL n</strong>: wie viele Wunschlisten ihn nennen. Mit der Maus darüber siehst du, wer ihn will (Main-Spec zuerst, nach Rang, mit Enhanced). In der Wurfliste steht bei Würflern mit dem Item auf der Liste <code>[WL #Rang]</code>.</p>
       </Feature>
     </section>
@@ -250,9 +279,9 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
         <table className="table">
           <thead><tr><th>Text</th><th>Richtung</th><th>Wo auf der Website</th><th>Wo im Addon</th></tr></thead>
           <tbody>
-            <tr><td><code>RS2;INV</code></td><td>Website → Spiel</td><td>Raid → Aufstellung → <em>Einladungen für Addon</em> → <strong>Für Addon kopieren</strong></td><td><strong>RAID</strong> → einfügen → <strong>EINLESEN</strong></td></tr>
-            <tr><td><code>RS2;ROSTER</code></td><td>Spiel → Website</td><td>Raid → Aufstellung → <em>Aufstellung aus Addon abgleichen</em> → <strong>Abgleichen</strong></td><td><strong>RAID</strong> → <em>Teilnahme für die Webseite</em> → <strong>EXPORT</strong></td></tr>
-            <tr><td><code>RS2;LOOT</code></td><td>Spiel → Website</td><td>Raid → Loot → <em>Loot aus Addon importieren</em> → <strong>Vorschau</strong></td><td><strong>EXPORT</strong> oben im Fenster (<code>/ledger export</code>)</td></tr>
+            <tr><td><code>RS2;INV</code></td><td>Website → Spiel</td><td>Raid → Aufstellung → <em>Einladungen für Addon</em> → <strong>Für Addon kopieren</strong></td><td>Reiter <strong>RAID</strong> → einfügen → <strong>EINLESEN</strong></td></tr>
+            <tr><td><code>RS2;ROSTER</code></td><td>Spiel → Website</td><td>Raid → Aufstellung → <em>Aufstellung aus Addon abgleichen</em> → <strong>Abgleichen</strong></td><td>Reiter <strong>RAID</strong> → <em>Teilnahme für die Webseite</em> → <strong>EXPORT</strong></td></tr>
+            <tr><td><code>RS2;LOOT</code></td><td>Spiel → Website</td><td>Raid → Loot → <em>Loot aus Addon importieren</em> → <strong>Vorschau</strong></td><td>Reiter <strong>VERGABEN</strong> → <strong>EXPORT</strong> (<code>/ledger export</code>)</td></tr>
           </tbody>
         </table>
       </div>
@@ -266,7 +295,7 @@ Sternfall;DD;Priester;1`}</Code>
       <p>Datum und Startzeit sind <strong>Serverzeit</strong> (die Zeitzone der Raidserie). Ohne Raidserie fehlen die beiden Felder: Einladen geht trotzdem, nur der Kalender-Termin braucht sie. Die Raid-ID merkt sich RaidLedger auch für den Loot-Export.</p>
       <h3>Teilnahme und Loot zurück</h3>
       <p>Die Teilnahme listet jeden, der im Raid war, mit Klasse und erster Sichtung, auch Nachzügler und wer früher ging. Der Loot-Export enthält jede Vergabe mit Item, Boss, Empfänger, Wurf, Spec und Wurfbereich. Die Website zeigt erst eine <strong>Vorschau</strong>: Enhanced-Würfe sind als Enhanced vorgewählt, geparkte und gelöschte Zeilen werden angezeigt, aber nie importiert. Ein zweiter Import legt nichts doppelt an.</p>
-      <Tip><strong>Reihenfolge am Raidabend:</strong> erst <strong>EXPORT</strong>, dann <strong>NEUER RAID</strong> (oder LEEREN). Neuer Raid leert das Buch.</Tip>
+      <Tip><strong>Reihenfolge am Raidabend:</strong> erst <strong>EXPORT</strong>, dann <strong>NEUER RAID</strong> (beide in VERGABEN). Neuer Raid leert das Buch und die Korrekturen in SPIELER.</Tip>
     </section>
 
     <section className="card guide-section" id="ledger-befehle" aria-labelledby="ledger-befehle-title">
@@ -292,6 +321,8 @@ Sternfall;DD;Priester;1`}</Code>
             <tr><td><code>/ledger export</code></td><td>Loot-Export anzeigen</td></tr>
             <tr><td><code>/ledger newraid</code></td><td>Buch leeren für den nächsten Raid (vorher exportieren)</td></tr>
             <tr><td><code>/ledger sync</code></td><td>Vergaben dieses Raids aus der Gruppe holen</td></tr>
+            <tr><td><code>/ledger allow|deny &lt;Name&gt;</code> · <code>/ledger editors</code></td><td>Bearbeiter hinzufügen oder entfernen; Liste zeigen</td></tr>
+            <tr><td><code>/ledger settings</code></td><td>Reiter EINSTELLUNGEN öffnen</td></tr>
             <tr><td><code>/ledger minimap on|off</code></td><td>Minimap-Knopf ein- oder ausblenden</td></tr>
             <tr><td><code>/ledger help</code></td><td>Alle Befehle im Spiel</td></tr>
           </tbody>
@@ -315,7 +346,7 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
       eyebrow="Für jeden Raider"
       audience="Alle Raider"
       pitch="Deine Wunschliste im Spiel: Wenn die Raidleitung ein Item von deiner Liste auswürfelt, würfelst du mit einem Klick den richtigen Bereich, auch mit Enhanced. Oder das Addon würfelt automatisch für dich."
-      shot={<Shot name="raidwishlist-fenster" caption="RaidWishlist: Wunschliste, offene Items und dieser Raid" width={437} height={400} />}
+      shot={<Shot name="raidwishlist-fenster" caption="RaidWishlist, Reiter WUNSCHLISTE: das Item ist ERHALTEN" width={466} height={409} />}
     />
     {error && <p className="error" role="alert">{error}</p>}
     <Contents entries={[
@@ -348,12 +379,16 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
         </ul>
       </Feature>
 
-      <Feature title="3. Offene Items und dieser Raid">
-        <p><strong>OFFENE ITEMS</strong> zeigt Beute, die noch ausgewürfelt wird: auf der Leiche, beim Plündermeister oder bei einem Raider geparkt, mit Status <strong>OFFEN</strong>, <strong>WIRD GEWÜRFELT</strong> oder dem Gewinner. Items von deiner Liste sind markiert.</p>
-        <p><strong>DIESER RAID</strong> listet jede Vergabe der Raidleitung: Item, Empfänger, Spec. Oben steht deine Zählung (Items und Tokens, je Main- und Second-Spec), die bei knappen Würfen entscheidet. Erhaltene Wünsche zeigen <strong>ERHALTEN</strong>.</p>
+      <Feature title="3. Drei Reiter, jede Liste scrollbar">
+        <p>Jeder Reiter ist eine Liste über die ganze Fensterhöhe, die mit dem <strong>Mausrad</strong> scrollt. Unten rechts steht, welche Einträge du siehst („18-30 / 30“), die Reiter zählen ihre Einträge mit.</p>
+        <ul>
+          <li><strong>WUNSCHLISTE:</strong> deine Wünsche nach Rang, mit Notiz und Würfelbereich. Erhaltene Wünsche zeigen <strong>ERHALTEN</strong>.</li>
+          <li><strong>OFFEN:</strong> Beute, die noch ausgewürfelt wird: auf der Leiche, beim Plündermeister oder bei einem Raider geparkt, mit Status <strong>OFFEN</strong>, <strong>WIRD GEWÜRFELT</strong> oder dem Gewinner. Items von deiner Liste sind markiert. Wird ein Wunsch-Item ausgewürfelt, öffnet sich das Fenster hier.</li>
+          <li><strong>DIESER RAID:</strong> jede Vergabe der Raidleitung mit Item, Empfänger und Spec. Oben stehen deine Items bisher (Items und Tokens, je Main- und Second-Spec), die bei knappen Würfen entscheiden.</li>
+        </ul>
       </Feature>
 
-      <Feature title="4. In deiner Farbe" shot={<Shot name="raidwishlist-farbe" caption="Der Farbknopf oben öffnet die Farbauswahl" width={437} height={400} />}>
+      <Feature title="4. In deiner Farbe" shot={<Shot name="raidwishlist-farbe" caption="Der Farbknopf oben öffnet die Farbauswahl" width={466} height={409} />}>
         <p>Das Fenster sieht aus wie RaidLedger, in deiner Farbe: Der Farbknopf oben (oder <code>/wish color</code>) öffnet die Farbauswahl, Rechtsklick (oder <code>/wish color reset</code>) geht zurück auf Grün. Die Farbe gilt für alle deine Charaktere. Sehr dunkle Farben hellt das Addon auf, damit die Schrift lesbar bleibt.</p>
       </Feature>
 

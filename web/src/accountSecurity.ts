@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api'
 
-// Account-security reminder (ADR 088). The server reports which second factors an
+// Account-security reminder (ADR 092). The server reports which second factors an
 // account has; the client only decides whether to show the reminder.
 
 export interface MFAStatus {

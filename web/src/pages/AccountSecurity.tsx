@@ -4,7 +4,7 @@ import { useAuth } from '../auth'
 import { NavIcon } from '../components/NavIcon'
 import { Link } from '../router'
 
-// Why a second factor matters (ADR 088). Every number on this page is taken from
+// Why a second factor matters (ADR 092). Every number on this page is taken from
 // the published source listed under "Quellen"; ADR 026 forbids invented figures.
 
 interface Source {

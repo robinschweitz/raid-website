@@ -30,7 +30,8 @@ function rollText(row: AddonLootPreviewRow) {
 function initialChoices(preview: AddonLootPreview): Record<string, Choice> {
   // Held drops are still with the loot master, so they wait for an explicit
   // choice unless the addon already knows the roll winner (RS2).
-  return Object.fromEntries(preview.rows.map((row) => [row.line_key, { isSelected: row.is_importable && row.character_id != null && (row.state !== 'held' || Boolean(row.winner_name)), bossID: row.catalog_boss_id ?? '', characterID: row.character_id != null ? String(row.character_id) : '', method: row.award_method }]))
+  // Disenchanted and banked drops go to nobody: nothing to choose, so selected.
+  return Object.fromEntries(preview.rows.map((row) => [row.line_key, { isSelected: row.is_importable && (row.is_unclaimed || (row.character_id != null && (row.state !== 'held' || Boolean(row.winner_name)))), bossID: row.catalog_boss_id ?? '', characterID: row.character_id != null ? String(row.character_id) : '', method: row.award_method }]))
 }
 
 export function AddonLootImport({ raidID, onImported }: Props) {
@@ -61,13 +62,15 @@ export function AddonLootImport({ raidID, onImported }: Props) {
   })
 
   const selectedRows = preview?.rows.filter((row) => row.is_importable && choices[row.line_key]?.isSelected) ?? []
-  const isReady = selectedRows.length > 0 && selectedRows.every((row) => choices[row.line_key].bossID && choices[row.line_key].characterID)
+  const isReady = selectedRows.length > 0 && selectedRows.every((row) => row.is_unclaimed || (choices[row.line_key].bossID && choices[row.line_key].characterID))
 
   const apply = () => submit(async () => {
     if (!preview || !isReady) return
     setError('')
     try {
-      const selections = selectedRows.map((row) => ({ line_key: row.line_key, catalog_boss_id: choices[row.line_key].bossID, character_id: Number(choices[row.line_key].characterID), award_method: choices[row.line_key].method }))
+      const selections = selectedRows.map((row) => row.is_unclaimed
+        ? { line_key: row.line_key, catalog_boss_id: choices[row.line_key].bossID }
+        : { line_key: row.line_key, catalog_boss_id: choices[row.line_key].bossID, character_id: Number(choices[row.line_key].characterID), award_method: choices[row.line_key].method })
       const imported = await api.post<AddonLootImportResult[]>(`/api/v1/raids/${raidID}/addon-loot-import`, { payload: previewedPayload, selections })
       if (!isActive()) return
       setResults(imported)
@@ -107,15 +110,15 @@ export function AddonLootImport({ raidID, onImported }: Props) {
                     {row.boss_options.map((boss) => <option key={boss.id} value={boss.id}>{boss.name}</option>)}
                   </select>
                   : row.boss_options.find((boss) => boss.id === row.catalog_boss_id)?.name ?? '—'}</td>
-                <td>{row.is_importable
+                <td>{row.is_importable && !row.is_unclaimed
                   ? <select aria-label={`Empfänger für Zeile ${row.line_number}`} disabled={pending} value={choice?.characterID ?? ''} onChange={(e) => choose(row, { characterID: e.target.value })}>
                     <option value="">Empfänger wählen</option>
                     {preview.recipient_options.map((option) => <option key={option.character_id} value={option.character_id}>{option.character_name}</option>)}
                   </select>
                   : row.character_name || row.recipient_name || '—'}
-                  {row.is_importable && row.recipient_name && row.recipient_name.toLocaleLowerCase('de') !== (row.character_name || '').toLocaleLowerCase('de') && <div className="muted">Addon: {row.recipient_name}</div>}
+                  {row.is_importable && !row.is_unclaimed && row.recipient_name && row.recipient_name.toLocaleLowerCase('de') !== (row.character_name || '').toLocaleLowerCase('de') && <div className="muted">Addon: {row.recipient_name}</div>}
                   {stateLabels[row.state] && <div className="muted">{stateLabels[row.state]}</div>}</td>
-                <td>{row.is_importable
+                <td>{row.is_unclaimed ? 'Ohne Empfänger' : row.is_importable
                   ? <select aria-label={`Vergabeart für Zeile ${row.line_number}`} disabled={pending} value={choice?.method ?? row.award_method} onChange={(e) => choose(row, { method: e.target.value as AwardMethod })}>
                     {Object.entries(methodLabels).map(([method, label]) => <option key={method} value={method}>{label}</option>)}
                   </select>

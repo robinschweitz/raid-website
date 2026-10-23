@@ -3,7 +3,7 @@ const { test } = require('node:test')
 const fs = require('node:fs')
 const path = require('node:path')
 
-// The account-security explainer and MFA reminder (ADR 088).
+// The account-security explainer and MFA reminder (ADR 092).
 const page = fs.readFileSync(path.join(__dirname, '..', 'src', 'pages', 'AccountSecurity.tsx'), 'utf8')
 const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8')
 

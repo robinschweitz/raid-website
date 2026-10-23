@@ -1,6 +1,6 @@
-# ADR 088: MFA reminder banner and account-security page
+# ADR 092: MFA reminder banner and account-security page
 
-Status: Accepted. Amends ADR 046 (MFA stays optional).
+Status: Accepted. Amends ADR 046 (MFA stays optional for every role except ADMIN; Admins must set it up, FR-3.10 and SC-040, owner 2026-10-23).
 
 ## Context
 

@@ -119,6 +119,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/character-options", RequireAuth(a.characterOptions))
 	mux.HandleFunc("POST /api/v1/raids/{id}/quick-add", RequireRole(validation.RoleRaidassistent, a.quickAddCharacter))
 	mux.HandleFunc("PATCH /api/v1/characters/{id}", RequireRole(validation.RoleAdmin, a.updateCharacter))
+	mux.HandleFunc("POST /api/v1/characters/{id}/transfer", RequireRole(validation.RoleAdmin, a.transferCharacter))
 	mux.HandleFunc("POST /api/v1/characters/{id}/merge", RequireRole(validation.RoleAdmin, a.mergeCharacter))
 	mux.HandleFunc("POST /api/v1/characters/{id}/retry-link", RequireRole(validation.RoleAdmin, a.retryCharacterLink))
 	mux.HandleFunc("POST /api/v1/characters/{id}/reload-profile", RequireRole(validation.RoleAdmin, a.reloadCharacterProfile))
@@ -126,6 +127,7 @@ func (a *API) Register(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/raids", a.listRaids)
 	mux.HandleFunc("POST /api/v1/raids", RequireRole(validation.RoleRaidassistent, a.createRaid))
+	mux.HandleFunc("GET /api/v1/raids/current", RequireAuth(a.currentRaid))
 	mux.HandleFunc("GET /api/v1/raids/{id}", RequireAuth(a.getRaid))
 	mux.HandleFunc("PATCH /api/v1/raids/{id}", RequireRole(validation.RoleRaidassistent, a.configureRaidSchedule))
 	mux.HandleFunc("POST /api/v1/raids/{id}/cancel", RequireRole(validation.RoleRaidassistent, a.cancelRaid))

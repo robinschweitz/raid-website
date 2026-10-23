@@ -3,7 +3,7 @@ import { dismissReminder, isReminderDismissed, useOwnMFAState } from '../account
 import { Link } from '../router'
 import { NavIcon } from './NavIcon'
 
-// A thin reminder for signed-in players without a second factor (ADR 088).
+// A thin reminder for signed-in players without a second factor (ADR 092).
 export function MFAReminderBanner({ isSignedIn }: { isSignedIn: boolean }) {
   const mfaState = useOwnMFAState(isSignedIn)
   const [isDismissed, setIsDismissed] = useState(isReminderDismissed)

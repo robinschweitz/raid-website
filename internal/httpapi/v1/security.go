@@ -7,16 +7,21 @@ import (
 	"strings"
 )
 
+// clientAddress returns the address used for per-client limits such as the
+// login rate limit. Behind the trusted reverse proxy, X-Real-IP is preferred
+// because nginx overwrites it with the connecting address. X-Forwarded-For is
+// only a fallback, and then only its last entry: nginx appends the real address
+// to whatever the client sent, so earlier entries are chosen by the client.
 func clientAddress(r *http.Request, trustProxyHeaders bool) string {
 	if trustProxyHeaders {
-		if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
-			parts := strings.Split(forwarded, ",")
-			if ip := strings.TrimSpace(parts[0]); ip != "" {
-				return ip
-			}
-		}
 		if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
 			return realIP
+		}
+		if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
+			parts := strings.Split(forwarded, ",")
+			if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
+				return ip
+			}
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

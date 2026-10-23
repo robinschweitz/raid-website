@@ -1,4 +1,4 @@
-export const appVersion = '1.0.25'
+export const appVersion = '1.0.28'
 
 export const changelog = [
   {
@@ -11,7 +11,32 @@ export const changelog = [
     ],
   },
   {
-    version: '1.0.24',
+    version: '1.0.27',
+    title: 'RaidLedger 2.5.0 und RaidWishlist 2.0.0',
+    changes: [
+      'Neue Addon-Versionen zum Herunterladen unter „Addons“. RaidLedger hat jetzt fünf Reiter (Beute, Vergaben, Spieler, Raid, Einstellungen): alles geht per Klick, jeder Knopf hat einen Tooltip.',
+      'RaidLedger: Unter „Spieler“ siehst du Items und Tokens pro Spieler und korrigierst sie mit − / +. Unter „Einstellungen“ legst du fest, wer außer dem Plündermeister etwas ändern darf, und siehst, wer welches Addon hat. Gleiche Tokens einer Leiche werden in einem Wurf verteilt, Gruppenplündern wird mitgeschrieben.',
+      'RaidWishlist: drei Reiter (Wunschliste, Offen, Dieser Raid), jede Liste scrollt jetzt mit dem Mausrad bis zum letzten Eintrag.',
+    ],
+  },
+  {
+    version: '1.0.26',
+    title: 'Charakter dem richtigen Spieler zuordnen',
+    changes: [
+      'Admins können unter Spieler → Charaktere einen versehentlich falsch zugeordneten Charakter zu einem anderen Spieler verschieben. Die Raid-Aufstellungen zeigen danach den richtigen Spieler; Loot und EP bleiben unverändert. Die Änderung steht im Audit-Protokoll.',
+    ],
+  },
+  {
+    version: '1.0.25',
+    title: 'Aktueller Raid, Boss-Reihenfolge und Beute ohne Empfänger',
+    changes: [
+      'Neu im Menü: „Aktueller Raid“ (mobil „Aktuell“) führt direkt zum Raid von heute Abend, also zum neuesten Raid, der schon begonnen hat (sonst zum nächsten).',
+      'Die Bosse stehen jetzt in einer Reihenfolge, die ein Admin unten auf der Seite „Beute“ festlegt: bei der Boss-Auswahl beim Loot-Eintragen und bei den Boss-Gruppen in der Beuteliste eines Raids.',
+      'Neu im Raid unter „Loot“: „Beute ohne Empfänger“ für Items, die entzaubert wurden, in die Gildenbank gehen oder die niemand wollte. Sie zählen für keinen Spieler. Der Addon-Import übernimmt entzauberte und Gildenbank-Items von RaidLedger jetzt dorthin.',
+    ],
+  },
+  {
+    version: appVersion,
     title: 'Schattengram im Raid: freie Auswahl aus der Aufstellung',
     changes: [
       'Bei „Schattengram im Raid“ kann die Raidleitung jetzt auch Krieger, Paladine und Todesritter aus der Aufstellung einteilen, die nicht auf der Schattengram-Liste stehen.',

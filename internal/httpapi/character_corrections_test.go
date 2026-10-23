@@ -8,14 +8,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
 	"raid-website/internal/character"
+	"raid-website/internal/raid"
 	"raid-website/internal/validation"
+	"raid-website/internal/wishlist"
 )
 
 type characterCorrectionFixture struct {
@@ -232,5 +236,91 @@ func TestCharacterCorrectionsConcurrentFieldsAndBeforeSnapshots(t *testing.T) {
 			t.Fatalf("spec overwrote concurrent rename: %+v", log)
 		}
 		previous = after
+	}
+}
+
+func TestCharacterOwnerTransferMovesWishlistAndRaidAttendance(t *testing.T) {
+	f := newCharacterCorrectionFixture(t)
+	defer f.srv.Close()
+	ctx := context.Background()
+	targetID := seedAccount(t, f.db, "correct-owner", "password", validation.RoleGuest)
+	targetToken := login(t, f.srv.Client(), f.srv, "correct-owner", "password")
+	now := time.Now().UTC()
+	rd := &raid.Raid{Name: "ICC", RaidLeaderID: f.actorID, Status: validation.RaidStatusPlanned, CreatedAt: now, UpdatedAt: now}
+	if err := raid.NewRepo(f.db).Create(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	entry := &attendance.Attendance{RaidID: rd.ID, PlayerID: f.actorID, CharacterID: f.initial.ID, Role: validation.RoleDD, CreatedAt: now, UpdatedAt: now}
+	if err := attendance.NewRepo(f.db).Create(ctx, entry); err != nil {
+		t.Fatal(err)
+	}
+	wishlistURL := fmt.Sprintf("%s/api/v1/characters/%d/wishlist/items", f.srv.URL, f.initial.ID)
+	if status, body := do(t, f.srv.Client(), http.MethodPost, wishlistURL, f.token, map[string]any{"item_id": "50415", "item_name": "Bryntroll", "priority": 1}); status != http.StatusCreated {
+		t.Fatalf("create wishlist item status %d: %s", status, body)
+	}
+
+	transferURL := fmt.Sprintf("%s/api/v1/characters/%d/transfer", f.srv.URL, f.initial.ID)
+	status, body := do(t, f.srv.Client(), http.MethodPost, transferURL, targetToken, map[string]any{"target_player_id": targetID})
+	if status != http.StatusForbidden {
+		t.Fatalf("guest transfer status %d: %s", status, body)
+	}
+	status, body = do(t, f.srv.Client(), http.MethodPost, transferURL, f.token, map[string]any{"target_player_id": targetID})
+	if status != http.StatusOK {
+		t.Fatalf("transfer status %d: %s", status, body)
+	}
+	stored, err := character.NewRepo(f.db).Get(ctx, f.initial.ID)
+	if err != nil || stored.PlayerID != targetID {
+		t.Fatalf("character owner: %+v, %v", stored, err)
+	}
+	wishes, err := wishlist.NewService(f.db).ListByCharacter(ctx, f.initial.ID)
+	if err != nil || len(wishes) != 1 || wishes[0].PlayerID != targetID {
+		t.Fatalf("wishlist owner: %+v, %v", wishes, err)
+	}
+	storedAttendance, err := attendance.NewRepo(f.db).Get(ctx, entry.ID)
+	if err != nil || storedAttendance.PlayerID != targetID || storedAttendance.CharacterID != f.initial.ID {
+		t.Fatalf("raid attendance owner: %+v, %v", storedAttendance, err)
+	}
+	logs, err := audit.NewRepo(f.db).ListByEntity(ctx, "character", fmt.Sprint(f.initial.ID))
+	if err != nil || len(logs) != 1 || logs[0].Action != "transfer_owner" || logs[0].ActorID == nil || *logs[0].ActorID != f.actorID || !strings.Contains(logs[0].BeforeJSON, `"owner_name":"character-admin"`) || !strings.Contains(logs[0].AfterJSON, `"owner_name":"correct-owner"`) {
+		t.Fatalf("transfer audit: %+v, %v", logs, err)
+	}
+	attendanceLogs, err := audit.NewRepo(f.db).ListByEntity(ctx, "attendance", fmt.Sprint(entry.ID))
+	if err != nil || len(attendanceLogs) != 1 || attendanceLogs[0].Action != "character_owner_transfer" || attendanceLogs[0].ActorID == nil || *attendanceLogs[0].ActorID != f.actorID || !strings.Contains(attendanceLogs[0].BeforeJSON, fmt.Sprintf(`"player_id":%d`, f.actorID)) || !strings.Contains(attendanceLogs[0].AfterJSON, fmt.Sprintf(`"player_id":%d`, targetID)) {
+		t.Fatalf("attendance transfer audit: %+v, %v", attendanceLogs, err)
+	}
+
+	status, body = do(t, f.srv.Client(), http.MethodPost, transferURL, f.token, map[string]any{"target_player_id": targetID})
+	if status != http.StatusConflict {
+		t.Fatalf("same owner status %d: %s", status, body)
+	}
+	status, body = do(t, f.srv.Client(), http.MethodPost, transferURL, f.token, map[string]any{"target_player_id": 999999})
+	if status != http.StatusNotFound {
+		t.Fatalf("missing target status %d: %s", status, body)
+	}
+}
+
+func TestCharacterOwnerTransferRejectsConflictingRaidAttendance(t *testing.T) {
+	f := newCharacterCorrectionFixture(t)
+	defer f.srv.Close()
+	ctx := context.Background()
+	targetID := seedAccount(t, f.db, "conflicting-owner", "password", validation.RoleGuest)
+	now := time.Now().UTC()
+	rd := &raid.Raid{Name: "ICC", RaidLeaderID: f.actorID, Status: validation.RaidStatusPlanned, CreatedAt: now, UpdatedAt: now}
+	if err := raid.NewRepo(f.db).Create(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	for _, ownerID := range []int64{f.actorID, targetID} {
+		if err := attendance.NewRepo(f.db).Create(ctx, &attendance.Attendance{RaidID: rd.ID, PlayerID: ownerID, CharacterID: f.initial.ID, Role: validation.RoleDD, CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	transferURL := fmt.Sprintf("%s/api/v1/characters/%d/transfer", f.srv.URL, f.initial.ID)
+	status, body := do(t, f.srv.Client(), http.MethodPost, transferURL, f.token, map[string]any{"target_player_id": targetID})
+	if status != http.StatusConflict {
+		t.Fatalf("conflicting attendance status %d: %s", status, body)
+	}
+	stored, err := character.NewRepo(f.db).Get(ctx, f.initial.ID)
+	if err != nil || stored.PlayerID != f.actorID {
+		t.Fatalf("character transfer escaped conflict: %+v, %v", stored, err)
 	}
 }

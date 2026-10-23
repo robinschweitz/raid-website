@@ -2,9 +2,11 @@ package character
 
 import (
 	"context"
+	"time"
 
 	"github.com/uptrace/bun"
 
+	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
 	"raid-website/internal/player"
 )
@@ -21,9 +23,9 @@ func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
 }
 
-func (r *Repo) correctInTransaction(ctx context.Context, fn func(*Repo, *player.Repo, *audit.Repo) error) error {
+func (r *Repo) correctInTransaction(ctx context.Context, fn func(*Repo, *player.Repo, *attendance.Repo, *audit.Repo) error) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		return fn(r.WithTx(tx), player.NewRepo(tx), audit.NewRepo(tx))
+		return fn(r.WithTx(tx), player.NewRepo(tx), attendance.NewRepo(tx), audit.NewRepo(tx))
 	})
 }
 
@@ -61,6 +63,16 @@ func (r *Repo) FindByExternalProfile(ctx context.Context, source, profileID stri
 
 func (r *Repo) Update(ctx context.Context, c *Character) error {
 	_, err := r.db.NewUpdate().Model(c).WherePK().Exec(ctx)
+	return err
+}
+
+// UpdateWishlistOwner keeps the wishlist's denormalized owner in sync with its character.
+func (r *Repo) UpdateWishlistOwner(ctx context.Context, characterID, playerID int64, updatedAt time.Time) error {
+	_, err := r.db.NewUpdate().Table("character_wishlist").
+		Set("player_id = ?", playerID).
+		Set("updated_at = ?", updatedAt).
+		Where("character_id = ?", characterID).
+		Exec(ctx)
 	return err
 }
 

@@ -3507,7 +3507,7 @@ test('audit log describes roster additions, wishlist, polls, locks and account c
   assert.ok(links.includes('/roster'))
 })
 
-test('MFA reminder shows only for signed-in players without a second factor (ADR 088)', async () => {
+test('MFA reminder shows only for signed-in players without a second factor (ADR 092)', async () => {
   const s = setup({ id: 2, role: 'MEMBER' })
   const { MFAReminderBanner } = s.load('components/MFAReminderBanner.tsx')
   const view = s.mount(MFAReminderBanner, { isSignedIn: true })
@@ -3541,7 +3541,7 @@ test('MFA reminder shows only for signed-in players without a second factor (ADR
   assert.equal(anonymous.requests.length, 0, 'visitors cause no MFA lookup')
 })
 
-test('MFA reminder can be hidden and follows MFA changes from the profile (ADR 088)', async () => {
+test('MFA reminder can be hidden and follows MFA changes from the profile (ADR 092)', async () => {
   const s = setup({ id: 2, role: 'MEMBER' })
   const { announceMFAChange } = s.load('accountSecurity.ts')
   const view = s.mount(s.load('components/MFAReminderBanner.tsx').MFAReminderBanner, { isSignedIn: true })
@@ -3565,7 +3565,7 @@ test('MFA reminder can be hidden and follows MFA changes from the profile (ADR 0
   assert.equal(hideView.tree, null)
 })
 
-test('the account-security deep link opens the profile account tab (ADR 088)', async () => {
+test('the account-security deep link opens the profile account tab (ADR 092)', async () => {
   const s = setup({ id: 2, role: 'MEMBER' })
   const { PlayerDetailPage } = s.load('pages/PlayerDetail.tsx')
   const view = s.mount(PlayerDetailPage, { playerID: 2, initialView: 'account' })
@@ -3578,4 +3578,26 @@ test('the account-security deep link opens the profile account tab (ADR 088)', a
   resolvePlayer(s, 2)
   await flush(plain)
   assert.equal(nodes(plain.tree, (n) => n.type === 'section' && n.props.id === 'profile-account')[0].props.hidden, true)
+})
+
+test('loot that went to nobody: listed for everyone, staff record more (ADR 089)', async () => {
+  const s = setup()
+  const bosses = [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }]
+  const view = s.mount(s.load('components/UnclaimedLoot.tsx').UnclaimedLoot, { raidID: 1, canWrite: true, needsReason: false, bosses, version: 0 })
+  assert.equal(resolveIf(s, '/api/v1/raids/1/unclaimed-loot', [{ id: 1, boss: 'Saurfang', item_id: '50667', item_name: 'Gürtelbund des gerechten Zorns', outcome: 'DISENCHANTED', holder_name: 'Shanna', notes: '', source: 'addon' }]), true)
+  await flush(view)
+  assert.match(text(view.tree), /Gürtelbund des gerechten Zorns/)
+  assert.match(text(view.tree), /Entzaubert/)
+  assert.match(text(view.tree), /\(Addon\)/)
+  input(view, 'Name des Gegenstands').props.onChange(change('Bryntroll'))
+  view.render()
+  nodes(view.tree, (n) => n.type === 'form')[0].props.onSubmit({ preventDefault() {} })
+  assert.equal(writes(s)[0].url, '/api/v1/raids/1/unclaimed-loot')
+  assert.deepEqual(writes(s)[0].body, { catalog_boss_id: '', item_name: 'Bryntroll', outcome: 'NOBODY', holder_name: '', notes: '', reason: '' })
+
+  const reader = setup({ id: 2, role: 'MEMBER' })
+  const empty = reader.mount(reader.load('components/UnclaimedLoot.tsx').UnclaimedLoot, { raidID: 1, canWrite: false, needsReason: false, bosses: [], version: 0 })
+  assert.equal(resolveIf(reader, '/api/v1/raids/1/unclaimed-loot', []), true)
+  await flush(empty)
+  assert.doesNotMatch(text(empty.tree) || '', /Beute ohne Empfänger/)
 })

@@ -616,11 +616,11 @@
   margin-top: 8px;
 }
 
-/* Account-security explainer (ADR 088). */
+/* Account-security explainer (ADR 092). */
 .security-status { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .security-status p { flex: 1; min-width: 220px; margin: 0; }
-.security-status.warn { border-color: rgba(240, 200, 120, 0.45); }
-.security-status.warn > svg { color: #f0c878; }
+.security-status.warn { border-color: rgba(255, 210, 122, 0.45); }
+.security-status.warn > svg { color: #ffd27a; }
 .security-status.ok { border-color: rgba(139, 212, 176, 0.45); }
 .security-status.ok > svg { color: var(--ok); }
 .security-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 14px 0; }

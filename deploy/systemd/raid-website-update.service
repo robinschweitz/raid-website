@@ -12,6 +12,9 @@ Environment=HOME=/var/lib/raiddeploy
 Environment=GOPATH=/var/lib/raiddeploy/go
 Environment=GOMODCACHE=/var/lib/raiddeploy/go/pkg/mod
 Environment=GOCACHE=/var/lib/raiddeploy/.cache/go-build
+# Build with the toolchain named in go.mod (SC-045), even when the distribution's Go
+# defaults to its own version.
+Environment=GOTOOLCHAIN=auto
 EnvironmentFile=/etc/raid-website-update.env
 ExecStart=/usr/local/sbin/raid-website-update
 UMask=0077

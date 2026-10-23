@@ -1883,25 +1883,25 @@ input[type='checkbox'] {
 .my-raid-secondary button { width: 100%; min-height: 34px; font-size: 13px; }
 .my-raid-decline { display: flex; flex-direction: column; gap: 8px; flex: 1; }
 
-/* Account-security reminder (ADR 088): one thin line under the top bar. */
+/* Account-security reminder (ADR 092): one thin line under the top bar, in the `warning` status colours (DESIGN.md). */
 .mfa-reminder {
   display: flex;
   align-items: center;
   gap: 10px;
   margin: -1rem 0 1.4rem;
   padding: 7px 8px 7px 12px;
-  border: 1px solid rgba(240, 200, 120, 0.35);
-  border-left: 3px solid #f0c878;
+  border: 1px solid rgba(255, 210, 122, 0.35);
+  border-left: 3px solid #ffd27a;
   border-radius: 4px;
-  background: rgba(240, 200, 120, 0.07);
-  color: #f3dfb4;
+  background: rgba(255, 210, 122, 0.07);
+  color: #e4eef7;
   font-size: 13px;
   line-height: 1.4;
 }
 
 .mfa-reminder > svg {
   flex: none;
-  color: #f0c878;
+  color: #ffd27a;
 }
 
 .mfa-reminder-link {
@@ -1911,12 +1911,12 @@ input[type='checkbox'] {
 }
 
 .mfa-reminder-link span {
-  color: #d8c9a6;
+  color: #9eafc3;
 }
 
 .mfa-reminder-link:hover span,
 .mfa-reminder-link:focus-visible span {
-  color: #f3dfb4;
+  color: #e4eef7;
   text-decoration: underline;
 }
 
@@ -1931,17 +1931,26 @@ input[type='checkbox'] {
   padding: 0;
   border: 0;
   background: transparent;
-  color: #d8c9a6;
+  color: #9eafc3;
   cursor: pointer;
 }
 
 .mfa-reminder-close:hover,
 .mfa-reminder-close:focus-visible {
-  color: #f3dfb4;
-  background: rgba(240, 200, 120, 0.12);
+  color: #e4eef7;
+  background: rgba(255, 210, 122, 0.12);
 }
 
 @media (max-width: 600px) {
   .mfa-reminder-link span { display: none; }
-  .mfa-reminder-link strong::after { content: ' Warum? →'; font-weight: 400; color: #d8c9a6; }
+  .mfa-reminder-link strong::after { content: ' Warum? →'; font-weight: 400; color: #9eafc3; }
 }
+.boss-order-list { margin: 12px 0; padding-left: 26px; display: grid; gap: 4px; max-width: 520px; }
+.boss-order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px; border: 1px solid var(--card-border); border-radius: 4px; }
+.boss-order-list .actions { margin: 0; }
+.unclaimed-loot { margin-top: 14px; }
+.unclaimed-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; margin-top: 10px; }
+.unclaimed-form .actions { margin: 0; }
+.badge.unclaimed-disenchanted { color: #d6b4ff; border-color: #8c5bd1; }
+.badge.unclaimed-bank { color: #f2dc8c; border-color: #b39a3d; }
+.badge.unclaimed-nobody { color: #a9b6c2; border-color: #5d6b78; }

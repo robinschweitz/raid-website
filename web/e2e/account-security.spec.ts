@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { admin, signIn, snapshot } from './fixtures'
 
-// ADR 088: players without a second factor see a thin reminder that leads to the
+// ADR 092: players without a second factor see a thin reminder that leads to the
 // account-security explainer and from there straight to their account tab.
 test('MFA-Hinweis führt zur Erklärung und ins eigene Konto', async ({ page }, testInfo) => {
   await signIn(page, admin)

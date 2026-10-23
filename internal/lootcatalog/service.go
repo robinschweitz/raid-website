@@ -137,7 +137,8 @@ func (s *Service) Instances(ctx context.Context) ([]Instance, error) {
 	return catalog.Instances, nil
 }
 
-// Bosses lists bosses, optionally restricted to one instance.
+// Bosses lists bosses, optionally restricted to one instance, in the
+// Admin-set order (ADR 088).
 func (s *Service) Bosses(ctx context.Context, instanceID string) ([]Boss, error) {
 	catalog, err := s.List(ctx)
 	if err != nil {
@@ -149,6 +150,11 @@ func (s *Service) Bosses(ctx context.Context, instanceID string) ([]Boss, error)
 			bosses = append(bosses, boss)
 		}
 	}
+	positions, err := s.repo.bossPositions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sortBosses(bosses, positions)
 	return bosses, nil
 }
 

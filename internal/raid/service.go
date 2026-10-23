@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"raid-website/internal/enhancepoints"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/validation"
 )
@@ -50,7 +51,10 @@ func (s *Service) CancelRaid(ctx context.Context, raidID, actorID int64) (*Raid,
 		if err := repo.Update(ctx, rd); err != nil {
 			return err
 		}
-		return repo.Audit(ctx, actorID, rd.ID, "cancel", &before, rd)
+		if err := repo.Audit(ctx, actorID, rd.ID, "cancel", &before, rd); err != nil {
+			return err
+		}
+		return enhancepoints.NewRepo(repo.db).ExpireRaidLocks(ctx, actorID, rd.ID, now)
 	})
 	return rd, err
 }

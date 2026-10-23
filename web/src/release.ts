@@ -1,8 +1,15 @@
-export const appVersion = '1.0.31'
+export const appVersion = '1.0.32'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'RaidLedger 2.5.1',
+    changes: [
+      'Neue RaidLedger-Version zum Herunterladen unter „Addons“. Behält der Plündermeister ein Item für den Gewinner eines Wurfs, nennt die Ansage im Raid jetzt den Gewinner („geht an Alice – Main-Spec (bei Tester bis zum Handel)“) statt den Plündermeister. Für den Gewinner gezählt wurde es schon vorher sofort.',
+    ],
+  },
+  {
+    version: '1.0.31',
     title: 'Höchstens fünf falsche Codes',
     changes: [
       'Bei der Anmeldung mit zweitem Faktor sind höchstens fünf falsche Codes erlaubt. Danach meldest du dich erneut mit deinem Passwort an.',

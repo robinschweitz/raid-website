@@ -154,7 +154,7 @@ implemented yet when it differs from the code.
 
 ### 11. Current raid and dashboard
 
-- **FR-11.1** "Aktueller Raid" MUST open the newest non-cancelled raid whose real or scheduled start is not in the future, else the next raid. With no raid, the answer MUST be HTTP 404 `no_current_raid`. (ADR 088)
+- **FR-11.1** "Aktueller Raid" MUST open the most recently started raid that is still PLANNED or OPEN and not archived; otherwise it MUST open the soonest future PLANNED or OPEN raid that is not archived. Completed, cancelled and archived raids MUST NOT be selected. A raid with no real or scheduled start MUST NOT be selected. If none qualifies, the answer MUST be HTTP 404 `no_current_raid`. (ADR 088 amended by ADR 094; Owner 2026-10-23)
 - **FR-11.2** The dashboard MUST show an active raid with a start time in the past as "Läuft" until staff archives it. This MUST NOT be a stored status. (ADR 034)
 - **FR-11.3** For MEMBER and higher, the overview MUST show the next four raids that have not started, with the user's status and actions to sign up with the main character, to decline, and to take back a decline. (ADR 081)
 - **FR-11.4** The dashboard MUST show the encounters of the configured instance; kill progress follows FR-29.4. (ADR 030; Owner 2026-10-22, OQ-7)

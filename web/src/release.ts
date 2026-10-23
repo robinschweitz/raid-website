@@ -1,8 +1,15 @@
-export const appVersion = '1.0.29'
+export const appVersion = '1.0.30'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Schutz vor Passwort-Raten',
+    changes: [
+      'Nach 30 fehlgeschlagenen Anmeldungen von derselben Internetadresse innerhalb von 15 Minuten sind weitere Anmeldeversuche von dort vorübergehend gesperrt, egal für welchen Benutzernamen. Erfolgreiche Anmeldungen zählen nicht mit.',
+    ],
+  },
+  {
+    version: '1.0.29',
     title: 'Admins brauchen einen zweiten Faktor',
     changes: [
       'Admin-Funktionen gehen nur noch mit Authenticator-App oder Sicherheitsschlüssel. Admins ohne zweiten Faktor landen nach dem Anmelden im Reiter „Konto“ und sehen oben einen Hinweis, der sich nicht ausblenden lässt.',

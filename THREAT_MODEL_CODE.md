@@ -123,8 +123,8 @@ sessions; validation checks only the 30-day expiry.
 **CT-025 — Admins reset passwords directly** — no reset-code flow. **Status:** CONFIRMED.
 **Rules:** SC-042.
 
-**CT-026 — No per-address login limit** — only per username and address. **Status:** CONFIRMED.
-**Rules:** SC-043.
+**CT-026 — No per-address login limit** — only per username and address. **Status:** FIXED (PR #119,
+issue #60). **Rules:** SC-043.
 
 ### Request handling
 
@@ -413,7 +413,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-023 | CONFIRMED | Mitigate | App | SC-041 | T-021 |
 | CT-024 | FIX PENDING | Mitigate | App | SC-040 | T-020 |
 | CT-025 | CONFIRMED | Mitigate | App | SC-042 | T-026 |
-| CT-026 | CONFIRMED | Mitigate | App | SC-043 | T-003 |
+| CT-026 | FIXED | Mitigate | App | SC-043 | T-003 |
 | CT-027 | FIXED | Mitigate | App | SC-006 | T-001 |
 | CT-028 | CONFIRMED | Mitigate | App | SC-018 | T-010 |
 | CT-029 | CONFIRMED | Eliminate | App | SC-038 | T-022 |

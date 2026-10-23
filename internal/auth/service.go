@@ -25,16 +25,21 @@ import (
 )
 
 const (
-	defaultSessionTTL        = 30 * 24 * time.Hour
-	MinPasswordLength        = 12
-	loginFailureLimit        = 5
-	loginFailureWindow       = 15 * time.Minute
-	mfaChallengeTTL          = 5 * time.Minute
-	totpPeriodSeconds  int64 = 30
+	defaultSessionTTL         = 30 * 24 * time.Hour
+	MinPasswordLength         = 12
+	loginFailureLimit         = 5
+	loginFailureWindow        = 15 * time.Minute
+	addressFailureLimit       = 30
+	mfaChallengeTTL           = 5 * time.Minute
+	totpPeriodSeconds   int64 = 30
 
 	// CookieName is the name of the session cookie.
 	CookieName = "raid_session"
 )
+
+// comparePassword is the login password check; tests replace it to prove that
+// a rate-limited attempt never reaches bcrypt (SC-008, SC-043).
+var comparePassword = bcrypt.CompareHashAndPassword
 
 var (
 	// ErrInvalidCredentials is returned when a username/password pair does not match.
@@ -242,7 +247,8 @@ func (s *Service) Login(ctx context.Context, username, password string) (string,
 	return s.LoginWithClient(ctx, username, password, "")
 }
 
-// LoginWithClient verifies credentials with rate limiting for a username/client pair.
+// LoginWithClient verifies credentials with rate limiting per username and
+// client address (SC-008) and per client address (SC-043).
 func (s *Service) LoginWithClient(ctx context.Context, username, password, clientIP string) (string, *player.Player, error) {
 	result, err := s.StartLogin(ctx, username, password, clientIP)
 	if err != nil {
@@ -258,6 +264,13 @@ func (s *Service) StartLogin(ctx context.Context, username, password, clientIP s
 	uname := strings.ToLower(strings.TrimSpace(username))
 	now := time.Now().UTC()
 	if clientIP != "" {
+		addressCount, err := s.sessions.CountFailedLoginAttemptsFromAddress(ctx, clientIP, now.Add(-loginFailureWindow))
+		if err != nil {
+			return nil, fmt.Errorf("count address login attempts: %w", err)
+		}
+		if addressCount >= addressFailureLimit {
+			return nil, ErrLoginRateLimited
+		}
 		count, err := s.sessions.CountFailedLoginAttempts(ctx, uname, clientIP, now.Add(-loginFailureWindow))
 		if err != nil {
 			return nil, fmt.Errorf("count login attempts: %w", err)
@@ -278,7 +291,7 @@ func (s *Service) StartLogin(ctx context.Context, username, password, clientIP s
 		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
 		return nil, ErrInvalidCredentials
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(p.PasswordHash), []byte(password)); err != nil {
+	if err := comparePassword([]byte(p.PasswordHash), []byte(password)); err != nil {
 		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
 		return nil, ErrInvalidCredentials
 	}

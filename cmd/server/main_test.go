@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
+	"raid-website/internal/webui"
 )
 
 func TestDetectPattern(t *testing.T) {
@@ -220,5 +222,24 @@ func TestReqPlatform011_AC02(t *testing.T) {
 	}
 	if err := <-done; err != nil {
 		t.Fatalf("serve = %v, want nil", err)
+	}
+}
+
+// TestReqPlatform012_AC01: production without the embedded index.html fails.
+func TestReqPlatform012_AC01(t *testing.T) {
+	missing := func() error { return webui.ErrNotBuilt }
+	if err := checkWebBuild("production", missing); !errors.Is(err, webui.ErrNotBuilt) {
+		t.Fatalf("checkWebBuild(production, missing) = %v, want ErrNotBuilt", err)
+	}
+	if err := checkWebBuild("production", func() error { return nil }); err != nil {
+		t.Fatalf("checkWebBuild(production, built) = %v, want nil", err)
+	}
+}
+
+// TestReqPlatform012_AC02: development starts without a web build.
+func TestReqPlatform012_AC02(t *testing.T) {
+	missing := func() error { return webui.ErrNotBuilt }
+	if err := checkWebBuild("development", missing); err != nil {
+		t.Fatalf("checkWebBuild(development, missing) = %v, want nil", err)
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"golang.org/x/crypto/bcrypt"
+	"strings"
 )
 
 // recordPasswordChecks replaces the login bcrypt comparison with a wrapper
@@ -16,17 +16,14 @@ func recordPasswordChecks(t *testing.T) *[]string {
 	original := comparePassword
 	comparePassword = func(hash, password []byte) error {
 		hashes = append(hashes, string(hash))
-		return bcrypt.CompareHashAndPassword(hash, password)
+		return verifyStoredPassword(string(hash),string(password))
 	}
 	t.Cleanup(func() { comparePassword = original })
 	return &hashes
 }
 
-func TestDummyPasswordHashUsesDefaultCost(t *testing.T) {
-	cost, err := bcrypt.Cost([]byte(dummyPasswordHash))
-	if err != nil || cost != bcrypt.DefaultCost {
-		t.Fatalf("dummy hash cost = %d, %v; want %d", cost, err, bcrypt.DefaultCost)
-	}
+func TestDummyPasswordHashUsesArgon2id(t *testing.T) {
+ if !strings.HasPrefix(dummyPasswordHash,"$argon2id$"){t.Fatal("expected Argon2id dummy hash")}
 }
 
 func TestReqAuth012_AC01(t *testing.T) {

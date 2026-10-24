@@ -1,8 +1,15 @@
-export const appVersion = '1.0.39'
+export const appVersion = '1.0.40'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Schutz vor fremden Anfragen',
+    changes: [
+      'Jede Änderung (auch Anmeldung und Registrierung) wird nur noch mit gültigem Sicherheits-Token angenommen. Im normalen Gebrauch merkst du davon nichts.',
+    ],
+  },
+  {
+    version: '1.0.39',
     title: 'Loot zurückziehen ohne Begründung im offenen Raid',
     changes: [
       'Loot lässt sich in offenen und geplanten Raids ohne Begründung zurückziehen. Im archivierten Raid bleibt die Begründung Pflicht.',

@@ -143,7 +143,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `wishlist` | Wishlist items, raid interests, WL2 export | Owner-only writes | wishlist items | FR-19, FR-20.13 | SUPPORTED |
 | `shadowmourne` | Questline list and raid task choices | Eligible classes, stage choice rules | entries, raid tasks | FR-22 | SUPPORTED |
 | `recruitment` | Recruitment template per series or raid | Length, shape, slot values | recruitment templates | FR-23 | SUPPORTED (slot check not built) |
-| `poll` | Polls and votes | Option validity, closed polls | polls, options, votes | FR-24 | SUPPORTED |
+| `poll` | Polls and votes, poll edits (`PUT /api/v1/polls/{id}`) | Option validity, closed polls, no removal of voted options | polls, options, votes | FR-24 | SUPPORTED |
 | `audit` | Audit writer and Admin reader | Append-only, no secrets in snapshots | audit log | FR-26 | SUPPORTED |
 | Statistics (`GET /api/v1/statistics`, `internal/statistics`) | Public aggregates computed on the server | Public field subset (FR-27.2) | none (derived, read-only) | FR-27 | SUPPORTED |
 | `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (loot and import integration not built) |

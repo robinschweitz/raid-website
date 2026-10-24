@@ -156,7 +156,7 @@ implemented yet when it differs from the code.
 
 - **FR-11.1** "Aktueller Raid" MUST open the most recently started raid that is still PLANNED or OPEN and not archived; otherwise it MUST open the soonest future PLANNED or OPEN raid that is not archived. Completed, cancelled and archived raids MUST NOT be selected. A raid with no real or scheduled start MUST NOT be selected. If none qualifies, the answer MUST be HTTP 404 `no_current_raid`. (ADR 088 amended by ADR 094; Owner 2026-10-23)
 - **FR-11.2** The dashboard MUST show an active raid with a start time in the past as "Läuft" until staff archives it. This MUST NOT be a stored status. (ADR 034)
-- **FR-11.3** For MEMBER and higher, the overview MUST show the next four raids that have not started, with the user's status and actions to sign up with the main character, to decline, and to take back a decline. (ADR 081)
+- **FR-11.3** For MEMBER and higher, the overview MUST show the next four raids that have not started, with the user's status and actions to sign up with the main character, to decline, and to take back a decline. A roster row of one of the user's characters MUST show the status as accepted with that character, also when the user never signed up (staff added it directly). (ADR 081, ADR 097)
 - **FR-11.4** The dashboard MUST show the encounters of the configured instance; kill progress follows FR-29.4. (ADR 030; Owner 2026-10-22, OQ-7)
 - **FR-11.5** The UI MUST NOT show invented data: progression, RSVP rates, notifications, or performance numbers. (ADR 026)
 
@@ -175,6 +175,7 @@ implemented yet when it differs from the code.
 - **FR-12.11** An absence MUST NOT change the roster, signups, or bench. (ADR 069)
 - **FR-12.12** A TENTATIVE absence MUST NOT change the EP rule. (ADR 082)
 - **FR-12.13** For members, a planned or open raid page MUST open on "Anmeldungen". For staff, it MUST open on "Aufstellung". (ADR 081)
+- **FR-12.14** The "Anmeldungen" tab MUST list one row per player who signed up, stands in the roster, or has an absence, ordered pending, in the roster, tentative, declined, then by name, with counts per state. Each character MUST show class emblem, class, and spec; roster rows without a signup MUST appear as added by staff. For staff the list MUST come first and their own signup MUST be folded below it. (ADR 097)
 
 ### 13. Raid roster
 
@@ -299,6 +300,7 @@ implemented yet when it differs from the code.
 - **FR-24.4** A vote on a closed poll or after its closing time MUST give HTTP 409 `poll_closed`. (code)
 - **FR-24.5** A CHOICE vote MUST reference only configured options. Duplicate or too many selections MUST be rejected. (ADR 039)
 - **FR-24.6** A poll write without a session MUST give HTTP 401 `unauthenticated`, like every other protected endpoint. (Owner 2026-10-22, OQ-10; amended by ADR 095)
+- **FR-24.7** Staff MUST be able to edit an existing poll: title, description, closing time, status OPEN or CLOSED (so a closed poll can be reopened), and for CHOICE polls the options (rename, add, remove, reorder). Poll type and multiple selection MUST NOT change. Renaming an option MUST keep its votes under the new label. Removing an option that has votes MUST be rejected with HTTP 409 `poll_option_has_votes` and change nothing. An OPEN poll MUST NOT get a closing time in the past. The edit MUST be audited with before and after. (Owner 2026-10-24, ADR 096)
 
 ### 25. Loot catalog
 

@@ -61,7 +61,7 @@ test.describe('Raids im Voraus planen', () => {
     await page.getByRole('checkbox', { name: /Funkenflug/ }).check()
     await page.getByRole('button', { name: 'Ausgewählte Charaktere anmelden' }).click()
     await expect(page.getByText(/Funkenflug · Magier · Angemeldet/)).toBeVisible()
-    await snapshot(page, testInfo, '06-mitglied-angemeldet', page.getByRole('heading', { name: 'Charakteroptionen nach Spieler' }))
+    await snapshot(page, testInfo, '06-mitglied-angemeldet', page.getByRole('heading', { name: 'Anmeldeliste' }))
     await signOut(page)
   })
 

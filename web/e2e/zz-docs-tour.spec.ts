@@ -262,7 +262,7 @@ test('Raidleitung', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: 'Anmeldungen', exact: true }).click()
   await page.waitForTimeout(600)
   await shot(page, testInfo, '32-raid-anmeldungen-leitung')
-  await page.getByRole('heading', { name: 'Charakteroptionen nach Spieler' }).scrollIntoViewIfNeeded()
+  await page.getByRole('heading', { name: 'Anmeldeliste' }).scrollIntoViewIfNeeded()
   await shot(page, testInfo, '33-anmeldungen-uebernehmen')
   await page.getByRole('button', { name: /^Aufstellung/ }).click()
   await page.waitForTimeout(600)

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError } from './api'
+import { browserHasPushAPI, disablePushOnLogout } from './pushNotifications'
 import type { Player } from './types'
 import { getWebAuthnCredential, type WebAuthnBeginResponse } from './webauthn'
 
@@ -92,6 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     const requestVersion = ++version.current
+    // Stop this device's notifications while the session can still delete them.
+    if (browserHasPushAPI()) await disablePushOnLogout()
     try {
       await api.post<void>('/api/v1/auth/logout')
     } catch (err) {

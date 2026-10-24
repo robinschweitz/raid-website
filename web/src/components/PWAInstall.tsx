@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { installHint } from '../installHint'
+import { installHint, isIOSDevice, isStandaloneDisplay } from '../installHint'
 import { NavIcon } from './NavIcon'
 
 // The event Chromium browsers fire when the site can be installed.
@@ -21,18 +21,6 @@ function dismissHint() {
   } catch {
     // Without storage the hint is hidden until the next page load only.
   }
-}
-
-function isStandaloneDisplay(): boolean {
-  const standaloneQuery = typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches
-  const iosStandalone = typeof navigator !== 'undefined' && (navigator as Navigator & { standalone?: boolean }).standalone === true
-  return standaloneQuery || iosStandalone
-}
-
-function isIOSDevice(): boolean {
-  if (typeof navigator === 'undefined') return false
-  // iPadOS reports itself as a Mac but has touch.
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Macintosh') && navigator.maxTouchPoints > 1)
 }
 
 // Optional "add to home screen" hint (FR-28.5, ADR 101). The service worker it

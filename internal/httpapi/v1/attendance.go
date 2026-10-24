@@ -172,11 +172,13 @@ func (a *API) createAttendance(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
+	before := a.rosterSnapshot(r.Context(), raidID)
 	if err := a.Corrections.SaveAttendance(r.Context(), row, actor, req.Reason, raidcorrection.SnapshotPatch{CharacterName: req.CharacterName, Class: req.Class, Spec: req.Spec}); err != nil {
 		writeCorrectionError(w, err)
 		return
 	}
 	WriteJSON(w, http.StatusCreated, map[string]any{"data": row})
+	a.notifyNewRosterPlayers(w, r, raidID, actor, before)
 }
 
 func writeCorrectionError(w http.ResponseWriter, err error) {

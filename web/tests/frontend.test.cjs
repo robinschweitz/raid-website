@@ -3774,13 +3774,78 @@ test('install hint shows the iPhone steps and can be hidden (FR-28.5)', () => {
   }
 })
 
-test('the service worker caches nothing and handles no requests (FR-28.5, ADR 101)', () => {
+test('the service worker caches nothing and handles no requests (FR-28.5, SC-052)', () => {
   const worker = fs.readFileSync(path.resolve(__dirname, '../public/sw.js'), 'utf8')
-  assert.doesNotMatch(worker, /addEventListener\(\s*['"](fetch|push)['"]/)
-  assert.doesNotMatch(worker, /caches\.|CacheStorage/)
+  assert.doesNotMatch(worker, /addEventListener\(\s*['"]fetch['"]/)
+  assert.doesNotMatch(worker, /caches\.|CacheStorage|importScripts/)
   const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../public/manifest.webmanifest'), 'utf8'))
   for (const size of ['192x192', '512x512']) {
     const icon = manifest.icons.find((entry) => entry.sizes === size && entry.type === 'image/png')
     assert.ok(icon && fs.existsSync(path.resolve(__dirname, '../public', icon.src.slice(1))), `PNG icon ${size}`)
   }
+})
+
+function runServiceWorker() {
+  const listeners = {}
+  const shown = []
+  const opened = []
+  const self = {
+    location: { origin: 'https://raid.example' },
+    addEventListener: (type, fn) => { listeners[type] = fn },
+    skipWaiting: () => {},
+    registration: { showNotification: (title, options) => { shown.push({ title, options }); return Promise.resolve() } },
+    clients: { claim: () => Promise.resolve(), matchAll: () => Promise.resolve([]), openWindow: (url) => { opened.push(url); return Promise.resolve() } },
+  }
+  vm.runInNewContext(fs.readFileSync(path.resolve(__dirname, '../public/sw.js'), 'utf8'), { self, URL })
+  const fire = (type, event) => {
+    let pending = Promise.resolve()
+    listeners[type]({ ...event, waitUntil: (p) => { pending = p } })
+    return pending
+  }
+  return { listeners, shown, opened, fire }
+}
+
+test('a push shows only a fixed German text for its kind (FR-32, SC-053)', async () => {
+  const sw = runServiceWorker()
+  const data = (value) => ({ json: () => JSON.parse(value) })
+  await sw.fire('push', { data: data('{"kind":"poll","title":"Geheimer Titel"}') })
+  await sw.fire('push', { data: data('{"kind":"raid"}') })
+  await sw.fire('push', { data: data('{"kind":"roster"}') })
+  await sw.fire('push', { data: data('{"kind":"<b>unbekannt</b>"}') })
+  await sw.fire('push', { data: { json: () => { throw new Error('not json') } } })
+  await sw.fire('push', { data: null })
+  assert.deepEqual(sw.shown.map((n) => n.options.body), [
+    'Es gibt eine neue Umfrage.',
+    'Es wurde ein neuer Raid geplant.',
+    'Du stehst in einer Raid-Aufstellung.',
+    'Es gibt Neuigkeiten in RAID.',
+    'Es gibt Neuigkeiten in RAID.',
+    'Es gibt Neuigkeiten in RAID.',
+  ])
+  assert.ok(sw.shown.every((n) => n.title === 'RAID' && !JSON.stringify(n).includes('Geheim') && !JSON.stringify(n).includes('<b>')))
+  await sw.fire('notificationclick', { notification: { close: () => {}, data: sw.shown[0].options.data } })
+  assert.deepEqual(sw.opened, ['https://raid.example/#/polls'])
+})
+
+test('push opt-in states, including iPhone without installation (FR-32)', () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { pushAvailability, base64URLToBytes, subscriptionBody } = s.load('pushNotifications.ts')
+  const base = { hasPushAPI: true, isIOS: false, isStandalone: false, permission: 'default', serverEnabled: true }
+  assert.equal(pushAvailability(base), 'available')
+  assert.equal(pushAvailability({ ...base, serverEnabled: false }), 'server-off')
+  assert.equal(pushAvailability({ ...base, isIOS: true }), 'ios-install')
+  assert.equal(pushAvailability({ ...base, isIOS: true, isStandalone: true }), 'available')
+  assert.equal(pushAvailability({ ...base, hasPushAPI: false, permission: 'unsupported' }), 'unsupported')
+  assert.equal(pushAvailability({ ...base, permission: 'denied' }), 'denied')
+  assert.deepEqual(Array.from(base64URLToBytes('-_8')), [0xfb, 0xff])
+  assert.deepEqual(subscriptionBody({ endpoint: 'https://fcm.googleapis.com/x', expirationTime: null, keys: { p256dh: 'p', auth: 'a' } }), { endpoint: 'https://fcm.googleapis.com/x', p256dh: 'p', auth: 'a' })
+})
+
+test('the browser is asked for notification permission only after a click (FR-32)', () => {
+  const sources = ['src/pushNotifications.ts', 'src/components/PushNotificationSettings.tsx', 'src/auth.tsx', 'src/App.tsx', 'src/components/PWAInstall.tsx']
+    .map((file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8'))
+  const calls = sources.join('\n').match(/requestPermission\(/g) ?? []
+  assert.equal(calls.length, 1)
+  assert.match(sources[0], /export async function enablePush[\s\S]*requestPermission\(/)
+  assert.match(sources[2], /if \(browserHasPushAPI\(\)\) await disablePushOnLogout\(\)\s*\n\s*try \{\s*\n\s*await api\.post<void>\('\/api\/v1\/auth\/logout'\)/)
 })

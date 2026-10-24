@@ -77,7 +77,7 @@ func (r *Repo) InsertPointTransaction(ctx context.Context, row *enhancepoints.Tr
 }
 
 func (r *Repo) RevokeSourceAuth(ctx context.Context, playerID int64) (map[string]int64, error) {
-	tables := []string{"sessions", "webauthn_sessions", "mfa_login_challenges", "mfa_recovery_codes", "webauthn_credentials", "player_mfa_settings"}
+	tables := []string{"sessions", "webauthn_sessions", "mfa_login_challenges", "mfa_recovery_codes", "webauthn_credentials", "player_mfa_settings", "push_subscriptions"}
 	counts := make(map[string]int64, len(tables))
 	for _, table := range tables {
 		result, err := r.db.NewDelete().Table(table).Where("player_id = ?", playerID).Exec(ctx)

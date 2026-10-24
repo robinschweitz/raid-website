@@ -124,6 +124,14 @@ func (r *Repo) Create(ctx context.Context, rd *Raid) error {
 	return err
 }
 
+// MaxID returns the highest raid ID, or 0 without raids. Comparing it before
+// and after a write tells whether the write created raids (FR-32.2).
+func (r *Repo) MaxID(ctx context.Context) (int64, error) {
+	var id int64
+	err := r.db.NewSelect().Model((*Raid)(nil)).ColumnExpr("COALESCE(MAX(id), 0)").Scan(ctx, &id)
+	return id, err
+}
+
 func (r *Repo) Get(ctx context.Context, id int64) (*Raid, error) {
 	rd := new(Raid)
 	err := r.db.NewSelect().Model(rd).Where("id = ?", id).Scan(ctx)

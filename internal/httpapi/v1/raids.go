@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"raid-website/internal/push"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcompletion"
 	"raid-website/internal/validation"
@@ -118,6 +119,7 @@ func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusCreated, map[string]any{"data": rd})
+	a.notifyAll(w, r, push.KindRaid, actor)
 }
 
 func (a *API) getRaid(w http.ResponseWriter, r *http.Request) {
@@ -184,6 +186,8 @@ func (a *API) archiveRaid(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
+	// Archiving may create the successor and top up the planning window.
+	maxRaidID, maxErr := a.Raids.MaxID(r.Context())
 	rd, next, err := a.Completion.ArchiveRaidWithout(r.Context(), id, actor, req.WithoutPoints)
 	if err != nil {
 		if writeSeriesError(w, err) {
@@ -208,6 +212,9 @@ func (a *API) archiveRaid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": rd, "next_raid": next})
+	if maxErr == nil && a.raidsCreatedSince(r.Context(), maxRaidID) {
+		a.notifyAll(w, r, push.KindRaid, actor)
+	}
 }
 
 func (a *API) configureRaidSchedule(w http.ResponseWriter, r *http.Request) {

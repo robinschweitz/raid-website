@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"raid-website/internal/poll"
+	"raid-website/internal/push"
 	"raid-website/internal/validation"
 )
 
@@ -109,6 +110,7 @@ func (a *API) createPoll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusCreated, map[string]any{"data": p})
+	a.notifyAll(w, r, push.KindPoll, actor)
 }
 
 func (a *API) getPoll(w http.ResponseWriter, r *http.Request) {

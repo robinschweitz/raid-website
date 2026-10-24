@@ -22,6 +22,7 @@ import { SpecSelect } from '../components/SpecSelect'
 import { browserSupportsWebAuthn, createWebAuthnCredential, type WebAuthnBeginResponse } from '../webauthn'
 import { announceMFAChange, type MFAStatus } from '../accountSecurity'
 import { ErrorMessage } from '../components/ErrorMessage'
+import { PushNotificationSettings } from '../components/PushNotificationSettings'
 
 const CLASSES = [
   'Todesritter',
@@ -854,6 +855,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
             </form>
             {passwordStatus && <p className="muted" role="status">{passwordStatus}</p>}
           </section>}
+          {isOwnMember && <PushNotificationSettings />}
           {isOwnProfile && <section className="subcard">
             <h3>Multi-Faktor-Authentifizierung</h3>
             <p className="muted">Optional: Richte einen Authenticator-Code oder YubiKey ein. Du wirst beim Start einer Änderung nach deinem aktuellen Passwort gefragt. <Link to="/kontosicherheit">Warum das wichtig ist</Link></p>

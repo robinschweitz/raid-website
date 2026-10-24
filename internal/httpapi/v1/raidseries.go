@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"raid-website/internal/lootcatalog"
+	"raid-website/internal/push"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
 )
@@ -77,6 +78,9 @@ func (a *API) saveRaidSeries(w http.ResponseWriter, r *http.Request, update bool
 		status = http.StatusOK
 	}
 	WriteJSON(w, status, map[string]any{"data": series})
+	if len(planned) > 0 {
+		a.notifyAll(w, r, push.KindRaid, actor)
+	}
 }
 
 type planSeriesRequest struct {
@@ -109,6 +113,9 @@ func (a *API) planRaidSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeListJSON(w, created)
+	if len(created) > 0 {
+		a.notifyAll(w, r, push.KindRaid, actor)
+	}
 }
 
 func writeSeriesError(w http.ResponseWriter, err error) bool {

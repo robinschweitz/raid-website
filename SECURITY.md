@@ -278,7 +278,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-032 - Anonymisation**
 - **Status:** ACTIVE
-- **Rule:** Anonymisation (FR-30.2–30.4) MUST run in one transaction and MUST remove every credential row of the player: password hash, sessions, MFA settings, recovery codes, and WebAuthn credentials (SC-017).
+- **Rule:** Anonymisation (FR-30.2–30.4) MUST run in one transaction and MUST remove every credential row of the player: password hash, sessions, MFA settings, recovery codes, WebAuthn credentials (SC-017), and push subscriptions (SC-053).
 - **Enforcement:** `accountmerge` anonymise operation (not built).
 - **Evidence:** FR-30, AQ-6. Code: not built.
 - **Verification:** After anonymisation no row links the player to a login, secret, or external profile; old sessions return 401.
@@ -364,7 +364,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-044 - Incident plan and secret rotation**
 - **Status:** ACTIVE
-- **Rule:** `deploy/README.md` MUST contain an incident plan with these steps: end all sessions (the documented database command that deletes every session row), rotate `ADMIN_PASSWORD`, the Worker token, the Cloudflare API token, and the TOTP key, pause automatic deploys (stop `raid-website-update.timer`), and restore from a verified snapshot. There is no in-app "log everyone out" action. The owner is the only person who acts (T-040 accepted).
+- **Rule:** `deploy/README.md` MUST contain an incident plan with these steps: end all sessions (the documented database command that deletes every session row), rotate `ADMIN_PASSWORD`, the Worker token, the Cloudflare API token, the TOTP key, and the VAPID key (SC-054), pause automatic deploys (stop `raid-website-update.timer`), and restore from a verified snapshot. There is no in-app "log everyone out" action. The owner is the only person who acts (T-040 accepted).
 - **Enforcement:** `deploy/README.md`.
 - **Evidence:** OD-015 (owner, 2026-10-23). Code: plan written in `deploy/README.md` ("Incident plan and secret rotation", #108): detection, containment, rotation, restore, review. The TOTP key step says SC-014 is not built, and the Admin password step notes that the env variable does not change an existing account (FR-2.10) and refers to `cmd/reset-code` (SC-051, not built). Owner dry run still pending. Threats: T-040, T-041.
 - **Verification:** Each step was carried out once on a test setup and old session cookies returned 401 afterwards.
@@ -418,12 +418,26 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Evidence:** FR-3.11, OD-019 (owner, 2026-10-23). Code: **not built**. Threats: T-049.
 - **Verification:** Running the command for the only Admin prints a code that works once within 72 hours; the audit log shows the operator entry; no HTTP route reaches the command.
 
-**SC-052 - Service worker without cache or push**
+**SC-052 - Service worker without cache; push shows fixed texts only**
 - **Status:** ACTIVE
-- **Rule:** The service worker (`/sw.js`) MUST NOT register a `fetch` or `push` handler and MUST NOT use Cache Storage, so no page or API response is kept on the device and every request reaches the server with its normal session and CSRF checks. Adding caching or push needs a new owner decision.
+- **Rule:** The service worker (`/sw.js`) MUST NOT register a `fetch` handler, MUST NOT use Cache Storage, and MUST NOT load other scripts, so no page or API response is kept on the device and every request reaches the server with its normal session and CSRF checks. Its `push` handler MUST read only the `kind` of a message and MUST show the fixed German text for that kind (FR-32.5), or a fixed fallback text for an unknown or unreadable message; it MUST NOT display any other field of the message. Its `notificationclick` handler MUST open only same-origin pages. Adding caching, other message content, or other handlers needs a new owner decision.
 - **Enforcement:** `web/public/sw.js`; `web/src/components/PWAInstall.tsx` (registration only).
-- **Evidence:** FR-28.5, ADR 101 (owner, 2026-10-24). Code: compliant since #160; test `the service worker caches nothing and handles no requests` in `web/tests/frontend.test.cjs`. In Chromium the worker registered and controlled the page with no caches (2026-10-24).
-- **Verification:** After a visit, `caches.keys()` is empty and `sw.js` contains no `fetch` or `push` listener.
+- **Evidence:** FR-28.5, FR-32.5, ADR 101, ADR 102 (owner, 2026-10-24; amended for push). Code: compliant; tests `the service worker caches nothing and handles no requests` and `a push shows only a fixed German text for its kind` in `web/tests/frontend.test.cjs`.
+- **Verification:** After a visit, `caches.keys()` is empty and `sw.js` contains no `fetch` listener; a push whose payload carries extra fields shows only the fixed text.
+
+**SC-053 - Push subscriptions and delivery**
+- **Status:** ACTIVE
+- **Rule:** A subscription endpoint MUST be an `https` URL on port 443 without user info whose host is one of `fcm.googleapis.com`, `updates.push.services.mozilla.com`, a subdomain of `push.apple.com`, or a subdomain of `notify.windows.com`; `p256dh` MUST be a valid uncompressed P-256 point and `auth` 16 bytes. Anything else is rejected with `400 invalid_push_subscription` and nothing is stored. The sender MUST NOT follow redirects, MUST time out after 10 s per message and 15 s per fan-out, and MUST read at most 4 KiB of an answer. A message payload MUST be the JSON `{"kind": …}` only, encrypted per RFC 8291 (aes128gcm) with a fresh key and salt per message. Endpoints and keys MUST NOT appear in API responses, logs, or audit snapshots; the audit entry keeps the push-service host only. Logs name the subscription ID and HTTP status, never the endpoint (SC-030).
+- **Enforcement:** `internal/push` (`SubscriptionInput.validate`, `HTTPSender`, `auditView`); `internal/httpapi/v1/push.go`.
+- **Evidence:** FR-32, ADR 102 (owner, 2026-10-24). Code: compliant; tests `TestReqPush001_*` (RFC 8291 test vector), `TestReqPush003_EndpointAllowlist`, `TestReqPush005_SubscribeValidatesAndAudits`.
+- **Verification:** A subscription for `https://127.0.0.1/` or `http://fcm.googleapis.com/` returns 400 without an outbound request; the audit log and the journal contain no endpoint path.
+
+**SC-054 - VAPID key**
+- **Status:** ACTIVE
+- **Rule:** The VAPID private key (`VAPID_PRIVATE_KEY`, base64url P-256 scalar) and its contact (`VAPID_SUBJECT`, `mailto:` or `https:`) MUST come only from `/etc/raid-website.env` (SC-033), are set together or not at all, and MUST NOT be committed, logged, or sent to the client; only the public key is served (`GET /api/v1/push/config`). An invalid key MUST stop startup; a missing key MUST switch push off (FR-32.6). The key is part of the daily encrypted off-server copy of the env file (SC-034) and MUST be rotated with the other secrets in the incident plan (SC-044); rotation invalidates every subscription. The JWT MUST be ES256, `aud` the push-service origin, `exp` at most 12 hours ahead (RFC 8292). New keys come from `go run ./cmd/vapid-key`.
+- **Enforcement:** `internal/config`, `cmd/server` (`push.ParseVAPIDKey`), `internal/push/webpush.go`; `deploy/README.md`.
+- **Evidence:** FR-32.6, ADR 102 (owner, 2026-10-24). Code: compliant; tests `TestVAPIDConfiguration`, `TestReqPush002_*`.
+- **Verification:** A key without a subject stops startup; `GET /api/v1/push/config` returns the public key and nothing else; the repository secret scan finds no key.
 
 ## Open Security Decisions
 
@@ -454,3 +468,7 @@ Decided by the owner on 2026-10-23 (threat model):
 - **OD-018** A password reset code lasts 72 hours → SC-042.
 - **OD-019** A locked-out only Admin gets a reset code from a server command → SC-051, FR-3.11.
 - **OD-020** OD-007 (off-server backup) is decided by 2026-11-30 (decided 2026-10-24).
+
+Decided by the owner on 2026-10-24 (Web Push):
+
+- **OD-021** Opt-in Web Push for a new poll, a new raid, and the own roster place; RFC 8291/8292 with the standard library, no new dependency; VAPID key in the env file and its off-server copy, push off without it → SC-052, SC-053, SC-054, FR-32, ADR 102.

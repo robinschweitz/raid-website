@@ -154,3 +154,26 @@ func ExpireActiveOnEnd(activeLocks []ItemLock) []ItemLock {
 	}
 	return exp
 }
+
+// ExpireRaidLocks expires every active lock of a raid at no EP cost and audits
+// each change. Callers run it inside the transaction of the raid change
+// (FR-17.6).
+func (r *Repo) ExpireRaidLocks(ctx context.Context, actorID, raidID int64, now time.Time) error {
+	locks, err := r.ListActiveLocksByRaid(ctx, raidID)
+	if err != nil {
+		return fmt.Errorf("load active locks for raid %d: %w", raidID, err)
+	}
+	for i := range locks {
+		before := locks[i]
+		locks[i].Status = validation.LockStatusExpired
+		locks[i].ExpiredAt = &now
+		locks[i].UpdatedAt = now
+		if err := r.UpdateLock(ctx, &locks[i]); err != nil {
+			return fmt.Errorf("expire lock %d: %w", locks[i].ID, err)
+		}
+		if err := r.AuditLock(ctx, actorID, "expire", &before, &locks[i]); err != nil {
+			return fmt.Errorf("audit lock %d: %w", locks[i].ID, err)
+		}
+	}
+	return nil
+}

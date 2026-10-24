@@ -8,14 +8,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"raid-website/internal/db"
 	"raid-website/internal/migrations"
 	"raid-website/internal/player"
-	"raid-website/internal/raid"
 	"raid-website/internal/validation"
 )
 
-func setupLockCreation(t *testing.T, status validation.RaidStatus, isArchived bool) (context.Context, *Repo, *raid.Raid, []int64) {
+func setupLockCreation(t *testing.T, status validation.RaidStatus, isArchived bool) (context.Context, *Repo, *testRaid, []int64) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
@@ -44,11 +45,11 @@ func setupLockCreation(t *testing.T, status validation.RaidStatus, isArchived bo
 			t.Fatal(err)
 		}
 	}
-	raidRecord := &raid.Raid{Name: "ICC", RaidLeaderID: playerIDs[0], Status: status, CreatedAt: now, UpdatedAt: now}
+	raidRecord := &testRaid{Name: "ICC", RaidLeaderID: playerIDs[0], Status: status, CreatedAt: now, UpdatedAt: now}
 	if isArchived {
 		raidRecord.ArchivedAt = &now
 	}
-	if err := raid.NewRepo(bdb.DB).Create(ctx, raidRecord); err != nil {
+	if err := createTestRaid(ctx, bdb.DB, raidRecord); err != nil {
 		t.Fatal(err)
 	}
 	return ctx, repo, raidRecord, playerIDs
@@ -251,4 +252,23 @@ func TestFindActiveLockByItemLegacyAmbiguity(t *testing.T) {
 	if err != nil || len(locks) != 2 {
 		t.Fatalf("legacy ambiguity must not mutate locks: %v, err %v", locks, err)
 	}
+}
+
+// testRaid is a minimal raids row; importing the raid package here would form
+// an import cycle because raid expires locks on cancel (FR-17.6).
+type testRaid struct {
+	bun.BaseModel `bun:"table:raids"`
+
+	ID           int64                 `bun:"id,pk,autoincrement"`
+	Name         string                `bun:"name,notnull"`
+	RaidLeaderID int64                 `bun:"raid_leader_id,notnull"`
+	Status       validation.RaidStatus `bun:"status,notnull"`
+	ArchivedAt   *time.Time            `bun:"archived_at,nullzero"`
+	CreatedAt    time.Time             `bun:"created_at,notnull"`
+	UpdatedAt    time.Time             `bun:"updated_at,notnull"`
+}
+
+func createTestRaid(ctx context.Context, db bun.IDB, rd *testRaid) error {
+	_, err := db.NewInsert().Model(rd).Exec(ctx)
+	return err
 }

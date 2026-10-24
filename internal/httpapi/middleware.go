@@ -60,10 +60,8 @@ func csrfProtection(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if r.Header.Get("Origin") == "" && r.Header.Get("Sec-Fetch-Site") == "" {
-			next.ServeHTTP(w, r)
-			return
-		}
+		// The token is required whether or not the request has a session cookie,
+		// Origin, or Sec-Fetch-Site: absent browser metadata must never skip it (SC-019).
 		cookie, err := r.Cookie(csrfCookieName)
 		if err != nil || cookie.Value == "" || r.Header.Get("X-CSRF-Token") == "" || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(r.Header.Get("X-CSRF-Token"))) != 1 {
 			v1.WriteError(w, http.StatusForbidden, "csrf_required", "CSRF token required")

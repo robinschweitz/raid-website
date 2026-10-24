@@ -60,10 +60,10 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   assumes exactly one application process (DR-9).
 - **Server lifecycle.** The HTTP server sets read-header, read, write, and idle timeouts and
   shuts down gracefully on SIGTERM, finishing running requests (Owner 2026-10-22, AQ-3); the values
-  are owned by `SECURITY.md`. Not built: the code calls `http.ListenAndServe` without them.
+  are owned by `SECURITY.md` (SC-026).
 - **Statistics.** A public `GET /api/v1/statistics` returns only server-computed aggregates
-  (FR-27.2); the statistics page reads only this endpoint (Owner 2026-10-22, AQ-2). Not built: the
-  page now computes figures in the browser from login-only and per-raid loot endpoints.
+  (FR-27.2); the statistics page reads only this endpoint (Owner 2026-10-22, AQ-2). The endpoint is built; the
+  page still computes figures in the browser until REQ-STATS-011 (#88).
   Response contract (FR-27.3), all counts integers:
   `raids_by_status` (`[{status, count}]`), `class_distribution` (`[{class, count}]`),
   `role_history` (`[{role, count}]`), `loot_by_class` (`[{class, count}]`),
@@ -81,14 +81,22 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   values, read by `internal/config`, and reach the page through a public read endpoint
   `GET /api/v1/privacy-contact` (Owner 2026-10-22, AQ-6; endpoint confirmed 2026-10-23, backlog #49).
   Not built.
-- **Boss kills.** A new `bosskill` domain package owns `raid_boss_kills` (raid, catalog boss,
-  difficulty; unique per raid and boss). `loot` reads the kill for the award difficulty.
-  `raidcorrection` writes kills, so the manual loot path and the `addonsync` import create a
-  missing kill and the loot in one transaction (FR-29.7, FR-29.8) (Owner 2026-10-22, AQ-5). Not built.
+- **Boss kills.** The `bosskill` domain package owns `raid_boss_kills` (raid, catalog boss,
+  difficulty; at most one active kill per raid and boss, enforced by a partial unique index;
+  a removed kill keeps its row with `removed_at`, FR-31.1). `raidcorrection` writes kills
+  (record, change difficulty, remove) under the raid-state and reason rules of its other
+  corrections, with the audit entry in the same transaction; the difficulties offered for a
+  boss come from `lootcatalog` drops for the raid's instance and size (FR-29.5, FR-29.6,
+  FR-29.9, FR-29.14) (Owner 2026-10-22, AQ-5). Endpoints: `GET /api/v1/raids/{id}/kills`
+  (signed-in), `POST /api/v1/raids/{id}/kills`, `PATCH /api/v1/raids/{id}/kills/{killID}`,
+  `POST /api/v1/raids/{id}/kills/{killID}/remove` (RAIDASSISTENT and higher). Not built:
+  `loot` reading the kill for the award difficulty, and the manual loot path and the
+  `addonsync` import creating a missing kill and the loot in one transaction (FR-29.7,
+  FR-29.8).
 - **Public interface.** Without a session, only these reads answer (FR-1.2): `GET /api/v1/raids`,
   `/players`, `/polls`, `/raids/{id}/attendance`, `/addons`, `/addons/{name}/download`,
-  `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, and, not
-  built, `/statistics` and `/privacy-contact`. Login, MFA, and registration writes are public too.
+  `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/statistics`, and, not
+  built, `/privacy-contact`. Login, MFA, and registration writes are public too.
 - **API notes.** Catalog reads: `GET /api/v1/loot-catalog` and its `/instances`, `/bosses`,
   `/items`; there are no catalog write endpoints. Raid series: `weekdays` are 0 (Sunday) to 6
   (Saturday), `start_time` is `HH:MM`, `timezone` an IANA name. `PATCH /api/v1/raids/{id}` takes
@@ -113,7 +121,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | Component | Responsibility | Business rules enforced | Data owned | Requirements | Status |
 | --- | --- | --- | --- | --- | --- |
 | Web client (`web/src`) | Pages, forms, hash routing, German UI, local drafts | None authoritative; convenience checks only | Browser drafts (`localStorage`) | FR-28, `DESIGN.md` | SUPPORTED |
-| HTTP layer (`httpapi`, `httpapi/v1`) | Middleware chain, route guards, DTOs, error mapping, SPA and health, server timeouts | Role matrix, session presence, CSRF, body size | None | FR-1, FR-2.8, NFR-4.1, NFR-4.2 | SUPPORTED (timeouts not built) |
+| HTTP layer (`httpapi`, `httpapi/v1`) | Middleware chain, route guards, DTOs, error mapping, SPA and health, server timeouts | Role matrix, session presence, CSRF, body size | None | FR-1, FR-2.8, NFR-4.1, NFR-4.2 | SUPPORTED |
 | `auth` | Login, sessions, passwords, TOTP, recovery codes, WebAuthn, bootstrap admin | Password length, login rate limit, MFA challenge expiry | sessions, login attempts, MFA secrets and credentials, password hash | FR-2, FR-3 | SUPPORTED |
 | `registration` | Rising-Gods client and cache; registration requests, codes, claims; visitor search counter | Alliance level-80 filter, request deduplication, code expiry, visitor search limit | registration requests, codes, external profiles | FR-4, FR-7 | SUPPORTED (search limit not built; unused warmer to delete) |
 | `player` | Players, roles, public player view | Public field subset | players | FR-1.3, FR-1.9, FR-5.1–5.2 | SUPPORTED |
@@ -125,20 +133,20 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `raid` | Raids, schedule, cancel, current raid | Name from template, status transitions for cancel | raids | FR-10.1–10.5, FR-11.1 | SUPPORTED |
 | `raidsignup` | Signup availability, choices, acceptance, absences | Deadline, ownership, one accepted character | signups, absences | FR-12 | SUPPORTED |
 | `attendance` | Roster rows with per-raid snapshots | Snapshot completeness | raid attendance | FR-13.2–13.4 | SUPPORTED |
-| `raidcorrection` | Roster and loot writes, corrections, withdrawal, quick-add | Raid-state rules, archived reason, EP eligibility delta, retry receipts | quick-add receipts (coordinator otherwise) | FR-13, FR-14.8–14.10, FR-16.5–16.6 | SUPPORTED |
+| `raidcorrection` | Roster and loot writes, corrections, withdrawal, quick-add | Raid-state rules, archived reason, EP eligibility delta, retry receipts | quick-add receipts (coordinator otherwise) | FR-13, FR-14.8–14.10, FR-16.5–16.6, FR-29.5 | SUPPORTED |
 | `loot` | Loot awards, methods, enhanced cost, lock auto-award, token derivation | Roster recipient, request-ID idempotency, cost formula | loot awards | FR-14, FR-18 | SUPPORTED |
-| `unclaimedloot` | Items that went to nobody | No player effect | unclaimed loot | FR-15 | SUPPORTED (SQL to move, DR-4) |
+| `unclaimedloot` | Items that went to nobody | No player effect | unclaimed loot | FR-15 | SUPPORTED |
 | `enhancepoints` | EP ledger, balances, item locks | 150-EP lock threshold, competing locks, ownership | EP transactions, item locks | FR-16, FR-17 | SUPPORTED |
 | `raidcompletion` | Archive: EP award, lock expiry, successor, plan-ahead top-up, preview | Idempotent finalisation, exclusions, successor conflicts | (coordinator) | FR-10.6–10.15 | SUPPORTED |
 | `addonsync` | RS1/RS2 parsing, roster and loot import previews and applies, invite export | Raid-scoped request IDs, importable states | (coordinator) | FR-20 | SUPPORTED |
 | `addons` | Embedded addon bundles and download zips | Bundle completeness | embedded files | FR-21 | SUPPORTED |
 | `wishlist` | Wishlist items, raid interests, WL2 export | Owner-only writes | wishlist items | FR-19, FR-20.13 | SUPPORTED |
 | `shadowmourne` | Questline list and raid task choices | Eligible classes, stage choice rules | entries, raid tasks | FR-22 | SUPPORTED |
-| `recruitment` | Recruitment template per series or raid | Length, shape, slot values | recruitment templates | FR-23 | SUPPORTED (slot check and SQL move not built) |
-| `poll` | Polls and votes | Option validity, closed polls | polls, options, votes | FR-24 | SUPPORTED |
+| `recruitment` | Recruitment template per series or raid | Length, shape, slot values | recruitment templates | FR-23 | SUPPORTED (slot check not built) |
+| `poll` | Polls and votes, poll edits (`PUT /api/v1/polls/{id}`) | Option validity, closed polls, no removal of voted options | polls, options, votes | FR-24 | SUPPORTED |
 | `audit` | Audit writer and Admin reader | Append-only, no secrets in snapshots | audit log | FR-26 | SUPPORTED |
-| Statistics (`GET /api/v1/statistics`) | Public aggregates computed on the server | Public field subset (FR-27.2) | none (derived, read-only) | FR-27 | SUPPORTED (not built) |
-| `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (not built) |
+| Statistics (`GET /api/v1/statistics`, `internal/statistics`) | Public aggregates computed on the server | Public field subset (FR-27.2) | none (derived, read-only) | FR-27 | SUPPORTED |
+| `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (loot and import integration not built) |
 | Privacy page | Static page with contact from configuration | None | none | FR-30.1 | SUPPORTED (not built) |
 | Infrastructure (`config`, `db`, `migrations`, `validation`, `webui`) | Environment config, DB open, schema, enums, embedded SPA | Production config rules, foreign keys, SPA present in production | schema | NFR-1 | SUPPORTED (SPA check not built) |
 | Rising-Gods Worker (`workers/`) | Authenticated fixed-origin GET proxy to `db.rising-gods.de` | Fixed origin and shared token (SC-029) | none | FR-7, ADR 048, ADR 053 | SUPPORTED |
@@ -251,9 +259,8 @@ sequenceDiagram
 - **DR-3** Each table has exactly one owning domain package (the "Data owned" column). Only the
   owner's repository writes it; other components call the owner's repository or service.
 - **DR-4** SQL and Bun query builders appear only in `repo.go` files. Models may carry Bun struct
-  tags. There are no exceptions (Owner 2026-10-22, AQ-1). Not yet followed by
-  `internal/character/merge.go`, `internal/lootcatalog/order.go`, `internal/recruitment/service.go`
-  and `internal/unclaimedloot/unclaimed.go`; their queries move into `repo.go`.
+  tags. There are no exceptions (Owner 2026-10-22, AQ-1). `TestReqArch010_AC01` scans for query calls
+  outside `repo.go` in `character`, `lootcatalog`, `recruitment`, and `unclaimedloot`.
 - **DR-5** A write that touches more than one row or table, including its audit entry and ledger
   rows, runs in one transaction passed down with `WithTx`.
 - **DR-6** Business rules live in domain services, never in handlers, middleware, or the web

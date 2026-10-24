@@ -5,9 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/uptrace/bun"
 	"raid-website/internal/config"
@@ -58,8 +63,54 @@ func run() (err error) {
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)
 	}
+	ln, err := net.Listen("tcp", cfg.ListenAddr)
+	if err != nil {
+		return fmt.Errorf("listen: %w", err)
+	}
+	stopCtx, stop := signal.NotifyContext(ctx, syscall.SIGTERM, os.Interrupt)
+	defer stop()
 	log.Printf("listening on %s", cfg.ListenAddr)
-	if err := http.ListenAndServe(cfg.ListenAddr, h); err != nil && err != http.ErrServerClosed {
+	return serve(stopCtx, newHTTPServer(h), ln, shutdownTimeout)
+}
+
+// Server limits from SECURITY.md SC-026. systemd stops the service after 30 s,
+// so the shutdown grace period stays below that.
+const (
+	readHeaderTimeout = 10 * time.Second
+	readTimeout       = 30 * time.Second
+	writeTimeout      = 60 * time.Second
+	idleTimeout       = 120 * time.Second
+	shutdownTimeout   = 25 * time.Second
+)
+
+func newHTTPServer(h http.Handler) *http.Server {
+	return &http.Server{
+		Handler:           h,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+	}
+}
+
+// serve runs srv on ln until ctx is cancelled, then stops accepting
+// connections and gives running requests up to grace to finish.
+func serve(ctx context.Context, srv *http.Server, ln net.Listener, grace time.Duration) error {
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- srv.Serve(ln) }()
+	select {
+	case err := <-serveErr:
+		return err
+	case <-ctx.Done():
+	}
+	// The parent context is already cancelled, so the grace period needs its own.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), grace)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		_ = srv.Close()
+		return fmt.Errorf("shutdown: %w", err)
+	}
+	if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil

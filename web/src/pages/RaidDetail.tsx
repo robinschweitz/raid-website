@@ -18,6 +18,7 @@ import { UnclaimedLoot } from '../components/UnclaimedLoot'
 import { AddonRosterImport } from '../components/AddonRosterImport'
 import { RaidRecruitment } from './Recruitment'
 import { ShadowmourneRaidCard } from '../components/ShadowmourneRaidCard'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 interface Props {
   raidID: number
@@ -765,7 +766,7 @@ function RaidDetail({ raidID, initialView }: Props) {
         <p>
           <Link to="/raids">← Raids</Link>
         </p>
-        {error ? <p className="error">{error}</p> : <p className="muted">Lade…</p>}
+        {error ? <ErrorMessage>{error}</ErrorMessage> : <p className="muted">Lade…</p>}
       </div>
     )
   }
@@ -788,7 +789,7 @@ function RaidDetail({ raidID, initialView }: Props) {
         {raid.notes && <p className="setup-note">{raid.notes}</p>}
         {raid.archived_at && <p className="muted">Archivierte Historie: Änderungen an Roster und Loot erfordern eine Begründung.</p>}
       </RaidBanner>
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
       {message && <p className="success-message" role="status"><span>{message}</span><button type="button" aria-label="Meldung schließen" onClick={() => setMessage('')}>Schließen</button></p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
       <nav className="workspace-tabs" aria-label="Raidbereiche">
@@ -902,7 +903,7 @@ function RaidDetail({ raidID, initialView }: Props) {
         <RaidRosterBoard onBench={canWrite && isActiveRaid ? benchAttendance : undefined} absences={absenceReasons} tentative={tentativeReasons} attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
         {canWrite && (
           <div>
-            {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
+            {optionsError && <ErrorMessage>{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></ErrorMessage>}
             {!attEditing && !quickAdd && <button type="button" disabled={pending} onClick={() => { setQuickAddName(''); setQuickAdd(true) }}>Neuen Charakter anlegen</button>}
             {quickAdd ? <RaidQuickAdd key={quickAddName} initialQuery={quickAddName} raidID={raidID} players={players} options={classSpecs} needsReason={attNeedsReason} pending={pending} submit={submit} isActive={isActive} onCancel={() => setQuickAdd(false)} onAdded={async () => { setQuickAdd(false); await load() }} /> :
             <form className="inline-form" onSubmit={addAttendance}>
@@ -938,7 +939,7 @@ function RaidDetail({ raidID, initialView }: Props) {
                 }} /> {label}
               </label>)}</fieldset>
               {attNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Teilnahme-Begründung" value={attReason} onChange={(e) => setAttReason(e.target.value)} required /></label>}
-              {attEditing && error && <p className="error" role="alert">{error}</p>}
+              {attEditing && error && <ErrorMessage>{error}</ErrorMessage>}
               {!pending && (!hasAttCharacter ? <p className="field-hint">Zuerst einen Charakter wählen.</p> : attNeedsReason && !attReason.trim() ? <p className="field-hint">Begründung eintragen.</p> : null)}
               <button className="primary-action" type="submit" disabled={pending || !hasAttCharacter || (attNeedsReason && !attReason.trim())}>{attEditing ? 'Teilnahme-Korrektur speichern' : 'Hinzufügen'}</button>
               {attEditing && <button type="button" disabled={pending} onClick={() => editAttendance(null)}>Bearbeitung abbrechen</button>}
@@ -1018,7 +1019,7 @@ function RaidDetail({ raidID, initialView }: Props) {
               {lootEditing && <p className="muted">Unveränderter Enhanced-Gewinner behält seine historischen Kosten. Ein Methoden- oder Empfängerwechsel wird vom Server samt EP, abgeleiteter Token-Sicht und Audit atomar ausgeglichen.</p>}
               <label>Notizen<input disabled={pending} placeholder="Loot-Notizen" value={lootNotes} onChange={(e) => changeLoot(() => setLootNotes(e.target.value))} /></label>
               {lootNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Loot-Begründung" value={lootReason} onChange={(e) => changeLoot(() => setLootReason(e.target.value))} required /></label>}
-              {lootEditing && error && <p className="error" role="alert">{error}</p>}
+              {lootEditing && error && <ErrorMessage>{error}</ErrorMessage>}
                 {lootBlockedHint && <p className="field-hint loot-submit-hint">{lootBlockedHint}</p>}
                 <button className="primary-action" type="submit" disabled={pending || !lootItem.trim() || !hasLootRecipient || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : 'Vergeben'}</button>
 				{lootEditing && <button type="button" disabled={pending || (lootNeedsReason && !lootReason.trim())} onClick={() => void withdrawLoot()}>Loot zurückziehen</button>}

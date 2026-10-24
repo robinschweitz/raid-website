@@ -302,9 +302,6 @@ table.table.small {
   min-width: 15rem;
 }
 
-.addon-hint-error {
-  color: var(--danger);
-}
 
 .option-stack {
   display: flex;

@@ -4,6 +4,7 @@ import { useAuth } from '../auth'
 import { Link } from '../router'
 import { atLeast, type GeneratedRegistrationCode, type RegistrationCode, type RegistrationRequest } from '../types'
 import { useSubmission } from '../useSubmission'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 const pageSize = 20
 
@@ -157,7 +158,7 @@ export function RegistrationRequestsPage() {
     <p><Link to="/roster">← Gildenkonfiguration</Link></p>
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Registrierungsanfragen</h1></div></div>
     <p className="muted">Codes werden nur einmal angezeigt. Die aktive Ansicht enthält nur offene Anfragen und aktive Codes.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {addonCodes && <section className="card">
       <h2>Addon-Export</h2>
       <p className="muted">Neue offene, noch nicht gesendete Codes dieser Sitzung im Format <code>Name:Code</code>.</p>

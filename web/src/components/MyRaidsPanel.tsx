@@ -3,7 +3,8 @@ import { api, ApiError } from '../api'
 import { Link } from '../router'
 import { useSubmission } from '../useSubmission'
 import { myRaidStatus, quickSignupChoice, upcomingRaids } from '../myRaids'
-import type { AbsenceStatus, Character, Raid, SignupOverview } from '../types'
+import type { AbsenceStatus, Attendance, Character, Raid, SignupOverview } from '../types'
+import { ErrorMessage } from './ErrorMessage'
 
 interface Props {
   playerID: number
@@ -20,6 +21,7 @@ export function MyRaidsPanel({ playerID, raids, characters }: Props) {
   const [now] = useState(() => Date.now())
   const upcoming = upcomingRaids(raids, now, 4)
   const [overviews, setOverviews] = useState<Record<number, SignupOverview>>({})
+  const [rosters, setRosters] = useState<Record<number, Attendance[]>>({})
   const [declining, setDeclining] = useState<{ raidID: number; status: AbsenceStatus } | null>(null)
   const [reason, setReason] = useState('')
   const [message, setMessage] = useState('')
@@ -28,8 +30,17 @@ export function MyRaidsPanel({ playerID, raids, characters }: Props) {
 
   const load = useCallback(async () => {
     const ids = raidKey ? raidKey.split(',').map(Number) : []
-    const rows = await Promise.all(ids.map(async (id) => [id, await api.get<SignupOverview>(`/api/v1/raids/${id}/signups`)] as const))
-    if (isActive()) setOverviews(Object.fromEntries(rows))
+    // Staff can put a character straight into the roster, so the roster counts too.
+    const rows = await Promise.all(ids.map(async (id) => {
+      const [overview, roster] = await Promise.all([
+        api.get<SignupOverview>(`/api/v1/raids/${id}/signups`),
+        api.get<Attendance[]>(`/api/v1/raids/${id}/attendance`),
+      ])
+      return { id, overview, roster }
+    }))
+    if (!isActive()) return
+    setOverviews(Object.fromEntries(rows.map((row) => [row.id, row.overview])))
+    setRosters(Object.fromEntries(rows.map((row) => [row.id, row.roster])))
   }, [raidKey, isActive])
 
   useEffect(() => {
@@ -55,11 +66,11 @@ export function MyRaidsPanel({ playerID, raids, characters }: Props) {
 
   return <section className="card my-raids" aria-label="Meine nächsten Raids">
     <div className="section-heading"><div><h2>Meine nächsten Raids</h2><p className="muted">Hier meldest du dich an, sagst ab oder meldest, dass du noch unsicher bist. Die Raidleitung sieht es sofort.</p></div></div>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {message && <p className="success-message" role="status"><span>{message}</span><button type="button" aria-label="Meldung schließen" onClick={() => setMessage('')}>Schließen</button></p>}
     <ul className="my-raid-list">{upcoming.map((raid) => {
       const overview = overviews[raid.id]
-      const status = overview ? myRaidStatus(overview, playerID) : null
+      const status = overview ? myRaidStatus(overview, playerID, rosters[raid.id]) : null
       const quick = overview ? quickSignupChoice(characters, overview.class_specs) : null
       const when = new Date(raid.scheduled_start!).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
       const signupLink = `/raids/${raid.id}/anmeldungen`

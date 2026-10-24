@@ -12,6 +12,7 @@ import { GuildNotifications } from '../components/GuildNotifications'
 import { PlayerProfilePanel } from '../components/PlayerProfilePanel'
 import { MyRaidsPanel } from '../components/MyRaidsPanel'
 import { atLeast } from '../types'
+import { ErrorMessage } from '../components/ErrorMessage'
 // import { StatisticsCharts } from '../components/StatisticsCharts'
 
 
@@ -93,7 +94,7 @@ export function DashboardPage() {
       </div>
       <Link to="/raids">Alle Raids ansehen &rarr;</Link>
     </div>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
 
     {player && atLeast(player.role, 'MEMBER') && !loading && <MyRaidsPanel playerID={player.id} raids={raids} characters={characters} />}
 
@@ -108,7 +109,7 @@ export function DashboardPage() {
           </div>
           <h2>{nextRaid.name}</h2>
           <p className="muted">Raidleitung: {players.find((p) => p.id === nextRaid.raid_leader_id)?.name ?? `Spieler #${nextRaid.raid_leader_id}`}</p>
-          {attendanceError ? <p className="error" role="alert">{attendanceError}</p> : attendance ? <>
+          {attendanceError ? <ErrorMessage>{attendanceError}</ErrorMessage> : attendance ? <>
             <div className="composition" aria-label="Gespeicherte Raidaufstellung">
               <span><strong>{attendance.length}</strong> Aufgestellt</span>
               <span><strong>{attendance.filter((a) => a.role === 'TANK').length}</strong> Tanks</span>
@@ -142,7 +143,7 @@ export function DashboardPage() {
 
       <section className="card widget-poll">
         <div className="section-heading"><h2>Aktive Umfrage</h2><Link to="/polls">Alle &rarr;</Link></div>
-        {votesError && <p className="error" role="alert">{votesError}</p>}
+        {votesError && <ErrorMessage>{votesError}</ErrorMessage>}
         {polls.map((p) => {
           const pollVotes = votes[p.id]
           const choiceCounts: Record<string, number> = {}
@@ -194,7 +195,7 @@ export function DashboardPage() {
         <div className="section-heading"><h2>Mein Profil</h2></div>
         {player && <PlayerProfilePanel player={player} characters={characters} points={points} />}
         {player && atLeast(player.role, 'MEMBER') && <p className="profile-link"><Link to="/wishlist">Meine Wunschliste &amp; Addon-Export &rarr;</Link></p>}
-        {pointsError && <p className="error" role="alert">{pointsError}</p>}
+        {pointsError && <ErrorMessage>{pointsError}</ErrorMessage>}
       </section>}
 
       <section className="card widget-agenda">
@@ -210,7 +211,7 @@ export function DashboardPage() {
 
     {/* <div className="dashboard-columns">
       <div className="dashboard-points">
-        {pointsError && <p className="error" role="alert">{pointsError}</p>}
+        {pointsError && <ErrorMessage>{pointsError}</ErrorMessage>}
         <EnhancePointsCard points={points} />
         {player && <p className="profile-link"><Link to={`/players/${player.id}`}>Mein Profil &amp; EP-Historie &rarr;</Link></p>}
       </div>
@@ -225,7 +226,7 @@ export function DashboardPage() {
       </section>
       <section className="card dashboard-polls">
         <div className="section-heading"><h2>Offene Umfragen</h2><Link to="/polls">Alle &rarr;</Link></div>
-        {votesError && <p className="error" role="alert">{votesError}</p>}
+        {votesError && <ErrorMessage>{votesError}</ErrorMessage>}
         {polls.map((p) => <div className="poll-preview" key={p.id}>
           <h3>{p.title}</h3>
           {p.description && <p className="muted">{p.description}</p>}

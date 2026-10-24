@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api, ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
 import type { AddonRosterImportResult, AddonRosterPreview, AddonRosterPreviewRow, AttendanceRole } from '../types'
+import { ErrorMessage } from './ErrorMessage'
 
 interface Props {
   raidID: number
@@ -76,9 +77,9 @@ export function AddonRosterImport({ raidID, onImported, onQuickAdd }: Props) {
     <div className="actions">
       <button type="button" disabled={pending || !payload.trim()} onClick={() => void runPreview()}>Abgleichen</button>
     </div>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {preview && <>
-      {preview.warnings.map((warning) => <p key={warning} className="error" role="alert">{warning}</p>)}
+      {preview.warnings.map((warning) => <ErrorMessage key={warning}>{warning}</ErrorMessage>)}
       <p className="muted">Exportiert von {preview.recorder || 'unbekannt'} · {preview.rows.length} Charaktere im Raid gesehen</p>
       {preview.missing.length > 0 && <p className="muted">In der Aufstellung, aber im Spiel nicht gesehen: {preview.missing.join(', ')}</p>}
       <div className="table-scroll">
@@ -98,7 +99,7 @@ export function AddonRosterImport({ raidID, onImported, onQuickAdd }: Props) {
                   : '—'}</td>
                 <td>{choice ? <input type="checkbox" aria-label={`${row.name} später dazugekommen`} disabled={pending} checked={choice.lateJoin} onChange={(e) => choose(id, { lateJoin: e.target.checked })} /> : '—'}</td>
                 <td className="addon-hints">
-                  {row.errors.length > 0 ? row.errors.map((text) => <div key={text} className="addon-hint-error">{text}</div>) : <div className={row.status === 'in_roster' ? 'muted' : ''}>{statusLabels[row.status]}</div>}
+                  {row.errors.length > 0 ? row.errors.map((text) => <ErrorMessage key={text}>{text}</ErrorMessage>) : <div className={row.status === 'in_roster' ? 'muted' : ''}>{statusLabels[row.status]}</div>}
                   {row.status === 'unknown' && <button type="button" disabled={pending} onClick={() => onQuickAdd(row.name)}>Per Schnellanlage hinzufügen</button>}
                 </td>
               </tr>

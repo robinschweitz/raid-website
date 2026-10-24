@@ -178,6 +178,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/polls/{id}/vote", RequireRole(validation.RoleMember, a.votePoll))
 	mux.HandleFunc("GET /api/v1/polls/{id}/votes", RequireAuth(a.listPollVotes))
 	mux.HandleFunc("POST /api/v1/polls/{id}/close", RequireRole(validation.RoleRaidassistent, a.closePoll))
+	mux.HandleFunc("PUT /api/v1/polls/{id}", RequireRole(validation.RoleRaidassistent, a.editPoll))
 
 	WishlistHandlers{Wishlist: wishlist.NewService(a.DB)}.Register(mux)
 

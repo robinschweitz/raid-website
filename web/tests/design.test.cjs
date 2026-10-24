@@ -451,3 +451,33 @@ test('series editing preloads association, omits unchanged fields and validates 
   assert.equal(writes(s)[1].body.raid_size, 25)
   writes(s)[1].reject(new Error('offline')); await flush(s)
 })
+
+// REQ-UI-010: every control edge (input, select, textarea, button) uses outline-control, not the decorative outline line.
+// States that carry their own highlight (hover, focus, disabled, active, selected, pressed, primary) keep that colour.
+function controlEdgeViolations(css) {
+  const violations = []
+  const rules = css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)
+  for (const [, selectorText, body] of rules) {
+    for (const selector of selectorText.split(',').map((part) => part.trim())) {
+      if (!/(^|[\s>])(button|input|select|textarea|\.button-link)(?![\w-])/.test(selector)) continue
+      if (/:hover|:focus|:disabled|:checked|\.active|aria-|\[aria-pressed|primary|\[aria-selected/.test(selector)) continue
+      for (const [, property, value] of body.matchAll(/(?:^|[\s;])(border(?:-(?:top|right|bottom|left))?(?:-color)?)\s*:\s*([^;]+)/g)) {
+        if (/transparent|none|^0\b/.test(value.trim())) continue
+        if (!/var\(--outline-control\)|#5989a3/.test(value)) violations.push(`${selector} { ${property}: ${value.trim()} }`)
+      }
+    }
+  }
+  return violations
+}
+
+test('REQ-UI-010 AC-01: every control edge on every page uses outline-control #5989a3', () => {
+  const css = ['../src/index.css', '../src/secondary-pages.css'].map((file) => fs.readFileSync(path.resolve(__dirname, file), 'utf8')).join('\n')
+  assert.deepEqual(controlEdgeViolations(css), [])
+  assert.match(fs.readFileSync(path.resolve(__dirname, '../src/index.css'), 'utf8'), /--outline-control: #5989a3;/)
+})
+
+test('REQ-UI-010 AC-02: the control edge check fails on a control border that uses outline', () => {
+  assert.deepEqual(controlEdgeViolations('button { border: 1px solid var(--border); }'), ['button { border: 1px solid var(--border) }'])
+  assert.deepEqual(controlEdgeViolations('.field:hover, select { border-color: #2a4057; }'), ['select { border-color: #2a4057 }'])
+  assert.deepEqual(controlEdgeViolations('.card { border: 1px solid var(--border); }'), [])
+})

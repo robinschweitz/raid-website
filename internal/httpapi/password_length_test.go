@@ -10,15 +10,15 @@ import (
 )
 
 // REQ-AUTH-023 / SC-005: every endpoint that takes a new password rejects more
-// than 72 bytes with 422 password_too_long and changes nothing.
-func TestReqAuth023_AC01_PasswordEndpointsRejectSeventyThreeBytes(t *testing.T) {
+// than 1024 bytes with 422 password_too_long and changes nothing.
+func TestReqAuth023_AC01_PasswordEndpointsRejectOver1024Bytes(t *testing.T) {
 	srv, db := setupServer(t)
 	client := srv.Client()
 	memberID := seedAccount(t, db, "pw-member", "member-password", validation.RoleMember)
 	seedAccount(t, db, "pw-admin", "admin-password", validation.RoleAdmin)
 	member := login(t, client, srv, "pw-member", "member-password")
 	admin := login(t, client, srv, "pw-admin", "admin-password")
-	tooLong := strings.Repeat("a", 73)
+	tooLong := strings.Repeat("a", 1025)
 
 	assertTooLong := func(name string, status int, body []byte) {
 		t.Helper()
@@ -46,7 +46,7 @@ func TestReqAuth023_AC02_SeventyTwoBytesAccepted(t *testing.T) {
 	client := srv.Client()
 	seedAccount(t, db, "pw-edge", "member-password", validation.RoleMember)
 	member := login(t, client, srv, "pw-edge", "member-password")
-	// 36 umlauts are 72 bytes, so the limit must count bytes rather than characters.
+	// 36 umlauts are 1024 bytes, so the limit must count bytes rather than characters.
 	exact := strings.Repeat("ä", 36)
 
 	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/password", member, map[string]any{"current_password": "member-password", "new_password": exact})

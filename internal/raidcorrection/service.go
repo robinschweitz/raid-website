@@ -449,12 +449,10 @@ func (s *Service) WithdrawLoot(ctx context.Context, raidID, id, actor int64, rea
 		if old.RaidID != raidID || old.Source != "manual" || old.WithdrawnAt != nil {
 			return ErrInvalid
 		}
+		// check requires a nonblank reason only for archived raids (FR-26.5).
 		completed, err := s.check(ctx, r, raidID, actor, reason)
 		if err != nil {
 			return err
-		}
-		if strings.TrimSpace(reason) == "" {
-			return ErrReason
 		}
 		var eligibilityBefore map[int64]int
 		if completed {
@@ -466,8 +464,9 @@ func (s *Service) WithdrawLoot(ctx context.Context, raidID, id, actor int64, rea
 		*row = *old
 		now := time.Now().UTC()
 		row.WithdrawnAt, row.WithdrawnByPlayerID = &now, &actor
-		withdrawnReason := strings.TrimSpace(reason)
-		row.WithdrawnReason = &withdrawnReason
+		if withdrawnReason := strings.TrimSpace(reason); withdrawnReason != "" {
+			row.WithdrawnReason = &withdrawnReason
+		}
 		row.UpdatedAt = now
 		if err := r.loot.Update(ctx, row); err != nil {
 			return err

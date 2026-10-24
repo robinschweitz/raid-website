@@ -3,6 +3,7 @@ import { api } from '../api'
 import { NavIcon } from '../components/NavIcon'
 import { Link } from '../router'
 import type { AddonDownload } from '../types'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 // The addons pages (ADR 085): a showcase per addon with downloads served by the
 // website itself. Screenshots in public/addons are cropped from live test runs
@@ -116,7 +117,7 @@ function Overview({ addons, error }: { addons: AddonDownload[], error: string })
       </div>
     </div>
     <p className="guide-lead">Zwei Addons verbinden das Spiel mit dieser Website: Die Raidleitung lädt mit <strong>RaidLedger</strong> ein und verteilt den Loot, jeder Raider würfelt mit <strong>RaidWishlist</strong> auf seine Wunschliste. Alles läuft über Kopieren und Einfügen. Die Addons verbinden sich nie selbst mit dem Internet.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     <div className="addon-cards">
       <article className="card addon-card ledger">
         <div className="addon-card-shot"><img src="/addons/raidledger-fenster.webp" alt="Das RaidLedger-Fenster im Spiel" width={709} height={448} /></div>
@@ -172,7 +173,7 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
       pitch="Das Werkzeug für den Raidabend: Aufstellung von der Website einladen, Kalender-Termin anlegen, Loot nach unseren Regeln auswürfeln, vergeben, nachhalten und am Ende Teilnahme und Loot zurück auf die Website bringen."
       shot={<Shot name="raidledger-fenster" caption="RaidLedger, Reiter BEUTE: das Item, seine Würfe mit BISHER und der Gewinner" width={709} height={448} />}
     />
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     <Contents entries={[
       { id: 'ledger-funktionen', title: 'Funktionen' },
       { id: 'ledger-website', title: 'Zusammenspiel mit der Website' },
@@ -348,7 +349,7 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
       pitch="Deine Wunschliste im Spiel: Wenn die Raidleitung ein Item von deiner Liste auswürfelt, würfelst du mit einem Klick den richtigen Bereich, auch mit Enhanced. Oder das Addon würfelt automatisch für dich."
       shot={<Shot name="raidwishlist-fenster" caption="RaidWishlist, Reiter WUNSCHLISTE: das Item ist ERHALTEN" width={466} height={409} />}
     />
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     <Contents entries={[
       { id: 'wish-funktionen', title: 'Funktionen' },
       { id: 'wish-website', title: 'Zusammenspiel mit der Website' },
@@ -374,7 +375,7 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
         <p>Startet die Raidleitung einen Wurf auf ein Item von deiner Liste, erscheint oben am Bildschirm ein Hinweis mit Rang und Notiz und zwei Knöpfen: <strong>WÜRFELN MS 21-120</strong> (dein Spec und Bereich) oder <strong>PASSEN</strong>.</p>
         <ul>
           <li><strong>AUTO-WURF: AN</strong> würfelt etwa eine Sekunde nach dem Start für dich, z. B. wenn du kurz weg bist.</li>
-          <li>Das Addon würfelt höchstens einmal pro Wurf (nur der erste zählt), beim Stechen nur, wenn du dabei bist, und nicht auf Items, die du in diesem Raid schon bekommen hast.</li>
+          <li>Das Addon würfelt höchstens einmal pro Wurf (nur der erste zählt), beim Stechen nur, wenn du dabei bist, und nicht auf Items, die du in diesem Raid schon bekommen hast. Was du in einem früheren Raid bekommen hast, zählt nicht.</li>
           <li>Enhanced würfelt <strong>1+X bis 100+X</strong> mit X = EP, höchstens 50. Nach einem Enhanced-Gewinn senkt das Addon seinen EP-Stand bis zum nächsten Export.</li>
         </ul>
       </Feature>
@@ -382,7 +383,7 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
       <Feature title="3. Drei Reiter, jede Liste scrollbar">
         <p>Jeder Reiter ist eine Liste über die ganze Fensterhöhe, die mit dem <strong>Mausrad</strong> scrollt. Unten rechts steht, welche Einträge du siehst („18-30 / 30“), die Reiter zählen ihre Einträge mit.</p>
         <ul>
-          <li><strong>WUNSCHLISTE:</strong> deine Wünsche nach Rang, mit Notiz und Würfelbereich. Erhaltene Wünsche zeigen <strong>ERHALTEN</strong>.</li>
+          <li><strong>WUNSCHLISTE:</strong> deine Wünsche nach Rang, mit Notiz und Würfelbereich. Erhaltene Wünsche zeigen <strong>ERHALTEN</strong>. Ein Item, das dein Spiel noch nie gesehen hat, steht kurz als <code>[Gegenstand 12345]</code> da, bis der Server seinen Namen schickt.</li>
           <li><strong>OFFEN:</strong> Beute, die noch ausgewürfelt wird: auf der Leiche, beim Plündermeister oder bei einem Raider geparkt, mit Status <strong>OFFEN</strong>, <strong>WIRD GEWÜRFELT</strong> oder dem Gewinner. Items von deiner Liste sind markiert. Wird ein Wunsch-Item ausgewürfelt, öffnet sich das Fenster hier.</li>
           <li><strong>DIESER RAID:</strong> jede Vergabe der Raidleitung mit Item, Empfänger und Spec. Oben stehen deine Items bisher (Items und Tokens, je Main- und Second-Spec), die bei knappen Würfen entscheiden.</li>
         </ul>
@@ -392,7 +393,11 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
         <p>Das Fenster sieht aus wie RaidLedger, in deiner Farbe: Der Farbknopf oben (oder <code>/wish color</code>) öffnet die Farbauswahl, Rechtsklick (oder <code>/wish color reset</code>) geht zurück auf Grün. Die Farbe gilt für alle deine Charaktere. Sehr dunkle Farben hellt das Addon auf, damit die Schrift lesbar bleibt.</p>
       </Feature>
 
-      <Feature title="5. Die Raidleitung weiß, was du willst">
+      <Feature title="5. Größe und Skalierung">
+        <p>Für große und kleine Bildschirme: Die Ecke unten rechts im Fenster ziehen macht es größer (bis zum Bildschirmrand, mindestens 500 × 440), die Listen zeigen dann mehr Zeilen. <strong>–</strong> und <strong>+</strong> unten im Fenster (oder <code>/wish scale 80</code>) machen das ganze Fenster kleiner oder größer, von 60 bis 150 %. Größe und Skalierung gelten für alle deine Charaktere. <code>/wish reset</code> setzt das Fenster in die Mitte, in normaler Größe und auf 100 %.</p>
+      </Feature>
+
+      <Feature title="6. Die Raidleitung weiß, was du willst">
         <p>Deine Liste (Items, Spec, Enhanced, Reihenfolge) geht an RaidLedger der Raidleitung. Sie sieht bei jedem Drop, wie viele und wer ihn wollen. <strong>Notizen bleiben privat.</strong> <code>/wish share off</code> schaltet das Teilen ab.</p>
       </Feature>
     </section>
@@ -426,6 +431,8 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
             <tr><td><code>/wish share on|off</code></td><td>Wunschliste mit der Raidleitung teilen (Standard: an)</td></tr>
             <tr><td><code>/wish minimap on|off</code></td><td>Minimap-Knopf ein- oder ausblenden</td></tr>
             <tr><td><code>/wish color</code> · <code>/wish color reset</code></td><td>Fensterfarbe wählen oder zurück auf Grün</td></tr>
+            <tr><td><code>/wish scale &lt;Prozent&gt;</code></td><td>Fenster kleiner oder größer (60–150 %)</td></tr>
+            <tr><td><code>/wish reset</code></td><td>Fenster in die Mitte, normale Größe, 100 %</td></tr>
           </tbody>
         </table>
       </div>

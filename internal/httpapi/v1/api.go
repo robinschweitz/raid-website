@@ -69,6 +69,8 @@ func NewAPI(d Deps) *API {
 
 func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/health", Health)
+	mux.HandleFunc("POST /api/v1/push/subscriptions", RequireAuth(a.registerPush))
+	mux.HandleFunc("POST /api/v1/push/subscriptions/revoke", RequireAuth(a.unregisterPush))
 	mux.HandleFunc("GET /api/v1/auth/csrf", a.csrfToken)
 	mux.HandleFunc("POST /api/v1/auth/login", a.login)
 	mux.HandleFunc("POST /api/v1/auth/mfa/verify", a.verifyMFA)

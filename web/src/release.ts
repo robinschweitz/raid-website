@@ -1,8 +1,15 @@
-export const appVersion = '1.0.37'
+export const appVersion = '1.0.38'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Absage gibt Item-Sperren frei',
+    changes: [
+      'Wird ein Raid abgesagt, laufen seine noch nicht eingelösten Item-Sperren jetzt ab. Dabei gehen keine Enhance Points verloren. Sperren früher abgesagter Raids bleiben unverändert.',
+    ],
+  },
+  {
+    version: '1.0.37',
     title: 'Übersichtlichere Anmeldungen und Umfragen bearbeiten',
     changes: [
       'Die Anmeldeliste eines Raids zeigt jeden Spieler in einer Zeile, offene Anmeldungen zuerst, mit Klassensymbol, Klasse und Spec. Oben steht, wie viele ausstehend, eingetragen, unsicher und abgesagt sind.',

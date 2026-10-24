@@ -418,6 +418,13 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Evidence:** FR-3.11, OD-019 (owner, 2026-10-23). Code: **not built**. Threats: T-049.
 - **Verification:** Running the command for the only Admin prints a code that works once within 72 hours; the audit log shows the operator entry; no HTTP route reaches the command.
 
+**SC-052 - Service worker without cache or push**
+- **Status:** ACTIVE
+- **Rule:** The service worker (`/sw.js`) MUST NOT register a `fetch` or `push` handler and MUST NOT use Cache Storage, so no page or API response is kept on the device and every request reaches the server with its normal session and CSRF checks. Adding caching or push needs a new owner decision.
+- **Enforcement:** `web/public/sw.js`; `web/src/components/PWAInstall.tsx` (registration only).
+- **Evidence:** FR-28.5, ADR 101 (owner, 2026-10-24). Code: compliant since #160; test `the service worker caches nothing and handles no requests` in `web/tests/frontend.test.cjs`. In Chromium the worker registered and controlled the page with no caches (2026-10-24).
+- **Verification:** After a visit, `caches.keys()` is empty and `sw.js` contains no `fetch` or `push` listener.
+
 ## Open Security Decisions
 
 The owner decided OD-001 to OD-006, OD-008, and OD-009 on 2026-10-22; the answers are in the rules that

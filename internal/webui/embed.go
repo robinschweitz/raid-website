@@ -11,9 +11,16 @@ import (
 	"embed"
 	"errors"
 	"io/fs"
+	"mime"
 	"net/http"
 	"strings"
 )
+
+func init() {
+	// The system MIME table differs per host; the web manifest needs its own type
+	// on every one (FR-28.5).
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
 
 //go:embed all:dist
 var distFS embed.FS

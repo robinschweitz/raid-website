@@ -50,6 +50,8 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   (`web/src/api.ts`) that sends `credentials: 'include'` and the CSRF header. Vite builds it into
   `internal/webui/dist`, which the Go binary embeds and serves for `/`; the frontend is built
   before the binary. In development Vite proxies `/api` to `:8080`.
+  The SPA also ships a web app manifest and a service worker without cache or push, so it can
+  be installed as a PWA (FR-28.5, SC-052, ADR 101).
 - **Sessions and identity.** The `authenticate` middleware resolves the session cookie into the
   actor on the request context; route guards `RequireAuth` and `RequireRole(role)` enforce the
   role matrix (FR-1.*); domain services re-check ownership where a rule depends on it (for

@@ -76,7 +76,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-005 - Password storage and policy**
 - **Status:** ACTIVE
-- **Rule:** Password policy: at least 12 characters after trimming. Passwords MUST be hashed with bcrypt (`golang.org/x/crypto/bcrypt`, `DefaultCost`). A password longer than bcrypt's 72-byte input limit MUST be rejected with a validation error, not truncated and not answered with a 500.
+- **Rule:** Password policy: at least 12 characters after trimming. New passwords MUST be hashed with Argon2id (64 MiB, 3 iterations, parallelism 1). Existing bcrypt hashes remain supported and migrate after successful login. Passwords longer than 1024 bytes MUST be rejected.
 - **Enforcement:** `auth.ValidatePassword`, `auth.HashPassword`.
 - **Evidence:** FR-2.2, ADR 046. Code: compliant. Over-72-byte passwords are rejected before hashing with 422 `password_too_long` (REQ-AUTH-023, `auth.ValidatePassword`), on own password change, admin account save and registration; tests `TestReqAuth023_*`.
 - **Verification:** A 73-byte password gets a 4xx validation error; a 12-character one is accepted; the stored value starts with `$2`.

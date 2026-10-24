@@ -1,0 +1,33 @@
+[Unit]
+Description=Restore the newest off-server Raid Website copy and start the server on it
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/local/sbin/raid-website-backup --restore-test
+TimeoutStartSec=15min
+# No NoNewPrivileges here: combined with this sandbox it makes setpriv fail to
+# switch to raidweb. setpriv sets no_new_privs for the restored server itself.
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ReadOnlyPaths=/etc/raid-website-backup
+# setpriv drops to raidweb to start the restored copy without root.
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_FOWNER CAP_CHOWN CAP_SETUID CAP_SETGID CAP_KILL
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native

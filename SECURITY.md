@@ -18,7 +18,7 @@ and open security decisions. All security controls are written here; other files
   production sets `ENV=production`, `COOKIE_SECURE=true`, `TRUST_PROXY_HEADERS=true`,
   `PUBLIC_ORIGIN` (deploy/README.md).
 - **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (specification, T-001 to T-050) and `THREAT_MODEL_CODE.md` (implementation, CT-001 to CT-030).
-- **Material gaps:** off-server backup storage and key holder (OQ-14, OD-007).
+- **Material gaps:** none; the off-server backup storage and key holder were decided on 2026-10-24 (OD-007, ADR 099).
 - **Conflicts found:** the client address can be forged behind nginx (SC-006, fixed in PR #44);
   production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007); `main` was
   not protected although ADR 071/072 require it (SC-039, T-012, fixed 2026-10-23); the deploy
@@ -291,11 +291,11 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Verification:** A secret scan of the repository finds none; production with default credentials fails startup.
 
 **SC-034 - Off-server backups**
-- **Status:** BLOCKED
-- **Rule:** The daily off-server copy MUST be encrypted before it leaves the host, and the key MUST NOT exist only on the host (NFR-2.3). Blocked on storage and key holder.
-- **Enforcement:** `deploy/` backup units.
-- **Evidence:** NFR-2.3, ADR 070. Depends on **OD-007** (OQ-14). Threats: T-011, T-030.
-- **Verification:** A restore from the off-server copy on another machine succeeds every month (NFR-2.5).
+- **Status:** ACTIVE
+- **Rule:** The daily off-server copy (newest verified snapshot plus `/etc/raid-website.env`) MUST be encrypted with GnuPG symmetric AES-256 before it leaves the host. The passphrase is in `/etc/raid-website-backup/passphrase` (root, 0400), and the owner keeps a second copy off the host; it MUST NOT be committed. The server MUST reach the Storage Box only through its own sub-account (SSH key, pinned host key, Hetzner network only, one folder). It MUST only add files: upload under a temporary name, rename without replacing, compare against a download, never delete. The server MUST NOT hold a Hetzner API token, so it cannot change the Storage Box snapshots.
+- **Enforcement:** `deploy/bin/raid-website-backup` (`--offsite`, `--restore-test`); `raid-website-backup-offsite.timer` (daily), `raid-website-backup-restore-test.timer` (monthly); Storage Box snapshot plan (daily, 10 kept).
+- **Evidence:** NFR-2.3, NFR-2.5, ADR 070, ADR 099, OD-007 (owner, 2026-10-24). Code and host: compliant since #109. The first copy was uploaded on 2026-10-24 and restored on the host and on the owner's PC; the site started with the restored data. Threats: T-011, T-030.
+- **Verification:** `systemctl start raid-website-backup-offsite.service` adds one `.tar.gpg` and its `.sha256`, and a second run adds nothing. `systemctl start raid-website-backup-restore-test.service` succeeds. A wrong target makes the upload unit fail. Decrypting with the owner's passphrase on another machine gives a database that passes `PRAGMA integrity_check`.
 
 ### Platform, build, and supply chain (V13, V15)
 
@@ -432,9 +432,7 @@ cite them. IDs are not reused.
 - **OD-008** 7-day idle timeout → SC-018.
 - **OD-009** CSRF token also for requests without a session cookie (login, MFA, registration) → SC-019, FR-2.8. Found during ownership reconciliation.
 
-- **OD-007** DEFERRED. Off-server backup storage and key holder (SC-034). Owner: owner. Done when SC-034's rule and verification are met: an encrypted daily copy off the host, a key that also exists off the host, and a monthly restore test on another machine. Decide by 2026-11-30 (OD-020).
-  - Missing: storage location and who holds the encryption key. Same decision as OQ-14 in `REQUIREMENTS.md`.
-  - Affected: SC-034, NFR-2.3. Owner: owner.
+- **OD-007** Off-server backup to a Hetzner Storage Box. The passphrase is kept on the server and by the owner. Reading a copy is acceptable, overwriting one is not: uploads only add files, and Storage Box snapshots are outside the server's reach → SC-034, ADR 099 (owner, 2026-10-24).
 
 Decided by the owner on 2026-10-23 (threat model):
 
@@ -448,4 +446,4 @@ Decided by the owner on 2026-10-23 (threat model):
 - **OD-017** Only name, class, specs, and gear score are kept from a Rising-Gods profile; raw copies are dropped → SC-050, FR-30.6.
 - **OD-018** A password reset code lasts 72 hours → SC-042.
 - **OD-019** A locked-out only Admin gets a reset code from a server command → SC-051, FR-3.11.
-- **OD-020** OD-007 (off-server backup) is decided by 2026-11-30.
+- **OD-020** OD-007 (off-server backup) is decided by 2026-11-30 (decided 2026-10-24).

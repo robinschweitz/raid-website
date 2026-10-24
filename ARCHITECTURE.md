@@ -181,7 +181,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 - **TB-5 Addon text → application.** Pasted RS1/RS2 text is untrusted, is previewed without
   writes, and is applied only through the ordinary validated paths (FR-20.3, FR-20.6).
 - **TB-6 Application → SQLite file and snapshots.** Local file permissions of the service account;
-  snapshots leave the host encrypted (NFR-2.3).
+  snapshots leave the host encrypted, once a day, to a Hetzner Storage Box over SFTP (NFR-2.3, SC-034).
 - **TB-7 Build and deploy.** Code from `main` is built by an unprivileged build account; a fixed
   root-owned publisher installs it (ADR 071, ADR 072). The design depends on a protected `main`
   (SC-039) and on committed, reviewed deploy scripts in `deploy/bin/` (SC-037); both hold since
@@ -210,7 +210,7 @@ flowchart LR
   end
   W[Cloudflare Worker]
   RG[Rising-Gods profiler]
-  OFF[(Off-server encrypted copy<br/>TO BE DECIDED)]
+  OFF[(Hetzner Storage Box<br/>encrypted daily copies)]
 
   B -->|"TB-1 HTTPS"| N
   N -->|"TB-2 HTTP loopback"| MW

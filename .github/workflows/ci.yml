@@ -37,6 +37,9 @@ jobs:
         run: npm test
       - name: Lint DESIGN.md
         run: npx --yes @google/design.md@0.4.0 lint DESIGN.md
+      # The root-run host scripts are reviewed like code (SC-037).
+      - name: Check host scripts
+        run: shellcheck -s sh deploy/bin/*
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: 1.26.x

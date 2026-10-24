@@ -111,6 +111,15 @@ for disaster recovery, then test a full restore.
 
 ## Deployment safety
 
+The root-run scripts in `deploy/bin/` are reviewed like code (SC-037): change
+them only through a pull request, then install them with the `install` lines
+from "Initial setup". The installed copies must match the repository; check
+with:
+
+```sh
+for f in deploy/bin/*; do cmp "$f" "/usr/local/sbin/$(basename "$f")"; done
+```
+
 Protect `main` in GitHub and review its commits before merging. The update
 service fetches only the approved public repository and `main`, builds and
 tests as `raiddeploy`, takes a database snapshot, then publishes only after a

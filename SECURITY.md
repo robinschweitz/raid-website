@@ -20,9 +20,9 @@ and open security decisions. All security controls are written here; other files
 - **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (specification, T-001 to T-050) and `THREAT_MODEL_CODE.md` (implementation, CT-001 to CT-030).
 - **Material gaps:** off-server backup storage and key holder (OQ-14, OD-007).
 - **Conflicts found:** the client address can be forged behind nginx (SC-006, fixed in PR #44);
-  production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007); `main` is
-  not protected although ADR 071/072 require it (SC-039, T-012); the deploy scripts that
-  `deploy/README.md` installs are not in the repository (SC-037, T-013).
+  production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007); `main` was
+  not protected although ADR 071/072 require it (SC-039, T-012, fixed 2026-10-23); the deploy
+  scripts that `deploy/README.md` installs were not in the repository (SC-037, T-013, fixed #105).
 
 ## Selected Manicode Prompts
 
@@ -317,7 +317,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Every script that `deploy/README.md` installs (`raid-website-publish`, `-update`, `-backup`, `-configure-ufw`) MUST be committed under `deploy/bin/` and reviewed like code. `.gitignore` MUST NOT exclude `deploy/bin/`. The installed copies MUST match the committed ones.
 - **Enforcement:** `.gitignore`, `deploy/bin/`, `deploy/README.md`.
-- **Evidence:** ADR 071, ADR 072; `.gitignore` contains `bin/`, and `deploy/bin/` is missing from `main`. Code: **not compliant**. Threats: T-013, T-029.
+- **Evidence:** ADR 071, ADR 072. Code: compliant since #105 — `.gitignore` ignores only the root `/bin/`, the four scripts are committed under `deploy/bin/` (`TestReqPlatform013_AC01` in `internal/ciconfig`), CI runs `shellcheck` on them, and on 2026-10-24 the installed copies in `/usr/local/sbin` were identical to the committed ones. Threats: T-013, T-029.
 - **Verification:** `git ls-files deploy/bin` lists all four scripts; a diff of the installed scripts against the repository is empty.
 
 **SC-038 - Short-lived security records are deleted**

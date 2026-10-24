@@ -1,0 +1,67 @@
+#!/bin/sh
+set -eu
+
+REPO_URL=${REPO_URL:-https://github.com/robinschweitz/raid-website.git}
+BRANCH=${BRANCH:-main}
+APP_DIR=/opt/raid-website
+SOURCE_DIR=$APP_DIR/source
+BUILD_DIR=$APP_DIR/build
+REVISION_FILE=$APP_DIR/current-revision
+LOCK_FILE=$HOME/raid-website-update.lock
+
+case "$REPO_URL" in
+    https://github.com/robinschweitz/raid-website.git) ;;
+    *) echo "REPO_URL is not an approved repository" >&2; exit 2 ;;
+esac
+case "$BRANCH" in
+    main) ;;
+    *) echo "BRANCH is not approved" >&2; exit 2 ;;
+esac
+
+mkdir -p "$SOURCE_DIR" "$BUILD_DIR" "$GOPATH" "$GOMODCACHE" "$GOCACHE"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "another Raid Website update is already running"
+    exit 0
+fi
+
+if [ ! -d "$SOURCE_DIR/.git" ]; then
+    rmdir "$SOURCE_DIR" 2>/dev/null || true
+    git -c core.hooksPath=/dev/null clone --branch "$BRANCH" --depth 1 "$REPO_URL" "$SOURCE_DIR"
+else
+    git -C "$SOURCE_DIR" -c core.hooksPath=/dev/null fetch --depth 1 origin "refs/heads/$BRANCH"
+    git -C "$SOURCE_DIR" -c core.hooksPath=/dev/null checkout --detach --force FETCH_HEAD
+    git -C "$SOURCE_DIR" -c core.hooksPath=/dev/null clean -ffdx
+fi
+
+revision=$(git -C "$SOURCE_DIR" rev-parse HEAD)
+case "$revision" in
+    ????????*) ;;
+    *) echo "could not determine checked out revision" >&2; exit 1 ;;
+esac
+if [ -r "$REVISION_FILE" ] && [ "$(cat "$REVISION_FILE")" = "$revision" ]; then
+    echo "already running $revision"
+    exit 0
+fi
+if ! grep -q 'LISTEN_ADDR' "$SOURCE_DIR/internal/config/config.go"; then
+    echo "refusing to publish a revision without the required loopback listener guard" >&2
+    exit 1
+fi
+
+cd "$SOURCE_DIR/web"
+npm ci
+npm run build
+npm test
+
+cd "$SOURCE_DIR"
+go test ./...
+go build -o "$BUILD_DIR/server.new" ./cmd/server
+chmod 0755 "$BUILD_DIR/server.new"
+printf '%s\n' "$revision" >"$BUILD_DIR/revision"
+
+sudo -n /usr/bin/systemctl start raid-website-publish.service
+if [ "$(cat "$REVISION_FILE")" != "$revision" ]; then
+    echo "publisher did not record the expected revision" >&2
+    exit 1
+fi
+echo "published $revision"

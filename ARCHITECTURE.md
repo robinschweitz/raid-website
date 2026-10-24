@@ -184,8 +184,8 @@ and similar notes say which specified parts the code does not have yet. All rows
   snapshots leave the host encrypted (NFR-2.3).
 - **TB-7 Build and deploy.** Code from `main` is built by an unprivileged build account; a fixed
   root-owned publisher installs it (ADR 071, ADR 072). The design depends on a protected `main`
-  (SC-039) and on committed, reviewed deploy scripts in `deploy/bin/` (SC-037); neither holds today
-  (T-012, T-013).
+  (SC-039) and on committed, reviewed deploy scripts in `deploy/bin/` (SC-037); both hold since
+  2026-10-24 (T-012, T-013).
 
 Controls at each boundary are defined in `SECURITY.md`; the threats that cross each boundary are
 in `THREAT_MODEL.md` ("Trust boundaries to threats").

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 
 	"raid-website/internal/db"
 	"raid-website/internal/player"
@@ -26,7 +25,7 @@ func countPasswordChecks(t *testing.T) *int {
 	original := comparePassword
 	comparePassword = func(hash, password []byte) error {
 		calls++
-		return bcrypt.CompareHashAndPassword(hash, password)
+		return verifyStoredPassword(string(hash),string(password))
 	}
 	t.Cleanup(func() { comparePassword = original })
 	return &calls

@@ -37,11 +37,16 @@ const (
 )
 
 // comparePassword is the login password check; tests replace it to prove that
-// a rate-limited attempt never reaches bcrypt (SC-008, SC-043).
-var comparePassword = func(hash,password []byte) error {return verifyStoredPassword(string(hash),string(password))}
+// a rate-limited attempt never reaches the password hash (SC-008, SC-043).
+var comparePassword = func(hash, password []byte) error {
+	return verifyStoredPassword(string(hash), string(password))
+}
 
-// Dummy comparisons use Argon2id to reduce username enumeration via timing.
-var dummyPasswordHash = func() string {h,err:=HashPassword("dummy-unknown-account-password");if err!=nil{panic(err)};return h}()
+// dummyPasswordHash is an Argon2id hash (current parameters) of a random secret
+// that was discarded after hashing. Logins for unknown usernames and accounts
+// without a password compare against it, so they take as long as a wrong
+// password and response time does not reveal which usernames exist (SC-009).
+const dummyPasswordHash = "$argon2id$v=19$m=65536,t=3,p=1$ydwgDnow7o4c5A0n0TInAg$/MoBjTPy4gijAXdfRlT5UutfKTMtkB5JLw6KUqRbADo"
 
 // rejectWithoutAccount spends the time of one password comparison and fails.
 func rejectWithoutAccount(password string) error {
@@ -107,6 +112,7 @@ func NewService(players *player.Repo, sessions *Repo) *Service {
 	return &Service{players: players, sessions: sessions, ttl: defaultSessionTTL}
 }
 
+// ErrPasswordTooLong is returned when a password exceeds maxPasswordBytes (SC-005).
 var ErrPasswordTooLong = errors.New("password must be at most 1024 bytes")
 
 // ValidatePassword enforces the account password policy for new or changed credentials.
@@ -114,7 +120,7 @@ func ValidatePassword(password string) error {
 	if len([]rune(strings.TrimSpace(password))) < MinPasswordLength {
 		return ErrWeakPassword
 	}
-	// The length is measured on the raw password, because bcrypt hashes the raw bytes.
+	// The length is measured on the raw password, because the hash reads the raw bytes.
 	if len(password) > maxPasswordBytes {
 		return ErrPasswordTooLong
 	}
@@ -126,7 +132,7 @@ func (s *Service) VerifyPassword(ctx context.Context, playerID int64, password s
 	if err != nil {
 		return fmt.Errorf("get password player: %w", err)
 	}
-	if p.PasswordHash == "" || verifyStoredPassword(p.PasswordHash,password) != nil {
+	if p.PasswordHash == "" || verifyStoredPassword(p.PasswordHash, password) != nil {
 		return ErrInvalidCredentials
 	}
 	if !p.Active {
@@ -197,6 +203,11 @@ func (s *Service) BootstrapAdmin(ctx context.Context, username, password string)
 	uname := strings.ToLower(strings.TrimSpace(username))
 	if uname == "" {
 		return errors.New("bootstrap admin: username required")
+	}
+	// The minimum length is not enforced here so development defaults keep
+	// working; an over-long password still stops startup (NFR-1.1, SC-005).
+	if len(password) > maxPasswordBytes {
+		return fmt.Errorf("bootstrap admin: %w", ErrPasswordTooLong)
 	}
 	return s.sessions.InTransaction(ctx, func(players *player.Repo) error {
 		if _, err := players.FindByUsername(ctx, uname); err == nil {
@@ -326,15 +337,22 @@ func (s *Service) StartLogin(ctx context.Context, username, password, clientIP s
 		return nil, ErrInvalidCredentials
 	}
 	if !p.Active {
-  s.recordLoginAttempt(ctx,uname,clientIP,false,now)
-  return nil,ErrInactive
- }
- if !strings.HasPrefix(p.PasswordHash,"$argon2id$") {
-  replacement,hashErr:=HashPassword(password)
-  if hashErr!=nil{return nil,fmt.Errorf("rehash password: %w",hashErr)}
-  if err:=s.sessions.UpgradePasswordHash(ctx,p.ID,p.PasswordHash,replacement);err!=nil{return nil,fmt.Errorf("upgrade password hash: %w",err)}
- }
- status, err := s.MFAStatus(ctx, p.ID)
+		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
+		return nil, ErrInactive
+	}
+	// The password was just verified, so a legacy bcrypt hash (or Argon2id with
+	// old parameters) is replaced now. The password itself does not change, so
+	// sessions stay valid and no audit entry is written (ADR 100).
+	if needsRehash(p.PasswordHash) {
+		replacement, err := HashPassword(password)
+		if err != nil {
+			return nil, fmt.Errorf("rehash password: %w", err)
+		}
+		if err := s.sessions.UpgradePasswordHash(ctx, p.ID, p.PasswordHash, replacement); err != nil {
+			return nil, fmt.Errorf("upgrade password hash: %w", err)
+		}
+	}
+	status, err := s.MFAStatus(ctx, p.ID)
 	if err != nil {
 		return nil, err
 	}

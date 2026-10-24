@@ -36,7 +36,7 @@ func TestBootstrapAdmin(t *testing.T) {
 			opts := Options{AdminUsername: " Owner ", AdminPassword: "initial-password"}
 			switch scenario {
 			case "hash failure":
-				opts.AdminPassword = strings.Repeat("x", 73)
+				opts.AdminPassword = strings.Repeat("x", 1025)
 			case "insert failure":
 				if _, err := bdb.DB.ExecContext(ctx, "CREATE TRIGGER reject_admin AFTER INSERT ON players BEGIN SELECT RAISE(ABORT, 'injected failure'); END"); err != nil {
 					t.Fatal(err)

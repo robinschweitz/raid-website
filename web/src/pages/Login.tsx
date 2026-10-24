@@ -206,7 +206,7 @@ export function LoginPage() {
           <label>Code<input value={code} onChange={(e) => setCode(e.target.value)} required /></label>
           <label>Benutzername<input value={regUser} onChange={(e) => setRegUser(e.target.value)} autoComplete="username" required /></label>
           <label>Passwort<input type="password" value={regPass} onChange={(e) => setRegPass(e.target.value)} autoComplete="new-password" required aria-describedby="reg-pass-hint" />
-            <span id="reg-pass-hint" className="muted">Mindestens 12 Zeichen, höchstens 72 Bytes. Umlaute und Sonderzeichen zählen mehrfach.</span></label>
+            <span id="reg-pass-hint" className="muted">Mindestens 12 Zeichen, höchstens 1024 Bytes. Umlaute und Sonderzeichen zählen mehrfach.</span></label>
           <button className="primary-action" type="submit" disabled={busy || !code.trim() || !regUser.trim() || !regPass.trim()}>Registrieren</button>
         </form>}
         {error && <ErrorMessage>{error}</ErrorMessage>}

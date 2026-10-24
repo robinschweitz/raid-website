@@ -40,18 +40,18 @@ func TestReqAuth023_AC01_PasswordEndpointsRejectOver1024Bytes(t *testing.T) {
 	login(t, client, srv, "pw-member", "member-password")
 }
 
-// REQ-AUTH-023 / SC-005: a 72-byte password is accepted by the own-password endpoint.
-func TestReqAuth023_AC02_SeventyTwoBytesAccepted(t *testing.T) {
+// REQ-AUTH-023 / SC-005: a 1024-byte password is accepted by the own-password endpoint.
+func TestReqAuth023_AC02_1024BytesAccepted(t *testing.T) {
 	srv, db := setupServer(t)
 	client := srv.Client()
 	seedAccount(t, db, "pw-edge", "member-password", validation.RoleMember)
 	member := login(t, client, srv, "pw-edge", "member-password")
-	// 36 umlauts are 1024 bytes, so the limit must count bytes rather than characters.
-	exact := strings.Repeat("ä", 36)
+	// 512 umlauts are 1024 bytes, so the limit must count bytes rather than characters.
+	exact := strings.Repeat("ä", 512)
 
 	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/password", member, map[string]any{"current_password": "member-password", "new_password": exact})
 	if status != http.StatusNoContent {
-		t.Fatalf("72-byte password: status %d body %s, want 204", status, body)
+		t.Fatalf("1024-byte password: status %d body %s, want 204", status, body)
 	}
 	login(t, client, srv, "pw-edge", exact)
 }

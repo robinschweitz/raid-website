@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-
 	"raid-website/internal/db"
 	"raid-website/internal/player"
 )
@@ -17,7 +16,7 @@ const (
 	otherAddress   = "198.51.100.4"
 )
 
-// countPasswordChecks replaces the login bcrypt comparison with a counting
+// countPasswordChecks replaces the login password comparison with a counting
 // wrapper for the duration of the test.
 func countPasswordChecks(t *testing.T) *int {
 	t.Helper()
@@ -25,7 +24,7 @@ func countPasswordChecks(t *testing.T) *int {
 	original := comparePassword
 	comparePassword = func(hash, password []byte) error {
 		calls++
-		return verifyStoredPassword(string(hash),string(password))
+		return verifyStoredPassword(string(hash), string(password))
 	}
 	t.Cleanup(func() { comparePassword = original })
 	return &calls

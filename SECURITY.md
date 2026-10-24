@@ -11,7 +11,7 @@ and open security decisions. All security controls are written here; other files
   `deploy/README.md`, `deploy/` templates, `workers/rising-gods-proxy.js`, `.github/workflows/`,
   and the Go and TypeScript sources they describe. No earlier `SECURITY.md` existed.
 - **Confirmed facts used:** Go 1.26 `net/http` server behind nginx (TLS, Let's Encrypt) on one
-  host; SQLite; React 18 SPA from the same origin; local accounts with bcrypt, optional TOTP,
+  host; SQLite; React 18 SPA from the same origin; local accounts with Argon2id password hashes (legacy bcrypt until the next login), optional TOTP,
   recovery codes, and WebAuthn (`go-webauthn/webauthn` v0.18.2); cookie sessions; roles
   GUEST < MEMBER < RAIDASSISTENT < RAIDLEADER < ADMIN; public reads in FR-1.2; outbound HTTPS to
   `db.rising-gods.de`, optionally via a Cloudflare Worker; personal data under GDPR (FR-30);
@@ -76,10 +76,10 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-005 - Password storage and policy**
 - **Status:** ACTIVE
-- **Rule:** Password policy: at least 12 characters after trimming. New passwords MUST be hashed with Argon2id (64 MiB, 3 iterations, parallelism 1). Existing bcrypt hashes remain supported and migrate after successful login. Passwords longer than 1024 bytes MUST be rejected.
-- **Enforcement:** `auth.ValidatePassword`, `auth.HashPassword`.
-- **Evidence:** FR-2.2, ADR 046. Code: compliant. Over-72-byte passwords are rejected before hashing with 422 `password_too_long` (REQ-AUTH-023, `auth.ValidatePassword`), on own password change, admin account save and registration; tests `TestReqAuth023_*`.
-- **Verification:** A 73-byte password gets a 4xx validation error; a 12-character one is accepted; the stored value starts with `$2`.
+- **Rule:** Password policy: at least 12 characters after trimming and at most 1024 bytes. A longer password MUST be rejected with a validation error, never truncated. New and changed passwords MUST be hashed with Argon2id (`golang.org/x/crypto/argon2`, 64 MiB, 3 passes, 1 lane, 16-byte random salt, PHC string). Existing bcrypt hashes MUST keep working, and after a successful login MUST be replaced by an Argon2id hash of the same password; the replacement MUST NOT overwrite a hash that changed meanwhile. At most two Argon2id computations MAY run at once, and stored parameters outside fixed bounds MUST be rejected before hashing.
+- **Enforcement:** `auth.ValidatePassword`, `auth.HashPassword`, `auth.verifyStoredPassword`, `auth.StartLogin` (rehash), `auth.Repo.UpgradePasswordHash`.
+- **Evidence:** FR-2.2, ADR 046, ADR 100 (owner, 2026-10-24). Code: compliant since #161. Over-1024-byte passwords are rejected before hashing with 422 `password_too_long` (REQ-AUTH-023), on own password change, Admin account save, and registration; tests `TestReqAuth023_*`, `TestArgon2id*`, `TestBcryptMigrationOnLogin`, `TestUpgradePasswordHashKeepsConcurrentChange`.
+- **Verification:** A 1025-byte password gets a 4xx validation error; 73 and 1024 bytes are accepted and hashed in full; a new stored value starts with `$argon2id$v=19$m=65536,t=3,p=1$`; a bcrypt account still logs in and afterwards has an Argon2id hash.
 
 **SC-006 - Trustworthy client address behind the proxy**
 - **Status:** ACTIVE
@@ -104,10 +104,10 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-009 - No username probing**
 - **Status:** ACTIVE
-- **Rule:** Login for an unknown username, an account without a password, and a wrong password MUST return the same error and MUST take comparable time (run a bcrypt comparison against a fixed dummy hash when no hash exists).
+- **Rule:** Login for an unknown username, an account without a password, and a wrong password MUST return the same error and MUST take comparable time (run a password comparison against a fixed dummy hash with the current Argon2id parameters when no hash exists).
 - **Enforcement:** `auth.StartLogin`.
-- **Evidence:** V6. Code: compliant since #61 — unknown usernames and accounts without a password compare against `dummyPasswordHash` (DefaultCost) and return the same `invalid_credentials`; inactive accounts run the normal comparison first. Threats: T-003, T-004.
-- **Verification:** Median response time for an unknown and a known username differ by less than the bcrypt cost; `TestReqAuth012_*` checks that each path runs exactly one bcrypt comparison.
+- **Evidence:** V6. Code: compliant since #61 — unknown usernames and accounts without a password compare against `dummyPasswordHash` (Argon2id with the current parameters, ADR 100) and return the same `invalid_credentials`; inactive accounts run the normal comparison first. Threats: T-003, T-004.
+- **Verification:** Median response time for an unknown and a known username differ by less than the cost of one password hash; `TestReqAuth012_*` checks that each path runs exactly one password comparison. Accounts with a legacy bcrypt hash are slightly faster until their next login (ADR 100).
 
 **SC-010 - MFA challenge**
 - **Status:** ACTIVE
@@ -359,8 +359,8 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Besides SC-008, one client address (SC-006) MUST NOT make more than 30 failed login attempts, for any usernames, in 15 minutes; further attempts are rejected with the rate-limit error before any password check. Successful logins do not count (owner 2026-10-23, ADR 093). There is no separate per-account limit across addresses (T-002 accepted).
 - **Enforcement:** `auth.StartLogin`, `login_attempts`.
-- **Evidence:** FR-2.3, OD-010 (owner, 2026-10-23), ADR 093. Code: compliant since #60 — `auth.StartLogin` counts failed attempts per address (`CountFailedLoginAttemptsFromAddress`, index from migration 076) before the per-username check and before bcrypt. Threats: T-002, T-003.
-- **Verification:** After 30 failed logins from one address within 15 minutes, the next attempt is rejected without a bcrypt comparison (`TestReqAuth011_*`).
+- **Evidence:** FR-2.3, OD-010 (owner, 2026-10-23), ADR 093. Code: compliant since #60 — `auth.StartLogin` counts failed attempts per address (`CountFailedLoginAttemptsFromAddress`, index from migration 076) before the per-username check and before any password hash. Threats: T-002, T-003.
+- **Verification:** After 30 failed logins from one address within 15 minutes, the next attempt is rejected without a password comparison (`TestReqAuth011_*`).
 
 **SC-044 - Incident plan and secret rotation**
 - **Status:** ACTIVE

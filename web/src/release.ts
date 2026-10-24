@@ -1,8 +1,15 @@
-export const appVersion = '1.0.41'
+export const appVersion = '1.0.42'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Längere Passwörter und sicherere Speicherung',
+    changes: [
+      'Passwörter dürfen jetzt bis zu 1024 Bytes lang sein. Sie werden mit Argon2id gespeichert. Bestehende Passwörter gelten weiter und werden bei der nächsten Anmeldung automatisch umgestellt; niemand wird dabei abgemeldet.',
+    ],
+  },
+  {
+    version: '1.0.41',
     title: 'Passwörter höchstens 72 Bytes',
     changes: [
       'Passwörter, die länger als 72 Bytes sind, werden abgelehnt statt gekürzt. Umlaute und Sonderzeichen zählen mehrfach. Das gilt bei Registrierung, Passwortänderung und Kontodaten durch Admins.',

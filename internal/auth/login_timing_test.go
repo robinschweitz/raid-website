@@ -3,12 +3,11 @@ package auth
 import (
 	"context"
 	"errors"
-	"testing"
-
 	"strings"
+	"testing"
 )
 
-// recordPasswordChecks replaces the login bcrypt comparison with a wrapper
+// recordPasswordChecks replaces the login password comparison with a wrapper
 // that records the hash of every comparison.
 func recordPasswordChecks(t *testing.T) *[]string {
 	t.Helper()
@@ -16,14 +15,20 @@ func recordPasswordChecks(t *testing.T) *[]string {
 	original := comparePassword
 	comparePassword = func(hash, password []byte) error {
 		hashes = append(hashes, string(hash))
-		return verifyStoredPassword(string(hash),string(password))
+		return verifyStoredPassword(string(hash), string(password))
 	}
 	t.Cleanup(func() { comparePassword = original })
 	return &hashes
 }
 
-func TestDummyPasswordHashUsesArgon2id(t *testing.T) {
- if !strings.HasPrefix(dummyPasswordHash,"$argon2id$"){t.Fatal("expected Argon2id dummy hash")}
+// The dummy hash must cost exactly what a real hash costs (SC-009).
+func TestDummyPasswordHashUsesCurrentParameters(t *testing.T) {
+	if !strings.HasPrefix(dummyPasswordHash, argonPrefix) {
+		t.Fatalf("dummy hash %q does not use the current Argon2id parameters %q", dummyPasswordHash, argonPrefix)
+	}
+	if err := verifyStoredPassword(dummyPasswordHash, "any password"); !errors.Is(err, errPasswordMismatch) {
+		t.Fatalf("dummy hash check = %v, want a plain mismatch", err)
+	}
 }
 
 func TestReqAuth012_AC01(t *testing.T) {

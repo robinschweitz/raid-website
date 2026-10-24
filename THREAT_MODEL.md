@@ -105,8 +105,8 @@ threats that cross each boundary.
 
 **T-003 — Login CPU exhaustion**
 - **Category:** Denial of service. **Actor:** visitor. **Asset:** A-7.
-- **Scenario:** Every login runs bcrypt (SC-005), and SC-009 adds a dummy bcrypt for unknown
-  names. The spec limits failures per username and address, not per address across usernames, so
+- **Scenario:** Every login runs Argon2id (SC-005, 64 MiB, at most two at once), and SC-009 adds a
+  dummy hash for unknown names. The spec limits failures per username and address, not per address across usernames, so
   one client rotating usernames can keep the CPU busy.
 - **Status:** COVERED — SC-043 (30 failed attempts per address in 15 minutes; rotating usernames are failures).
 
@@ -681,7 +681,7 @@ sequenceDiagram
   B->>N: POST /login + X-CSRF-Token
   N->>S: X-Real-IP = client (SC-006)
   S->>S: limits per username + address (SC-008) and per address (SC-043)
-  S->>S: bcrypt or dummy bcrypt, same error (SC-005, SC-009)
+  S->>S: Argon2id (legacy bcrypt) or dummy hash, same error (SC-005, SC-009)
   S-->>B: MFA challenge, 5 min, single use (SC-010)
   B->>S: code (at most 5 wrong: SC-011; each code once: SC-012)
   S-->>B: session cookie HttpOnly, 30 days, 7 days idle (SC-016, SC-018)

@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
 	"raid-website/internal/db"
 	"raid-website/internal/migrations"
 	"raid-website/internal/player"
@@ -181,7 +179,7 @@ func TestConcurrentCredentialsPreservePassword(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(after.PasswordHash), []byte("replacement-password")); err != nil {
+	if err := verifyStoredPassword(after.PasswordHash, "replacement-password"); err != nil {
 		t.Fatalf("blank-password update lost the replacement hash: %v", err)
 	}
 	if after.Name != before.Name || after.Active != before.Active || !after.CreatedAt.Equal(before.CreatedAt) || after.Role != validation.RoleMember {

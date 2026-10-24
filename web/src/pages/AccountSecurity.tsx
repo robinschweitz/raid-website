@@ -173,7 +173,7 @@ export function AccountSecurityPage() {
     <section className="card guide-section" aria-labelledby="tipps-title">
       <h2 id="tipps-title">Noch drei einfache Tipps</h2>
       <ul>
-        <li><strong>Ein Passwort pro Seite.</strong> Ein Passwortmanager merkt sie sich für dich. Hier gilt: mindestens 12 Zeichen, höchstens 72 Bytes.</li>
+        <li><strong>Ein Passwort pro Seite.</strong> Ein Passwortmanager merkt sie sich für dich. Hier gilt: mindestens 12 Zeichen, höchstens 1024 Bytes.</li>
         <li><strong>Prüfe, ob du betroffen bist.</strong> Auf <a href="https://haveibeenpwned.com/" target="_blank" rel="noreferrer">Have I Been Pwned</a> siehst du, ob deine E-Mail-Adresse in einem bekannten Datenleck steckt <Cite id="hibp" />.</li>
         <li><strong>Niemand aus der Gilde fragt nach deinem Passwort oder Code.</strong> Auch kein Admin. Wer danach fragt, will dein Konto.</li>
       </ul>

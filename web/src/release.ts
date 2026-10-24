@@ -1,8 +1,15 @@
-export const appVersion = '1.0.38'
+export const appVersion = '1.0.39'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Loot zurückziehen ohne Begründung im offenen Raid',
+    changes: [
+      'Loot lässt sich in offenen und geplanten Raids ohne Begründung zurückziehen. Im archivierten Raid bleibt die Begründung Pflicht.',
+    ],
+  },
+  {
+    version: '1.0.38',
     title: 'Absage gibt Item-Sperren frei',
     changes: [
       'Wird ein Raid abgesagt, laufen seine noch nicht eingelösten Item-Sperren jetzt ab. Dabei gehen keine Enhance Points verloren. Sperren früher abgesagter Raids bleiben unverändert.',

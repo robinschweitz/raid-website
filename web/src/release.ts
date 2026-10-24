@@ -1,8 +1,15 @@
-export const appVersion = '1.0.43'
+export const appVersion = '1.0.44'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Längere Passwörter und sicherere Speicherung',
+    changes: [
+      'Passwörter dürfen jetzt bis zu 1024 Bytes lang sein. Sie werden mit Argon2id gespeichert. Bestehende Passwörter gelten weiter und werden bei der nächsten Anmeldung automatisch umgestellt; niemand wird dabei abgemeldet.',
+    ],
+  },
+  {
+    version: '1.0.43',
     title: 'RAID zum Startbildschirm hinzufügen',
     changes: [
       'Auf unterstützten Smartphones kannst du RAID freiwillig zum Startbildschirm hinzufügen. Auf iPhones gibt es eine kurze Anleitung. Es werden dabei keine privaten Seiten offline gespeichert.',

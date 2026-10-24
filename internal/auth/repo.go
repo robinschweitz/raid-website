@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -16,6 +17,20 @@ type Repo struct {
 
 func NewRepo(db bun.IDB) *Repo {
 	return &Repo{db: db}
+}
+
+// UpgradePasswordHash replaces a verified hash with a new one of the same
+// password. It only writes while the old hash is still stored, so a password
+// change that ran meanwhile is not undone.
+func (r *Repo) UpgradePasswordHash(ctx context.Context, playerID int64, oldHash, newHash string) error {
+	_, err := r.db.NewUpdate().Model((*player.Player)(nil)).
+		Set("password_hash = ?", newHash).
+		Where("id = ? AND password_hash = ?", playerID, oldHash).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("upgrade password hash of player %d: %w", playerID, err)
+	}
+	return nil
 }
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo {

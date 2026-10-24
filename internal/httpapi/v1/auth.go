@@ -14,9 +14,9 @@ import (
 const sessionMaxAgeSeconds = 30 * 24 * 60 * 60
 const csrfCookieName = "raid_csrf"
 
-// passwordTooLongMessage is shown for passwords above bcrypt's 72-byte limit (SC-005).
+// passwordTooLongMessage is shown for passwords above the 1024-byte limit (SC-005).
 // Multibyte characters count several bytes, which is why the hint says so.
-const passwordTooLongMessage = "Das Passwort darf höchstens 72 Bytes lang sein. Umlaute und Sonderzeichen zählen mehrfach."
+const passwordTooLongMessage = "Das Passwort darf höchstens 1024 Bytes lang sein. Umlaute und Sonderzeichen zählen mehrfach."
 
 type loginRequest struct {
 	Username string `json:"username"`

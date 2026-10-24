@@ -250,6 +250,15 @@ func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, 
 		if !role.Valid() {
 			return errors.New("invalid role")
 		}
+		if p.Role == validation.RoleAdmin && p.Active && role != validation.RoleAdmin {
+			admins, err := players.CountActiveAdmins(ctx)
+			if err != nil {
+				return fmt.Errorf("count active admins: %w", err)
+			}
+			if admins <= 1 {
+				return player.ErrLastAdmin
+			}
+		}
 		before := *p
 		hash := p.PasswordHash
 		if password != "" {

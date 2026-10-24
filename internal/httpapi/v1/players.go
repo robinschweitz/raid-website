@@ -63,6 +63,9 @@ func visiblePlayerPtr(actor *player.Player, p *player.Player) playerResponse {
 	return visiblePlayer(actor, *p)
 }
 
+// lastAdminMessage is the 409 text when a change would remove the last Admin.
+const lastAdminMessage = "at least one active admin must remain"
+
 type createPlayerRequest struct {
 	Name        string `json:"name"`
 	GuildRankID *int64 `json:"guild_rank_id"`
@@ -181,6 +184,8 @@ func (a *API) mergePlayer(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusUnprocessableEntity, "invalid_merge", err.Error())
 		case errors.Is(err, accountmerge.ErrSourceInactive):
 			WriteError(w, http.StatusConflict, "source_inactive", err.Error())
+		case errors.Is(err, player.ErrLastAdmin):
+			WriteError(w, http.StatusConflict, "last_admin", lastAdminMessage)
 		case errors.Is(err, accountmerge.ErrLockConflict):
 			WriteError(w, http.StatusConflict, "lock_conflict", err.Error())
 		case isNotFound(err):

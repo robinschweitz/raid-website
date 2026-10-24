@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"raid-website/internal/auth"
+	"raid-website/internal/player"
 	"raid-website/internal/validation"
 )
 
@@ -435,6 +436,10 @@ func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if isNotFound(err) {
 			WriteError(w, http.StatusNotFound, "not_found", "player not found")
+			return
+		}
+		if errors.Is(err, player.ErrLastAdmin) {
+			WriteError(w, http.StatusConflict, "last_admin", lastAdminMessage)
 			return
 		}
 		if errors.Is(err, auth.ErrWeakPassword) {

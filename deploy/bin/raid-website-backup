@@ -48,12 +48,190 @@ PY
     echo "verified $snapshot"
 }
 
+# Off-server copy (NFR-2.3, SC-034). The settings file holds no secrets; the
+# SSH key, known_hosts, and gpg passphrase live root-only in $OFFSITE_KEY_DIR.
+load_offsite_settings() {
+    OFFSITE_SETTINGS=${OFFSITE_SETTINGS:-/etc/raid-website-backup.env}
+    if [ ! -r "$OFFSITE_SETTINGS" ]; then
+        echo "missing off-server settings: $OFFSITE_SETTINGS" >&2
+        exit 1
+    fi
+    # shellcheck disable=SC1090
+    . "$OFFSITE_SETTINGS"
+    : "${OFFSITE_HOST:?OFFSITE_HOST is not set}"
+    : "${OFFSITE_USER:?OFFSITE_USER is not set}"
+    OFFSITE_PORT=${OFFSITE_PORT:-23}
+    OFFSITE_KEY_DIR=${OFFSITE_KEY_DIR:-/etc/raid-website-backup}
+    APP_ENV_FILE=${APP_ENV_FILE:-/etc/raid-website.env}
+    for required in id_ed25519 known_hosts passphrase; do
+        if [ ! -s "$OFFSITE_KEY_DIR/$required" ]; then
+            echo "missing $OFFSITE_KEY_DIR/$required" >&2
+            exit 1
+        fi
+    done
+}
+
+# Runs one sftp batch read from stdin; any failed command fails the call.
+offsite_sftp() {
+    sftp -q -b - -F /dev/null -P "$OFFSITE_PORT" \
+        -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+        -o "IdentityFile=$OFFSITE_KEY_DIR/id_ed25519" \
+        -o "UserKnownHostsFile=$OFFSITE_KEY_DIR/known_hosts" \
+        -o ConnectTimeout=30 -o ServerAliveInterval=15 \
+        "$OFFSITE_USER@$OFFSITE_HOST"
+}
+
+offsite_gpg() {
+    gpg --homedir "$work/gnupg" --batch --yes --quiet --no-tty --pinentry-mode loopback \
+        --passphrase-file "$OFFSITE_KEY_DIR/passphrase" "$@"
+}
+
+cleanup_work() {
+    if [ -n "${server_pid:-}" ]; then
+        kill "$server_pid" 2>/dev/null || true
+        wait "$server_pid" 2>/dev/null || true
+    fi
+    gpgconf --homedir "$work/gnupg" --kill all >/dev/null 2>&1 || true
+    rm -rf "$work"
+}
+
+offsite_archives() {
+    listing=$(printf 'ls -1\n' | offsite_sftp)
+    printf '%s\n' "$listing" | sed -n 's|^\(\./\)\{0,1\}\(raid-website-[0-9]\{8\}T[0-9]\{6\}Z\.tar\.gpg\)$|\2|p' | sort
+}
+
+offsite_upload() {
+    load_offsite_settings
+    verify_snapshot
+    snapshot=$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'raid.db-*.sqlite3.gz' -printf '%f\n' | sort | tail -n 1)
+    stamp=${snapshot#raid.db-}
+    stamp=${stamp%.sqlite3.gz}
+    archive="raid-website-$stamp.tar.gpg"
+
+    # The server only adds files and never deletes or replaces one, so a copy
+    # that left the host stays as it was; Storage Box snapshots cover the rest.
+    archives=$(offsite_archives)
+    if printf '%s\n' "$archives" | grep -qx "$archive"; then
+        echo "$archive is already off the server"
+        return 0
+    fi
+
+    work=$(mktemp -d)
+    trap cleanup_work EXIT HUP INT TERM
+    mkdir -m 0700 "$work/gnupg" "$work/bundle"
+    cp "$BACKUP_DIR/$snapshot" "$BACKUP_DIR/$snapshot.sha256" "$work/bundle/"
+    cp "$APP_ENV_FILE" "$work/bundle/raid-website.env"
+    tar -C "$work/bundle" -cf "$work/bundle.tar" .
+    offsite_gpg --symmetric --cipher-algo AES256 --s2k-digest-algo SHA512 \
+        --s2k-count 65011712 --compress-algo none -o "$work/$archive" "$work/bundle.tar"
+    (cd "$work" && sha256sum "$archive" >"$archive.sha256")
+
+    offsite_sftp <<EOF
+put $work/$archive.sha256 .upload-$archive.sha256
+put $work/$archive .upload-$archive
+rename .upload-$archive.sha256 $archive.sha256
+rename .upload-$archive $archive
+get $archive $work/downloaded
+EOF
+    if ! cmp -s "$work/$archive" "$work/downloaded"; then
+        echo "uploaded $archive does not match the local copy" >&2
+        exit 1
+    fi
+    echo "copied $archive off the server"
+}
+
+# Monthly restore test (NFR-2.5): fetch the newest off-server copy, decrypt it,
+# check it, and start the installed server binary on a throwaway copy.
+offsite_restore_test() {
+    load_offsite_settings
+    archive=$(offsite_archives | tail -n 1)
+    if [ -z "${archive:-}" ]; then
+        echo "no off-server copy exists" >&2
+        exit 1
+    fi
+
+    work=$(mktemp -d)
+    server_pid=
+    trap cleanup_work EXIT HUP INT TERM
+    mkdir -m 0700 "$work/gnupg" "$work/bundle"
+    offsite_sftp <<EOF
+get $archive $work/$archive
+get $archive.sha256 $work/$archive.sha256
+EOF
+    (cd "$work" && sha256sum -c "$archive.sha256")
+    offsite_gpg -d -o "$work/bundle.tar" "$work/$archive"
+    tar -C "$work/bundle" -xf "$work/bundle.tar"
+    snapshot=$(find "$work/bundle" -maxdepth 1 -type f -name 'raid.db-*.sqlite3.gz' -printf '%f\n' | head -n 1)
+    if [ -z "${snapshot:-}" ] || [ ! -s "$work/bundle/raid-website.env" ]; then
+        echo "$archive lacks the database snapshot or the environment file" >&2
+        exit 1
+    fi
+    (cd "$work/bundle" && sha256sum -c "$snapshot.sha256")
+
+    restore_dir="$work/restore"
+    mkdir "$restore_dir"
+    gzip -cd "$work/bundle/$snapshot" >"$restore_dir/raid.db"
+    python3 - "$restore_dir/raid.db" <<'PY'
+import sqlite3
+import sys
+
+connection = sqlite3.connect(sys.argv[1])
+try:
+    result = connection.execute("PRAGMA integrity_check").fetchone()[0]
+    if result != "ok":
+        raise SystemExit("SQLite integrity_check failed: " + result)
+    players = connection.execute("SELECT COUNT(*) FROM players").fetchone()[0]
+    raids = connection.execute("SELECT COUNT(*) FROM raids").fetchone()[0]
+finally:
+    connection.close()
+if players == 0 or raids == 0:
+    raise SystemExit("restored database has no players or raids")
+print(f"restored database: {players} players, {raids} raids")
+PY
+
+    # The copy runs as the unprivileged service user on a loopback port in
+    # development mode, so it starts without the production secrets.
+    chown -R raidweb:raidweb "$restore_dir"
+    chmod 0711 "$work"
+    (cd "$restore_dir" && exec setpriv --reuid=raidweb --regid=raidweb --clear-groups --no-new-privs \
+        env -i PATH=/usr/bin:/bin ENV=development LISTEN_ADDR=127.0.0.1:18080 \
+        "DATABASE_URL=file:$restore_dir/raid.db?_pragma=journal_mode(WAL)" \
+        "$SERVER_BINARY") >"$work/server.log" 2>&1 &
+    server_pid=$!
+    healthy=false
+    attempt=0
+    while [ "$attempt" -lt 30 ]; do
+        if curl --fail --silent --max-time 2 http://127.0.0.1:18080/api/v1/health >/dev/null; then
+            healthy=true
+            break
+        fi
+        attempt=$((attempt + 1))
+        sleep 1
+    done
+    if [ "$healthy" != true ]; then
+        echo "the server did not start with the restored copy of $archive" >&2
+        tail -n 20 "$work/server.log" >&2
+        exit 1
+    fi
+    curl --fail --silent --max-time 5 http://127.0.0.1:18080/api/v1/statistics >/dev/null
+    echo "restore test passed for $archive"
+}
+
 if [ "${1:-}" = "--verify" ]; then
     verify_snapshot
     exit 0
 fi
+if [ "${1:-}" = "--offsite" ]; then
+    offsite_upload
+    exit 0
+fi
+if [ "${1:-}" = "--restore-test" ]; then
+    SERVER_BINARY=${SERVER_BINARY:-/opt/raid-website/server}
+    offsite_restore_test
+    exit 0
+fi
 if [ "$#" -ne 0 ]; then
-    echo "usage: $0 [--verify]" >&2
+    echo "usage: $0 [--verify | --offsite | --restore-test]" >&2
     exit 2
 fi
 

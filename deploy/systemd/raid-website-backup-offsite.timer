@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted off-server copy of the Raid Website database
+
+[Timer]
+OnCalendar=*-*-* 04:20:00 UTC
+Persistent=true
+RandomizedDelaySec=20m
+Unit=raid-website-backup-offsite.service
+
+[Install]
+WantedBy=timers.target

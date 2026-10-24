@@ -21,6 +21,7 @@ func sessionEndFixture(t *testing.T) (*Service, *player.Repo, *player.Player, st
 	if err != nil {
 		t.Fatal(err)
 	}
+	seedSecondAdmin(t, players)
 	device1, _, err := svc.Login(ctx, "owner", "initial-password")
 	if err != nil {
 		t.Fatal(err)

@@ -1,8 +1,15 @@
-export const appVersion = '1.0.45'
+export const appVersion = '1.0.46'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Der letzte Admin bleibt Admin',
+    changes: [
+      'Der einzige aktive Admin kann sich nicht mehr selbst die Admin-Rolle nehmen oder mit einem anderen Spieler zusammengeführt werden. Die Seite zeigt dann einen Hinweis, dass mindestens ein aktiver Admin bleiben muss.',
+    ],
+  },
+  {
+    version: '1.0.45',
     title: 'Benachrichtigungen aufs Handy',
     changes: [
       'Im Reiter Konto kannst du freiwillig Benachrichtigungen einschalten. Dein Gerät meldet sich dann bei einer neuen Umfrage, einem neuen Raid und wenn du in eine Raid-Aufstellung kommst. Die Meldung nennt keine Inhalte. Auf iPhone und iPad klappt das nur, wenn RAID auf dem Home-Bildschirm liegt (ab iOS 16.4).',

@@ -148,6 +148,17 @@ func TestAuthenticateOperationalFailures(t *testing.T) {
 	}
 }
 
+// seedSecondAdmin adds another active Admin so tests may demote the first one (SC-047).
+func seedSecondAdmin(t *testing.T, players *player.Repo) {
+	t.Helper()
+	uname := "second-admin"
+	now := time.Now().UTC()
+	p := &player.Player{Name: "Second", Username: &uname, Active: true, Role: validation.RoleAdmin, CreatedAt: now, UpdatedAt: now}
+	if err := players.Create(context.Background(), p); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestConcurrentCredentialsPreservePassword(t *testing.T) {
 	ctx := context.Background()
 	bdb := reliabilityDB(t)
@@ -156,6 +167,7 @@ func TestConcurrentCredentialsPreservePassword(t *testing.T) {
 	if err := svc.BootstrapAdmin(ctx, "owner", "initial-password"); err != nil {
 		t.Fatal(err)
 	}
+	seedSecondAdmin(t, players)
 	before, err := players.FindByUsername(ctx, "owner")
 	if err != nil {
 		t.Fatal(err)

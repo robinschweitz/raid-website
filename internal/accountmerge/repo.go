@@ -37,6 +37,10 @@ func (r *Repo) GetPlayer(ctx context.Context, id int64) (*player.Player, error) 
 	return p, err
 }
 
+func (r *Repo) CountActiveAdmins(ctx context.Context) (int, error) {
+	return player.NewRepo(r.db).CountActiveAdmins(ctx)
+}
+
 func (r *Repo) ListCharacters(ctx context.Context, playerID int64) ([]character.Character, error) {
 	var rows []character.Character
 	err := r.db.NewSelect().Model(&rows).Where("player_id = ?", playerID).Order("id ASC").Scan(ctx)

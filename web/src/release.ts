@@ -1,8 +1,15 @@
-export const appVersion = '1.0.45'
+export const appVersion = '1.0.46'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Neue Konten sind Mitglieder',
+    changes: [
+      'Wer sich mit einem Registrierungscode neu anmeldet, ist sofort Mitglied und kann sich für Raids anmelden. Bestehende Gast-Konten bleiben unverändert; ein Admin stuft sie hoch.',
+    ],
+  },
+  {
+    version: '1.0.45',
     title: 'Benachrichtigungen aufs Handy',
     changes: [
       'Im Reiter Konto kannst du freiwillig Benachrichtigungen einschalten. Dein Gerät meldet sich dann bei einer neuen Umfrage, einem neuen Raid und wenn du in eine Raid-Aufstellung kommst. Die Meldung nennt keine Inhalte. Auf iPhone und iPad klappt das nur, wenn RAID auf dem Home-Bildschirm liegt (ab iOS 16.4).',

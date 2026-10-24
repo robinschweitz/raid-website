@@ -3275,7 +3275,7 @@ test('staff can mark a player as unsure; unsure is listed apart from declined', 
   resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [], absences: [{ player_id: 3, reason: '', status: 'DECLINED', created_at: '2030-01-01T00:00:00Z' }] })
   resolveIf(s, '/api/v1/players/1/characters', [])
   await flush(view)
-  assert.match(text(view.tree), /Absagen & Unsicher \(\s*1\s*\).*Krank.*Hat abgesagt/s)
+  assert.match(text(view.tree), /1\s*abgesagt.*Krank.*Hat abgesagt/s)
   select(view, 'Spieler markieren').props.onChange(change('2'))
   view.render()
   button(view, 'Als unsicher markieren').props.onClick()
@@ -3658,4 +3658,42 @@ test('loot that went to nobody: listed for everyone, staff record more (ADR 089)
   assert.equal(resolveIf(reader, '/api/v1/raids/1/unclaimed-loot', []), true)
   await flush(empty)
   assert.doesNotMatch(text(empty.tree) || '', /Beute ohne Empfänger/)
+})
+
+test('staff see the signup list with class emblems first and their own signup folded away', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const view = s.mount(s.load('components/RaidSignups.tsx').RaidSignups, {
+    raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' },
+    attendance: [{ id: 44, player_id: 3, character_id: 30, character_name: 'Direkt', class: 'Priester', spec: 'Heilig', role: 'HEAL' }],
+    players: [{ id: 1, name: 'Leitung', active: true }, { id: 2, name: 'Neu', active: true }, { id: 3, name: 'Gesetzt', active: true }], onRosterChange: async () => {},
+  })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, absences: [], entries: [
+    { id: 4, player_id: 2, character_id: 20, character_name: 'Funkenflug', class: 'Magier', spec: 'Feuer', attendance_id: 0, is_accepted: false, is_withdrawn: false },
+  ] })
+  resolveIf(s, '/api/v1/players/1/characters', [])
+  await flush(view)
+  const flat = text(view.tree)
+  assert.match(flat, /Anmeldeliste.*Neu.*Ausstehend.*Funkenflug.*Magier\s+·\s+Feuer.*Gesetzt.*In der Aufstellung.*Direkt.*Priester\s+·\s+Heilig.*Von der Raidleitung eingetragen.*Eigene Anmeldung/s)
+  assert.deepEqual(nodes(view.tree, (n) => n.type?.name === 'ClassEmblem').map((n) => n.props.characterClass), ['Magier', 'Priester'])
+  assert.equal(nodes(view.tree, (n) => n.type === 'details').length, 1, 'own signup is folded for staff')
+  button(view, 'In Aufstellung übernehmen').props.onClick()
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/signups/4/accept')
+})
+
+test('poll editor keeps option ids so renamed options keep their votes, and can reopen a poll', () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const saved = []
+  const poll = { id: 5, title: 'Raidtag', description: '', poll_type: 'CHOICE', allow_multiple: false, status: 'CLOSED', closes_at: null, options: [{ id: 11, label: 'Mittwoch' }, { id: 12, label: 'Donnerstag' }] }
+  const view = s.mount(s.load('components/PollEditor.tsx').PollEditor, { poll, pending: false, onSave: (body) => saved.push(body), onCancel: () => {} })
+  nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Antwort 2')[0].props.onChange(change('Donnerstag 20 Uhr'))
+  view.render()
+  nodes(view.tree, (n) => n.type === 'button' && n.props['aria-label'] === 'Antwort 2 nach oben')[0].props.onClick()
+  view.render()
+  button(view, 'Antwort hinzufügen').props.onClick()
+  view.render()
+  nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Antwort 3')[0].props.onChange(change('Samstag'))
+  nodes(view.tree, (n) => n.type === 'select')[0].props.onChange(change('OPEN'))
+  view.render()
+  form(view).props.onSubmit(event)
+  assert.deepEqual(saved, [{ title: 'Raidtag', description: '', status: 'OPEN', closes_at: '', options: [{ id: 12, label: 'Donnerstag 20 Uhr' }, { id: 11, label: 'Mittwoch' }, { id: 0, label: 'Samstag' }] }])
 })

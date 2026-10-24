@@ -14,6 +14,7 @@ import (
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
 	"raid-website/internal/auth"
+	"raid-website/internal/bosskill"
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	v1 "raid-website/internal/httpapi/v1"
@@ -115,6 +116,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	v1.StatisticsHandlers{Statistics: statistics.NewService(statistics.NewRepo(db))}.Register(mux)
 	unclaimed := unclaimedloot.NewService(unclaimedloot.NewRepo(db), raids, catalog)
 	v1.UnclaimedHandlers{Unclaimed: unclaimed}.Register(mux)
+	v1.BossKillHandlers{Kills: bosskill.NewService(bosskill.NewRepo(db)), Corrections: corrections}.Register(mux)
 	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed)}.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)
 	if spa, err := webui.Handler(); err == nil {

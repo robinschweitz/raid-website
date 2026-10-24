@@ -1,4 +1,4 @@
-# ADR 096: Cancelling a raid expires its unused item locks
+# ADR 098: Cancelling a raid expires its unused item locks
 
 Status: Accepted.
 

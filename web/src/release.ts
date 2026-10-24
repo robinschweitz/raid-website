@@ -1,8 +1,15 @@
-export const appVersion = '1.0.40'
+export const appVersion = '1.0.41'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Passwörter höchstens 72 Bytes',
+    changes: [
+      'Passwörter, die länger als 72 Bytes sind, werden abgelehnt statt gekürzt. Umlaute und Sonderzeichen zählen mehrfach. Das gilt bei Registrierung, Passwortänderung und Kontodaten durch Admins.',
+    ],
+  },
+  {
+    version: '1.0.40',
     title: 'Schutz vor fremden Anfragen',
     changes: [
       'Jede Änderung (auch Anmeldung und Registrierung) wird nur noch mit gültigem Sicherheits-Token angenommen. Im normalen Gebrauch merkst du davon nichts.',

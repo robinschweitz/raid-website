@@ -849,7 +849,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
             <h3>Passwort ändern</h3>
             <form className="inline-form" onSubmit={changeOwnPassword}>
               <input type="password" aria-label="Aktuelles Passwort" placeholder="Aktuelles Passwort" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" />
-              <input type="password" aria-label="Neues Passwort" placeholder="Neues Passwort (mind. 12 Zeichen)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
+              <input type="password" aria-label="Neues Passwort" placeholder="Neues Passwort (mind. 12 Zeichen, höchstens 72 Bytes)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
               <button type="submit" disabled={pending || !currentPassword.trim() || !newPassword.trim()}>Passwort ändern</button>
             </form>
             {passwordStatus && <p className="muted" role="status">{passwordStatus}</p>}

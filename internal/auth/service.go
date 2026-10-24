@@ -121,10 +121,21 @@ func HashPassword(password string) (string, error) {
 	return string(b), nil
 }
 
+// ErrPasswordTooLong is returned when a password exceeds bcrypt's input limit.
+// bcrypt cannot hash more than 72 bytes, so the password is rejected instead of truncated (SC-005).
+var ErrPasswordTooLong = errors.New("password must be at most 72 bytes")
+
+// maxPasswordBytes is bcrypt's input limit in bytes, not characters (SC-005).
+const maxPasswordBytes = 72
+
 // ValidatePassword enforces the account password policy for new or changed credentials.
 func ValidatePassword(password string) error {
 	if len([]rune(strings.TrimSpace(password))) < MinPasswordLength {
 		return ErrWeakPassword
+	}
+	// The length is measured on the raw password, because bcrypt hashes the raw bytes.
+	if len(password) > maxPasswordBytes {
+		return ErrPasswordTooLong
 	}
 	return nil
 }
@@ -202,9 +213,6 @@ func (s *Service) BootstrapAdmin(ctx context.Context, username, password string)
 	if username == "" || password == "" {
 		return nil
 	}
-	if err := ValidatePassword(password); err != nil {
-		return err
-	}
 	uname := strings.ToLower(strings.TrimSpace(username))
 	if uname == "" {
 		return errors.New("bootstrap admin: username required")
@@ -214,6 +222,10 @@ func (s *Service) BootstrapAdmin(ctx context.Context, username, password string)
 			return nil
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("find bootstrap admin: %w", err)
+		}
+		// The password is only used when the account is created; an existing account is left untouched.
+		if err := ValidatePassword(password); err != nil {
+			return err
 		}
 		hash, err := HashPassword(password)
 		if err != nil {

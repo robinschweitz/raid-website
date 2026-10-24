@@ -78,7 +78,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Password policy: at least 12 characters after trimming. Passwords MUST be hashed with bcrypt (`golang.org/x/crypto/bcrypt`, `DefaultCost`). A password longer than bcrypt's 72-byte input limit MUST be rejected with a validation error, not truncated and not answered with a 500.
 - **Enforcement:** `auth.ValidatePassword`, `auth.HashPassword`.
-- **Evidence:** FR-2.2, ADR 046. Code: compliant for hashing and minimum; the over-72-byte case is not validated before hashing.
+- **Evidence:** FR-2.2, ADR 046. Code: compliant. Over-72-byte passwords are rejected before hashing with 422 `password_too_long` (REQ-AUTH-023, `auth.ValidatePassword`), on own password change, admin account save and registration; tests `TestReqAuth023_*`.
 - **Verification:** A 73-byte password gets a 4xx validation error; a 12-character one is accepted; the stored value starts with `$2`.
 
 **SC-006 - Trustworthy client address behind the proxy**

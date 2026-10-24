@@ -14,6 +14,10 @@ import (
 const sessionMaxAgeSeconds = 30 * 24 * 60 * 60
 const csrfCookieName = "raid_csrf"
 
+// passwordTooLongMessage is shown for passwords above bcrypt's 72-byte limit (SC-005).
+// Multibyte characters count several bytes, which is why the hint says so.
+const passwordTooLongMessage = "Das Passwort darf höchstens 72 Bytes lang sein. Umlaute und Sonderzeichen zählen mehrfach."
+
 type loginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -396,6 +400,10 @@ func (a *API) changeOwnPassword(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusUnprocessableEntity, "password_too_short", "password must be at least 12 characters")
 			return
 		}
+		if errors.Is(err, auth.ErrPasswordTooLong) {
+			WriteError(w, http.StatusUnprocessableEntity, "password_too_long", passwordTooLongMessage)
+			return
+		}
 		WriteError(w, http.StatusInternalServerError, "internal", "could not change password")
 		return
 	}
@@ -431,6 +439,10 @@ func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, auth.ErrWeakPassword) {
 			WriteError(w, http.StatusUnprocessableEntity, "password_too_short", "password must be at least 12 characters")
+			return
+		}
+		if errors.Is(err, auth.ErrPasswordTooLong) {
+			WriteError(w, http.StatusUnprocessableEntity, "password_too_long", passwordTooLongMessage)
 			return
 		}
 		WriteError(w, http.StatusUnprocessableEntity, "invalid_request", err.Error())

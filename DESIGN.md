@@ -403,6 +403,10 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
 - **Copy box:** for addon exports, numbered steps and one "Export kopieren" button; if the
   clipboard is blocked, the text is shown selected for manual copying (ADR 081).
 
+- **Install hint:** one thin line under the top bar in the `info` colour, styled like the
+  account-security reminder: phone icon, a bold sentence, muted detail, the browser's
+  "Installieren" button where offered, and a quiet close button (FR-28.5, ADR 101). App icons
+  are PNGs of the crest on `background` (`web/public/app-icon-*.png`, `apple-touch-icon.png`).
 - **New screens:** the boss kill list and difficulty prompt (FR-29), the privacy page and the
   anonymise action (FR-30), the EP-floor warning (FR-16.8), the forced Admin MFA setup (FR-3.10), and the password reset
   with a code (FR-5.8) are designed in their own

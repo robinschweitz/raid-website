@@ -332,6 +332,7 @@ implemented yet when it differs from the code.
 - **FR-28.2** The navigation MUST show the application version. A changelog page MUST list user-facing changes in German. (ADR 056)
 - **FR-28.3** All user-facing text MUST be German. (owner brief)
 - **FR-28.4** The UI MUST show times in the user's local timezone. (ADR 003)
+- **FR-28.5** Users MAY install the website as a PWA where the browser supports it; using it MUST NOT require installation. The site MUST offer the browser's install prompt where one exists and the manual steps on iPhone and iPad, MUST show no hint when nothing can be offered or the site already runs installed, and the hint MAY be hidden for the browser session. Installation MUST NOT store pages or API responses on the device (SC-052). (Owner 2026-10-24, #159, ADR 101)
 
 ### 29. Boss kills
 

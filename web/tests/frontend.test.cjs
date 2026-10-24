@@ -3744,3 +3744,43 @@ test('poll editor keeps option ids so renamed options keep their votes, and can 
   form(view).props.onSubmit(event)
   assert.deepEqual(saved, [{ title: 'Raidtag', description: '', status: 'OPEN', closes_at: '', options: [{ id: 12, label: 'Donnerstag 20 Uhr' }, { id: 11, label: 'Mittwoch' }, { id: 0, label: 'Samstag' }] }])
 })
+
+test('install hint picks the browser prompt, iPhone steps, or nothing (FR-28.5)', () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { installHint } = s.load('installHint.ts')
+  const base = { isStandalone: false, isDismissed: false, hasPrompt: false, isIOS: false }
+  assert.equal(installHint(base), 'none', 'no prompt and no iPhone: nothing to offer')
+  assert.equal(installHint({ ...base, hasPrompt: true }), 'prompt')
+  assert.equal(installHint({ ...base, isIOS: true }), 'ios')
+  assert.equal(installHint({ ...base, hasPrompt: true, isStandalone: true }), 'none', 'already installed')
+  assert.equal(installHint({ ...base, isIOS: true, isDismissed: true }), 'none', 'hidden for this session')
+})
+
+test('install hint shows the iPhone steps and can be hidden (FR-28.5)', () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, writable: true, value: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', maxTouchPoints: 5 } })
+  try {
+    const s = setup({ id: 1, role: 'MEMBER' })
+    const view = s.mount(s.load('components/PWAInstall.tsx').PWAInstall)
+    view.render()
+    assert.match(text(view.tree), /Zum Home-Bildschirm/)
+    assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Installieren').length, 0, 'iPhone has no install button')
+    nodes(view.tree, (n) => n.type === 'button' && n.props['aria-label'] === 'Hinweis für diese Sitzung ausblenden')[0].props.onClick()
+    view.render()
+    assert.equal(view.tree, null)
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'navigator', previous)
+    else delete globalThis.navigator
+  }
+})
+
+test('the service worker caches nothing and handles no requests (FR-28.5, ADR 101)', () => {
+  const worker = fs.readFileSync(path.resolve(__dirname, '../public/sw.js'), 'utf8')
+  assert.doesNotMatch(worker, /addEventListener\(\s*['"](fetch|push)['"]/)
+  assert.doesNotMatch(worker, /caches\.|CacheStorage/)
+  const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../public/manifest.webmanifest'), 'utf8'))
+  for (const size of ['192x192', '512x512']) {
+    const icon = manifest.icons.find((entry) => entry.sizes === size && entry.type === 'image/png')
+    assert.ok(icon && fs.existsSync(path.resolve(__dirname, '../public', icon.src.slice(1))), `PNG icon ${size}`)
+  }
+})

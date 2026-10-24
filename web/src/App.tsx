@@ -29,6 +29,7 @@ import { MFAReminderBanner } from './components/MFAReminderBanner'
 import { CurrentRaidPage } from './pages/CurrentRaid'
 import { appVersion } from './release'
 import { ErrorMessage } from './components/ErrorMessage'
+import { PWAInstall } from './components/PWAInstall'
 
 // After signing in from the login link the address is still /login.
 function RedirectHome() {
@@ -131,6 +132,7 @@ function Layout() {
           <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button></> : <Link to="/login">Anmelden</Link>}</div>
       </header>
       {path !== '/kontosicherheit' && <MFAReminderBanner isSignedIn={player !== null} adminID={player?.role === 'ADMIN' ? player.id : undefined} path={path} />}
+      <PWAInstall />
       <main id="main-content" className={path === '/' ? undefined : 'secondary-page'} tabIndex={-1}>
         {error && <ErrorMessage>{error}</ErrorMessage>}
         <Routes />

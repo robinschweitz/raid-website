@@ -1944,6 +1944,48 @@ input[type='checkbox'] {
   border-left-width: 4px;
 }
 
+/* Optional install hint (FR-28.5, ADR 101): the same thin line as the reminder, in the `info` colour. */
+.install-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -1rem 0 1.4rem;
+  padding: 5px 8px 5px 12px;
+  border: 1px solid rgba(138, 205, 234, 0.35);
+  border-left: 3px solid #8acdea;
+  border-radius: 4px;
+  background: rgba(138, 205, 234, 0.07);
+  color: #e4eef7;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.install-hint > svg { flex: none; color: #8acdea; }
+.install-hint-text { flex: 1; min-width: 0; margin: 0; }
+.install-hint-text span { color: #9eafc3; }
+.install-hint > button:not(.install-hint-close) { flex: none; }
+
+.install-hint-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9eafc3;
+  cursor: pointer;
+}
+
+.install-hint-close:hover,
+.install-hint-close:focus-visible {
+  color: #e4eef7;
+  background: rgba(138, 205, 234, 0.12);
+}
+
 @media (max-width: 600px) {
   .mfa-reminder-link span { display: none; }
   .mfa-reminder-link strong::after { content: ' Warum? →'; font-weight: 400; color: #9eafc3; }

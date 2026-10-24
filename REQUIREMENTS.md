@@ -375,8 +375,8 @@ implemented yet when it differs from the code.
 - **NFR-1.3** Production network exposure: SC-025. (ADR 070)
 - **NFR-2.1** The system MUST take a verified database snapshot before each deployment. (ADR 071, 072)
 - **NFR-2.2** The system MUST keep 48 hourly, 32 daily, 13 weekly, and 25 monthly database snapshots. A weekly job MUST verify the newest snapshot. (ADR 070)
-- **NFR-2.3** An encrypted copy of the newest verified snapshot MUST leave the server every day for storage that the owner controls. The maximum data loss is therefore one day. The storage and the key holder are DEFERRED (OQ-14); encryption and key rules: SC-034. (ADR 070; Owner 2026-10-22, OQ-8)
-- **NFR-2.5** A restore from the off-server copy MUST be tested every month. (Owner 2026-10-22, OQ-8)
+- **NFR-2.3** An encrypted copy of the newest verified snapshot MUST leave the server every day for storage that the owner controls: a Hetzner Storage Box in another data centre. The server MUST only add copies there and MUST NOT overwrite or delete one. The maximum data loss is therefore one day. Encryption and key rules: SC-034. (ADR 070, ADR 099; Owner 2026-10-22, OQ-8; Owner 2026-10-24, OQ-14)
+- **NFR-2.5** A restore from the off-server copy MUST be tested every month: download, decrypt, check, and start the server on it. (Owner 2026-10-22, OQ-8; ADR 099)
 - **NFR-3.1** The system MUST cache Rising-Gods name searches for 12 hours and MAY serve them stale for up to 7 days while it refreshes. The cache MUST hold at most 2000 searches. (ADR 044)
 - **NFR-3.2** Parallel identical Rising-Gods lookups MUST share one upstream request. (ADR 044)
 - **NFR-3.3** A Rising-Gods list result that reached the upstream cap (300 rows) MUST NOT be treated as complete or reused to answer a more specific query. (ADR 044)
@@ -386,11 +386,11 @@ implemented yet when it differs from the code.
 
 ## Open Questions
 
-The owner's question and review passes on 2026-10-22 and 2026-10-23 resolved OQ-1 to OQ-13 and OQ-15. Their answers are in
+The owner's question and review passes on 2026-10-22, 2026-10-23, and 2026-10-24 resolved OQ-1 to OQ-15. Their answers are in
 the requirements marked "Owner 2026-10-22". NFR-2.4 (delete the pre-migration-066 backup) is
 done and was removed. IDs are not reused.
 
-- **OQ-14** DEFERRED until 2026-11-30 (OD-020). Off-server backup (NFR-2.3): Which storage, and who holds the encryption key? Blocks only NFR-2.3.
+None open.
 
 ### Resolved (2026-10-22)
 
@@ -408,4 +408,5 @@ done and was removed. IDs are not reused.
 - **OQ-12** Privacy details → FR-30.1–30.5.
 - **OQ-13** Anonymised name: oldest main, else oldest character → FR-30.2.
 - **OQ-15** Access to one's own data: on request, Admin download → FR-30.7 (2026-10-23).
+- **OQ-14** Off-server backup: Hetzner Storage Box, passphrase on the server and with the owner, add-only uploads → NFR-2.3, ADR 099 (2026-10-24).
 - Owner review: EP stops at zero with a warning → FR-16.6, FR-16.8; visitor search limit → FR-7.6; pre-066 backup deleted (former NFR-2.4).

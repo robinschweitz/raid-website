@@ -22,6 +22,7 @@ import (
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/registration"
+	"raid-website/internal/webui"
 )
 
 func main() {
@@ -35,6 +36,9 @@ func run() (err error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
+	}
+	if err := checkWebBuild(cfg.Env, webui.CheckBuilt); err != nil {
+		return err
 	}
 	bdb, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -71,6 +75,18 @@ func run() (err error) {
 	defer stop()
 	log.Printf("listening on %s", cfg.ListenAddr)
 	return serve(stopCtx, newHTTPServer(h), ln, shutdownTimeout)
+}
+
+// checkWebBuild stops a production start without the embedded frontend
+// (NFR-1.1, DR-13); development keeps working without a web build.
+func checkWebBuild(env string, check func() error) error {
+	if env != "production" {
+		return nil
+	}
+	if err := check(); err != nil {
+		return fmt.Errorf("web build: %w", err)
+	}
+	return nil
 }
 
 // Server limits from SECURITY.md SC-026. systemd stops the service after 30 s,

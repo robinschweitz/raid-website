@@ -54,7 +54,7 @@ test.describe('Mitglied: Anmelden, Absagen, Wunschliste', () => {
     await page.goto('/#/raids')
     await page.getByRole('region', { name: 'Raidübersicht' }).getByRole('link', { name: 'MW-3' }).click()
     await page.getByRole('button', { name: 'Anmeldungen', exact: true }).click()
-    const list = page.getByRole('region', { name: 'Absagen und Unsicher' })
+    const list = page.getByRole('region', { name: 'Anmeldeliste' })
     await expect(list).toContainText('Sternfall')
     await expect(list.getByText('Unsicher', { exact: true })).toBeVisible()
     await list.getByLabel('Spieler markieren').selectOption({ label: 'e2e-admin' })

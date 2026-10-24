@@ -1,0 +1,17 @@
+# Dependabot proposes update pull requests only (SC-036, OD-006). Merging stays manual.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly

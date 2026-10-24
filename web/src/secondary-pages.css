@@ -631,3 +631,42 @@
 .security-cite a { padding: 0 1px; }
 .security-sources li { scroll-margin-top: 80px; word-break: break-word; }
 .security-sources li:target, .security-sources li:focus-within { color: var(--accent); }
+
+/* Signup list: one compact row per player, grouped by state (pending first). */
+.raid-signups .signup-toolbar { align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.signup-board { margin-top: 1rem; }
+.signup-counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.signup-list, .signup-characters { list-style: none; margin: 0; padding: 0; }
+.signup-row { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--card-border); border-left: 3px solid var(--state-color, var(--border)); border-radius: 4px; background: rgba(22, 39, 59, 0.55); }
+.signup-row + .signup-row { margin-top: 8px; }
+.signup-row-pending { --state-color: var(--info); }
+.signup-row-accepted { --state-color: var(--ok); }
+.signup-row-tentative { --state-color: #ffd27a; }
+.signup-row-declined { --state-color: var(--danger); }
+.signup-player { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.signup-player button { margin-left: auto; min-height: 32px; }
+.signup-character { display: grid; grid-template-columns: minmax(160px, 1.2fr) minmax(120px, 1fr) auto minmax(0, auto); align-items: center; gap: 6px 12px; padding: 4px 0; border-top: 1px solid rgba(42, 64, 87, 0.45); }
+.signup-character-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.signup-character-name .class-emblem { width: 24px; height: 24px; flex: 0 0 24px; border-radius: 3px; }
+.signup-character-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.signup-character-actions button { min-height: 32px; }
+.signup-switch { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.signup-switch p { flex-basis: 100%; margin: 0; }
+.signup-mark { margin-top: 12px; align-items: flex-end; }
+.own-signup { margin-top: 1rem; }
+.own-signup > summary { cursor: pointer; font-weight: 650; }
+@media (max-width: 600px) {
+  .signup-character { grid-template-columns: 1fr auto; }
+  .signup-character-actions { grid-column: 1 / -1; justify-content: stretch; }
+  .signup-character-actions button { flex: 1 1 auto; }
+}
+
+/* Poll edited in place inside its own card (FR-24.7). */
+.poll-editor { display: grid; gap: 10px; }
+.poll-editor-options { display: grid; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid var(--card-border); border-radius: 4px; }
+.poll-editor-options legend { padding: 0 4px; font-weight: 650; }
+.poll-editor-option { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; }
+@media (max-width: 600px) {
+  .poll-editor-option { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .poll-editor-option > button:last-child { grid-column: 1 / -1; }
+}

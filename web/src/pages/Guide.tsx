@@ -106,7 +106,7 @@ export function GuidePage() {
             <tr><td><strong>Besucher</strong></td><td>Nicht eingeloggt</td><td>Nächsten Raid, Raidhistorie, aktive Umfrage und diese Anleitung ansehen</td></tr>
             <tr><td><strong>Gast</strong> <code>GUEST</code></td><td>Frisch registriert</td><td>Alles ansehen, auch die Schattengram-Reihenfolge. Anmelden geht erst, wenn ein Admin dich zum Mitglied macht.</td></tr>
             <tr><td><strong>Mitglied</strong> <code>MEMBER</code></td><td>Normale Raider</td><td>Für Raids anmelden, absagen oder „unsicher“ melden, Wunschliste, Item-Locks, abstimmen</td></tr>
-            <tr><td><strong>Raidassistent</strong> <code>RAIDASSISTENT</code></td><td>Helfer der Raidleitung</td><td>Dazu: Raids anlegen und vorausplanen, Anmeldungen übernehmen, Aufstellung, Gesuchtext, Loot, archivieren, Umfragen erstellen, Schattengram-Liste pflegen und pro Raid einteilen</td></tr>
+            <tr><td><strong>Raidassistent</strong> <code>RAIDASSISTENT</code></td><td>Helfer der Raidleitung</td><td>Dazu: Raids anlegen und vorausplanen, Anmeldungen übernehmen, Aufstellung, Gesuchtext, Loot, archivieren, Umfragen erstellen und bearbeiten, Schattengram-Liste pflegen und pro Raid einteilen</td></tr>
             <tr><td><strong>Raidleitung</strong> <code>RAIDLEADER</code></td><td>Leitet die Raids</td><td>Alles vom Raidassistenten</td></tr>
             <tr><td><strong>Admin</strong> <code>ADMIN</code></td><td>Gildenverwaltung</td><td>Dazu: Spieler und Rollen, Registrierungscodes, Raidserien, Gildenkonfiguration, Audit-Protokoll</td></tr>
           </tbody>
@@ -173,7 +173,7 @@ export function GuidePage() {
           <tbody>
             <tr><td><span className="badge warn">Noch nicht angemeldet</span></td><td>Du hast noch nichts gesagt.</td></tr>
             <tr><td><span className="badge">Angemeldet</span></td><td>Die Raidleitung weiß, dass du willst, hat dich aber noch nicht eingeplant.</td></tr>
-            <tr><td><span className="badge ok">Bestätigt</span></td><td>Du bist in der Aufstellung.</td></tr>
+            <tr><td><span className="badge ok">Bestätigt</span></td><td>Du bist in der Aufstellung, auch wenn die Raidleitung dich selbst eingetragen hat.</td></tr>
             <tr><td><span className="badge warn">Unsicher</span></td><td>Du weißt noch nicht sicher, ob du kommst.</td></tr>
             <tr><td><span className="badge bad">Abgesagt</span></td><td>Du kannst nicht.</td></tr>
           </tbody>
@@ -259,6 +259,7 @@ export function GuidePage() {
       <Shot name="21-konto" caption="Konto: Passwort und Zwei-Faktor" />
       <h3>Umfragen</h3>
       <p>Unter <Link to="/polls">Umfragen</Link> Antwort wählen und <strong>Abstimmen</strong> klicken.</p>
+      <p>Die Raidleitung kann eine Umfrage mit <strong>Bearbeiten</strong> nachträglich ändern: Titel, Beschreibung, Ende, Antworten, und eine geschlossene Umfrage wieder öffnen. Eine umbenannte Antwort behält ihre Stimmen; eine Antwort, für die schon jemand gestimmt hat, lässt sich nicht entfernen.</p>
       <Shot name="22-umfragen" caption="Eine Umfrage" />
     </Section>
 
@@ -299,13 +300,14 @@ export function GuidePage() {
       <h3>Anmeldungen steuern</h3>
       <ul>
         <li><strong>Anmeldungen schließen</strong> beendet die Anmeldung früher (und kann sie wieder öffnen).</li>
-        <li><strong>Absagen &amp; Unsicher</strong> zeigt, wer nicht kann oder unsicher ist. <strong>Sicher dabei</strong> bzw. <strong>Absage zurücknehmen</strong> setzt jemanden wieder auf dabei.</li>
+        <li>Die <strong>Anmeldeliste</strong> steht ganz oben, deine eigene Anmeldung ist darunter unter <em>Eigene Anmeldung</em> eingeklappt. Oben zählt sie, wie viele ausstehend, in der Aufstellung, unsicher und abgesagt sind.</li>
+        <li>Wer unsicher ist oder abgesagt hat, steht unten in der Liste. <strong>Sicher dabei</strong> bzw. <strong>Absage zurücknehmen</strong> setzt jemanden wieder auf dabei.</li>
         <li>Unter <em>Spieler markieren</em> trägst du selbst jemanden als abgesagt oder unsicher ein, z. B. nach einer Discord-Nachricht.</li>
       </ul>
       <Shot name="32-raid-anmeldungen-leitung" caption="Anmeldungen aus Sicht der Raidleitung" />
       <h3>In die Aufstellung übernehmen</h3>
-      <p>Unter <strong>Charakteroptionen nach Spieler</strong> steht jeder Angemeldete mit allen angebotenen Charakteren. Bei <em>Ausstehend</em> klickst du <strong>In Aufstellung übernehmen</strong>. Mit <strong>Auf diesen Charakter wechseln</strong> tauschst du den Charakter. Pro Spieler kommt nur ein Charakter in den Raid.</p>
-      <Shot name="33-anmeldungen-uebernehmen" caption="Charakteroptionen nach Spieler" />
+      <p>In der <strong>Anmeldeliste</strong> steht jeder Spieler in einer Zeile, offene Anmeldungen zuerst. Jeder Charakter zeigt Klassensymbol, Klasse und Spec. Bei <em>Ausstehend</em> klickst du <strong>In Aufstellung übernehmen</strong>. Mit <strong>Auf diesen Charakter wechseln</strong> tauschst du den Charakter. Pro Spieler kommt nur ein Charakter in den Raid.</p>
+      <Shot name="33-anmeldungen-uebernehmen" caption="Anmeldeliste nach Status" />
       <h3>Die Aufstellung</h3>
       <p>Der Reiter <strong>Aufstellung</strong> sortiert nach Tanks, Heilung, Nahkampf und Fernkampf, dazu die Ersatzbank. Mit <strong>Teilnahme hinzufügen</strong> trägst du jemanden ohne Anmeldung ein. Mit dem <strong>Stift</strong> änderst du Charakter und Spec oder nimmst jemanden mit <strong>Entfernen</strong> heraus.</p>
       <Shot name="34-aufstellung" caption="Raidaufstellung nach Rollen" />

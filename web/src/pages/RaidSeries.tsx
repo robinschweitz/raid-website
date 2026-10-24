@@ -5,6 +5,7 @@ import { Link } from '../router'
 import { atLeast, catalogRaidSizes, type LootCatalog, type Player, type RaidSeries } from '../types'
 import { useSubmission } from '../useSubmission'
 import { CatalogAssociationFields } from '../components/CatalogAssociationFields'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 const weekdays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
 const emptySchedule = { name: '', name_template: '', next_raid_number: '1', raid_leader_id: '', weekdays: [] as number[], interval_weeks: '', start_time: '', timezone: '', plan_weeks_ahead: '0', catalog_instance_id: '', raid_size: '' }
@@ -92,9 +93,9 @@ export function RaidSeriesPage() {
       <label>Automatisch im Voraus planen (Wochen, 0 = aus)<input aria-label="Wochen im Voraus" disabled={pending} required type="number" min="0" step="1" value={schedule.plan_weeks_ahead} onChange={(e) => setSchedule({ ...schedule, plan_weeks_ahead: e.target.value })} /></label>
       <p className="muted">Hält so viele Wochen an Raids dieser Serie angelegt, mit offener Anmeldung. Aufgefüllt wird beim Speichern der Serie und bei jedem Archivieren.</p>
       <label>IANA-Zeitzone<input disabled={pending} required placeholder="IANA-Zeitzone" value={schedule.timezone} onChange={(e) => setSchedule({ ...schedule, timezone: e.target.value })} /></label>
-      {catalogError && <p className="error" role="alert">{catalogError}</p>}
+      {catalogError && <ErrorMessage>{catalogError}</ErrorMessage>}
       <CatalogAssociationFields catalog={catalog} instanceID={schedule.catalog_instance_id} raidSize={schedule.raid_size} disabled={pending} existingInstanceID={existing?.catalog_instance_id ?? ''} existingRaidSize={existing?.raid_size == null ? '' : String(existing.raid_size)} onChange={(instance, size) => { if (!isPending() && isActive()) setSchedule({ ...schedule, catalog_instance_id: instance, raid_size: size }) }} />
-      {!associationValid && <p className="error">Bitte eine verfügbare Raidgröße zur Raidinstanz auswählen.</p>}
+      {!associationValid && <ErrorMessage>Bitte eine verfügbare Raidgröße zur Raidinstanz auswählen.</ErrorMessage>}
       <button disabled={pending || schedule.weekdays.length === 0 || !associationValid} type="submit">Serie speichern</button>
       {editingID !== null && <button disabled={pending} type="button" onClick={() => edit(null)}>Bearbeitung abbrechen</button>}
     </form>
@@ -103,7 +104,7 @@ export function RaidSeriesPage() {
     <p><Link to="/roster">← Gildenkonfiguration</Link></p>
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Raidserien</h1></div></div>
     <p className="muted">Beim Archivieren entsteht der nächste zukünftige Termin nach dieser Konfiguration; abgesagte Termine werden übersprungen. Raids lassen sich auch auf der Raidseite im Voraus anlegen. Die Wiederholung verwendet die konfigurierte IANA-Zeitzone, nicht die Browser-Zeitzone.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {isAdmin && editingID === null && <details className="card editor-disclosure"><summary>Neue Raidserie</summary>{editorForm}</details>}
     <ul className="series-directory">{series.map((s) => <li className={`card${editingID === s.id ? ' is-editing' : ''}`} key={s.id}>
       <h2>{s.name}</h2>

@@ -18,8 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
 	"raid-website/internal/player"
 	"raid-website/internal/validation"
 )
@@ -40,13 +38,10 @@ const (
 
 // comparePassword is the login password check; tests replace it to prove that
 // a rate-limited attempt never reaches bcrypt (SC-008, SC-043).
-var comparePassword = bcrypt.CompareHashAndPassword
+var comparePassword = func(hash,password []byte) error {return verifyStoredPassword(string(hash),string(password))}
 
-// dummyPasswordHash is a bcrypt hash (DefaultCost) of a random secret that was
-// discarded after hashing. Logins for unknown usernames and accounts without a
-// password compare against it, so they take as long as a wrong password and
-// response time does not reveal which usernames exist (SC-009).
-const dummyPasswordHash = "$2a$10$K2Drynp35mJ6iuIp7vjpQuCh996s6qZFXqBeKpnRNVPIQ.11SHWxa"
+// Dummy comparisons use Argon2id to reduce username enumeration via timing.
+var dummyPasswordHash = func() string {h,err:=HashPassword("dummy-unknown-account-password");if err!=nil{panic(err)};return h}()
 
 // rejectWithoutAccount spends the time of one password comparison and fails.
 func rejectWithoutAccount(password string) error {
@@ -112,21 +107,7 @@ func NewService(players *player.Repo, sessions *Repo) *Service {
 	return &Service{players: players, sessions: sessions, ttl: defaultSessionTTL}
 }
 
-// HashPassword derives a bcrypt hash suitable for storage.
-func HashPassword(password string) (string, error) {
-	b, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
-}
-
-// ErrPasswordTooLong is returned when a password exceeds bcrypt's input limit.
-// bcrypt cannot hash more than 72 bytes, so the password is rejected instead of truncated (SC-005).
-var ErrPasswordTooLong = errors.New("password must be at most 72 bytes")
-
-// maxPasswordBytes is bcrypt's input limit in bytes, not characters (SC-005).
-const maxPasswordBytes = 72
+var ErrPasswordTooLong = errors.New("password must be at most 1024 bytes")
 
 // ValidatePassword enforces the account password policy for new or changed credentials.
 func ValidatePassword(password string) error {
@@ -145,7 +126,7 @@ func (s *Service) VerifyPassword(ctx context.Context, playerID int64, password s
 	if err != nil {
 		return fmt.Errorf("get password player: %w", err)
 	}
-	if p.PasswordHash == "" || bcrypt.CompareHashAndPassword([]byte(p.PasswordHash), []byte(password)) != nil {
+	if p.PasswordHash == "" || verifyStoredPassword(p.PasswordHash,password) != nil {
 		return ErrInvalidCredentials
 	}
 	if !p.Active {
@@ -345,10 +326,15 @@ func (s *Service) StartLogin(ctx context.Context, username, password, clientIP s
 		return nil, ErrInvalidCredentials
 	}
 	if !p.Active {
-		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
-		return nil, ErrInactive
-	}
-	status, err := s.MFAStatus(ctx, p.ID)
+  s.recordLoginAttempt(ctx,uname,clientIP,false,now)
+  return nil,ErrInactive
+ }
+ if !strings.HasPrefix(p.PasswordHash,"$argon2id$") {
+  replacement,hashErr:=HashPassword(password)
+  if hashErr!=nil{return nil,fmt.Errorf("rehash password: %w",hashErr)}
+  if err:=s.sessions.UpgradePasswordHash(ctx,p.ID,p.PasswordHash,replacement);err!=nil{return nil,fmt.Errorf("upgrade password hash: %w",err)}
+ }
+ status, err := s.MFAStatus(ctx, p.ID)
 	if err != nil {
 		return nil, err
 	}

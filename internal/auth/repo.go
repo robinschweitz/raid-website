@@ -18,6 +18,11 @@ func NewRepo(db bun.IDB) *Repo {
 	return &Repo{db: db}
 }
 
+// UpgradePasswordHash uses compare-and-swap to preserve concurrent password changes.
+func (r *Repo) UpgradePasswordHash(ctx context.Context,id int64,oldHash,newHash string) error {
+ _,err:=r.db.NewUpdate().Model((*player.Player)(nil)).Set("password_hash = ?",newHash).Where("id = ? AND password_hash = ?",id,oldHash).Exec(ctx)
+ return err
+}
 func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
 }

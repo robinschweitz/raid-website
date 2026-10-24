@@ -1,0 +1,142 @@
+#!/bin/sh
+set -eu
+
+DATABASE_PATH=${DATABASE_PATH:-/var/lib/raid-website/raid.db}
+BACKUP_DIR=${BACKUP_DIR:-/var/backups/raid-website}
+LOCK_FILE=/run/raid-website-backup.lock
+
+umask 077
+mkdir -p "$BACKUP_DIR"
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "another Raid Website backup is already running"
+    exit 0
+fi
+
+verify_snapshot() {
+    snapshot=$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'raid.db-*.sqlite3.gz' -printf '%f\n' | sort | tail -n 1)
+    if [ -z "${snapshot:-}" ]; then
+        echo "no database snapshot exists" >&2
+        exit 1
+    fi
+
+    checksum="$BACKUP_DIR/$snapshot.sha256"
+    if [ ! -f "$checksum" ]; then
+        echo "missing checksum for $snapshot" >&2
+        exit 1
+    fi
+
+    (cd "$BACKUP_DIR" && sha256sum -c "$(basename "$checksum")")
+    temporary_database=$(mktemp "$BACKUP_DIR/.verify.XXXXXX.sqlite3")
+    trap 'rm -f "$temporary_database"' EXIT HUP INT TERM
+    gzip -cd "$BACKUP_DIR/$snapshot" >"$temporary_database"
+    python3 - "$temporary_database" <<'PY'
+import sqlite3
+import sys
+
+connection = sqlite3.connect(sys.argv[1])
+try:
+    result = connection.execute("PRAGMA integrity_check").fetchone()[0]
+finally:
+    connection.close()
+if result != "ok":
+    raise SystemExit("SQLite integrity_check failed: " + result)
+PY
+    rm -f "$temporary_database"
+    trap - EXIT HUP INT TERM
+    echo "verified $snapshot"
+}
+
+if [ "${1:-}" = "--verify" ]; then
+    verify_snapshot
+    exit 0
+fi
+if [ "$#" -ne 0 ]; then
+    echo "usage: $0 [--verify]" >&2
+    exit 2
+fi
+
+if [ ! -f "$DATABASE_PATH" ]; then
+    echo "database does not exist: $DATABASE_PATH" >&2
+    exit 1
+fi
+
+timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+snapshot="raid.db-$timestamp.sqlite3.gz"
+temporary_database=$(mktemp "$BACKUP_DIR/.snapshot.XXXXXX.sqlite3")
+temporary_snapshot=$(mktemp "$BACKUP_DIR/.snapshot.XXXXXX.gz")
+trap 'rm -f "$temporary_database" "$temporary_snapshot"' EXIT HUP INT TERM
+
+# sqlite3.Connection.backup reads a transactionally consistent view, including WAL data.
+python3 - "$DATABASE_PATH" "$temporary_database" <<'PY'
+import os
+import sqlite3
+import sys
+
+source_path, destination_path = sys.argv[1:]
+source = sqlite3.connect("file:" + source_path + "?mode=ro", uri=True)
+destination = sqlite3.connect(destination_path)
+try:
+    source.backup(destination)
+    result = destination.execute("PRAGMA integrity_check").fetchone()[0]
+    if result != "ok":
+        raise RuntimeError("SQLite integrity_check failed: " + result)
+finally:
+    destination.close()
+    source.close()
+os.chmod(destination_path, 0o600)
+PY
+
+gzip -9 -c "$temporary_database" >"$temporary_snapshot"
+mv -f "$temporary_snapshot" "$BACKUP_DIR/$snapshot"
+(cd "$BACKUP_DIR" && sha256sum "$snapshot" >"$snapshot.sha256")
+rm -f "$temporary_database"
+trap - EXIT HUP INT TERM
+
+# Keep 48 hourly, 32 daily, 13 weekly, and 25 monthly recovery points.
+python3 - "$BACKUP_DIR" <<'PY'
+from datetime import datetime, timezone
+from pathlib import Path
+import re
+import sys
+
+directory = Path(sys.argv[1])
+pattern = re.compile(r"raid\.db-(\d{8}T\d{6}Z)\.sqlite3\.gz$")
+now = datetime.now(timezone.utc)
+snapshots = []
+for path in directory.glob("raid.db-*.sqlite3.gz"):
+    match = pattern.fullmatch(path.name)
+    if match:
+        snapshots.append((datetime.strptime(match.group(1), "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc), path))
+
+keep = set()
+daily = set()
+weekly = set()
+monthly = set()
+for captured_at, path in sorted(snapshots, reverse=True):
+    age_hours = (now - captured_at).total_seconds() / 3600
+    if age_hours <= 48:
+        keep.add(path)
+    day = captured_at.date()
+    week = captured_at.isocalendar()[:2]
+    month = (captured_at.year, captured_at.month)
+    if age_hours <= 32 * 24 and day not in daily:
+        daily.add(day)
+        keep.add(path)
+    if age_hours <= 13 * 7 * 24 and week not in weekly:
+        weekly.add(week)
+        keep.add(path)
+    if age_hours <= 25 * 31 * 24 and month not in monthly:
+        monthly.add(month)
+        keep.add(path)
+
+for _, path in snapshots:
+    if path not in keep:
+        path.unlink()
+        checksum = path.with_name(path.name + ".sha256")
+        if checksum.exists():
+            checksum.unlink()
+PY
+
+echo "created and verified $BACKUP_DIR/$snapshot"

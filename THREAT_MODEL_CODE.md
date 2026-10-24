@@ -159,7 +159,7 @@ CONFIRMED. **Rules:** SC-024.
 ### Build, deploy, and repository
 
 **CT-017 — Host scripts not in the repository** — `.gitignore` line `bin/` excludes `deploy/bin/`.
-**Status:** CONFIRMED. **Rules:** SC-037.
+**Status:** FIXED (scripts committed under `deploy/bin/`, host copies identical 2026-10-24, #105). **Rules:** SC-037.
 
 **CT-018 — `main` unprotected** — GitHub API: `protected: false`; ruleset "Protect" disabled.
 **Status:** FIXED (ruleset "Protect" active 2026-10-23, #107). **Rules:** SC-039.
@@ -404,7 +404,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-014 | CONFIRMED | Mitigate | App | SC-026 | T-017 |
 | CT-015 | CONFIRMED | Mitigate | App | SC-028 | T-016, T-035 |
 | CT-016 | CONFIRMED | Eliminate | App | SC-038 | T-022 |
-| CT-017 | CONFIRMED | Mitigate | Ops | SC-037 | T-013 |
+| CT-017 | FIXED | Mitigate | Ops | SC-037 | T-013 |
 | CT-018 | FIXED | Mitigate | Ops | SC-039 | T-012 |
 | CT-019 | CONFIRMED | Mitigate | Ops | SC-036 | T-014 |
 | CT-020 | CONFIRMED | Eliminate | App | SC-024 | T-024 |

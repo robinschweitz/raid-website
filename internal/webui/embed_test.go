@@ -2,6 +2,7 @@ package webui
 
 import (
 	"errors"
+	"mime"
 	"testing"
 	"testing/fstest"
 )
@@ -24,5 +25,11 @@ func TestCheckIndexPresent(t *testing.T) {
 	root := fstest.MapFS{"index.html": {Data: []byte("<!doctype html>")}}
 	if err := checkIndex(root); err != nil {
 		t.Fatalf("checkIndex with index.html = %v, want nil", err)
+	}
+}
+
+func TestWebManifestMIMEType(t *testing.T) {
+	if got := mime.TypeByExtension(".webmanifest"); got != "application/manifest+json" {
+		t.Fatalf("TypeByExtension(.webmanifest) = %q, want application/manifest+json", got)
 	}
 }

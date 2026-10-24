@@ -1,4 +1,4 @@
-export const appVersion = '1.0.42'
+export const appVersion = '1.0.43'
 
 export const changelog = [
   {

@@ -35,6 +35,18 @@ test('status follows absence, then acceptance, then signup', () => {
   assert.equal(myRaidStatus(overview({ absences: [{ player_id: 7, reason: '', created_at: '' }] }), 7).state, 'absent', 'absences without status are declines')
 })
 
+test('a roster row counts as accepted even without an own signup', () => {
+  const row = (extra) => ({ id: 9, raid_id: 1, player_id: 7, character_id: 4, character_name: 'Eisblock', class: 'Magier', spec: 'Frost', role: 'DD', is_bench: false, ...extra })
+  const added = myRaidStatus(overview(), 7, [row()])
+  assert.deepEqual([added.state, added.label, added.detail], ['accepted', 'Bestätigt', 'Eisblock (Frost)'])
+  assert.equal(myRaidStatus(overview({ is_open: false }), 7, [row()]).state, 'accepted', 'closed signups still show the roster place')
+  assert.equal(myRaidStatus(overview(), 7, [row({ player_id: 8 })]).state, 'open', 'other players do not count')
+  const signedElsewhere = myRaidStatus(overview({ entries: [entry()] }), 7, [row()])
+  assert.deepEqual([signedElsewhere.state, signedElsewhere.detail], ['accepted', 'Eisblock (Frost)'], 'the roster wins over a pending signup')
+  const declined = myRaidStatus(overview({ absences: [{ player_id: 7, reason: '', status: 'DECLINED', created_at: '' }] }), 7, [row()])
+  assert.deepEqual([declined.state, declined.detail], ['absent', 'Eisblock (Frost)'])
+})
+
 test('quick signup offers the main character with its main spec', () => {
   const specs = { Magier: ['Arkan', 'Feuer', 'Frost'], Priester: ['Disziplin', 'Heilig', 'Schatten'] }
   const chars = [
@@ -57,4 +69,25 @@ test('upcoming raids are active, not started and soonest first', () => {
   ]
   assert.deepEqual(upcomingRaids(raids, now, 4).map((row) => row.id), [2, 1, 7])
   assert.deepEqual(upcomingRaids(raids, now, 1).map((row) => row.id), [2])
+})
+
+test('signup list shows pending players first and includes players added straight to the roster', () => {
+  const { signupList } = load('myRaids.ts', { './characterOptions': { canonicalClass: (value) => value } })
+  const names = { 1: 'Zora', 2: 'Anna', 3: 'Bert', 4: 'Carl', 5: 'Dora' }
+  const rows = signupList(overview({
+    entries: [
+      entry({ id: 1, player_id: 1, character_id: 10 }),
+      entry({ id: 2, player_id: 2, character_id: 20, is_accepted: true, attendance_id: 7 }),
+      entry({ id: 3, player_id: 5, character_id: 50, is_withdrawn: true }),
+    ],
+    absences: [{ player_id: 4, reason: 'Urlaub', status: 'DECLINED', created_at: '' }, { player_id: 3, reason: '', status: 'TENTATIVE', created_at: '' }],
+  }), [
+    { id: 7, player_id: 2, character_id: 20, character_name: 'Funkenflug', spec: 'Feuer' },
+    { id: 8, player_id: 5, character_id: 51, character_name: 'Direkt', class: 'Priester', spec: 'Heilig' },
+  ], (id) => names[id])
+  assert.deepEqual(rows.map((row) => [row.playerName, row.state]), [['Zora', 'pending'], ['Anna', 'accepted'], ['Dora', 'accepted'], ['Bert', 'tentative'], ['Carl', 'declined']])
+  assert.equal(rows[1].directRoster.length, 0, 'a roster row covered by a signup is not listed twice')
+  assert.deepEqual(rows[2].directRoster.map((row) => row.character_name), ['Direkt'])
+  assert.equal(rows[2].entries.length, 0, 'withdrawn signups are hidden')
+  assert.equal(rows[4].reason, 'Urlaub')
 })

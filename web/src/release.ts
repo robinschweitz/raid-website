@@ -1,8 +1,18 @@
-export const appVersion = '1.0.36'
+export const appVersion = '1.0.37'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Übersichtlichere Anmeldungen und Umfragen bearbeiten',
+    changes: [
+      'Die Anmeldeliste eines Raids zeigt jeden Spieler in einer Zeile, offene Anmeldungen zuerst, mit Klassensymbol, Klasse und Spec. Oben steht, wie viele ausstehend, eingetragen, unsicher und abgesagt sind.',
+      'Die Raidleitung sieht die Anmeldeliste ganz oben; die eigene Anmeldung ist darunter eingeklappt.',
+      'Trägt die Raidleitung deinen Charakter direkt in die Aufstellung ein, zeigt „Meine nächsten Raids“ dich jetzt als bestätigt.',
+      'Die Raidleitung kann Umfragen nachträglich bearbeiten: Titel, Beschreibung, Ende, Antwortoptionen, und geschlossene Umfragen wieder öffnen. Umbenannte Optionen behalten ihre Stimmen.',
+    ],
+  },
+  {
+    version: '1.0.36',
     title: 'RaidWishlist 2.1.0',
     changes: [
       'Neue RaidWishlist-Version zum Herunterladen unter „Addons“. Das Fenster lässt sich an der Ecke unten rechts größer ziehen, die Listen zeigen dann mehr Zeilen. Mit – und + unten im Fenster (oder /wish scale) wird es kleiner oder größer, von 60 bis 150 %. /wish reset stellt Größe und Position zurück.',

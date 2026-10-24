@@ -1,8 +1,15 @@
-export const appVersion = '1.0.41'
+export const appVersion = '1.0.42'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'RAID zum Startbildschirm hinzufügen',
+    changes: [
+      'Auf unterstützten Smartphones kannst du RAID freiwillig zum Startbildschirm hinzufügen. Auf iPhones gibt es eine kurze Anleitung. Es werden dabei keine privaten Seiten offline gespeichert.',
+    ],
+  },
+  {
+    version: '1.0.41',
     title: 'Passwörter höchstens 72 Bytes',
     changes: [
       'Passwörter, die länger als 72 Bytes sind, werden abgelehnt statt gekürzt. Umlaute und Sonderzeichen zählen mehrfach. Das gilt bei Registrierung, Passwortänderung und Kontodaten durch Admins.',

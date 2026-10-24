@@ -1,8 +1,17 @@
-export const appVersion = '1.0.35'
+export const appVersion = '1.0.36'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'RaidWishlist 2.1.0',
+    changes: [
+      'Neue RaidWishlist-Version zum Herunterladen unter „Addons“. Das Fenster lässt sich an der Ecke unten rechts größer ziehen, die Listen zeigen dann mehr Zeilen. Mit – und + unten im Fenster (oder /wish scale) wird es kleiner oder größer, von 60 bis 150 %. /wish reset stellt Größe und Position zurück.',
+      'Ein Item, das du im letzten Raid bekommen hast, verhindert im nächsten Raid nicht mehr den Würfel-Hinweis.',
+      'Items, die dein Spiel noch nie gesehen hat, zeigen kurz „[Gegenstand 12345]“ und dann ihren Namen statt „item:12345“.',
+    ],
+  },
+  {
+    version: '1.0.35',
     title: 'Andere Geräte nach Passwortänderung abgemeldet',
     changes: [
       'Ändert jemand sein Passwort, werden alle anderen Geräte abgemeldet; das aktuelle Gerät bleibt angemeldet.',

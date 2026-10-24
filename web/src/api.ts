@@ -69,5 +69,5 @@ export const api = {
   postEnvelope: <T>(path: string, body?: unknown) => request<T>('POST', path, body, true),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
-  del: <T>(path: string) => request<T>('DELETE', path),
+  del: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 }

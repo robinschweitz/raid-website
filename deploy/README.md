@@ -63,6 +63,17 @@ requires `ENV=production`, `DATABASE_URL`, `ADMIN_USERNAME`, and
 the HTTPS `PUBLIC_ORIGIN`. Configure nginx and request the certificate before
 starting the service.
 
+Push notifications (FR-32) are optional and stay off until both
+`VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` are set (SC-054). Create the key once on
+any machine with Go and add both lines to `/etc/raid-website.env`; the
+off-server copy then backs it up with the env file (SC-034):
+
+```sh
+go run ./cmd/vapid-key            # prints VAPID_PRIVATE_KEY=...
+echo 'VAPID_SUBJECT=mailto:you@example.com' >> /etc/raid-website.env
+systemctl restart raid-website.service
+```
+
 The nginx templates start with HTTP only, use a webroot ACME challenge, and
 then replace the site with the TLS reverse-proxy configuration:
 
@@ -292,6 +303,12 @@ and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
      lost second factor get a password reset, FR-3.11). Once SC-014 is built,
      rotate as it describes and keep the old key with the backup key material
      until the last snapshot that uses it has expired.
+   - **VAPID key (`VAPID_PRIVATE_KEY`).** Create a new key with
+     `go run ./cmd/vapid-key`, replace the line in `/etc/raid-website.env`, and
+     restart the service. Every existing push subscription stops working with
+     the old key; players switch notifications on again in their account tab
+     (SC-054). Delete the stale rows with
+     `sqlite3 /var/lib/raid-website/raid.db 'DELETE FROM push_subscriptions;'`.
    - **Deploy keys.** The updater fetches the public repository over HTTPS and
      uses no deploy key or token (see "Deployment safety"). If you later add
      one, add its rotation step here. SSH access is key-only: remove unknown

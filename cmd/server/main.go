@@ -19,6 +19,7 @@ import (
 	"raid-website/internal/db"
 	"raid-website/internal/httpapi"
 	"raid-website/internal/migrations"
+	"raid-website/internal/push"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/registration"
@@ -55,6 +56,14 @@ func run() (err error) {
 	if err := detectNamingPatterns(ctx, bdb.DB); err != nil {
 		return fmt.Errorf("naming pattern detection: %w", err)
 	}
+	var vapidKey *push.VAPIDKey
+	if cfg.VAPIDPrivateKey != "" {
+		if vapidKey, err = push.ParseVAPIDKey(cfg.VAPIDPrivateKey, cfg.VAPIDSubject); err != nil {
+			return fmt.Errorf("config: %w", err)
+		}
+	} else {
+		log.Printf("web push off: VAPID_PRIVATE_KEY is not set")
+	}
 	risingGods := registration.RisingGodsClient{ProxyURL: cfg.RisingGodsProxyURL, ProxyToken: cfg.RisingGodsProxyToken}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
 		CookieSecure:      cfg.CookieSecure,
@@ -63,6 +72,7 @@ func run() (err error) {
 		AdminUsername:     cfg.AdminUsername,
 		AdminPassword:     cfg.AdminPassword,
 		RegistrationFeed:  risingGods,
+		VAPIDKey:          vapidKey,
 	})
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)

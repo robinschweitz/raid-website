@@ -20,6 +20,9 @@ type Config struct {
 	AdminPassword        string
 	RisingGodsProxyURL   string
 	RisingGodsProxyToken string
+	// VAPIDPrivateKey and VAPIDSubject switch Web Push on (FR-32, SC-054).
+	VAPIDPrivateKey string
+	VAPIDSubject    string
 }
 
 func Load() (*Config, error) {
@@ -45,6 +48,11 @@ func Load() (*Config, error) {
 		AdminPassword:        getEnv("ADMIN_PASSWORD", "development-password"),
 		RisingGodsProxyURL:   strings.TrimRight(strings.TrimSpace(getEnv("RISING_GODS_PROXY_URL", "")), "/"),
 		RisingGodsProxyToken: strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
+		VAPIDPrivateKey:      strings.TrimSpace(getEnv("VAPID_PRIVATE_KEY", "")),
+		VAPIDSubject:         strings.TrimSpace(getEnv("VAPID_SUBJECT", "")),
+	}
+	if (c.VAPIDPrivateKey == "") != (c.VAPIDSubject == "") {
+		return nil, errors.New("VAPID_PRIVATE_KEY and VAPID_SUBJECT must be set together")
 	}
 	if (c.RisingGodsProxyURL == "") != (c.RisingGodsProxyToken == "") {
 		return nil, errors.New("RISING_GODS_PROXY_URL and RISING_GODS_PROXY_TOKEN must be set together")

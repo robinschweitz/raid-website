@@ -407,6 +407,13 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
   account-security reminder: phone icon, a bold sentence, muted detail, the browser's
   "Installieren" button where offered, and a quiet close button (FR-28.5, ADR 101). App icons
   are PNGs of the crest on `background` (`web/public/app-icon-*.png`, `apple-touch-icon.png`).
+- **Push opt-in:** a subcard "Benachrichtigungen" in the own account tab, above the MFA card,
+  for MEMBER and higher: one muted sentence on what is sent and that it names no content, the
+  device's state ("aktiv"/"aus"), and one ordinary button "Benachrichtigungen aktivieren" or
+  "… abschalten". On iPhone/iPad outside the installed app it shows only the install note; a
+  blocked permission is explained, not hidden. It is not shown when the server has no VAPID
+  key (FR-32, ADR 102). Notifications themselves use the title "RAID", the 192px app icon,
+  and a fixed German sentence (FR-32.5).
 - **New screens:** the boss kill list and difficulty prompt (FR-29), the privacy page and the
   anonymise action (FR-30), the EP-floor warning (FR-16.8), the forced Admin MFA setup (FR-3.10), and the password reset
   with a code (FR-5.8) are designed in their own

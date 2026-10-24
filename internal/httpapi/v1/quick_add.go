@@ -34,6 +34,7 @@ func (a *API) quickAddCharacter(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
+	before := a.rosterSnapshot(r.Context(), id)
 	row, err := a.Corrections.AddNewCharacter(r.Context(), id, actor, input)
 	if errors.Is(err, raidcorrection.ErrPlayerExists) {
 		WriteError(w, http.StatusConflict, "player_exists", "Ein Spieler mit diesem Namen existiert bereits. Bitte den vorhandenen Spieler auswählen.")
@@ -56,4 +57,5 @@ func (a *API) quickAddCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusCreated, map[string]any{"data": row})
+	a.notifyNewRosterPlayers(w, r, id, actor, before)
 }

@@ -101,3 +101,29 @@ func TestRisingGodsProxyConfiguration(t *testing.T) {
 		})
 	}
 }
+
+// TestVAPIDConfiguration: Web Push is off without a key; key and subject come
+// together (FR-32, SC-054). The key itself is parsed by cmd/server.
+func TestVAPIDConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		name, key, subject string
+		valid              bool
+	}{
+		{"disabled", "", "", true},
+		{"missing subject", "key", "", false},
+		{"missing key", "", "mailto:raid@example.org", false},
+		{"enabled", "key", "mailto:raid@example.org", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("VAPID_PRIVATE_KEY", tc.key)
+			t.Setenv("VAPID_SUBJECT", tc.subject)
+			cfg, err := Load()
+			if (err == nil) != tc.valid {
+				t.Fatalf("Load error = %v, want valid %v", err, tc.valid)
+			}
+			if tc.valid && cfg.VAPIDPrivateKey != tc.key {
+				t.Fatalf("VAPIDPrivateKey = %q", cfg.VAPIDPrivateKey)
+			}
+		})
+	}
+}

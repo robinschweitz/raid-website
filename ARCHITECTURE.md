@@ -50,8 +50,20 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   (`web/src/api.ts`) that sends `credentials: 'include'` and the CSRF header. Vite builds it into
   `internal/webui/dist`, which the Go binary embeds and serves for `/`; the frontend is built
   before the binary. In development Vite proxies `/api` to `:8080`.
-  The SPA also ships a web app manifest and a service worker without cache or push, so it can
-  be installed as a PWA (FR-28.5, SC-052, ADR 101).
+  The SPA also ships a web app manifest and a service worker without cache, so it can
+  be installed as a PWA (FR-28.5, SC-052, ADR 101); the worker shows push notifications
+  (FR-32, ADR 102).
+- **Web Push (ADR 102).** The `push` package owns `push_subscriptions` and implements RFC 8291
+  encryption and RFC 8292 VAPID with the standard library (`crypto/ecdh`, `crypto/hkdf`,
+  AES-GCM, ECDSA). `GET /api/v1/push/config` and `POST /api/v1/push/subscriptions` need
+  MEMBER, `DELETE /api/v1/push/subscriptions` a session. The handlers that create a poll, plan
+  or create raids, or add roster rows write their answer, flush it, and then call
+  `push.Service.Notify`/`NotifyPlayers` in the same request: at most four parallel posts with a
+  `sync.WaitGroup`, 15 s in total, on a context detached from the client's cancellation.
+  New raids are detected by `raid.Repo.MaxID` rising across the write; new roster places by
+  comparing the roster's players before and after it. The VAPID key comes from
+  `internal/config` and is parsed in `cmd/server`; without it the service is a no-op
+  (FR-32.6, SC-054).
 - **Sessions and identity.** The `authenticate` middleware resolves the session cookie into the
   actor on the request context; route guards `RequireAuth` and `RequireRole(role)` enforce the
   role matrix (FR-1.*); domain services re-check ownership where a rule depends on it (for
@@ -146,6 +158,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `shadowmourne` | Questline list and raid task choices | Eligible classes, stage choice rules | entries, raid tasks | FR-22 | SUPPORTED |
 | `recruitment` | Recruitment template per series or raid | Length, shape, slot values | recruitment templates | FR-23 | SUPPORTED (slot check not built) |
 | `poll` | Polls and votes, poll edits (`PUT /api/v1/polls/{id}`) | Option validity, closed polls, no removal of voted options | polls, options, votes | FR-24 | SUPPORTED |
+| `push` | Push subscriptions, RFC 8291/8292, delivery after commit | Endpoint allowlist, MEMBER recipients, neutral payload, 404/410 clean-up | push subscriptions | FR-32 | SUPPORTED |
 | `audit` | Audit writer and Admin reader | Append-only, no secrets in snapshots | audit log | FR-26 | SUPPORTED |
 | Statistics (`GET /api/v1/statistics`, `internal/statistics`) | Public aggregates computed on the server | Public field subset (FR-27.2) | none (derived, read-only) | FR-27 | SUPPORTED |
 | `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (loot and import integration not built) |
@@ -188,6 +201,9 @@ and similar notes say which specified parts the code does not have yet. All rows
   root-owned publisher installs it (ADR 071, ADR 072). The design depends on a protected `main`
   (SC-039) and on committed, reviewed deploy scripts in `deploy/bin/` (SC-037); both hold since
   2026-10-24 (T-012, T-013).
+- **TB-8 Application → push services.** The server posts encrypted messages to the browser
+  vendors' push services named in SC-053 only; their answers are read for the status code
+  alone. Browser-supplied subscriptions are untrusted until validated (SC-053).
 
 Controls at each boundary are defined in `SECURITY.md`; the threats that cross each boundary are
 in `THREAT_MODEL.md` ("Trust boundaries to threats").
@@ -269,7 +285,7 @@ sequenceDiagram
   client. Handlers do not compute ledger values or derive statuses.
 - **DR-7** Configuration is read only in `internal/config` and passed to components.
 - **DR-8** Vendor-specific code stays at the edge: Rising-Gods HTTP in `registration`, WebAuthn in
-  `auth`, addon formats in `addonsync` and `wishlist`, the Cloudflare Worker in `workers/`.
+  `auth`, Web Push in `push`, addon formats in `addonsync` and `wishlist`, the Cloudflare Worker in `workers/`.
 - **DR-9** The application runs as exactly one process. In-memory state (Rising-Gods cache, any
   future rate limiter) is allowed only under this rule.
 - **DR-10** The web client talks to the server only through `web/src/api.ts` and only to

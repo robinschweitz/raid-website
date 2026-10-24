@@ -1,8 +1,15 @@
-export const appVersion = '1.0.44'
+export const appVersion = '1.0.45'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Benachrichtigungen aufs Handy',
+    changes: [
+      'Im Reiter Konto kannst du freiwillig Benachrichtigungen einschalten. Dein Gerät meldet sich dann bei einer neuen Umfrage, einem neuen Raid und wenn du in eine Raid-Aufstellung kommst. Die Meldung nennt keine Inhalte. Auf iPhone und iPad klappt das nur, wenn RAID auf dem Home-Bildschirm liegt (ab iOS 16.4).',
+    ],
+  },
+  {
+    version: '1.0.44',
     title: 'Längere Passwörter und sicherere Speicherung',
     changes: [
       'Passwörter dürfen jetzt bis zu 1024 Bytes lang sein. Sie werden mit Argon2id gespeichert. Bestehende Passwörter gelten weiter und werden bei der nächsten Anmeldung automatisch umgestellt; niemand wird dabei abgemeldet.',

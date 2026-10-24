@@ -44,11 +44,7 @@ func (a *API) registerPush(w http.ResponseWriter, r *http.Request) {
         BadRequest(w, "invalid subscription"); return
     }
     // Existing subscription of another player must never be reassigned.
-    _, err := a.DB.NewInsert().TableExpr("push_subscriptions").
-        ColumnExpr("player_id, endpoint, p256dh, auth").
-        Value("?", playerID).Value("?", sub.Endpoint).
-        Value("?", sub.Keys.P256DH).Value("?", sub.Keys.Auth).
-        Exec(r.Context())
+    _, err := a.DB.ExecContext(r.Context(), "INSERT INTO push_subscriptions(player_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)", playerID, sub.Endpoint, sub.Keys.P256DH, sub.Keys.Auth)
     if err != nil {
         WriteError(w, http.StatusConflict, "subscription_conflict", "subscription unavailable")
         return
@@ -64,8 +60,7 @@ func (a *API) unregisterPush(w http.ResponseWriter, r *http.Request) {
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Endpoint) > 2048 {
         BadRequest(w, "invalid subscription"); return
     }
-    _, err := a.DB.NewDelete().TableExpr("push_subscriptions").
-        Where("player_id = ? AND endpoint = ?", playerID, req.Endpoint).Exec(r.Context())
+    _, err := a.DB.ExecContext(r.Context(), "DELETE FROM push_subscriptions WHERE player_id = ? AND endpoint = ?", playerID, req.Endpoint)
     if err != nil { WriteError(w, http.StatusInternalServerError, "internal", "could not unregister push"); return }
     w.WriteHeader(http.StatusNoContent)
 }

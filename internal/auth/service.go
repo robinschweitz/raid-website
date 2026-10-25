@@ -49,8 +49,12 @@ var comparePassword = func(hash, password []byte) error {
 const dummyPasswordHash = "$argon2id$v=19$m=65536,t=3,p=1$ydwgDnow7o4c5A0n0TInAg$/MoBjTPy4gijAXdfRlT5UutfKTMtkB5JLw6KUqRbADo"
 
 // rejectWithoutAccount spends the time of one password comparison and fails.
+// When no hashing slot is free it fails like a known account would, so a busy
+// server does not reveal which usernames exist either.
 func rejectWithoutAccount(password string) error {
-	_ = comparePassword([]byte(dummyPasswordHash), []byte(password))
+	if err := comparePassword([]byte(dummyPasswordHash), []byte(password)); errors.Is(err, ErrPasswordHashBusy) {
+		return ErrPasswordHashBusy
+	}
 	return ErrInvalidCredentials
 }
 
@@ -132,7 +136,13 @@ func (s *Service) VerifyPassword(ctx context.Context, playerID int64, password s
 	if err != nil {
 		return fmt.Errorf("get password player: %w", err)
 	}
-	if p.PasswordHash == "" || verifyStoredPassword(p.PasswordHash, password) != nil {
+	if p.PasswordHash == "" {
+		return ErrInvalidCredentials
+	}
+	if err := verifyStoredPassword(p.PasswordHash, password); err != nil {
+		if errors.Is(err, ErrPasswordHashBusy) {
+			return ErrPasswordHashBusy
+		}
 		return ErrInvalidCredentials
 	}
 	if !p.Active {
@@ -313,40 +323,38 @@ func (s *Service) LoginWithClient(ctx context.Context, username, password, clien
 func (s *Service) StartLogin(ctx context.Context, username, password, clientIP string) (*LoginStart, error) {
 	uname := strings.ToLower(strings.TrimSpace(username))
 	now := time.Now().UTC()
+	// The attempt is stored as failed in the same transaction that checks both
+	// limits, before the password is hashed. Parallel requests therefore count
+	// each other and cannot all pass the check while they wait for a hashing
+	// slot (SC-008, SC-043). A login that succeeds marks its row afterwards.
+	attemptID := int64(0)
 	if clientIP != "" {
-		addressCount, err := s.sessions.CountFailedLoginAttemptsFromAddress(ctx, clientIP, now.Add(-loginFailureWindow))
-		if err != nil {
-			return nil, fmt.Errorf("count address login attempts: %w", err)
-		}
-		if addressCount >= addressFailureLimit {
+		id, err := s.sessions.ReserveLoginAttempt(ctx, uname, clientIP, now, now.Add(-loginFailureWindow), loginFailureLimit, addressFailureLimit)
+		if errors.Is(err, ErrLoginRateLimited) {
 			return nil, ErrLoginRateLimited
 		}
-		count, err := s.sessions.CountFailedLoginAttempts(ctx, uname, clientIP, now.Add(-loginFailureWindow))
 		if err != nil {
-			return nil, fmt.Errorf("count login attempts: %w", err)
+			return nil, fmt.Errorf("reserve login attempt: %w", err)
 		}
-		if count >= loginFailureLimit {
-			return nil, ErrLoginRateLimited
-		}
+		attemptID = id
 	}
 	p, err := s.players.FindByUsername(ctx, uname)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			s.recordLoginAttempt(ctx, uname, clientIP, false, now)
-			return nil, rejectWithoutAccount(password)
+			return nil, s.rejectOrRelease(ctx, attemptID, rejectWithoutAccount(password))
 		}
 		return nil, fmt.Errorf("find login player: %w", err)
 	}
 	if p.PasswordHash == "" {
-		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
-		return nil, rejectWithoutAccount(password)
+		return nil, s.rejectOrRelease(ctx, attemptID, rejectWithoutAccount(password))
 	}
 	if err := comparePassword([]byte(p.PasswordHash), []byte(password)); err != nil {
-		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
+		if errors.Is(err, ErrPasswordHashBusy) {
+			return nil, s.rejectOrRelease(ctx, attemptID, ErrPasswordHashBusy)
+		}
 		return nil, ErrInvalidCredentials
 	}
 	if !p.Active {
-		s.recordLoginAttempt(ctx, uname, clientIP, false, now)
 		return nil, ErrInactive
 	}
 	// The password was just verified, so a legacy bcrypt hash (or Argon2id with
@@ -354,11 +362,15 @@ func (s *Service) StartLogin(ctx context.Context, username, password, clientIP s
 	// sessions stay valid and no audit entry is written (ADR 100).
 	if needsRehash(p.PasswordHash) {
 		replacement, err := HashPassword(password)
-		if err != nil {
+		switch {
+		case errors.Is(err, ErrPasswordHashBusy):
+			// The password is already verified; the upgrade waits for the next login.
+		case err != nil:
 			return nil, fmt.Errorf("rehash password: %w", err)
-		}
-		if err := s.sessions.UpgradePasswordHash(ctx, p.ID, p.PasswordHash, replacement); err != nil {
-			return nil, fmt.Errorf("upgrade password hash: %w", err)
+		default:
+			if err := s.sessions.UpgradePasswordHash(ctx, p.ID, p.PasswordHash, replacement); err != nil {
+				return nil, fmt.Errorf("upgrade password hash: %w", err)
+			}
 		}
 	}
 	status, err := s.MFAStatus(ctx, p.ID)
@@ -374,7 +386,7 @@ func (s *Service) StartLogin(ctx context.Context, username, password, clientIP s
 		if err := s.sessions.CreateMFAChallenge(ctx, &MFAChallenge{ChallengeHash: hashToken(challenge), PlayerID: p.ID, CreatedAt: now, ExpiresAt: now.Add(mfaChallengeTTL)}); err != nil {
 			return nil, fmt.Errorf("create mfa challenge: %w", err)
 		}
-		s.recordLoginAttempt(ctx, uname, clientIP, true, now)
+		s.markLoginSucceeded(ctx, attemptID)
 		return &LoginStart{Player: p, MFAChallenge: challenge, MFAFactors: factors}, nil
 	}
 	token, err := newToken()
@@ -391,18 +403,39 @@ func (s *Service) StartLogin(ctx context.Context, username, password, clientIP s
 	if err := s.sessions.CreateSession(ctx, sess); err != nil {
 		return nil, fmt.Errorf("create login session: %w", err)
 	}
-	s.recordLoginAttempt(ctx, uname, clientIP, true, now)
+	s.markLoginSucceeded(ctx, attemptID)
 	return &LoginStart{Token: token, Player: p}, nil
 }
 
-func (s *Service) recordLoginAttempt(ctx context.Context, username, clientIP string, success bool, at time.Time) {
-	if clientIP == "" {
+// markLoginSucceeded turns the reserved attempt into a successful one, so it
+// stops counting toward the login limits.
+func (s *Service) markLoginSucceeded(ctx context.Context, attemptID int64) {
+	if attemptID == 0 {
 		return
 	}
-	if err := s.sessions.CreateLoginAttempt(ctx, &LoginAttempt{Username: username, ClientIP: clientIP, Success: success, CreatedAt: at}); err != nil {
-		// Login correctness must not depend on best-effort throttle bookkeeping after the credential decision.
-		return
+	// Login correctness must not depend on best-effort throttle bookkeeping after the credential decision.
+	_ = s.sessions.MarkLoginAttemptSucceeded(ctx, attemptID)
+}
+
+// rejectOrRelease returns err. When no password was checked because every
+// hashing slot was busy, the reserved attempt is removed again: it was no guess.
+func (s *Service) rejectOrRelease(ctx context.Context, attemptID int64, err error) error {
+	if errors.Is(err, ErrPasswordHashBusy) && attemptID != 0 {
+		_ = s.sessions.DeleteLoginAttempt(ctx, attemptID)
 	}
+	return err
+}
+
+// SessionID returns the ID of the unexpired session for a raw token.
+func (s *Service) SessionID(ctx context.Context, token string) (int64, error) {
+	sess, err := s.sessions.FindSessionByHash(ctx, hashToken(token))
+	if err != nil {
+		return 0, fmt.Errorf("find session: %w", err)
+	}
+	if !sess.ExpiresAt.After(time.Now().UTC()) {
+		return 0, errors.New("session expired")
+	}
+	return sess.ID, nil
 }
 
 // Authenticate resolves a raw session token. Missing, unknown, or expired sessions return nil, nil.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -77,12 +78,14 @@ func (r *Repo) TrimPlayer(ctx context.Context, playerID int64, keep int) ([]Subs
 }
 
 // ListRecipients returns the subscriptions of active players with a login and
-// at least the MEMBER role, except the actor. With playerIDs only those
-// players are considered.
-func (r *Repo) ListRecipients(ctx context.Context, actorID int64, playerIDs []int64) ([]Subscription, error) {
+// at least the MEMBER role, except the actor, whose session is still valid at
+// now (FR-32.3). With playerIDs only those players are considered.
+func (r *Repo) ListRecipients(ctx context.Context, actorID int64, playerIDs []int64, now time.Time) ([]Subscription, error) {
 	subs := []Subscription{}
 	q := r.db.NewSelect().Model(&subs).
 		Join("JOIN players AS p ON p.id = subscription.player_id").
+		Join("JOIN sessions AS s ON s.id = subscription.session_id AND s.player_id = subscription.player_id").
+		Where("s.expires_at > ?", now).
 		Where("p.active = ?", true).
 		Where("p.username IS NOT NULL").
 		Where("p.role IN (?)", bun.List([]validation.Role{validation.RoleMember, validation.RoleRaidassistent, validation.RoleRaidleader, validation.RoleAdmin})).

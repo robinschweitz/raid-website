@@ -349,3 +349,66 @@ func TestReqPush010_DisabledWithoutKey(t *testing.T) {
 		t.Fatalf("subscribe: %d %s", status, raw)
 	}
 }
+
+// TestReqPush011_SubscriptionEndsWithItsSession: a subscription belongs to the
+// session that made it. Logging out on the server, or any other end of that
+// session, removes it, while the player's other devices keep theirs; a legacy
+// row without a session gets no messages (FR-32.3, ADR 103).
+func TestReqPush011_SubscriptionEndsWithItsSession(t *testing.T) {
+	f := newPushFixture(t)
+	client := f.srv.Client()
+	secondToken := login(t, client, f.srv, "push-member", "password")
+	f.subscribe(f.memberToken, endpointFor("phone"), http.StatusCreated)
+	f.subscribe(secondToken, endpointFor("laptop"), http.StatusCreated)
+
+	if status, raw := do(t, client, http.MethodPost, f.srv.URL+"/api/v1/auth/logout", f.memberToken, nil); status != http.StatusNoContent && status != http.StatusOK {
+		t.Fatalf("logout: %d %s", status, raw)
+	}
+	if f.subscriptionCount(endpointFor("phone")) != 0 {
+		t.Fatal("the logged-out session kept its push subscription")
+	}
+	if f.subscriptionCount(endpointFor("laptop")) != 1 {
+		t.Fatal("logging out one device removed another device's subscription")
+	}
+
+	legacy := &push.Subscription{PlayerID: f.other, Endpoint: endpointFor("legacy"), P256dh: testP256dh, Auth: testAuth, CreatedAt: time.Now().UTC()}
+	if _, err := f.db.NewInsert().Model(legacy).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if status, raw := do(t, client, http.MethodPost, f.srv.URL+"/api/v1/polls", f.staffToken, map[string]any{"title": "Nach dem Abmelden"}); status != http.StatusCreated {
+		t.Fatalf("create poll: %d %s", status, raw)
+	}
+	got := kindsByEndpoint(f.sender.take())
+	if len(got) != 1 || len(got[endpointFor("laptop")]) != 1 {
+		t.Fatalf("sent = %v, want only the laptop", got)
+	}
+}
+
+// TestReqPush012_EndedSessionsEndSubscriptions: ending all sessions of a player,
+// as an Admin password or role change does (FR-2.14, SC-017), also ends the
+// push subscriptions of those sessions (FR-32.3).
+func TestReqPush012_AdminPasswordChangeEndsSubscriptions(t *testing.T) {
+	f := newPushFixture(t)
+	f.subscribe(f.memberToken, endpointFor("member"), http.StatusCreated)
+	if err := auth.NewRepo(f.db).DeleteSessionsOfPlayer(context.Background(), f.member, ""); err != nil {
+		t.Fatal(err)
+	}
+	if f.subscriptionCount(endpointFor("member")) != 0 {
+		t.Fatal("ending the player's sessions kept the push subscription")
+	}
+}
+
+// TestReqPush013_RepeatedSubscribeIsQuiet: the client repeats the subscribe
+// call on every visit; an unchanged subscription writes nothing new.
+func TestReqPush013_RepeatedSubscribeIsQuiet(t *testing.T) {
+	f := newPushFixture(t)
+	f.subscribe(f.memberToken, endpointFor("member"), http.StatusCreated)
+	f.subscribe(f.memberToken, endpointFor("member"), http.StatusCreated)
+	count, err := f.db.NewSelect().Table("audit_log").Where("entity_type = ?", "push_subscription").Count(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("audit entries = %d, want 1", count)
+	}
+}

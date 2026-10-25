@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"raid-website/internal/auth"
 	"raid-website/internal/push"
 	"raid-website/internal/validation"
 )
@@ -53,7 +54,12 @@ func (a *API) subscribePush(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	sub, err := a.Push.Subscribe(r.Context(), actor, push.SubscriptionInput{Endpoint: req.Endpoint, P256dh: req.P256dh, Auth: req.Auth})
+	sessionID, ok := a.currentSessionID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "login required")
+		return
+	}
+	sub, err := a.Push.Subscribe(r.Context(), actor, sessionID, push.SubscriptionInput{Endpoint: req.Endpoint, P256dh: req.P256dh, Auth: req.Auth})
 	if err != nil {
 		writePushError(w, err)
 		return
@@ -77,6 +83,17 @@ func (a *API) unsubscribePush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// currentSessionID returns the ID of the session the request came with, so a
+// push subscription can end with it (FR-32.3).
+func (a *API) currentSessionID(r *http.Request) (int64, bool) {
+	cookie, err := r.Cookie(auth.CookieName)
+	if err != nil || cookie.Value == "" {
+		return 0, false
+	}
+	sessionID, err := a.Auth.SessionID(r.Context(), cookie.Value)
+	return sessionID, err == nil
 }
 
 func writePushError(w http.ResponseWriter, err error) {

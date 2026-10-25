@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError } from './api'
-import { browserHasPushAPI, disablePushOnLogout } from './pushNotifications'
+import { browserHasPushAPI, disablePushOnLogout, syncPushForPlayer } from './pushNotifications'
 import type { Player } from './types'
 import { getWebAuthnCredential, type WebAuthnBeginResponse } from './webauthn'
 
@@ -53,6 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh()
     return () => { ++requests.current }
   }, [refresh])
+
+  // Keep this device's push subscription bound to the current session, or drop
+  // it when another player turned it on (FR-32.3, ADR 103).
+  const playerID = player?.id
+  useEffect(() => {
+    if (playerID !== undefined && browserHasPushAPI()) void syncPushForPlayer(playerID)
+  }, [playerID])
 
   const login = async (username: string, password: string) => {
     const requestVersion = ++version.current

@@ -76,9 +76,9 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-005 - Password storage and policy**
 - **Status:** ACTIVE
-- **Rule:** Password policy: at least 12 characters after trimming and at most 1024 bytes. A longer password MUST be rejected with a validation error, never truncated. New and changed passwords MUST be hashed with Argon2id (`golang.org/x/crypto/argon2`, 64 MiB, 3 passes, 1 lane, 16-byte random salt, PHC string). Existing bcrypt hashes MUST keep working, and after a successful login MUST be replaced by an Argon2id hash of the same password; the replacement MUST NOT overwrite a hash that changed meanwhile. At most two Argon2id computations MAY run at once, and stored parameters outside fixed bounds MUST be rejected before hashing.
-- **Enforcement:** `auth.ValidatePassword`, `auth.HashPassword`, `auth.verifyStoredPassword`, `auth.StartLogin` (rehash), `auth.Repo.UpgradePasswordHash`.
-- **Evidence:** FR-2.2, ADR 046, ADR 100 (owner, 2026-10-24). Code: compliant since #161. Over-1024-byte passwords are rejected before hashing with 422 `password_too_long` (REQ-AUTH-023), on own password change, Admin account save, and registration; tests `TestReqAuth023_*`, `TestArgon2id*`, `TestBcryptMigrationOnLogin`, `TestUpgradePasswordHashKeepsConcurrentChange`.
+- **Rule:** Password policy: at least 12 characters after trimming and at most 1024 bytes. A longer password MUST be rejected with a validation error, never truncated. New and changed passwords MUST be hashed with Argon2id (`golang.org/x/crypto/argon2`, 64 MiB, 3 passes, 1 lane, 16-byte random salt, PHC string). Existing bcrypt hashes MUST keep working, and after a successful login MUST be replaced by an Argon2id hash of the same password; the replacement MUST NOT overwrite a hash that changed meanwhile. At most two Argon2id computations MAY run at once, and stored parameters outside fixed bounds MUST be rejected before hashing. A request MUST NOT wait longer than 5 seconds for a free hashing slot; then it MUST answer `503 server_busy` with `Retry-After`, MUST NOT count as a failed login, and an unknown username MUST get the same answer (SC-009) (Owner 2026-10-25, ADR 103).
+- **Enforcement:** `auth.ValidatePassword`, `auth.HashPassword`, `auth.verifyStoredPassword`, `auth.StartLogin` (rehash), `auth.Repo.UpgradePasswordHash`; `argonSlotWait`, `ErrPasswordHashBusy`, `writePasswordBusy`.
+- **Evidence:** FR-2.2, ADR 046, ADR 100 (owner, 2026-10-24). Code: compliant since #161. Over-1024-byte passwords are rejected before hashing with 422 `password_too_long` (REQ-AUTH-023), on own password change, Admin account save, and registration; tests `TestReqAuth023_*`, `TestArgon2id*`, `TestBcryptMigrationOnLogin`, `TestUpgradePasswordHashKeepsConcurrentChange`, `TestLoginBusyWithoutCountingAsFailure`.
 - **Verification:** A 1025-byte password gets a 4xx validation error; 73 and 1024 bytes are accepted and hashed in full; a new stored value starts with `$argon2id$v=19$m=65536,t=3,p=1$`; a bcrypt account still logs in and afterwards has an Argon2id hash.
 
 **SC-006 - Trustworthy client address behind the proxy**
@@ -97,10 +97,10 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-008 - Login throttling**
 - **Status:** ACTIVE
-- **Rule:** After 5 failed logins for the same normalised username and client address within 15 minutes, further attempts MUST be rejected without checking the password. Failures MUST be recorded in the database.
-- **Enforcement:** `auth.StartLogin`, `login_attempts` table.
-- **Evidence:** FR-2.3. Code: compliant (SC-006 fixed in PR #44). Threats: T-001, T-002.
-- **Verification:** The sixth attempt in the window returns the rate-limit error even with the correct password.
+- **Rule:** After 5 failed logins for the same normalised username and client address within 15 minutes, further attempts MUST be rejected without checking the password. Failures MUST be recorded in the database. The limit MUST hold for parallel requests: the attempt MUST be stored as failed in the same transaction that checks the limits, before the password is hashed, and a successful login marks it as success afterwards (ADR 103).
+- **Enforcement:** `auth.StartLogin`, `auth.Repo.ReserveLoginAttempt`, `login_attempts` table.
+- **Evidence:** FR-2.3. Code: compliant (SC-006 fixed in PR #44; the parallel-request gap found in the review of 2026-10-25 is closed by ADR 103, test `TestLoginLimitHoldsForParallelAttempts`). Threats: T-001, T-002.
+- **Verification:** The sixth attempt in the window returns the rate-limit error even with the correct password; of 12 parallel wrong logins for one username exactly 5 reach the password check.
 
 **SC-009 - No username probing**
 - **Status:** ACTIVE
@@ -336,9 +336,9 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-040 - MFA required for Admins**
 - **Status:** ACTIVE
-- **Rule:** An ADMIN account without enabled TOTP or a security key MUST be sent to MFA setup after login, and every other Admin-only request MUST be rejected with HTTP 403 `mfa_setup_required` until MFA is enabled. This includes the bootstrap Admin and a player who is newly given the ADMIN role. Other roles stay optional (FR-3.1).
+- **Rule:** An ADMIN account without enabled TOTP or a security key MUST be sent to MFA setup after login, and every other Admin-only request MUST be rejected with HTTP 403 `mfa_setup_required` until MFA is enabled. This includes the bootstrap Admin and a player who is newly given the ADMIN role. Responses shared with other roles MUST NOT show such an Admin the Admin-only fields of other players (login name, role, account timestamps); the Admin sees them like a RAIDLEADER (ADR 103). Other roles stay optional (FR-3.1).
 - **Enforcement:** `auth` login flow; `RequireRole(ADMIN)` route guard.
-- **Evidence:** FR-3.10, OD-012 (owner, 2026-10-23). Code: compliant after #69 — the session middleware records whether an ADMIN has TOTP or a security key, `RequireRole(ADMIN)` answers 403 `mfa_setup_required` without one, and the web client sends such an Admin to the account tab. Threats: T-020.
+- **Evidence:** FR-3.10, OD-012 (owner, 2026-10-23). Code: compliant after #69 — the session middleware records whether an ADMIN has TOTP or a security key, `RequireRole(ADMIN)` answers 403 `mfa_setup_required` without one, and the web client sends such an Admin to the account tab. `GET /api/v1/players/{id}` hides other players' account fields from it (`accountViewer`, test `TestReqAuth020_AC07_*`). Threats: T-020.
 - **Verification:** An Admin without MFA gets 403 `mfa_setup_required` on `GET /api/v1/audit-log` and succeeds after enabling TOTP.
 
 **SC-041 - Security event logging**
@@ -359,7 +359,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Besides SC-008, one client address (SC-006) MUST NOT make more than 30 failed login attempts, for any usernames, in 15 minutes; further attempts are rejected with the rate-limit error before any password check. Successful logins do not count (owner 2026-10-23, ADR 093). There is no separate per-account limit across addresses (T-002 accepted).
 - **Enforcement:** `auth.StartLogin`, `login_attempts`.
-- **Evidence:** FR-2.3, OD-010 (owner, 2026-10-23), ADR 093. Code: compliant since #60 — `auth.StartLogin` counts failed attempts per address (`CountFailedLoginAttemptsFromAddress`, index from migration 076) before the per-username check and before any password hash. Threats: T-002, T-003.
+- **Evidence:** FR-2.3, OD-010 (owner, 2026-10-23), ADR 093, ADR 103. Code: compliant since #60 — `auth.StartLogin` counts failed attempts per address (`CountFailedLoginAttemptsFromAddress`, index from migration 076) before the per-username check and before any password hash; since ADR 103 the count and the stored attempt share one transaction, so parallel requests are counted (`TestAddressLimitHoldsForParallelAttempts`). Threats: T-002, T-003.
 - **Verification:** After 30 failed logins from one address within 15 minutes, the next attempt is rejected without a password comparison (`TestReqAuth011_*`).
 
 **SC-044 - Incident plan and secret rotation**
@@ -427,9 +427,9 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-053 - Push subscriptions and delivery**
 - **Status:** ACTIVE
-- **Rule:** A subscription endpoint MUST be an `https` URL on port 443 without user info whose host is one of `fcm.googleapis.com`, `updates.push.services.mozilla.com`, a subdomain of `push.apple.com`, or a subdomain of `notify.windows.com`; `p256dh` MUST be a valid uncompressed P-256 point and `auth` 16 bytes. Anything else is rejected with `400 invalid_push_subscription` and nothing is stored. The sender MUST NOT follow redirects, MUST time out after 10 s per message and 15 s per fan-out, and MUST read at most 4 KiB of an answer. A message payload MUST be the JSON `{"kind": …}` only, encrypted per RFC 8291 (aes128gcm) with a fresh key and salt per message. Endpoints and keys MUST NOT appear in API responses, logs, or audit snapshots; the audit entry keeps the push-service host only. Logs name the subscription ID and HTTP status, never the endpoint (SC-030).
-- **Enforcement:** `internal/push` (`SubscriptionInput.validate`, `HTTPSender`, `auditView`); `internal/httpapi/v1/push.go`.
-- **Evidence:** FR-32, ADR 102 (owner, 2026-10-24). Code: compliant; tests `TestReqPush001_*` (RFC 8291 test vector), `TestReqPush003_EndpointAllowlist`, `TestReqPush005_SubscribeValidatesAndAudits`.
+- **Rule:** A subscription endpoint MUST be an `https` URL on port 443 without user info whose host is one of `fcm.googleapis.com`, `updates.push.services.mozilla.com`, a subdomain of `push.apple.com`, or a subdomain of `notify.windows.com`; `p256dh` MUST be a valid uncompressed P-256 point and `auth` 16 bytes. Anything else is rejected with `400 invalid_push_subscription` and nothing is stored. The sender MUST NOT follow redirects, MUST time out after 10 s per message and 15 s per fan-out, and MUST read at most 4 KiB of an answer. A message payload MUST be the JSON `{"kind": …}` only, encrypted per RFC 8291 (aes128gcm) with a fresh key and salt per message. Endpoints and keys MUST NOT appear in API responses, logs, or audit snapshots; the audit entry keeps the push-service host only. Logs name the subscription ID and HTTP status, never the endpoint (SC-030). A subscription MUST store the session that created it, MUST be deleted with that session (foreign key with cascade), and MUST get messages only while that session is unexpired (FR-32.3, ADR 103).
+- **Enforcement:** `internal/push` (`SubscriptionInput.validate`, `HTTPSender`, `auditView`, `Repo.ListRecipients`); `internal/httpapi/v1/push.go`; migration 081.
+- **Evidence:** FR-32, ADR 102 (owner, 2026-10-24). Code: compliant; tests `TestReqPush001_*` (RFC 8291 test vector), `TestReqPush003_EndpointAllowlist`, `TestReqPush005_SubscribeValidatesAndAudits`, `TestReqPush011_SubscriptionEndsWithItsSession`, `TestReqPush012_EndedSessionsEndSubscriptions`.
 - **Verification:** A subscription for `https://127.0.0.1/` or `http://fcm.googleapis.com/` returns 400 without an outbound request; the audit log and the journal contain no endpoint path.
 
 **SC-054 - VAPID key**
@@ -472,3 +472,7 @@ Decided by the owner on 2026-10-23 (threat model):
 Decided by the owner on 2026-10-24 (Web Push):
 
 - **OD-021** Opt-in Web Push for a new poll, a new raid, and the own roster place; RFC 8291/8292 with the standard library, no new dependency; VAPID key in the env file and its off-server copy, push off without it → SC-052, SC-053, SC-054, FR-32, ADR 102.
+
+Decided by the owner on 2026-10-25 (review fixes):
+
+- **OD-022** Review fixes of 2026-10-25: login attempts are reserved before hashing; a 5-second wait limit for a hashing slot with `503 server_busy`; push subscriptions end with their session; an Admin without MFA does not see other players' account fields; a GUEST player attached by a registration code becomes MEMBER → SC-005, SC-008, SC-040, SC-043, SC-053, FR-4.5, FR-32.3, ADR 103.

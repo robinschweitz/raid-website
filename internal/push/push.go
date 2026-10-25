@@ -53,8 +53,11 @@ var allowedPushHosts = []string{
 type Subscription struct {
 	bun.BaseModel `bun:"table:push_subscriptions,alias:subscription"`
 
-	ID        int64     `bun:"id,pk,autoincrement" json:"id"`
-	PlayerID  int64     `bun:"player_id,notnull" json:"player_id"`
+	ID       int64 `bun:"id,pk,autoincrement" json:"id"`
+	PlayerID int64 `bun:"player_id,notnull" json:"player_id"`
+	// SessionID is the session that subscribed; the row is deleted with it
+	// (FR-32.3, ADR 103). Rows from before migration 081 have none.
+	SessionID *int64    `bun:"session_id" json:"-"`
 	Endpoint  string    `bun:"endpoint,notnull" json:"-"`
 	P256dh    string    `bun:"p256dh,notnull" json:"-"`
 	Auth      string    `bun:"auth,notnull" json:"-"`
@@ -165,10 +168,12 @@ func allowedHost(host string) bool {
 	return false
 }
 
-// Subscribe stores the actor's subscription. A browser that was subscribed
-// for another account is moved to the actor, because one browser can only
-// have one subscription.
-func (s *Service) Subscribe(ctx context.Context, actorID int64, in SubscriptionInput) (*Subscription, error) {
+// Subscribe stores the actor's subscription for the session sessionID. A
+// browser that was subscribed for another account or session is moved to the
+// actor's session, because one browser can only have one subscription. The
+// web client repeats the call on every visit; an unchanged subscription is
+// left as it is and writes no audit entry.
+func (s *Service) Subscribe(ctx context.Context, actorID, sessionID int64, in SubscriptionInput) (*Subscription, error) {
 	if s.key == nil {
 		return nil, ErrDisabled
 	}
@@ -176,11 +181,15 @@ func (s *Service) Subscribe(ctx context.Context, actorID int64, in SubscriptionI
 	if err := in.validate(); err != nil {
 		return nil, err
 	}
-	sub := &Subscription{PlayerID: actorID, Endpoint: in.Endpoint, P256dh: strings.TrimSpace(in.P256dh), Auth: strings.TrimSpace(in.Auth), CreatedAt: s.now()}
+	sub := &Subscription{PlayerID: actorID, SessionID: &sessionID, Endpoint: in.Endpoint, P256dh: strings.TrimSpace(in.P256dh), Auth: strings.TrimSpace(in.Auth), CreatedAt: s.now()}
 	err := s.repo.Transaction(ctx, func(r *Repo, tx bun.Tx) error {
 		existing, err := r.GetByEndpoint(ctx, sub.Endpoint)
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return err
+		}
+		if existing != nil && existing.sameAs(sub) {
+			*sub = *existing
+			return nil
 		}
 		var before any
 		if existing != nil {
@@ -208,6 +217,13 @@ func (s *Service) Subscribe(ctx context.Context, actorID int64, in SubscriptionI
 		return nil, err
 	}
 	return sub, nil
+}
+
+// sameAs reports whether a stored subscription already is other: same
+// player, session, and keys.
+func (s Subscription) sameAs(other *Subscription) bool {
+	return s.PlayerID == other.PlayerID && s.SessionID != nil && other.SessionID != nil && *s.SessionID == *other.SessionID &&
+		s.P256dh == other.P256dh && s.Auth == other.Auth
 }
 
 // Unsubscribe deletes the actor's subscription for this endpoint. Deleting a
@@ -251,7 +267,7 @@ func (s *Service) notify(ctx context.Context, kind Kind, actorID int64, playerID
 	// its own bounded time.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sendTimeout)
 	defer cancel()
-	subs, err := s.repo.ListRecipients(ctx, actorID, playerIDs)
+	subs, err := s.repo.ListRecipients(ctx, actorID, playerIDs, s.now())
 	if err != nil {
 		s.logf("push %s: list recipients: %v", kind, err)
 		return

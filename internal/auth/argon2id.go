@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/bcrypt"
@@ -34,12 +35,27 @@ var argonPrefix = fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$", argon2.Version, 
 // logins cannot claim more than slots × 64 MiB of memory on the host.
 var argonSlots = make(chan struct{}, 2)
 
+// argonSlotWait bounds how long a request waits for a free slot. A flood of
+// logins then gets ErrPasswordHashBusy quickly instead of a queue that holds
+// every later login until the write timeout (SC-005). Tests shorten it.
+var argonSlotWait = 5 * time.Second
+
 var errPasswordMismatch = errors.New("password mismatch")
 
-func argonKey(password, salt []byte, time, memory uint32, threads uint8, keyLen uint32) []byte {
-	argonSlots <- struct{}{}
+// ErrPasswordHashBusy is returned when no Argon2id slot became free in time.
+// No password was checked, so it is never counted as a failed login.
+var ErrPasswordHashBusy = errors.New("password hashing busy")
+
+func argonKey(password, salt []byte, passes, memory uint32, threads uint8, keyLen uint32) ([]byte, error) {
+	wait := time.NewTimer(argonSlotWait)
+	defer wait.Stop()
+	select {
+	case argonSlots <- struct{}{}:
+	case <-wait.C:
+		return nil, ErrPasswordHashBusy
+	}
 	defer func() { <-argonSlots }()
-	return argon2.IDKey(password, salt, time, memory, threads, keyLen)
+	return argon2.IDKey(password, salt, passes, memory, threads, keyLen), nil
 }
 
 // HashPassword derives an Argon2id hash in PHC string format for storage.
@@ -48,7 +64,10 @@ func HashPassword(password string) (string, error) {
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("generate password salt: %w", err)
 	}
-	key := argonKey([]byte(password), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
+	key, err := argonKey([]byte(password), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
+	if err != nil {
+		return "", err
+	}
 	encoding := base64.RawStdEncoding
 	return argonPrefix + encoding.EncodeToString(salt) + "$" + encoding.EncodeToString(key), nil
 }
@@ -87,7 +106,10 @@ func verifyStoredPassword(hash, password string) error {
 	if err != nil || len(expected) < 16 || len(expected) > 64 {
 		return errors.New("invalid argon2 key")
 	}
-	actual := argonKey([]byte(password), salt, time, memory, threads, uint32(len(expected)))
+	actual, err := argonKey([]byte(password), salt, time, memory, threads, uint32(len(expected)))
+	if err != nil {
+		return err
+	}
 	if subtle.ConstantTimeCompare(actual, expected) != 1 {
 		return errPasswordMismatch
 	}

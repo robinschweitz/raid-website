@@ -133,7 +133,7 @@ export function GuidePage() {
         <li>Klicke auf <strong>Registrieren</strong>.</li>
       </ol>
       <Shot name="03-registrieren" caption="Registrieren mit Code, Benutzername und Passwort" />
-      <Tip><strong>Wichtig:</strong> Nach der Registrierung bist du <strong>Mitglied</strong> und kannst dich für Raids anmelden und eine Wunschliste anlegen. Hängt dein Charakter schon an einem älteren Konto, bleibt dessen Rolle erhalten. Dann sag einem Admin Bescheid, damit er dich zum <strong>Mitglied</strong> macht.</Tip>
+      <Tip><strong>Wichtig:</strong> Nach der Registrierung bist du <strong>Mitglied</strong> und kannst dich für Raids anmelden und eine Wunschliste anlegen. Das gilt auch, wenn dein Charakter schon aus dem Raid bekannt war und du diesen Spieler übernimmst.</Tip>
       <h3>Schritt 3: Einloggen</h3>
       <p>Ab jetzt gehst du immer über <strong>Anmelden</strong>: Benutzername und Passwort eingeben, fertig.</p>
       <Shot name="01-login" caption="Die Login-Seite" />
@@ -256,7 +256,7 @@ export function GuidePage() {
       <Shot name="20-item-locks" caption="Item-Locks: aktiver Lock und Formular" />
       <h3>Konto</h3>
       <p>Im Reiter <strong>Konto</strong> änderst du dein Passwort. Freiwillig kannst du eine Authenticator-App oder einen Sicherheitsschlüssel als zweiten Faktor einrichten. Warum sich das lohnt, steht unter <Link to="/kontosicherheit">Kontosicherheit</Link>.</p>
-      <p>Ebenfalls freiwillig: Unter <strong>Benachrichtigungen</strong> schaltest du für dein Gerät Meldungen bei neuen Umfragen, neuen Raids und deinem Platz in einer Aufstellung ein. Der Browser fragt erst nach, wenn du auf den Knopf drückst. Auf iPhone und iPad geht das nur mit RAID auf dem Home-Bildschirm (ab iOS 16.4). Beim Abmelden werden die Meldungen für dieses Gerät beendet.</p>
+      <p>Ebenfalls freiwillig: Unter <strong>Benachrichtigungen</strong> schaltest du für dein Gerät Meldungen bei neuen Umfragen, neuen Raids und deinem Platz in einer Aufstellung ein. Der Browser fragt erst nach, wenn du auf den Knopf drückst. Auf iPhone und iPad geht das nur mit RAID auf dem Home-Bildschirm (ab iOS 16.4). Beim Abmelden werden die Meldungen für dieses Gerät beendet, ebenso wenn deine Anmeldung auf dem Gerät anders endet, etwa nach einer Passwortänderung. Meldest du dich dort wieder an, laufen sie weiter.</p>
       <Shot name="21-konto" caption="Konto: Passwort und Zwei-Faktor" />
       <h3>Umfragen</h3>
       <p>Unter <Link to="/polls">Umfragen</Link> Antwort wählen und <strong>Abstimmen</strong> klicken.</p>
@@ -373,7 +373,7 @@ export function GuidePage() {
         <li>Die Person fordert auf der Login-Seite einen Code an.</li>
         <li>Unter <strong>Registrierung</strong> erscheint die Anfrage. Erstelle einen Code. Er wird nur einmal angezeigt.</li>
         <li>Schick den Code ingame an genau diesen Charakter und markiere ihn als gesendet.</li>
-        <li>Die Person registriert sich. Gibt es den Charakter schon (z. B. aus der alten Liste), bekommt <strong>der Spieler, dem der Charakter gehört</strong>, den Login. Sonst entsteht ein neuer Spieler als <strong>Mitglied</strong>.</li>
+        <li>Die Person registriert sich. Gibt es den Charakter schon (z. B. aus der alten Liste), bekommt <strong>der Spieler, dem der Charakter gehört</strong>, den Login, sonst entsteht ein neuer Spieler. In beiden Fällen ist die Person danach <strong>Mitglied</strong> (eine höhere Rolle bleibt).</li>
         <li>Ist die Person noch <strong>Gast</strong> (z. B. ein älteres Konto), mach sie zum <strong>Mitglied</strong> (nächster Schritt).</li>
       </ol>
       <p>Im Reiter <strong>Verlauf</strong> zeigt die Spalte <strong>Verknüpfter Spieler</strong>, für welchen Spieler ein Code eingelöst wurde, mit Login-Namen und Datum.</p>

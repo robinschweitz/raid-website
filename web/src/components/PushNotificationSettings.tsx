@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
+import { useAuth } from '../auth'
 import { isIOSDevice, isStandaloneDisplay } from '../installHint'
 import { browserHasPushAPI, currentPushSubscription, disablePush, enablePush, pushAvailability, type PushAvailability, type PushConfig } from '../pushNotifications'
 import { useSubmission } from '../useSubmission'
@@ -14,6 +15,7 @@ export function PushNotificationSettings() {
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const { pending, submit } = useSubmission()
+  const { player } = useAuth()
 
   const refresh = useCallback(async () => {
     try {
@@ -36,11 +38,11 @@ export function PushNotificationSettings() {
   useEffect(() => { void refresh() }, [refresh])
 
   const enable = () => submit(async () => {
-    if (!config) return
+    if (!config || !player) return
     setError('')
     setStatus('')
     try {
-      await enablePush(config)
+      await enablePush(config, player.id)
       setStatus('Benachrichtigungen sind auf diesem Gerät aktiv.')
     } catch (err) {
       if (err instanceof ApiError) setError(err.message)

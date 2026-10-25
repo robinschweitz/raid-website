@@ -1,8 +1,19 @@
-export const appVersion = '1.0.50'
+export const appVersion = '1.0.51'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Sicherere Anmeldung und Benachrichtigungen',
+    changes: [
+      'Die Sperre nach zu vielen falschen Passwörtern greift jetzt auch, wenn viele Anmeldeversuche gleichzeitig kommen.',
+      'Ist der Server gerade ausgelastet, meldet die Anmeldung das nach wenigen Sekunden, statt lange zu warten. Einfach kurz danach noch einmal versuchen.',
+      'Benachrichtigungen gehören jetzt zur Anmeldung auf dem Gerät: Endet die Anmeldung, zum Beispiel nach einer Passwortänderung, kommen dort keine Meldungen mehr. Meldest du dich auf demselben Gerät wieder an, laufen sie weiter.',
+      'Wer sich mit einem Code registriert und dabei einen schon vorhandenen Spieler übernimmt, ist jetzt auch Mitglied und kann sich sofort für Raids anmelden.',
+      'Admins ohne zweiten Faktor sehen Logins und Rollen anderer Spieler erst, wenn sie die Zwei-Faktor-Anmeldung eingerichtet haben.',
+    ],
+  },
+  {
+    version: '1.0.50',
     title: 'Aufgeräumte Statistik-Seite',
     changes: [
       'Auf der Statistik-Seite zeigen „Historische Rollen“ und „Loot-Verteilung“ jetzt Diagramme wie die Kacheln darüber. Dadurch sind alle Kacheln einer Zeile gleich hoch und es gibt keine leere Fläche mehr.',

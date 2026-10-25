@@ -587,6 +587,7 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 			}
 			p.Username = &uname
 			p.PasswordHash = hash
+			p.Role = memberAtLeast(p.Role)
 			p.UpdatedAt = now
 			if err := players.Update(ctx, p); err != nil {
 				return 0, err
@@ -606,6 +607,7 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 			}
 			p.Username = &uname
 			p.PasswordHash = hash
+			p.Role = memberAtLeast(p.Role)
 			p.UpdatedAt = now
 			if err := players.Update(ctx, p); err != nil {
 				return 0, err
@@ -615,8 +617,9 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return 0, err
 		}
-		// FR-4.5: a new account from a registration code is a MEMBER. Existing GUEST
-		// accounts keep their role (FR-4.10); only an Admin promotes them.
+		// FR-4.5: an account from a registration code is a MEMBER, also when the
+		// login is attached to an existing player above (ADR 103). Existing GUEST
+		// accounts with a login keep their role (FR-4.10); only an Admin promotes them.
 		p := &player.Player{Name: req.CharacterName, Username: &uname, PasswordHash: hash, Role: validation.RoleMember, Active: true, CreatedAt: now, UpdatedAt: now}
 		if err := players.Create(ctx, p); err != nil {
 			return 0, err
@@ -772,4 +775,13 @@ func hashCode(code string) string {
 	}
 	sum := sha256.Sum256([]byte(normalized))
 	return hex.EncodeToString(sum[:])
+}
+
+// memberAtLeast returns MEMBER for a player without a login who gets one from a
+// registration code (FR-4.5, ADR 103); a higher role stays as it is.
+func memberAtLeast(role validation.Role) validation.Role {
+	if role.AtLeast(validation.RoleMember) {
+		return role
+	}
+	return validation.RoleMember
 }

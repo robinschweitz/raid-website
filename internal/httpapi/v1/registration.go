@@ -24,6 +24,9 @@ type claimCodeRequest struct {
 }
 
 func registrationError(w http.ResponseWriter, err error) {
+	if writePasswordBusy(w, err) {
+		return
+	}
 	switch {
 	case errors.Is(err, registration.ErrInvalidCode):
 		WriteError(w, http.StatusBadRequest, "registration_code_invalid", "Code ungültig oder abgelaufen.")

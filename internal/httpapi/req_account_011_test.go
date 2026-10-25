@@ -112,7 +112,8 @@ func TestReqAccount011_AC02(t *testing.T) {
 	}
 }
 
-// AC-03: a code that attaches to an existing player without login keeps that player's role.
+// AC-03: a code that attaches to an existing GUEST player without login makes
+// that player a MEMBER (FR-4.5, ADR 103).
 func TestReqAccount011_AC03(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -130,12 +131,28 @@ func TestReqAccount011_AC03(t *testing.T) {
 			if status != http.StatusOK {
 				t.Fatalf("redeem: status %d body %s", status, body)
 			}
-			if role := redeemedRole(t, body); role != string(validation.RoleGuest) {
-				t.Fatalf("response role %q, want GUEST", role)
+			if role := redeemedRole(t, body); role != string(validation.RoleMember) {
+				t.Fatalf("response role %q, want MEMBER", role)
 			}
-			if role := storedRole(t, bdb, playerID); role != validation.RoleGuest {
-				t.Fatalf("attached player role %q, want GUEST", role)
+			if role := storedRole(t, bdb, playerID); role != validation.RoleMember {
+				t.Fatalf("attached player role %q, want MEMBER", role)
 			}
 		})
+	}
+}
+
+// AC-03b: attaching a login never lowers a role above MEMBER.
+func TestReqAccount011_AC03KeepsHigherRole(t *testing.T) {
+	srv, bdb, adminToken := req011Setup(t)
+	playerID := seedLoginlessGuest(t, bdb, "Firsthero", "1")
+	if _, err := bdb.NewUpdate().Model((*player.Player)(nil)).Set("role = ?", validation.RoleRaidassistent).Where("id = ?", playerID).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	code := registrationCode(t, srv, srv.URL, adminToken, "1")
+	if status, body := redeemNewAccount(t, srv, code, "attachedname"); status != http.StatusOK {
+		t.Fatalf("redeem: status %d body %s", status, body)
+	}
+	if role := storedRole(t, bdb, playerID); role != validation.RoleRaidassistent {
+		t.Fatalf("attached player role %q, want RAIDASSISTENT", role)
 	}
 }

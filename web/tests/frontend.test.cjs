@@ -3853,6 +3853,20 @@ test('push opt-in states, including iPhone without installation (FR-32)', () => 
   assert.deepEqual(subscriptionBody({ endpoint: 'https://fcm.googleapis.com/x', expirationTime: null, keys: { p256dh: 'p', auth: 'a' } }), { endpoint: 'https://fcm.googleapis.com/x', p256dh: 'p', auth: 'a' })
 })
 
+test("a visit keeps the own push subscription and drops another player's (FR-32.3, ADR 103)", () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { pushSyncAction } = s.load('pushNotifications.ts')
+  const base = { hasSubscription: true, owner: '7', playerID: 7, permission: 'granted' }
+  assert.equal(pushSyncAction(base), 'resubscribe')
+  assert.equal(pushSyncAction({ ...base, owner: null }), 'resubscribe')
+  assert.equal(pushSyncAction({ ...base, owner: '8' }), 'drop')
+  assert.equal(pushSyncAction({ ...base, owner: '8', permission: 'default' }), 'drop')
+  assert.equal(pushSyncAction({ ...base, permission: 'default' }), 'none')
+  assert.equal(pushSyncAction({ ...base, hasSubscription: false }), 'none')
+  const auth = fs.readFileSync(path.resolve(__dirname, '..', 'src/auth.tsx'), 'utf8')
+  assert.match(auth, /if \(playerID !== undefined && browserHasPushAPI\(\)\) void syncPushForPlayer\(playerID\)/)
+})
+
 test('the browser is asked for notification permission only after a click (FR-32)', () => {
   const sources = ['src/pushNotifications.ts', 'src/components/PushNotificationSettings.tsx', 'src/auth.tsx', 'src/App.tsx', 'src/components/PWAInstall.tsx']
     .map((file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8'))

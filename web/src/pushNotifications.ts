@@ -47,7 +47,60 @@ export async function currentPushSubscription(): Promise<PushSubscription | null
   return registration ? registration.pushManager.getSubscription() : null
 }
 
-export async function enablePush(config: PushConfig): Promise<void> {
+// The browser remembers which player turned push on, so that another player
+// who signs in on the same browser does not inherit the subscription (FR-32.3).
+const pushOwnerKey = 'raid-push-player'
+
+function readPushOwner(): string | null {
+  try {
+    return window.localStorage.getItem(pushOwnerKey)
+  } catch {
+    return null
+  }
+}
+
+function writePushOwner(playerID: number | null): void {
+  try {
+    if (playerID === null) window.localStorage.removeItem(pushOwnerKey)
+    else window.localStorage.setItem(pushOwnerKey, String(playerID))
+  } catch {
+    // Without storage the subscription is only kept for the player who made it.
+  }
+}
+
+// What syncPushForPlayer does with this browser's subscription for a signed-in
+// player: keep it bound to the current session, drop it because another player
+// turned it on, or nothing without a subscription or permission.
+export function pushSyncAction(state: { hasSubscription: boolean; owner: string | null; playerID: number; permission: NotificationPermission }): 'none' | 'drop' | 'resubscribe' {
+  if (!state.hasSubscription) return 'none'
+  if (state.owner !== null && state.owner !== String(state.playerID)) return 'drop'
+  if (state.permission !== 'granted') return 'none'
+  return 'resubscribe'
+}
+
+// A subscription ends on the server with the session that made it (ADR 103).
+// On every visit the browser's subscription is therefore sent again, so it is
+// bound to the current session of the same player; a subscription another
+// player turned on is dropped instead. Failures leave the account tab to show
+// the state; they never block the page.
+export async function syncPushForPlayer(playerID: number): Promise<void> {
+  try {
+    const subscription = await currentPushSubscription()
+    const action = pushSyncAction({ hasSubscription: subscription !== null, owner: readPushOwner(), playerID, permission: Notification.permission })
+    if (!subscription || action === 'none') return
+    if (action === 'drop') {
+      await subscription.unsubscribe().catch(() => false)
+      writePushOwner(null)
+      return
+    }
+    await api.post('/api/v1/push/subscriptions', subscriptionBody(subscription.toJSON()))
+    writePushOwner(playerID)
+  } catch {
+    // The account tab shows whether this device is subscribed.
+  }
+}
+
+export async function enablePush(config: PushConfig, playerID: number): Promise<void> {
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') throw new Error(permission === 'denied' ? 'denied' : 'dismissed')
   const registration = await navigator.serviceWorker.ready
@@ -57,6 +110,7 @@ export async function enablePush(config: PushConfig): Promise<void> {
   }
   try {
     await api.post('/api/v1/push/subscriptions', subscriptionBody(subscription.toJSON()))
+    writePushOwner(playerID)
   } catch (err) {
     // A browser subscription the server does not know would never get a message.
     await subscription.unsubscribe().catch(() => false)
@@ -71,6 +125,7 @@ export async function disablePush(): Promise<void> {
     await api.del('/api/v1/push/subscriptions', { endpoint: subscription.endpoint })
   } finally {
     await subscription.unsubscribe().catch(() => false)
+    writePushOwner(null)
   }
 }
 

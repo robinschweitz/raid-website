@@ -615,7 +615,9 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return 0, err
 		}
-		p := &player.Player{Name: req.CharacterName, Username: &uname, PasswordHash: hash, Role: validation.RoleGuest, Active: true, CreatedAt: now, UpdatedAt: now}
+		// FR-4.5: a new account from a registration code is a MEMBER. Existing GUEST
+		// accounts keep their role (FR-4.10); only an Admin promotes them.
+		p := &player.Player{Name: req.CharacterName, Username: &uname, PasswordHash: hash, Role: validation.RoleMember, Active: true, CreatedAt: now, UpdatedAt: now}
 		if err := players.Create(ctx, p); err != nil {
 			return 0, err
 		}

@@ -1,8 +1,15 @@
-export const appVersion = '1.0.46'
+export const appVersion = '1.0.47'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Neue Konten sind Mitglieder',
+    changes: [
+      'Wer sich mit einem Registrierungscode neu anmeldet, ist sofort Mitglied und kann sich für Raids anmelden. Bestehende Gast-Konten bleiben unverändert; ein Admin stuft sie hoch.',
+    ],
+  },
+  {
+    version: '1.0.46',
     title: 'Klarere Rahmen für Eingabefelder und Schaltflächen',
     changes: [
       'Eingabefelder, Auswahlfelder, Textfelder und Schaltflächen haben jetzt einen deutlicher sichtbaren Rahmen. So sind sie auch für Menschen mit eingeschränktem Sehvermögen besser zu erkennen.',

@@ -104,7 +104,7 @@ export function GuidePage() {
           <thead><tr><th>Rolle</th><th>Wer ist das?</th><th>Was kann ich?</th></tr></thead>
           <tbody>
             <tr><td><strong>Besucher</strong></td><td>Nicht eingeloggt</td><td>Nächsten Raid, Raidhistorie, aktive Umfrage und diese Anleitung ansehen</td></tr>
-            <tr><td><strong>Gast</strong> <code>GUEST</code></td><td>Frisch registriert</td><td>Alles ansehen, auch die Schattengram-Reihenfolge. Anmelden geht erst, wenn ein Admin dich zum Mitglied macht.</td></tr>
+            <tr><td><strong>Gast</strong> <code>GUEST</code></td><td>Ältere Konten und Spieler ohne Login aus dem Raid</td><td>Alles ansehen, auch die Schattengram-Reihenfolge. Anmelden geht erst, wenn ein Admin dich zum Mitglied macht.</td></tr>
             <tr><td><strong>Mitglied</strong> <code>MEMBER</code></td><td>Normale Raider</td><td>Für Raids anmelden, absagen oder „unsicher“ melden, Wunschliste, Item-Locks, abstimmen</td></tr>
             <tr><td><strong>Raidassistent</strong> <code>RAIDASSISTENT</code></td><td>Helfer der Raidleitung</td><td>Dazu: Raids anlegen und vorausplanen, Anmeldungen übernehmen, Aufstellung, Gesuchtext, Loot, archivieren, Umfragen erstellen und bearbeiten, Schattengram-Liste pflegen und pro Raid einteilen</td></tr>
             <tr><td><strong>Raidleitung</strong> <code>RAIDLEADER</code></td><td>Leitet die Raids</td><td>Alles vom Raidassistenten</td></tr>
@@ -133,7 +133,7 @@ export function GuidePage() {
         <li>Klicke auf <strong>Registrieren</strong>.</li>
       </ol>
       <Shot name="03-registrieren" caption="Registrieren mit Code, Benutzername und Passwort" />
-      <Tip><strong>Wichtig:</strong> Nach der Registrierung bist du zuerst <strong>Gast</strong>. Sag einem Admin Bescheid, damit er dich zum <strong>Mitglied</strong> macht. Erst dann kannst du dich für Raids anmelden und eine Wunschliste anlegen.</Tip>
+      <Tip><strong>Wichtig:</strong> Nach der Registrierung bist du <strong>Mitglied</strong> und kannst dich für Raids anmelden und eine Wunschliste anlegen. Hängt dein Charakter schon an einem älteren Konto, bleibt dessen Rolle erhalten. Dann sag einem Admin Bescheid, damit er dich zum <strong>Mitglied</strong> macht.</Tip>
       <h3>Schritt 3: Einloggen</h3>
       <p>Ab jetzt gehst du immer über <strong>Anmelden</strong>: Benutzername und Passwort eingeben, fertig.</p>
       <Shot name="01-login" caption="Die Login-Seite" />
@@ -373,8 +373,8 @@ export function GuidePage() {
         <li>Die Person fordert auf der Login-Seite einen Code an.</li>
         <li>Unter <strong>Registrierung</strong> erscheint die Anfrage. Erstelle einen Code. Er wird nur einmal angezeigt.</li>
         <li>Schick den Code ingame an genau diesen Charakter und markiere ihn als gesendet.</li>
-        <li>Die Person registriert sich. Gibt es den Charakter schon (z. B. aus der alten Liste), bekommt <strong>der Spieler, dem der Charakter gehört</strong>, den Login. Sonst entsteht ein neuer Spieler als <strong>Gast</strong>.</li>
-        <li>Mach die Person zum <strong>Mitglied</strong>, falls sie es noch nicht ist (nächster Schritt).</li>
+        <li>Die Person registriert sich. Gibt es den Charakter schon (z. B. aus der alten Liste), bekommt <strong>der Spieler, dem der Charakter gehört</strong>, den Login. Sonst entsteht ein neuer Spieler als <strong>Mitglied</strong>.</li>
+        <li>Ist die Person noch <strong>Gast</strong> (z. B. ein älteres Konto), mach sie zum <strong>Mitglied</strong> (nächster Schritt).</li>
       </ol>
       <p>Im Reiter <strong>Verlauf</strong> zeigt die Spalte <strong>Verknüpfter Spieler</strong>, für welchen Spieler ein Code eingelöst wurde, mit Login-Namen und Datum.</p>
       <p><strong>Beispiel:</strong> Die Anfrage für den Charakter <em>Mirabelle</em> ist eingelöst und mit dem Spieler <em>Mira</em> (Login <code>@mira</code>) verknüpft.</p>
@@ -393,7 +393,7 @@ export function GuidePage() {
       <Shot name="51b-spieler-ohne-konto" caption="Nur Spieler ohne Konto" />
       <h3>Rolle ändern, Passwort zurücksetzen</h3>
       <p>Unter <strong>Spieler</strong> auf den Namen klicken, Reiter <strong>Konto</strong>. Dort Rolle wählen (z. B. <code>MEMBER</code>), bei Bedarf ein neues Passwort setzen, <strong>Speichern</strong>.</p>
-      <p><strong>Beispiel:</strong> Ein frisch registrierter Spieler ist <code>GUEST</code>. Du stellst <code>MEMBER</code> ein und speicherst. Ab sofort kann er sich für Raids anmelden.</p>
+      <p><strong>Beispiel:</strong> Ein älteres Konto ist noch <code>GUEST</code>. Du stellst <code>MEMBER</code> ein und speicherst. Ab sofort kann er sich für Raids anmelden.</p>
       <Shot name="52-spieler-konto-admin" caption="Spielerkonto als Admin" />
       <p>Hat jemand zwei Accounts, nutze <strong>Konto zusammenführen</strong> mit einem Grund. Unter <strong>Spieler</strong> → <strong>Neuer Spieler</strong> legst du jemanden ohne Login an.</p>
       <h3>Raidserien</h3>

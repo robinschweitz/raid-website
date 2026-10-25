@@ -370,7 +370,7 @@
   .secondary-page .card { padding: 16px; }
   .secondary-page .workspace-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .secondary-page .workspace-tabs button { padding: 12px 8px; }
-  .secondary-page .workspace-tabs button:nth-child(n + 3) { border-top: 1px solid #29485e; }
+  .secondary-page .workspace-tabs button:nth-child(n + 3) { border-top: 1px solid var(--outline-control); }
   .raid-detail .raid-banner-content { padding: 20px; }
   .secondary-page .page-heading { padding: 16px; }
   .secondary-page .inline-form > label { flex-basis: 100%; }

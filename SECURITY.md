@@ -190,7 +190,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** JSON bodies MUST be decoded with `DisallowUnknownFields` and a 1 MiB limit; path IDs MUST be positive integers; enums, roles, classes, specs, statuses, and recruitment slot values MUST be validated on the server.
 - **Enforcement:** `DecodeJSON`, `pathID`, `internal/validation`, domain services.
-- **Evidence:** NFR-4.1, FR-23.4. Code: compliant except recruitment slot values (FR-23.4, not built). Threats: T-018, T-027.
+- **Evidence:** NFR-4.1, FR-23.4. Code: compliant; recruitment slot values are checked on the server against the editor's list, and a bad value answers 422 `invalid_slot` (#93). Stored values that the list no longer accepts are logged at startup, never changed. Threats: T-018, T-027.
 - **Verification:** Unknown fields, a 1 MiB + 1 body, ID `0`, and an unknown enum each return 4xx.
 
 **SC-021 - Parameterised SQL only**

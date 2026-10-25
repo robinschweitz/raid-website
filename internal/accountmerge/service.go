@@ -61,7 +61,7 @@ func (s *Service) Merge(ctx context.Context, targetID, sourceID, actorID int64, 
 
 		// The target keeps its own role, so only an Admin source that no active
 		// Admin target replaces can remove the last Admin (SC-047).
-		if source.Role == validation.RoleAdmin && !(target.Role == validation.RoleAdmin && target.Active) {
+		if source.Role == validation.RoleAdmin && (target.Role != validation.RoleAdmin || !target.Active) {
 			admins, err := repo.CountActiveAdmins(ctx)
 			if err != nil {
 				return fmt.Errorf("count active admins: %w", err)

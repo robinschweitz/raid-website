@@ -98,12 +98,18 @@ func TestReqRaid014_AC02(t *testing.T) {
 	}
 }
 
-// TestReqRaid014_AC03: the "Irgendein" placeholder is accepted.
+// TestReqRaid014_AC03: an "Irgendein <Rolle>" placeholder is accepted. The bare "Irgendein"
+// is not an editor value (owner decision 2026-10-25), so it answers 422 invalid_slot.
 func TestReqRaid014_AC03(t *testing.T) {
 	e := newSlotEnv(t)
-	status, body := do(t, e.srv.Client(), http.MethodPut, e.url, e.staff, map[string]any{"text": "Wir suchen", "setup": slotSetup("Irgendein")})
+	client := e.srv.Client()
+	status, body := do(t, client, http.MethodPut, e.url, e.staff, map[string]any{"text": "Wir suchen", "setup": slotSetup("Irgendein Heiler")})
 	if status != http.StatusOK {
 		t.Fatalf("status %d, want 200: %s", status, body)
+	}
+	status, body = do(t, client, http.MethodPut, e.url, e.staff, map[string]any{"text": "Wir suchen", "setup": slotSetup("Irgendein")})
+	if status != http.StatusUnprocessableEntity || !strings.Contains(string(body), `"invalid_slot"`) {
+		t.Fatalf("bare Irgendein: status %d, want 422 invalid_slot: %s", status, body)
 	}
 }
 

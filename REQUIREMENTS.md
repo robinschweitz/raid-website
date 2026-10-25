@@ -290,7 +290,7 @@ implemented yet when it differs from the code.
 - **FR-23.1** Staff MUST be able to read and save a recruitment template for a planned or open raid: one per series, else one per raid. (ADR 068)
 - **FR-23.2** The template text MUST have at most 2000 characters and a 5×5 target setup. (ADR 068)
 - **FR-23.3** The text MUST support `{{SETUP}}`, `{{SETUP_KURZ}}`, `{{TANK_SPECS}}`, `{{HEAL_SPECS}}`, `{{MDD_SPECS}}`, and `{{RDD_SPECS}}`, computed from the saved roster. (ADR 080)
-- **FR-23.4** The server MUST reject a target-setup slot value that is not a known class-and-spec value or "Irgendein" placeholder. (Owner 2026-10-22, OQ-4)
+- **FR-23.4** The server MUST reject a target-setup slot value that the setup editor does not offer: the class-and-spec values, `Maintank`, `Offtank`, `Leer`, and the four Irgendein placeholders `Irgendein Tank`, `Irgendein Heiler`, `Irgendein MDD`, `Irgendein RDD`. A bare `Irgendein` is rejected. (Owner 2026-10-22, OQ-4; Owner 2026-10-25)
 
 ### 24. Polls
 

@@ -3,11 +3,11 @@ package validation
 import "strings"
 
 // recruitmentSlotValues are the target-setup values that the recruitment editor
-// offers (web/src/raidSetup.ts, setupOptions), plus the bare "Irgendein" placeholder
-// that FR-23.4 names. "Leer", "Maintank" and "Offtank" are included because the
-// editor offers them and the standard ICC setup uses them.
+// offers (web/src/raidSetup.ts, setupOptions). "Leer", "Maintank" and "Offtank" are
+// included because the editor offers them and the standard ICC setup uses them
+// (owner decision 2026-10-25, FR-23.4).
 var recruitmentSlotValues = map[string]bool{
-	"Leer": true, "Maintank": true, "Offtank": true, "Irgendein": true,
+	"Leer": true, "Maintank": true, "Offtank": true,
 	"Irgendein Tank": true, "Irgendein Heiler": true, "Irgendein MDD": true, "Irgendein RDD": true,
 	"Krieger Furor": true, "Schurke Kampf": true, "Todesritter Unheilig": true, "Paladin Vergeltung": true,
 	"Jäger Treffsicherheit": true, "Hexer Dämonologie": true, "Druide Eule": true, "Magier Feuer": true,

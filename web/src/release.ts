@@ -1,8 +1,15 @@
-export const appVersion = '1.0.48'
+export const appVersion = '1.0.49'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Statistiken ohne Anmeldung',
+    changes: [
+      'Die Statistik-Seite kann jetzt auch ohne Anmeldung geöffnet werden. Sie zeigt nur Zahlen, keine Items und keine Enhance Points. Der Bereich „Loot-Verteilung“ zeigt jetzt die Verteilung nach Klasse.',
+    ],
+  },
+  {
+    version: '1.0.48',
     title: 'Der letzte Admin bleibt Admin',
     changes: [
       'Der einzige aktive Admin kann sich nicht mehr selbst die Admin-Rolle nehmen oder mit einem anderen Spieler zusammengeführt werden. Die Seite zeigt dann einen Hinweis, dass mindestens ein aktiver Admin bleiben muss.',

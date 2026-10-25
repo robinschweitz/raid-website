@@ -175,8 +175,8 @@ function Gate() {
     )
   }
   // The guide, the addons pages and the account-security page must be readable before an
-  // account exists (ADR 083, ADR 085, ADR 092).
-  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/')) {
+  // account exists (ADR 083, ADR 085, ADR 092); so must the statistics (FR-1.4).
+  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/') && path !== '/statistics') {
     return <LoginPage />
   }
   return <Layout />

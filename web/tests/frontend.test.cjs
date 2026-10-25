@@ -3861,3 +3861,43 @@ test('the browser is asked for notification permission only after a click (FR-32
   assert.match(sources[0], /export async function enablePush[\s\S]*requestPermission\(/)
   assert.match(sources[2], /if \(browserHasPushAPI\(\)\) await disablePushOnLogout\(\)\s*\n\s*try \{\s*\n\s*await api\.post<void>\('\/api\/v1\/auth\/logout'\)/)
 })
+
+const statisticsFixture = {
+  raids_by_status: [{ status: 'PLANNED', count: 1 }, { status: 'OPEN', count: 0 }, { status: 'COMPLETED', count: 3 }, { status: 'CANCELLED', count: 0 }],
+  class_distribution: [{ class: 'Magier', count: 2 }],
+  role_history: [{ role: 'TANK', count: 4 }],
+  loot_by_class: [{ class: 'Magier', count: 5 }],
+  top_attendance: [{ player_id: 3, player_name: 'Anna', count: 3 }],
+  top_loot: [{ player_id: 3, player_name: 'Anna', count: 5 }],
+}
+
+test('TestReqStats011_AC01 statistics render from the endpoint without a session', async () => {
+  const s = setup(null)
+  const view = s.mount(s.load('pages/Statistics.tsx').StatisticsPage)
+  s.requests[0].resolve(statisticsFixture)
+  await flush(view)
+  const cards = nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'StatCard').map((n) => [n.props.label, n.props.value])
+  assert.deepEqual(cards, [['Raids', 4], ['Archivierte Raids', 3], ['Aktive Charaktere', 2], ['Loot-Einträge', 5]])
+  const tables = nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'LeaderTable')
+  assert.deepEqual(tables.map((n) => n.props.rows[0].player_name), ['Anna', 'Anna'])
+  const app = fs.readFileSync(path.resolve(__dirname, '../src/App.tsx'), 'utf8')
+  assert.match(app, /path !== '\/addons' && !path\.startsWith\('\/addons\/'\) && path !== '\/statistics'/)
+})
+
+test('TestReqStats011_AC02 the page calls only the statistics endpoint', async () => {
+  const s = setup(null)
+  const view = s.mount(s.load('pages/Statistics.tsx').StatisticsPage)
+  s.requests[0].resolve(statisticsFixture)
+  await flush(view)
+  assert.deepEqual(s.requests.map((r) => `${r.method} ${r.url}`), ['get /api/v1/statistics'])
+})
+
+test('TestReqStats011_AC03 a failing endpoint shows the shared error component', async () => {
+  const s = setup(null)
+  const view = s.mount(s.load('pages/Statistics.tsx').StatisticsPage)
+  s.requests[0].reject(new Error('down'))
+  await flush(view)
+  const errors = nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'ErrorMessage')
+  assert.equal(errors.length, 1)
+  assert.match(text(errors[0]), /Statistiken konnten nicht geladen werden/)
+})

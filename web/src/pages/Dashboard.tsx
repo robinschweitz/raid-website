@@ -13,7 +13,6 @@ import { PlayerProfilePanel } from '../components/PlayerProfilePanel'
 import { MyRaidsPanel } from '../components/MyRaidsPanel'
 import { atLeast } from '../types'
 import { ErrorMessage } from '../components/ErrorMessage'
-// import { StatisticsCharts } from '../components/StatisticsCharts'
 
 
 export function DashboardPage() {
@@ -185,11 +184,6 @@ export function DashboardPage() {
           </tbody>
         </table></div>
       </section>
-
-      {/* <section className="card widget-stats">
-        <div className="section-heading"><h2>Statistiken</h2><span className="eyebrow">Saison</span></div>
-        <StatisticsCharts raids={raids} />
-      </section> */}
 
       {player && <section className="card widget-profile">
         <div className="section-heading"><h2>Mein Profil</h2></div>

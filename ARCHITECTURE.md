@@ -76,8 +76,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   shuts down gracefully on SIGTERM, finishing running requests (Owner 2026-10-22, AQ-3); the values
   are owned by `SECURITY.md` (SC-026).
 - **Statistics.** A public `GET /api/v1/statistics` returns only server-computed aggregates
-  (FR-27.2); the statistics page reads only this endpoint (Owner 2026-10-22, AQ-2). The endpoint is built; the
-  page still computes figures in the browser until REQ-STATS-011 (#88).
+  (FR-27.2); the statistics page reads only this endpoint (Owner 2026-10-22, AQ-2). The endpoint and the page are built.
   Response contract (FR-27.3), all counts integers:
   `raids_by_status` (`[{status, count}]`), `class_distribution` (`[{class, count}]`),
   `role_history` (`[{role, count}]`), `loot_by_class` (`[{class, count}]`),

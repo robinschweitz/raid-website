@@ -592,3 +592,19 @@ export interface AddonLootImportResult {
   code: string
   message: string
 }
+
+export interface PlayerCount {
+  player_id: number
+  player_name: string
+  count: number
+}
+
+// Public aggregates of GET /api/v1/statistics (FR-27.3).
+export interface Statistics {
+  raids_by_status: { status: string; count: number }[]
+  class_distribution: { class: string; count: number }[]
+  role_history: { role: string; count: number }[]
+  loot_by_class: { class: string; count: number }[]
+  top_attendance: PlayerCount[]
+  top_loot: PlayerCount[]
+}

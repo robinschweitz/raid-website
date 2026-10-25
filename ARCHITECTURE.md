@@ -155,7 +155,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `addons` | Embedded addon bundles and download zips | Bundle completeness | embedded files | FR-21 | SUPPORTED |
 | `wishlist` | Wishlist items, raid interests, WL2 export | Owner-only writes | wishlist items | FR-19, FR-20.13 | SUPPORTED |
 | `shadowmourne` | Questline list and raid task choices | Eligible classes, stage choice rules | entries, raid tasks | FR-22 | SUPPORTED |
-| `recruitment` | Recruitment template per series or raid | Length, shape, slot values | recruitment templates | FR-23 | SUPPORTED (slot check not built) |
+| `recruitment` | Recruitment template per series or raid | Length, shape, slot values | recruitment templates | FR-23 | SUPPORTED |
 | `poll` | Polls and votes, poll edits (`PUT /api/v1/polls/{id}`) | Option validity, closed polls, no removal of voted options | polls, options, votes | FR-24 | SUPPORTED |
 | `push` | Push subscriptions, RFC 8291/8292, delivery after commit | Endpoint allowlist, MEMBER recipients, neutral payload, 404/410 clean-up | push subscriptions | FR-32 | SUPPORTED |
 | `audit` | Audit writer and Admin reader | Append-only, no secrets in snapshots | audit log | FR-26 | SUPPORTED |

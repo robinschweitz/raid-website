@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -16,18 +17,19 @@ import (
 
 	"raid-website/internal/audit"
 	"raid-website/internal/raid"
+	"raid-website/internal/validation"
 )
 
 var (
-	ErrNotFound = errors.New("raid not found")
-	ErrInvalid  = errors.New("invalid recruitment template")
+	ErrNotFound    = errors.New("raid not found")
+	ErrInvalid     = errors.New("invalid recruitment template")
+	ErrInvalidSlot = errors.New("invalid recruitment slot")
 )
 
 const (
 	MaxTextRunes = 2000
 	groups       = 5
 	slotsPerGrp  = 5
-	maxSlotRunes = 40
 )
 
 // Template is the shared text and 5x5 target setup.
@@ -88,6 +90,8 @@ func (s *Service) Get(ctx context.Context, raidID int64) (*Template, error) {
 	return toTemplate(r)
 }
 
+// validate checks the shape of a template, then that every slot is an accepted value (FR-23.4).
+// Slot values are checked on the server, because the editor is not a trust boundary (SC-020).
 func validate(text string, setup [][]string) error {
 	if strings.TrimSpace(text) == "" || utf8.RuneCountInString(text) > MaxTextRunes {
 		return ErrInvalid
@@ -99,13 +103,54 @@ func validate(text string, setup [][]string) error {
 		if len(g) != slotsPerGrp {
 			return ErrInvalid
 		}
+	}
+	for _, g := range setup {
 		for _, slot := range g {
-			if strings.TrimSpace(slot) == "" || utf8.RuneCountInString(slot) > maxSlotRunes {
-				return ErrInvalid
+			if !validation.IsRecruitmentSlot(slot) {
+				return ErrInvalidSlot
 			}
 		}
 	}
 	return nil
+}
+
+// InvalidStoredSlot is a saved slot that the current allow-list does not accept.
+type InvalidStoredSlot struct {
+	Scope string // "series_id" or "raid_id", the column the template is stored under
+	ID    int64
+	Group int
+	Slot  int
+	Value string
+}
+
+// InvalidStoredSlots lists saved slots that are not accepted any more, e.g. values stored
+// before the allow-list existed. It only reads: stored data is never changed (FR-23.4).
+func (s *Service) InvalidStoredSlots(ctx context.Context) ([]InvalidStoredSlot, error) {
+	rows, err := s.repo.list(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var invalid []InvalidStoredSlot
+	for _, r := range rows {
+		t, err := toTemplate(&r)
+		if err != nil {
+			return nil, fmt.Errorf("decode template %d: %w", r.ID, err)
+		}
+		col, id := "raid_id", int64(0)
+		if r.SeriesID != nil {
+			col, id = "series_id", *r.SeriesID
+		} else if r.RaidID != nil {
+			id = *r.RaidID
+		}
+		for gi, g := range t.Setup {
+			for si, slot := range g {
+				if !validation.IsRecruitmentSlot(slot) {
+					invalid = append(invalid, InvalidStoredSlot{Scope: col, ID: id, Group: gi + 1, Slot: si + 1, Value: slot})
+				}
+			}
+		}
+	}
+	return invalid, nil
 }
 
 // Save stores the template for the raid's series (or the raid itself).

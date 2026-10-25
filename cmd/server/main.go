@@ -22,6 +22,7 @@ import (
 	"raid-website/internal/push"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
+	"raid-website/internal/recruitment"
 	"raid-website/internal/registration"
 	"raid-website/internal/webui"
 )
@@ -55,6 +56,9 @@ func run() (err error) {
 	}
 	if err := detectNamingPatterns(ctx, bdb.DB); err != nil {
 		return fmt.Errorf("naming pattern detection: %w", err)
+	}
+	if err := reportInvalidRecruitmentSlots(ctx, bdb.DB); err != nil {
+		return fmt.Errorf("recruitment slot report: %w", err)
 	}
 	var vapidKey *push.VAPIDKey
 	if cfg.VAPIDPrivateKey != "" {
@@ -138,6 +142,22 @@ func serve(ctx context.Context, srv *http.Server, ln net.Listener, grace time.Du
 	}
 	if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
+	}
+	return nil
+}
+
+// reportInvalidRecruitmentSlots logs stored recruitment slots the allow-list no longer
+// accepts. It changes no data; the owner decides what to do with them (FR-23.4).
+func reportInvalidRecruitmentSlots(ctx context.Context, db bun.IDB) error {
+	invalid, err := recruitment.NewService(db).InvalidStoredSlots(ctx)
+	if err != nil {
+		return err
+	}
+	for _, slot := range invalid {
+		log.Printf("recruitment template %s=%d: group %d slot %d not accepted: %q", slot.Scope, slot.ID, slot.Group, slot.Slot, slot.Value)
+	}
+	if len(invalid) > 0 {
+		log.Printf("recruitment: %d stored slot(s) not accepted; no data was changed", len(invalid))
 	}
 	return nil
 }

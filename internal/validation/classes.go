@@ -53,7 +53,7 @@ func NormalizeClassName(s string) string {
 		return "Schamane"
 	case "schurke":
 		return "Schurke"
-	case "hexer", "warlock":
+	case "hexer", "hexenmeister", "warlock":
 		return "Hexer"
 	case "krieger", "warrior":
 		return "Krieger"

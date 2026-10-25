@@ -29,11 +29,6 @@ const STATUS_LABELS: Record<string, string> = {
 
 const ROLE_LABELS: Record<string, string> = { TANK: 'Tank', HEAL: 'Heiler', DD: 'DD' }
 
-function percent(value: number, total: number): string {
-  if (total === 0) return '0%'
-  return `${Math.round((value / total) * 100)}%`
-}
-
 function sum(rows: { count: number }[]): number {
   return rows.reduce((total, row) => total + row.count, 0)
 }
@@ -46,9 +41,38 @@ function StatCard({ label, value, hint }: { label: string; value: string | numbe
   </article>
 }
 
-function BarList({ rows, total, empty }: { rows: { name: string; value: number }[]; total: number; empty: string }) {
+const TOOLTIP_PROPS = {
+  contentStyle: { background: '#101d2e', border: '1px solid #2a4057', borderRadius: 4 },
+  labelStyle: { color: '#dce6f0' },
+  itemStyle: { color: '#86d9f2' },
+}
+
+type NamedCount = { name: string; value: number }
+
+// DonutChart and CountBarChart share one height so that cards in the same grid row line up.
+function DonutChart({ rows, empty }: { rows: NamedCount[]; empty: string }) {
   if (rows.length === 0) return <p className="muted">{empty}</p>
-  return <div className="stat-bars">{rows.map((entry) => <div className="stat-bar-row" key={entry.name}><span>{entry.name}</span><strong>{entry.value}</strong><div><i style={{ width: percent(entry.value, total) }} /></div></div>)}</div>
+  return <ResponsiveContainer width="100%" height={260}>
+    <PieChart>
+      <Pie data={rows} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={62} outerRadius={92} paddingAngle={3}>
+        {rows.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+      </Pie>
+      <Tooltip {...TOOLTIP_PROPS} />
+      <Legend verticalAlign="bottom" iconType="circle" formatter={(value, entry) => <span style={{ color: '#dce6f0' }}>{value}: {(entry.payload as { value?: number } | undefined)?.value ?? 0}</span>} />
+    </PieChart>
+  </ResponsiveContainer>
+}
+
+function CountBarChart({ rows, empty }: { rows: NamedCount[]; empty: string }) {
+  if (rows.length === 0) return <p className="muted">{empty}</p>
+  return <ResponsiveContainer width="100%" height={260}>
+    <BarChart data={rows} layout="vertical" margin={{ left: 24 }}>
+      <XAxis type="number" allowDecimals={false} tick={{ fill: '#9eafc3', fontSize: 12 }} axisLine={{ stroke: '#2a4057' }} tickLine={false} />
+      <YAxis type="category" dataKey="name" interval={0} tick={{ fill: '#9eafc3', fontSize: 12 }} axisLine={{ stroke: '#2a4057' }} tickLine={false} />
+      <Tooltip {...TOOLTIP_PROPS} />
+      <Bar dataKey="value" fill="#86d9f2" radius={[0, 3, 3, 0]} />
+    </BarChart>
+  </ResponsiveContainer>
 }
 
 function LeaderTable({ rows, label, empty }: { rows: PlayerCount[]; label: string; empty: string }) {
@@ -76,7 +100,6 @@ export function StatisticsPage() {
   const totalRaids = sum(stats?.raids_by_status ?? [])
   const archivedRaids = stats?.raids_by_status.find((row) => row.status === 'COMPLETED')?.count ?? 0
   const totalCharacters = sum(stats?.class_distribution ?? [])
-  const totalRoles = sum(stats?.role_history ?? [])
   const totalLoot = sum(stats?.loot_by_class ?? [])
 
   return <div className="statistics-page">
@@ -95,37 +118,22 @@ export function StatisticsPage() {
       <div className="statistics-grid">
         <section className="card statistics-chart-card">
           <div className="section-heading"><h2>Raids nach Status</h2><span className="eyebrow">Alle gespeicherten Raids</span></div>
-          {raidStatusData.length > 0 ? <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie data={raidStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={62} outerRadius={92} paddingAngle={3}>
-                {raidStatusData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
-              </Pie>
-              <Tooltip contentStyle={{ background: '#101d2e', border: '1px solid #2a4057', borderRadius: 4 }} labelStyle={{ color: '#dce6f0' }} itemStyle={{ color: '#86d9f2' }} />
-              <Legend verticalAlign="bottom" iconType="circle" formatter={(value, entry) => <span style={{ color: '#dce6f0' }}>{value}: {(entry.payload as { value?: number } | undefined)?.value ?? 0}</span>} />
-            </PieChart>
-          </ResponsiveContainer> : <p className="muted">Noch keine Raids gespeichert.</p>}
+          <DonutChart rows={raidStatusData} empty="Noch keine Raids gespeichert." />
         </section>
 
         <section className="card statistics-chart-card">
           <div className="section-heading"><h2>Klassenverteilung</h2><span className="eyebrow">Aktive Charaktere</span></div>
-          {classData.length > 0 ? <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={classData} layout="vertical" margin={{ left: 24 }}>
-              <XAxis type="number" allowDecimals={false} tick={{ fill: '#9eafc3', fontSize: 12 }} axisLine={{ stroke: '#2a4057' }} tickLine={false} />
-              <YAxis type="category" dataKey="name" interval={0} tick={{ fill: '#9eafc3', fontSize: 12 }} axisLine={{ stroke: '#2a4057' }} tickLine={false} />
-              <Tooltip contentStyle={{ background: '#101d2e', border: '1px solid #2a4057', borderRadius: 4 }} labelStyle={{ color: '#dce6f0' }} itemStyle={{ color: '#86d9f2' }} />
-              <Bar dataKey="value" fill="#86d9f2" radius={[0, 3, 3, 0]} />
-            </BarChart>
-          </ResponsiveContainer> : <p className="muted">Noch keine aktiven Charaktere gespeichert.</p>}
+          <CountBarChart rows={classData} empty="Noch keine aktiven Charaktere gespeichert." />
         </section>
 
         <section className="card statistics-chart-card">
           <div className="section-heading"><h2>Historische Rollen</h2><span className="eyebrow">Archivierte Roster</span></div>
-          <BarList rows={roleData} total={totalRoles} empty="Noch keine historischen Aufstellungen vorhanden." />
+          <DonutChart rows={roleData} empty="Noch keine historischen Aufstellungen vorhanden." />
         </section>
 
         <section className="card statistics-chart-card">
           <div className="section-heading"><h2>Loot-Verteilung</h2><span className="eyebrow">Nach Klasse</span></div>
-          <BarList rows={lootClassData} total={totalLoot} empty="Noch keine Loot-Historie vorhanden." />
+          <CountBarChart rows={lootClassData} empty="Noch keine Loot-Historie vorhanden." />
         </section>
 
         <section className="card statistics-table-card">

@@ -387,7 +387,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** A role change, deactivation, merge, or anonymisation that would leave no active ADMIN MUST be rejected with `409 last_admin`.
 - **Enforcement:** `auth.SetCredentials`, `accountmerge`, the anonymise operation.
-- **Evidence:** FR-5.9; `THREAT_MODEL_CODE.md` CT-006. Code: **not compliant**. Threats: T-044.
+- **Evidence:** FR-5.9; `THREAT_MODEL_CODE.md` CT-006. Code: compliant for role change and merge since #80 — `auth.SetCredentials` and `accountmerge.Merge` count active Admins inside the write transaction and answer `409 last_admin` (`player.ErrLastAdmin`); a merge into an active Admin target passes. No code path deactivates a player yet; the anonymise operation (REQ-PRIVACY-011) must call the same check. Tests `TestReqAccount015_AC01` to `AC03`, frontend message test. Threats: T-044.
 - **Verification:** Demoting the only Admin returns 409 and changes nothing.
 
 **SC-048 - Cloned security keys are rejected**

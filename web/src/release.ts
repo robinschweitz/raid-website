@@ -1,8 +1,15 @@
-export const appVersion = '1.0.47'
+export const appVersion = '1.0.48'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Der letzte Admin bleibt Admin',
+    changes: [
+      'Der einzige aktive Admin kann sich nicht mehr selbst die Admin-Rolle nehmen oder mit einem anderen Spieler zusammengeführt werden. Die Seite zeigt dann einen Hinweis, dass mindestens ein aktiver Admin bleiben muss.',
+    ],
+  },
+  {
+    version: '1.0.47',
     title: 'Neue Konten sind Mitglieder',
     changes: [
       'Wer sich mit einem Registrierungscode neu anmeldet, ist sofort Mitglied und kann sich für Raids anmelden. Bestehende Gast-Konten bleiben unverändert; ein Admin stuft sie hoch.',

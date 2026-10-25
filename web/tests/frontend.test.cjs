@@ -3670,6 +3670,18 @@ test('the mfa_setup_required error is shown in German (REQ-AUTH-020)', async () 
   }
 })
 
+test('the last_admin error is shown in German (REQ-ACCOUNT-015)', async () => {
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async () => ({ ok: false, status: 409, statusText: 'Conflict', headers: { get: () => 'application/json' }, json: async () => ({ error: { code: 'last_admin', message: 'at least one active admin must remain' } }), text: async () => '{"error":{"code":"last_admin","message":"at least one active admin must remain"}}' })
+  try {
+    const s = setup({ id: 7, role: 'ADMIN' })
+    const real = s.load('api.ts')
+    await assert.rejects(real.api.get('/api/v1/players'), (err) => err.code === 'last_admin' && /mindestens ein aktiver Admin/.test(err.message))
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
 test('the account-security deep link opens the profile account tab (ADR 092)', async () => {
   const s = setup({ id: 2, role: 'MEMBER' })
   const { PlayerDetailPage } = s.load('pages/PlayerDetail.tsx')

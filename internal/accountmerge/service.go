@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"raid-website/internal/enhancepoints"
+	"raid-website/internal/player"
 	"raid-website/internal/validation"
 )
 
@@ -56,6 +57,18 @@ func (s *Service) Merge(ctx context.Context, targetID, sourceID, actorID int64, 
 		}
 		if !source.Active {
 			return ErrSourceInactive
+		}
+
+		// The target keeps its own role, so only an Admin source that no active
+		// Admin target replaces can remove the last Admin (SC-047).
+		if source.Role == validation.RoleAdmin && (target.Role != validation.RoleAdmin || !target.Active) {
+			admins, err := repo.CountActiveAdmins(ctx)
+			if err != nil {
+				return fmt.Errorf("count active admins: %w", err)
+			}
+			if admins <= 1 {
+				return player.ErrLastAdmin
+			}
 		}
 
 		sourceLocks, err := repo.ListLocks(ctx, sourceID)

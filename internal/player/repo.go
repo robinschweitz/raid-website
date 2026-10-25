@@ -3,12 +3,16 @@ package player
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 
 	"raid-website/internal/audit"
 	"raid-website/internal/validation"
 )
+
+// ErrLastAdmin is returned when a change would leave no active ADMIN (SC-047).
+var ErrLastAdmin = errors.New("last active admin")
 
 type Repo struct {
 	db bun.IDB
@@ -93,6 +97,15 @@ func (r *Repo) FindActiveAdmin(ctx context.Context) (*Player, error) {
 		return nil, err
 	}
 	return p, nil
+}
+
+// CountActiveAdmins returns the number of active ADMIN accounts.
+func (r *Repo) CountActiveAdmins(ctx context.Context) (int, error) {
+	count, err := r.db.NewSelect().Model((*Player)(nil)).
+		Where("role = ?", validation.RoleAdmin).
+		Where("active = ?", true).
+		Count(ctx)
+	return int(count), err
 }
 
 func (r *Repo) Update(ctx context.Context, p *Player) error {

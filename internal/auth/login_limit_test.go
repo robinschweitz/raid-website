@@ -22,9 +22,9 @@ func countPasswordChecks(t *testing.T) *int {
 	t.Helper()
 	calls := 0
 	original := comparePassword
-	comparePassword = func(hash, password []byte) error {
+	comparePassword = func(ctx context.Context, hash, password []byte) error {
 		calls++
-		return verifyStoredPassword(string(hash), string(password))
+		return verifyStoredPassword(ctx, string(hash), string(password))
 	}
 	t.Cleanup(func() { comparePassword = original })
 	return &calls

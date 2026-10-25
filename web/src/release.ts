@@ -7,7 +7,7 @@ export const changelog = [
     changes: [
       'Die Sperre nach zu vielen falschen Passwörtern greift jetzt auch, wenn viele Anmeldeversuche gleichzeitig kommen.',
       'Ist der Server gerade ausgelastet, meldet die Anmeldung das nach wenigen Sekunden, statt lange zu warten. Einfach kurz danach noch einmal versuchen.',
-      'Benachrichtigungen gehören jetzt zur Anmeldung auf dem Gerät: Endet die Anmeldung, zum Beispiel nach einer Passwortänderung, kommen dort keine Meldungen mehr. Meldest du dich auf demselben Gerät wieder an, laufen sie weiter.',
+      'Benachrichtigungen gehören jetzt zur Anmeldung auf dem Gerät: Endet die Anmeldung, zum Beispiel beim Abmelden oder nach einer Passwortänderung, kommen dort keine Meldungen mehr. Nach einer neuen Anmeldung schaltest du sie im Konto-Tab wieder ein. Wer Benachrichtigungen schon aktiviert hatte, muss sie einmal neu einschalten.',
       'Wer sich mit einem Code registriert und dabei einen schon vorhandenen Spieler übernimmt, ist jetzt auch Mitglied und kann sich sofort für Raids anmelden.',
       'Admins ohne zweiten Faktor sehen Logins und Rollen anderer Spieler erst, wenn sie die Zwei-Faktor-Anmeldung eingerichtet haben.',
     ],

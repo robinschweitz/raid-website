@@ -564,7 +564,7 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 		if req.RequesterPlayerID != nil || req.Purpose != PurposeNewAccount {
 			return 0, ErrForbidden
 		}
-		hash, err := auth.HashPassword(password)
+		hash, err := auth.HashPassword(ctx, password)
 		if err != nil {
 			return 0, err
 		}

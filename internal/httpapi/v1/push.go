@@ -21,6 +21,10 @@ type pushUnsubscribeRequest struct {
 	Endpoint string `json:"endpoint"`
 }
 
+type pushStatusResponse struct {
+	Active bool `json:"active"`
+}
+
 type pushConfigResponse struct {
 	Enabled   bool   `json:"enabled"`
 	PublicKey string `json:"public_key"`
@@ -37,6 +41,35 @@ func (a *API) registerPush(mux *http.ServeMux) {
 	// Any signed-in player may remove their own subscription, also after a
 	// demotion below MEMBER.
 	mux.HandleFunc("DELETE /api/v1/push/subscriptions", RequireAuth(a.unsubscribePush))
+	// The endpoint is a bearer secret of the browser, so it goes in the body,
+	// never in a URL that proxies log.
+	mux.HandleFunc("POST /api/v1/push/subscriptions/status", RequireAuth(a.pushStatus))
+}
+
+// pushStatus tells the account tab whether this browser's subscription is
+// bound to the current session (FR-32.3).
+func (a *API) pushStatus(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "login required")
+		return
+	}
+	sessionID, ok := a.currentSessionID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "login required")
+		return
+	}
+	var req pushUnsubscribeRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	active, err := a.Push.Active(r.Context(), actor, sessionID, req.Endpoint)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not read push subscription")
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": pushStatusResponse{Active: active}})
 }
 
 func (a *API) pushConfig(w http.ResponseWriter, r *http.Request) {

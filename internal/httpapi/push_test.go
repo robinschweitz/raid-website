@@ -351,15 +351,16 @@ func TestReqPush010_DisabledWithoutKey(t *testing.T) {
 }
 
 // TestReqPush011_SubscriptionEndsWithItsSession: a subscription belongs to the
-// session that made it. Logging out on the server, or any other end of that
-// session, removes it, while the player's other devices keep theirs; a legacy
-// row without a session gets no messages (FR-32.3, ADR 103).
+// session that made it. Logging out on the server removes it while the
+// player's other devices keep theirs, and a session that expired gets no
+// messages even before its row is deleted (FR-32.3, ADR 103).
 func TestReqPush011_SubscriptionEndsWithItsSession(t *testing.T) {
 	f := newPushFixture(t)
 	client := f.srv.Client()
 	secondToken := login(t, client, f.srv, "push-member", "password")
 	f.subscribe(f.memberToken, endpointFor("phone"), http.StatusCreated)
 	f.subscribe(secondToken, endpointFor("laptop"), http.StatusCreated)
+	f.subscribe(f.otherToken, endpointFor("expired"), http.StatusCreated)
 
 	if status, raw := do(t, client, http.MethodPost, f.srv.URL+"/api/v1/auth/logout", f.memberToken, nil); status != http.StatusNoContent && status != http.StatusOK {
 		t.Fatalf("logout: %d %s", status, raw)
@@ -371,8 +372,7 @@ func TestReqPush011_SubscriptionEndsWithItsSession(t *testing.T) {
 		t.Fatal("logging out one device removed another device's subscription")
 	}
 
-	legacy := &push.Subscription{PlayerID: f.other, Endpoint: endpointFor("legacy"), P256dh: testP256dh, Auth: testAuth, CreatedAt: time.Now().UTC()}
-	if _, err := f.db.NewInsert().Model(legacy).Exec(context.Background()); err != nil {
+	if _, err := f.db.NewUpdate().Table("sessions").Set("expires_at = ?", time.Now().UTC().Add(-time.Minute)).Where("player_id = ?", f.other).Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if status, raw := do(t, client, http.MethodPost, f.srv.URL+"/api/v1/polls", f.staffToken, map[string]any{"title": "Nach dem Abmelden"}); status != http.StatusCreated {
@@ -381,6 +381,45 @@ func TestReqPush011_SubscriptionEndsWithItsSession(t *testing.T) {
 	got := kindsByEndpoint(f.sender.take())
 	if len(got) != 1 || len(got[endpointFor("laptop")]) != 1 {
 		t.Fatalf("sent = %v, want only the laptop", got)
+	}
+}
+
+// TestReqPush014_StatusIsPerSession: the account tab asks whether this
+// browser's subscription belongs to the current session. A new session of the
+// same player does not inherit it; it has to opt in again (FR-32.3, ADR 103).
+func TestReqPush014_StatusIsPerSession(t *testing.T) {
+	f := newPushFixture(t)
+	client := f.srv.Client()
+	statusURL := f.srv.URL + "/api/v1/push/subscriptions/status"
+	active := func(token, endpoint string) bool {
+		t.Helper()
+		status, raw := do(t, client, http.MethodPost, statusURL, token, map[string]any{"endpoint": endpoint})
+		var out struct {
+			Data struct {
+				Active bool `json:"active"`
+			} `json:"data"`
+		}
+		if status != http.StatusOK || json.Unmarshal(raw, &out) != nil {
+			t.Fatalf("status: %d %s", status, raw)
+		}
+		return out.Data.Active
+	}
+	f.subscribe(f.memberToken, endpointFor("phone"), http.StatusCreated)
+	if !active(f.memberToken, endpointFor("phone")) {
+		t.Fatal("own subscription not active for its session")
+	}
+	newSession := login(t, client, f.srv, "push-member", "password")
+	if active(newSession, endpointFor("phone")) {
+		t.Fatal("a new session of the same player inherited the subscription")
+	}
+	if active(f.otherToken, endpointFor("phone")) {
+		t.Fatal("another player sees someone else's subscription as active")
+	}
+	if active(f.memberToken, endpointFor("unknown")) {
+		t.Fatal("unknown endpoint reported active")
+	}
+	if status, raw := do(t, client, http.MethodPost, statusURL, "", map[string]any{"endpoint": endpointFor("phone")}); status != http.StatusUnauthorized {
+		t.Fatalf("without session: %d %s", status, raw)
 	}
 }
 

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
-import { useAuth } from '../auth'
 import { isIOSDevice, isStandaloneDisplay } from '../installHint'
-import { browserHasPushAPI, currentPushSubscription, disablePush, enablePush, pushAvailability, type PushAvailability, type PushConfig } from '../pushNotifications'
+import { browserHasPushAPI, disablePush, enablePush, pushActiveOnThisDevice, pushAvailability, type PushAvailability, type PushConfig } from '../pushNotifications'
 import { useSubmission } from '../useSubmission'
 import { ErrorMessage } from './ErrorMessage'
 
@@ -15,7 +14,6 @@ export function PushNotificationSettings() {
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const { pending, submit } = useSubmission()
-  const { player } = useAuth()
 
   const refresh = useCallback(async () => {
     try {
@@ -29,7 +27,7 @@ export function PushNotificationSettings() {
         permission: hasPushAPI ? Notification.permission : 'unsupported',
         serverEnabled: loaded.enabled,
       }))
-      setIsSubscribed(hasPushAPI && (await currentPushSubscription()) !== null)
+      setIsSubscribed(hasPushAPI && loaded.enabled && (await pushActiveOnThisDevice()))
     } catch {
       setAvailability('unsupported')
     }
@@ -38,11 +36,11 @@ export function PushNotificationSettings() {
   useEffect(() => { void refresh() }, [refresh])
 
   const enable = () => submit(async () => {
-    if (!config || !player) return
+    if (!config) return
     setError('')
     setStatus('')
     try {
-      await enablePush(config, player.id)
+      await enablePush(config)
       setStatus('Benachrichtigungen sind auf diesem Gerät aktiv.')
     } catch (err) {
       if (err instanceof ApiError) setError(err.message)

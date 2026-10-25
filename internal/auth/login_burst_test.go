@@ -96,7 +96,7 @@ func TestLoginBusyWithoutCountingAsFailure(t *testing.T) {
 	if err := svc.VerifyPassword(ctx, 1, "valid-password"); !errors.Is(err, ErrPasswordHashBusy) {
 		t.Fatalf("VerifyPassword err = %v, want ErrPasswordHashBusy", err)
 	}
-	if _, err := HashPassword("valid-password"); !errors.Is(err, ErrPasswordHashBusy) {
+	if _, err := HashPassword(context.Background(), "valid-password"); !errors.Is(err, ErrPasswordHashBusy) {
 		t.Fatalf("HashPassword err = %v, want ErrPasswordHashBusy", err)
 	}
 }
@@ -115,5 +115,90 @@ func TestSuccessfulLoginIsNotCountedAsFailure(t *testing.T) {
 	}
 	if failures != 0 {
 		t.Fatalf("successful login left %d failed attempts, want 0", failures)
+	}
+}
+
+// failedAttempts counts the stored failed attempts for one username from limitedAddress.
+func failedAttempts(t *testing.T, svc *Service, username string) int {
+	t.Helper()
+	count, err := svc.sessions.CountFailedLoginAttempts(context.Background(), username, limitedAddress, time.Now().UTC().Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return count
+}
+
+// The credential decision is final: a correct password whose session cannot be
+// created afterwards fails the login but is not counted as a guess (ADR 103).
+func TestCorrectPasswordIsNotAGuessWhenSessionFails(t *testing.T) {
+	bdb, svc := loginLimitService(t)
+	if _, err := bdb.DB.NewRaw("ALTER TABLE sessions RENAME TO sessions_unavailable").Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.StartLogin(context.Background(), "owner", "valid-password", limitedAddress); err == nil {
+		t.Fatal("login without a sessions table succeeded")
+	}
+	if got := failedAttempts(t, svc, "owner"); got != 0 {
+		t.Fatalf("correct password left %d failed attempts, want 0", got)
+	}
+}
+
+// A request that ends while it waits for a hashing slot checked no password:
+// its reservation is released even though its context is already done.
+func TestCancelledWaitReleasesTheReservation(t *testing.T) {
+	_, svc := loginLimitService(t)
+	occupyArgonSlots(t)
+	argonSlotWait = time.Minute
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	_, err := svc.StartLogin(ctx, "owner", "wrong-password", limitedAddress)
+	if !errors.Is(err, ErrPasswordHashBusy) || !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want ErrPasswordHashBusy caused by the deadline", err)
+	}
+	if got := failedAttempts(t, svc, "owner"); got != 0 {
+		t.Fatalf("cancelled wait left %d failed attempts, want 0", got)
+	}
+}
+
+// Parallel right and wrong passwords near the limit: after all of them finish,
+// only wrong passwords that were really checked count as failures; right
+// passwords that logged in do not.
+func TestParallelSuccessesAndFailuresCountOnlyWrongPasswords(t *testing.T) {
+	_, svc := loginLimitService(t)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	wrongChecked, rightOK := 0, 0
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			password := "wrong-password"
+			if i%2 == 0 {
+				password = "valid-password"
+			}
+			result, err := svc.StartLogin(context.Background(), "owner", password, limitedAddress)
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case errors.Is(err, ErrLoginRateLimited):
+			case errors.Is(err, ErrInvalidCredentials):
+				wrongChecked++
+			case err == nil && result.Token != "":
+				rightOK++
+			default:
+				t.Errorf("attempt %d: %v", i, err)
+			}
+		}()
+	}
+	wg.Wait()
+	if wrongChecked > loginFailureLimit {
+		t.Fatalf("%d wrong passwords reached the check, limit %d", wrongChecked, loginFailureLimit)
+	}
+	if got := failedAttempts(t, svc, "owner"); got != wrongChecked {
+		t.Fatalf("stored failures %d, want the %d checked wrong passwords", got, wrongChecked)
+	}
+	// Undecided attempts count while they wait, so at most the limit gets through at once.
+	if wrongChecked+rightOK > loginFailureLimit {
+		t.Fatalf("%d attempts got through at once, limit %d", wrongChecked+rightOK, loginFailureLimit)
 	}
 }

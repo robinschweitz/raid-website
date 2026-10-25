@@ -56,8 +56,8 @@ type Subscription struct {
 	ID       int64 `bun:"id,pk,autoincrement" json:"id"`
 	PlayerID int64 `bun:"player_id,notnull" json:"player_id"`
 	// SessionID is the session that subscribed; the row is deleted with it
-	// (FR-32.3, ADR 103). Rows from before migration 081 have none.
-	SessionID *int64    `bun:"session_id" json:"-"`
+	// and a new session never inherits it (FR-32.3, ADR 103).
+	SessionID int64     `bun:"session_id,notnull" json:"-"`
 	Endpoint  string    `bun:"endpoint,notnull" json:"-"`
 	P256dh    string    `bun:"p256dh,notnull" json:"-"`
 	Auth      string    `bun:"auth,notnull" json:"-"`
@@ -171,8 +171,7 @@ func allowedHost(host string) bool {
 // Subscribe stores the actor's subscription for the session sessionID. A
 // browser that was subscribed for another account or session is moved to the
 // actor's session, because one browser can only have one subscription. The
-// web client repeats the call on every visit; an unchanged subscription is
-// left as it is and writes no audit entry.
+// repeated, unchanged subscription is left as it is and writes no audit entry.
 func (s *Service) Subscribe(ctx context.Context, actorID, sessionID int64, in SubscriptionInput) (*Subscription, error) {
 	if s.key == nil {
 		return nil, ErrDisabled
@@ -181,7 +180,7 @@ func (s *Service) Subscribe(ctx context.Context, actorID, sessionID int64, in Su
 	if err := in.validate(); err != nil {
 		return nil, err
 	}
-	sub := &Subscription{PlayerID: actorID, SessionID: &sessionID, Endpoint: in.Endpoint, P256dh: strings.TrimSpace(in.P256dh), Auth: strings.TrimSpace(in.Auth), CreatedAt: s.now()}
+	sub := &Subscription{PlayerID: actorID, SessionID: sessionID, Endpoint: in.Endpoint, P256dh: strings.TrimSpace(in.P256dh), Auth: strings.TrimSpace(in.Auth), CreatedAt: s.now()}
 	err := s.repo.Transaction(ctx, func(r *Repo, tx bun.Tx) error {
 		existing, err := r.GetByEndpoint(ctx, sub.Endpoint)
 		if err != nil && !errors.Is(err, ErrNotFound) {
@@ -222,8 +221,21 @@ func (s *Service) Subscribe(ctx context.Context, actorID, sessionID int64, in Su
 // sameAs reports whether a stored subscription already is other: same
 // player, session, and keys.
 func (s Subscription) sameAs(other *Subscription) bool {
-	return s.PlayerID == other.PlayerID && s.SessionID != nil && other.SessionID != nil && *s.SessionID == *other.SessionID &&
-		s.P256dh == other.P256dh && s.Auth == other.Auth
+	return s.PlayerID == other.PlayerID && s.SessionID == other.SessionID && s.P256dh == other.P256dh && s.Auth == other.Auth
+}
+
+// Active reports whether endpoint is subscribed for exactly this player and
+// session. The account tab shows this, not the browser's own state, because a
+// browser keeps its subscription after the server ended the session.
+func (s *Service) Active(ctx context.Context, actorID, sessionID int64, endpoint string) (bool, error) {
+	existing, err := s.repo.GetByEndpoint(ctx, strings.TrimSpace(endpoint))
+	if errors.Is(err, ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return existing.PlayerID == actorID && existing.SessionID == sessionID, nil
 }
 
 // Unsubscribe deletes the actor's subscription for this endpoint. Deleting a

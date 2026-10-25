@@ -3853,18 +3853,33 @@ test('push opt-in states, including iPhone without installation (FR-32)', () => 
   assert.deepEqual(subscriptionBody({ endpoint: 'https://fcm.googleapis.com/x', expirationTime: null, keys: { p256dh: 'p', auth: 'a' } }), { endpoint: 'https://fcm.googleapis.com/x', p256dh: 'p', auth: 'a' })
 })
 
-test("a visit keeps the own push subscription and drops another player's (FR-32.3, ADR 103)", () => {
+test('push changes run one at a time and a failed one does not block the next (ADR 103)', async () => {
   const s = setup({ id: 1, role: 'MEMBER' })
-  const { pushSyncAction } = s.load('pushNotifications.ts')
-  const base = { hasSubscription: true, owner: '7', playerID: 7, permission: 'granted' }
-  assert.equal(pushSyncAction(base), 'resubscribe')
-  assert.equal(pushSyncAction({ ...base, owner: null }), 'resubscribe')
-  assert.equal(pushSyncAction({ ...base, owner: '8' }), 'drop')
-  assert.equal(pushSyncAction({ ...base, owner: '8', permission: 'default' }), 'drop')
-  assert.equal(pushSyncAction({ ...base, permission: 'default' }), 'none')
-  assert.equal(pushSyncAction({ ...base, hasSubscription: false }), 'none')
-  const auth = fs.readFileSync(path.resolve(__dirname, '..', 'src/auth.tsx'), 'utf8')
-  assert.match(auth, /if \(playerID !== undefined && browserHasPushAPI\(\)\) void syncPushForPlayer\(playerID\)/)
+  const { runExclusive } = s.load('pushNotifications.ts')
+  const events = []
+  let releaseFirst
+  const first = runExclusive(() => new Promise((resolve) => { events.push('first:start'); releaseFirst = () => { events.push('first:end'); resolve('a') } }))
+  const second = runExclusive(async () => { events.push('second:start'); throw new Error('boom') })
+  const third = runExclusive(async () => { events.push('third:start'); return 'c' })
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(events, ['first:start'])
+  releaseFirst()
+  assert.equal(await first, 'a')
+  await assert.rejects(second, /boom/)
+  assert.equal(await third, 'c')
+  assert.deepEqual(events, ['first:start', 'first:end', 'second:start', 'third:start'])
+})
+
+test('a new session never re-attaches push on its own; the account tab asks the server (FR-32.3, ADR 103)', () => {
+  const read = (file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8')
+  const auth = read('src/auth.tsx')
+  const push = read('src/pushNotifications.ts')
+  assert.doesNotMatch(auth, /push\/subscriptions'|syncPush/)
+  assert.doesNotMatch(push, /localStorage/)
+  assert.match(push, /\/api\/v1\/push\/subscriptions\/status/)
+  assert.match(read('src/components/PushNotificationSettings.tsx'), /await pushActiveOnThisDevice\(\)/)
+  // The permission prompt stays outside the queue so it still belongs to the click.
+  assert.match(push, /requestPermission\(\)[\s\S]*await runExclusive\(/)
 })
 
 test('the browser is asked for notification permission only after a click (FR-32)', () => {

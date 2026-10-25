@@ -27,9 +27,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [player, setPlayer] = useState<Player | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  // Counts every sign-in and session load, also of the same player, so the
-  // push check-in below runs once per new session (FR-32.3, ADR 103).
-  const [signIns, setSignIns] = useState(0)
   const version = useRef(0)
 
   const refresh = useCallback(async () => {
@@ -38,10 +35,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError('')
     try {
       const current = await api.get<Player>('/api/v1/auth/me')
-      if (requestVersion === version.current) {
-        setPlayer(current)
-        setSignIns((count) => count + 1)
-      }
+      // The push check-in finishes before the player is shown as signed in (ADR 103).
+      await checkInPush()
+      if (requestVersion === version.current) setPlayer(current)
     } catch (err) {
       if (requestVersion !== version.current) return
       if (err instanceof ApiError && err.status === 401) {
@@ -60,10 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { ++requests.current }
   }, [refresh])
 
-  useEffect(() => {
-    if (signIns > 0) void checkInPush()
-  }, [signIns])
-
   const login = async (username: string, password: string) => {
     const requestVersion = ++version.current
     const result = await api.post<Player | { mfa_required: true; challenge: string; factors: MFAFactors }>('/api/v1/auth/login', { username, password })
@@ -71,9 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (requestVersion === version.current) setLoading(false)
       return { mfaRequired: true, challenge: result.challenge, factors: result.factors }
     }
+    await checkInPush()
     if (requestVersion === version.current) {
       setPlayer(result)
-      setSignIns((count) => count + 1)
       setError('')
       setLoading(false)
     }
@@ -83,9 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const verifyMFA = async (challenge: string, code: string) => {
     const requestVersion = ++version.current
     const p = await api.post<Player>('/api/v1/auth/mfa/verify', { challenge, code })
+    await checkInPush()
     if (requestVersion === version.current) {
       setPlayer(p)
-      setSignIns((count) => count + 1)
       setError('')
       setLoading(false)
     }
@@ -96,9 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const begin = await api.post<WebAuthnBeginResponse<Parameters<typeof getWebAuthnCredential>[0]>>('/api/v1/auth/mfa/webauthn/login/begin', { challenge })
     const response = await getWebAuthnCredential(begin.options)
     const p = await api.post<Player>('/api/v1/auth/mfa/webauthn/login/finish', { session: begin.session, response })
+    await checkInPush()
     if (requestVersion === version.current) {
       setPlayer(p)
-      setSignIns((count) => count + 1)
       setError('')
       setLoading(false)
     }

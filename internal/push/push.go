@@ -171,6 +171,18 @@ func allowedHost(host string) bool {
 	return false
 }
 
+// UnclaimedLifetime is how long a subscription from before migration 081 may
+// wait for its player's browser to attach it to a device (ADR 103).
+const UnclaimedLifetime = 30 * 24 * time.Hour
+
+// DeleteUnclaimed removes subscriptions that stayed without a device longer
+// than UnclaimedLifetime. The server runs it at startup (no background jobs);
+// such rows get no messages meanwhile, and the system removal writes no audit
+// entry (FR-31.2).
+func (s *Service) DeleteUnclaimed(ctx context.Context) (int64, error) {
+	return s.repo.DeleteUnclaimedBefore(ctx, s.now().Add(-UnclaimedLifetime))
+}
+
 // HashDevice turns the raw raid_device cookie into the value stored with a
 // subscription, so the database holds no usable device identifier.
 func HashDevice(raw string) string {

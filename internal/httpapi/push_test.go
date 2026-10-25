@@ -565,3 +565,92 @@ func TestReqPush013_RepeatedSubscribeIsQuiet(t *testing.T) {
 		t.Fatalf("audit entries = %d, want 1", count)
 	}
 }
+
+// loginDeviceCookie signs a player in with the given device cookie (empty for
+// none) and returns the raid_device cookie the login response set.
+func (f *pushFixture) loginDeviceCookie(username, device string) string {
+	f.t.Helper()
+	req, err := http.NewRequest(http.MethodPost, f.srv.URL+"/api/v1/auth/login", strings.NewReader(fmt.Sprintf(`{"username":%q,"password":"password"}`, username)))
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if device != "" {
+		req.AddCookie(&http.Cookie{Name: "raid_device", Value: device})
+	}
+	addCSRF(req)
+	resp, err := f.srv.Client().Do(req)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		f.t.Fatalf("login %s: status %d", username, resp.StatusCode)
+	}
+	for _, c := range resp.Cookies() {
+		if c.Name == "raid_device" {
+			return c.Value
+		}
+	}
+	return ""
+}
+
+// TestReqPush016_SignInWithoutDeviceCookie: a browser that lost its device
+// cookie still holds the previous player's push subscription. The login gives
+// it a new device cookie; the server cannot know which subscription the
+// browser holds, so the check-in of the new player removes it. Until then the
+// old row stays, which is why the web client checks in before it shows the new
+// player as signed in and drops the subscription itself if that fails.
+// A login with a device cookie renews it.
+func TestReqPush016_SignInWithoutDeviceCookie(t *testing.T) {
+	f := newPushFixture(t)
+	const original = "lost-device"
+	token := f.deviceLogin("push-member", original)
+	if status, raw, _ := f.deviceDo(http.MethodPost, "/api/v1/push/subscriptions", token, original, map[string]any{"endpoint": endpointFor("lost"), "p256dh": testP256dh, "auth": testAuth}); status != http.StatusCreated {
+		t.Fatalf("subscribe: %d %s", status, raw)
+	}
+	if renewed := f.loginDeviceCookie("push-member", original); renewed != original {
+		t.Fatalf("login with a device cookie set %q, want the same cookie renewed", renewed)
+	}
+
+	fresh := f.loginDeviceCookie("push-other", "")
+	if fresh == "" || fresh == original {
+		t.Fatalf("login without a device cookie set %q, want a new one", fresh)
+	}
+	otherToken := f.deviceLogin("push-other", fresh)
+	status, raw, _ := f.deviceDo(http.MethodPost, "/api/v1/push/subscriptions/sync", otherToken, fresh, map[string]any{"endpoint": endpointFor("lost")})
+	if status != http.StatusOK || !strings.Contains(string(raw), `"active":false`) {
+		t.Fatalf("check-in: %d %s", status, raw)
+	}
+	if f.subscriptionCount(endpointFor("lost")) != 0 {
+		t.Fatal("the previous player's subscription survived the new player's check-in")
+	}
+	if got := f.pollSent("Nach dem Wechsel"); len(got) != 0 {
+		t.Fatalf("sent = %v, want nothing", got)
+	}
+}
+
+// TestReqPush017_UnclaimedRowsGetNothingAndExpire: a subscription without a
+// device (from before migration 081) gets no messages until its own player's
+// browser claims it, and is deleted after 30 days unclaimed (ADR 103).
+func TestReqPush017_UnclaimedRowsGetNothingAndExpire(t *testing.T) {
+	f := newPushFixture(t)
+	now := time.Now().UTC()
+	old := &push.Subscription{PlayerID: f.member, Endpoint: endpointFor("old"), P256dh: testP256dh, Auth: testAuth, CreatedAt: now.Add(-push.UnclaimedLifetime - time.Hour)}
+	recent := &push.Subscription{PlayerID: f.member, Endpoint: endpointFor("recent"), P256dh: testP256dh, Auth: testAuth, CreatedAt: now}
+	for _, sub := range []*push.Subscription{old, recent} {
+		if _, err := f.db.NewInsert().Model(sub).Exec(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := f.pollSent("Ohne Gerät"); len(got) != 0 {
+		t.Fatalf("sent = %v, want nothing for rows without a device", got)
+	}
+	removed, err := push.NewService(push.NewRepo(f.db), nil, t.Logf).DeleteUnclaimed(context.Background())
+	if err != nil || removed != 1 {
+		t.Fatalf("removed %d, %v; want 1", removed, err)
+	}
+	if f.subscriptionCount(endpointFor("old")) != 0 || f.subscriptionCount(endpointFor("recent")) != 1 {
+		t.Fatal("cleanup must remove only rows unclaimed for 30 days")
+	}
+}

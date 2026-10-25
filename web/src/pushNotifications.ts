@@ -72,15 +72,58 @@ export function pushActiveOnThisDevice(): Promise<boolean> {
   })
 }
 
-// After every sign-in the browser checks in once. The server already removes
-// another player's subscription on this device during the login; this also
-// covers a browser without its device cookie. Failures never block the page.
+// How long a sign-in waits for the push check-in before it gives up on it.
+const checkInTimeoutMs = 5000
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms)
+    promise.then((value) => { clearTimeout(timer); resolve(value) }, (err) => { clearTimeout(timer); reject(err) })
+  })
+}
+
+export type CheckInOutcome = 'none' | 'active' | 'dropped'
+
+// checkInSubscription keeps this browser's subscription only when the server
+// confirms it belongs to the signed-in player. Anything else drops it in the
+// browser: a subscription of another player, an unknown one, and also a
+// check-in that failed or took too long. It fails closed, so a previous
+// player's opt-in can never stay active for the person using the browser now
+// (FR-32.3, ADR 103). Signing in itself never depends on it.
+export async function checkInSubscription(
+  subscription: { endpoint: string; unsubscribe: () => Promise<boolean> } | null,
+  ask: (endpoint: string) => Promise<boolean>,
+  timeoutMs: number,
+): Promise<CheckInOutcome> {
+  if (!subscription) return 'none'
+  let active = false
+  try {
+    active = await withTimeout(ask(subscription.endpoint), timeoutMs)
+  } catch {
+    active = false
+  }
+  if (active) return 'active'
+  await subscription.unsubscribe().catch(() => false)
+  return 'dropped'
+}
+
+// checkInPush runs before the web client shows a player as signed in, after
+// every login, MFA step, security key, and session load. The server already
+// removes another player's subscription during the login when it knows the
+// device; this step covers a browser that lost its device cookie. It never
+// throws.
 export async function checkInPush(): Promise<void> {
   if (!browserHasPushAPI()) return
   try {
-    await pushActiveOnThisDevice()
+    await runExclusive(async () => {
+      const subscription = await withTimeout(currentPushSubscription(), checkInTimeoutMs).catch(() => null)
+      await checkInSubscription(subscription, async (endpoint) => {
+        const status = await api.post<{ active: boolean }>('/api/v1/push/subscriptions/sync', { endpoint })
+        return status.active
+      }, checkInTimeoutMs)
+    })
   } catch {
-    // The account tab shows the state the next time it opens.
+    // Nothing to keep: checkInSubscription already dropped what it could not confirm.
   }
 }
 

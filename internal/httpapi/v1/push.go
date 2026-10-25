@@ -137,16 +137,20 @@ func deviceHash(r *http.Request) string {
 }
 
 // ensureDevice returns the device hash, giving the browser a new random device
-// cookie first when it has none.
+// cookie first when it has none. An existing cookie is sent again with a fresh
+// lifetime, so a device that signs in now and then never loses its identity to
+// cookie expiry (ADR 103).
 func (a *API) ensureDevice(w http.ResponseWriter, r *http.Request) (string, error) {
-	if hash := deviceHash(r); hash != "" {
-		return hash, nil
+	value := ""
+	if cookie, err := r.Cookie(deviceCookieName); err == nil && cookie.Value != "" {
+		value = cookie.Value
+	} else {
+		raw := make([]byte, 32)
+		if _, err := rand.Read(raw); err != nil {
+			return "", err
+		}
+		value = base64.RawURLEncoding.EncodeToString(raw)
 	}
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", err
-	}
-	value := base64.RawURLEncoding.EncodeToString(raw)
 	http.SetCookie(w, &http.Cookie{
 		Name:     deviceCookieName,
 		Value:    value,

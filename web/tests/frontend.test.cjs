@@ -3870,13 +3870,38 @@ test('push changes run one at a time and a failed one does not block the next (A
   assert.deepEqual(events, ['first:start', 'first:end', 'second:start', 'third:start'])
 })
 
-test('every sign-in checks the push subscription in with the server; nothing is stored in the browser (FR-32.3, ADR 103)', () => {
+test('the push check-in keeps only a subscription the server confirms and fails closed (FR-32.3, ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInSubscription } = s.load('pushNotifications.ts')
+  const browserSubscription = () => {
+    const sub = { endpoint: 'https://fcm.googleapis.com/x', dropped: 0, unsubscribe: () => { sub.dropped++; return Promise.resolve(true) } }
+    return sub
+  }
+  assert.equal(await checkInSubscription(null, () => Promise.resolve(true), 1000), 'none')
+
+  const own = browserSubscription()
+  assert.equal(await checkInSubscription(own, () => Promise.resolve(true), 1000), 'active')
+  assert.equal(own.dropped, 0)
+
+  const foreign = browserSubscription()
+  assert.equal(await checkInSubscription(foreign, () => Promise.resolve(false), 1000), 'dropped')
+  assert.equal(foreign.dropped, 1)
+
+  const failed = browserSubscription()
+  assert.equal(await checkInSubscription(failed, () => Promise.reject(new Error('offline')), 1000), 'dropped')
+  assert.equal(failed.dropped, 1)
+
+  const stuck = browserSubscription()
+  assert.equal(await checkInSubscription(stuck, () => new Promise(() => {}), 20), 'dropped')
+  assert.equal(stuck.dropped, 1)
+})
+
+test('every sign-in path checks push in before the player is shown as signed in (ADR 103)', () => {
   const read = (file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8')
   const auth = read('src/auth.tsx')
+  // login, MFA code, security key, and session load: each awaits the check-in before setPlayer.
+  assert.equal((auth.match(/await checkInPush\(\)\s*\n(\s*\/\/[^\n]*\n)?\s*if \(requestVersion === version\.current\)/g) ?? []).length, 4)
   const push = read('src/pushNotifications.ts')
-  // Keyed on a sign-in counter, not on the player ID, so a new session of the same player checks in too.
-  assert.match(auth, /if \(signIns > 0\) void checkInPush\(\)\s*\n\s*\}, \[signIns\]\)/)
-  assert.equal((auth.match(/setSignIns\(\(count\) => count \+ 1\)/g) ?? []).length, 4)
   assert.doesNotMatch(push, /localStorage/)
   assert.match(push, /\/api\/v1\/push\/subscriptions\/sync/)
   const settings = read('src/components/PushNotificationSettings.tsx')

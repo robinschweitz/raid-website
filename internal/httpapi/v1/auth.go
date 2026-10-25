@@ -86,10 +86,18 @@ func (a *API) setSessionCookie(w http.ResponseWriter, token string, maxAge int) 
 
 // startSession hands the new session cookie to the browser. First it removes
 // push subscriptions of other players on this device, so the last player's
-// opt-in never reaches the one signing in now (FR-32.3, ADR 103). If that
-// fails, the browser gets no session: it fails closed.
+// opt-in never reaches the one signing in now (FR-32.3, ADR 103); if that
+// fails, the browser gets no session. A browser without a device cookie gets
+// one here; which subscription it holds only the browser knows, so the web
+// client checks in before it shows the player as signed in.
 func (a *API) startSession(w http.ResponseWriter, r *http.Request, token string, playerID int64) bool {
-	if hash := deviceHash(r); hash != "" {
+	hadDevice := deviceHash(r) != ""
+	hash, err := a.ensureDevice(w, r)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not create login session")
+		return false
+	}
+	if hadDevice {
 		if err := a.Push.ClaimDevice(r.Context(), playerID, hash); err != nil {
 			WriteError(w, http.StatusInternalServerError, "internal", "could not create login session")
 			return false

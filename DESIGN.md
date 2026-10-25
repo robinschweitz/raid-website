@@ -438,9 +438,10 @@ Target: WCAG 2.2 level AA.
 - **Contrast (checked 2026-10-22 against `surface-card`, `surface-raised` and `surface-sidebar`):**
   all text tokens pass 4.5:1 (lowest: `class-deathknight` 5.8:1, `class-shaman` 6.6:1,
   `on-surface-muted` 6.8:1). The focus ring passes 3:1 (11.0:1). Form-control edges in
-  `outline-control` pass 3:1 (4.0:1 against `surface-raised`, 4.6:1 against `surface-card`); the
-  current code still uses `outline` there (1.4:1 to 1.6:1). ASSUMPTION: the translucent cards stay at or
-  darker than `surface-card` over every part of the background photo.
+  `outline-control` pass 3:1 (4.0:1 against `surface-raised`, 4.6:1 against `surface-card`).
+  Every control edge uses `outline-control`; the former `outline` edge was 1.4:1 to 1.6:1.
+  ASSUMPTION: the translucent cards stay at or darker than `surface-card` over every part of the
+  background photo.
 - **Focus:** every focusable element shows a 2px `primary` outline with 3px offset
   (`:focus-visible`). A skip link moves to the main content.
 - **Targets:** buttons and inputs are at least 36px high (WCAG 2.5.8 needs 24px).

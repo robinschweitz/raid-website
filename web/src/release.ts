@@ -1,4 +1,4 @@
-export const appVersion = '1.0.46'
+export const appVersion = '1.0.47'
 
 export const changelog = [
   {
@@ -6,6 +6,13 @@ export const changelog = [
     title: 'Der letzte Admin bleibt Admin',
     changes: [
       'Der einzige aktive Admin kann sich nicht mehr selbst die Admin-Rolle nehmen oder mit einem anderen Spieler zusammengeführt werden. Die Seite zeigt dann einen Hinweis, dass mindestens ein aktiver Admin bleiben muss.',
+    ],
+  },
+  {
+    version: '1.0.46',
+    title: 'Klarere Rahmen für Eingabefelder und Schaltflächen',
+    changes: [
+      'Eingabefelder, Auswahlfelder, Textfelder und Schaltflächen haben jetzt einen deutlicher sichtbaren Rahmen. So sind sie auch für Menschen mit eingeschränktem Sehvermögen besser zu erkennen.',
     ],
   },
   {

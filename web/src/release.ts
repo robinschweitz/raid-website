@@ -1,8 +1,16 @@
-export const appVersion = '1.0.49'
+export const appVersion = '1.0.50'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Aufgeräumte Statistik-Seite',
+    changes: [
+      'Auf der Statistik-Seite zeigen „Historische Rollen“ und „Loot-Verteilung“ jetzt Diagramme wie die Kacheln darüber. Dadurch sind alle Kacheln einer Zeile gleich hoch und es gibt keine leere Fläche mehr.',
+      'Ein Charakter mit der Klasse „Hexenmeister“ wird jetzt als Hexer erkannt und kann wie andere Hexer angemeldet und aufgestellt werden.',
+    ],
+  },
+  {
+    version: '1.0.49',
     title: 'Statistiken ohne Anmeldung',
     changes: [
       'Die Statistik-Seite kann jetzt auch ohne Anmeldung geöffnet werden. Sie zeigt nur Zahlen, keine Items und keine Enhance Points. Der Bereich „Loot-Verteilung“ zeigt jetzt die Verteilung nach Klasse.',

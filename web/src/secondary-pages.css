@@ -344,14 +344,8 @@
 .statistics-summary .stat-card span { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 .statistics-summary .stat-card strong { display: block; margin: 4px 0; color: #e7f8ff; font-size: clamp(28px, 4vw, 42px); font-family: Georgia, 'Times New Roman', serif; font-weight: 400; line-height: 1; }
 .statistics-summary .stat-card small { font-size: 12px; }
-.statistics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.statistics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
 .statistics-chart-card, .statistics-table-card { min-width: 0; }
-.stat-bars { display: grid; gap: 14px; margin-top: 18px; }
-.stat-bar-row { display: grid; grid-template-columns: minmax(90px, 1fr) auto; gap: 8px 14px; align-items: center; }
-.stat-bar-row > span { color: #d8eef8; font-weight: 700; overflow-wrap: anywhere; }
-.stat-bar-row > strong { color: #bcefff; font-variant-numeric: tabular-nums; }
-.stat-bar-row > div { grid-column: 1 / -1; height: 8px; overflow: hidden; border: 1px solid #31536a; border-radius: 999px; background: #061421; }
-.stat-bar-row i { display: block; height: 100%; min-width: 2px; border-radius: inherit; background: linear-gradient(90deg, #4ca3c5, #bcefff); }
 
 @media (min-width: 1250px) {
   .setup-board { grid-template-columns: repeat(4, minmax(0, 1fr)); }

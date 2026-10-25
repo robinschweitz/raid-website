@@ -220,7 +220,9 @@ func (a *API) registerWithCode(w http.ResponseWriter, r *http.Request) {
 		registrationError(w, err)
 		return
 	}
-	a.setSessionCookie(w, token, sessionMaxAgeSeconds)
+	if !a.startSession(w, r, token, p.ID) {
+		return
+	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(p, p)})
 }
 

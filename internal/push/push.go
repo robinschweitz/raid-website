@@ -6,6 +6,8 @@ package push
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
@@ -55,13 +57,14 @@ type Subscription struct {
 
 	ID       int64 `bun:"id,pk,autoincrement" json:"id"`
 	PlayerID int64 `bun:"player_id,notnull" json:"player_id"`
-	// SessionID is the session that subscribed; the row is deleted with it
-	// and a new session never inherits it (FR-32.3, ADR 103).
-	SessionID int64     `bun:"session_id,notnull" json:"-"`
-	Endpoint  string    `bun:"endpoint,notnull" json:"-"`
-	P256dh    string    `bun:"p256dh,notnull" json:"-"`
-	Auth      string    `bun:"auth,notnull" json:"-"`
-	CreatedAt time.Time `bun:"created_at,notnull" json:"created_at"`
+	// DeviceHash identifies the browser that subscribed (SHA-256 of its
+	// raid_device cookie). The opt-in stays with this player on this device
+	// across sign-ins and never passes to another player (FR-32.3, ADR 103).
+	DeviceHash *string   `bun:"device_hash" json:"-"`
+	Endpoint   string    `bun:"endpoint,notnull" json:"-"`
+	P256dh     string    `bun:"p256dh,notnull" json:"-"`
+	Auth       string    `bun:"auth,notnull" json:"-"`
+	CreatedAt  time.Time `bun:"created_at,notnull" json:"created_at"`
 }
 
 // auditView is what the audit log keeps of a subscription: the push service
@@ -168,11 +171,18 @@ func allowedHost(host string) bool {
 	return false
 }
 
-// Subscribe stores the actor's subscription for the session sessionID. A
-// browser that was subscribed for another account or session is moved to the
-// actor's session, because one browser can only have one subscription. The
-// repeated, unchanged subscription is left as it is and writes no audit entry.
-func (s *Service) Subscribe(ctx context.Context, actorID, sessionID int64, in SubscriptionInput) (*Subscription, error) {
+// HashDevice turns the raw raid_device cookie into the value stored with a
+// subscription, so the database holds no usable device identifier.
+func HashDevice(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}
+
+// Subscribe stores the actor's subscription for the device deviceHash. A
+// browser that was subscribed for another account is moved to the actor,
+// because one browser can only have one subscription. A repeated, unchanged
+// subscription is left as it is and writes no audit entry.
+func (s *Service) Subscribe(ctx context.Context, actorID int64, deviceHash string, in SubscriptionInput) (*Subscription, error) {
 	if s.key == nil {
 		return nil, ErrDisabled
 	}
@@ -180,7 +190,7 @@ func (s *Service) Subscribe(ctx context.Context, actorID, sessionID int64, in Su
 	if err := in.validate(); err != nil {
 		return nil, err
 	}
-	sub := &Subscription{PlayerID: actorID, SessionID: sessionID, Endpoint: in.Endpoint, P256dh: strings.TrimSpace(in.P256dh), Auth: strings.TrimSpace(in.Auth), CreatedAt: s.now()}
+	sub := &Subscription{PlayerID: actorID, DeviceHash: &deviceHash, Endpoint: in.Endpoint, P256dh: strings.TrimSpace(in.P256dh), Auth: strings.TrimSpace(in.Auth), CreatedAt: s.now()}
 	err := s.repo.Transaction(ctx, func(r *Repo, tx bun.Tx) error {
 		existing, err := r.GetByEndpoint(ctx, sub.Endpoint)
 		if err != nil && !errors.Is(err, ErrNotFound) {
@@ -219,23 +229,116 @@ func (s *Service) Subscribe(ctx context.Context, actorID, sessionID int64, in Su
 }
 
 // sameAs reports whether a stored subscription already is other: same
-// player, session, and keys.
+// player, device, and keys.
 func (s Subscription) sameAs(other *Subscription) bool {
-	return s.PlayerID == other.PlayerID && s.SessionID == other.SessionID && s.P256dh == other.P256dh && s.Auth == other.Auth
+	return s.PlayerID == other.PlayerID && sameDevice(s.DeviceHash, other.DeviceHash) && s.P256dh == other.P256dh && s.Auth == other.Auth
 }
 
-// Active reports whether endpoint is subscribed for exactly this player and
-// session. The account tab shows this, not the browser's own state, because a
-// browser keeps its subscription after the server ended the session.
-func (s *Service) Active(ctx context.Context, actorID, sessionID int64, endpoint string) (bool, error) {
-	existing, err := s.repo.GetByEndpoint(ctx, strings.TrimSpace(endpoint))
-	if errors.Is(err, ErrNotFound) {
-		return false, nil
-	}
+func sameDevice(a, b *string) bool {
+	return a != nil && b != nil && *a == *b
+}
+
+// Sync is called by a signed-in browser for its own subscription after every
+// sign-in and when the account tab opens. It reports whether the endpoint is
+// subscribed for the actor. A subscription of another player is removed: that
+// player's opt-in must not reach whoever uses the browser now. The actor's own
+// subscription is attached to this device when it has none or another one
+// (subscriptions from before migration 081, a cleared cookie).
+func (s *Service) Sync(ctx context.Context, actorID int64, deviceHash, endpoint string) (bool, error) {
+	active := false
+	err := s.repo.Transaction(ctx, func(r *Repo, tx bun.Tx) error {
+		existing, err := r.GetByEndpoint(ctx, strings.TrimSpace(endpoint))
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		auditRepo := audit.NewRepo(tx)
+		if existing.PlayerID != actorID {
+			if err := r.Delete(ctx, existing.ID); err != nil {
+				return err
+			}
+			return auditRepo.Record(ctx, actorID, "push_subscription", existing.ID, "remove", existing.auditView(), nil, reasonOtherPlayer)
+		}
+		active = true
+		if sameDevice(existing.DeviceHash, &deviceHash) {
+			return nil
+		}
+		before := existing.auditView()
+		if err := r.SetDevice(ctx, existing.ID, deviceHash); err != nil {
+			return err
+		}
+		return auditRepo.Record(ctx, actorID, "push_subscription", existing.ID, "update", before, existing.auditView(), "")
+	})
+	return active, err
+}
+
+// reasonOtherPlayer is the audit reason when a subscription is removed because
+// another player now uses the device.
+const reasonOtherPlayer = "another player signed in on this device"
+
+// ClaimDevice runs when playerID gets a session on the device deviceHash. It
+// removes every subscription of another player on that device, in the server,
+// so a forgotten opt-in never reaches the next player (FR-32.3).
+func (s *Service) ClaimDevice(ctx context.Context, playerID int64, deviceHash string) error {
+	return s.repo.Transaction(ctx, func(r *Repo, tx bun.Tx) error {
+		subs, err := r.ListByDevice(ctx, deviceHash)
+		if err != nil {
+			return err
+		}
+		auditRepo := audit.NewRepo(tx)
+		for _, sub := range subs {
+			if sub.PlayerID == playerID {
+				continue
+			}
+			if err := r.Delete(ctx, sub.ID); err != nil {
+				return err
+			}
+			if err := auditRepo.Record(ctx, playerID, "push_subscription", sub.ID, "remove", sub.auditView(), nil, reasonOtherPlayer); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// ForgetDevice removes the actor's subscriptions on the device deviceHash when
+// the actor signs out there (FR-32.3).
+func (s *Service) ForgetDevice(ctx context.Context, actorID int64, deviceHash string) error {
+	return s.repo.Transaction(ctx, func(r *Repo, tx bun.Tx) error {
+		return revoke(ctx, r, audit.NewRepo(tx), actorID, actorID, func(sub Subscription) bool { return sameDevice(sub.DeviceHash, &deviceHash) })
+	})
+}
+
+// RevokeForPlayer removes the push subscriptions of playerID inside the
+// caller's transaction db, except those on keepDeviceHash (empty keeps none).
+// Account changes that end other sessions call it, so a device that lost its
+// session through a password or role change stops getting messages too
+// (FR-2.13, FR-2.14, SC-017).
+func RevokeForPlayer(ctx context.Context, db bun.IDB, actorID, playerID int64, keepDeviceHash string) error {
+	return revoke(ctx, NewRepo(db), audit.NewRepo(db), actorID, playerID, func(sub Subscription) bool {
+		return keepDeviceHash == "" || !sameDevice(sub.DeviceHash, &keepDeviceHash)
+	})
+}
+
+func revoke(ctx context.Context, r *Repo, auditRepo *audit.Repo, actorID, playerID int64, match func(Subscription) bool) error {
+	subs, err := r.ListByPlayer(ctx, playerID)
 	if err != nil {
-		return false, err
+		return err
 	}
-	return existing.PlayerID == actorID && existing.SessionID == sessionID, nil
+	for _, sub := range subs {
+		if !match(sub) {
+			continue
+		}
+		if err := r.Delete(ctx, sub.ID); err != nil {
+			return err
+		}
+		if err := auditRepo.Record(ctx, actorID, "push_subscription", sub.ID, "remove", sub.auditView(), nil, ""); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Unsubscribe deletes the actor's subscription for this endpoint. Deleting a
@@ -279,7 +382,7 @@ func (s *Service) notify(ctx context.Context, kind Kind, actorID int64, playerID
 	// its own bounded time.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sendTimeout)
 	defer cancel()
-	subs, err := s.repo.ListRecipients(ctx, actorID, playerIDs, s.now())
+	subs, err := s.repo.ListRecipients(ctx, actorID, playerIDs)
 	if err != nil {
 		s.logf("push %s: list recipients: %v", kind, err)
 		return

@@ -3870,14 +3870,18 @@ test('push changes run one at a time and a failed one does not block the next (A
   assert.deepEqual(events, ['first:start', 'first:end', 'second:start', 'third:start'])
 })
 
-test('a new session never re-attaches push on its own; the account tab asks the server (FR-32.3, ADR 103)', () => {
+test('every sign-in checks the push subscription in with the server; nothing is stored in the browser (FR-32.3, ADR 103)', () => {
   const read = (file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8')
   const auth = read('src/auth.tsx')
   const push = read('src/pushNotifications.ts')
-  assert.doesNotMatch(auth, /push\/subscriptions'|syncPush/)
+  // Keyed on a sign-in counter, not on the player ID, so a new session of the same player checks in too.
+  assert.match(auth, /if \(signIns > 0\) void checkInPush\(\)\s*\n\s*\}, \[signIns\]\)/)
+  assert.equal((auth.match(/setSignIns\(\(count\) => count \+ 1\)/g) ?? []).length, 4)
   assert.doesNotMatch(push, /localStorage/)
-  assert.match(push, /\/api\/v1\/push\/subscriptions\/status/)
-  assert.match(read('src/components/PushNotificationSettings.tsx'), /await pushActiveOnThisDevice\(\)/)
+  assert.match(push, /\/api\/v1\/push\/subscriptions\/sync/)
+  const settings = read('src/components/PushNotificationSettings.tsx')
+  assert.match(settings, /await pushActiveOnThisDevice\(\)/)
+  assert.match(settings, /addEventListener\('visibilitychange'/)
   // The permission prompt stays outside the queue so it still belongs to the click.
   assert.match(push, /requestPermission\(\)[\s\S]*await runExclusive\(/)
 })

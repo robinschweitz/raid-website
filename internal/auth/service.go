@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"raid-website/internal/player"
+	"raid-website/internal/push"
 	"raid-website/internal/validation"
 )
 
@@ -170,8 +171,10 @@ func (s *Service) auditSecurity(ctx context.Context, playerID int64, action stri
 }
 
 // ChangeOwnPassword sets a new password and ends every other session of the
-// player; the session identified by currentToken stays (FR-2.13, SC-017).
-func (s *Service) ChangeOwnPassword(ctx context.Context, playerID int64, currentToken, currentPassword, newPassword string) error {
+// player; the session identified by currentToken stays (FR-2.13, SC-017). Push
+// subscriptions on other devices end with them; the one on currentDeviceHash
+// stays (FR-32.3).
+func (s *Service) ChangeOwnPassword(ctx context.Context, playerID int64, currentToken, currentDeviceHash, currentPassword, newPassword string) error {
 	if err := s.VerifyPassword(ctx, playerID, currentPassword); err != nil {
 		return err
 	}
@@ -198,6 +201,10 @@ func (s *Service) ChangeOwnPassword(ctx context.Context, playerID int64, current
 		}
 		if err := sessions.DeleteSessionsOfPlayer(ctx, playerID, keepHash); err != nil {
 			return fmt.Errorf("end other sessions: %w", err)
+		}
+		// Without a device cookie no device is known to be this one, so all go.
+		if err := push.RevokeForPlayer(ctx, sessions.db, playerID, playerID, currentDeviceHash); err != nil {
+			return fmt.Errorf("end push on other devices: %w", err)
 		}
 		if err := sessions.AuditSecurity(ctx, playerID, "password_change", map[string]any{"name": p.Name}); err != nil {
 			return fmt.Errorf("record security audit: %w", err)
@@ -292,6 +299,9 @@ func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, 
 		if endSessions {
 			if err := sessions.DeleteSessionsOfPlayer(ctx, playerID, ""); err != nil {
 				return fmt.Errorf("end player sessions: %w", err)
+			}
+			if err := push.RevokeForPlayer(ctx, sessions.db, actorID, playerID, ""); err != nil {
+				return fmt.Errorf("end player push subscriptions: %w", err)
 			}
 		}
 		updated = p
@@ -434,6 +444,15 @@ func (s *Service) reserveLoginAttempt(ctx context.Context, username, clientIP st
 	return &loginAttempt{sessions: s.sessions, id: id}, nil
 }
 
+// loginBookkeepingTimeout bounds the detached writes that finish a login
+// attempt, so a stuck database cannot hold the request forever.
+const loginBookkeepingTimeout = 5 * time.Second
+
+// bookkeepingContext outlives a cancelled request but not the timeout.
+func bookkeepingContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), loginBookkeepingTimeout)
+}
+
 // fail keeps the attempt as a failed guess.
 func (a *loginAttempt) fail() {
 	if a != nil {
@@ -442,15 +461,18 @@ func (a *loginAttempt) fail() {
 }
 
 // succeed marks the attempt as a successful login, so it stops counting. It
-// runs even when the client has gone, and a failure is logged: the attempt
-// then still counts, which errs on the side of the limit.
+// runs even when the client has gone. A failed write fails closed on purpose:
+// the attempt keeps counting toward the limit, and the failure is logged so it
+// can be seen in the journal (SC-008).
 func (a *loginAttempt) succeed(ctx context.Context) {
 	if a == nil {
 		return
 	}
 	a.decided = true
-	if err := a.sessions.MarkLoginAttemptSucceeded(context.WithoutCancel(ctx), a.id); err != nil {
-		log.Printf("login attempt %d: mark as success: %v", a.id, err)
+	writeCtx, cancel := bookkeepingContext(ctx)
+	defer cancel()
+	if err := a.sessions.MarkLoginAttemptSucceeded(writeCtx, a.id); err != nil {
+		log.Printf("login attempt %d: mark as success failed, it still counts as failed: %v", a.id, err)
 	}
 }
 
@@ -459,21 +481,12 @@ func (a *loginAttempt) releaseUndecided(ctx context.Context) {
 	if a == nil || a.decided {
 		return
 	}
-	if err := a.sessions.DeleteLoginAttempt(context.WithoutCancel(ctx), a.id); err != nil {
-		log.Printf("login attempt %d: release: %v", a.id, err)
+	writeCtx, cancel := bookkeepingContext(ctx)
+	defer cancel()
+	// Like succeed, a failed delete fails closed: the attempt keeps counting.
+	if err := a.sessions.DeleteLoginAttempt(writeCtx, a.id); err != nil {
+		log.Printf("login attempt %d: release failed, it still counts as failed: %v", a.id, err)
 	}
-}
-
-// SessionID returns the ID of the unexpired session for a raw token.
-func (s *Service) SessionID(ctx context.Context, token string) (int64, error) {
-	sess, err := s.sessions.FindSessionByHash(ctx, hashToken(token))
-	if err != nil {
-		return 0, fmt.Errorf("find session: %w", err)
-	}
-	if !sess.ExpiresAt.After(time.Now().UTC()) {
-		return 0, errors.New("session expired")
-	}
-	return sess.ID, nil
 }
 
 // Authenticate resolves a raw session token. Missing, unknown, or expired sessions return nil, nil.

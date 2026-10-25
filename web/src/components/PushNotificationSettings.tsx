@@ -35,6 +35,14 @@ export function PushNotificationSettings() {
 
   useEffect(() => { void refresh() }, [refresh])
 
+  // Another tab may have turned push on or off meanwhile; the server state is
+  // read again whenever this tab becomes visible (ADR 103).
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [refresh])
+
   const enable = () => submit(async () => {
     if (!config) return
     setError('')

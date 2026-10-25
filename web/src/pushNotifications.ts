@@ -58,17 +58,30 @@ export function runExclusive<T>(step: () => Promise<T>): Promise<T> {
   return result
 }
 
-// Whether this browser gets messages for the current session. A subscription
-// ends on the server with the session that made it and a new session never
-// inherits it (FR-32.3, ADR 103), so the browser's own subscription is not
-// enough: the server decides.
+// Whether this browser gets messages for the signed-in player. The opt-in
+// belongs to a player on a device (FR-32.3, ADR 103): the browser checks in with
+// its subscription, the server keeps it for the same player and removes it
+// when it belongs to someone else. The browser's own subscription is not
+// enough; the server decides.
 export function pushActiveOnThisDevice(): Promise<boolean> {
   return runExclusive(async () => {
     const subscription = await currentPushSubscription()
     if (!subscription) return false
-    const status = await api.post<{ active: boolean }>('/api/v1/push/subscriptions/status', { endpoint: subscription.endpoint })
+    const status = await api.post<{ active: boolean }>('/api/v1/push/subscriptions/sync', { endpoint: subscription.endpoint })
     return status.active
   })
+}
+
+// After every sign-in the browser checks in once. The server already removes
+// another player's subscription on this device during the login; this also
+// covers a browser without its device cookie. Failures never block the page.
+export async function checkInPush(): Promise<void> {
+  if (!browserHasPushAPI()) return
+  try {
+    await pushActiveOnThisDevice()
+  } catch {
+    // The account tab shows the state the next time it opens.
+  }
 }
 
 export async function enablePush(config: PushConfig): Promise<void> {

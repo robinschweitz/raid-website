@@ -58,9 +58,11 @@ systemctl reload ssh
 ```
 
 Create `/etc/raid-website.env` with mode `0600`, owned by root. Production
-requires `ENV=production`, `DATABASE_URL`, `ADMIN_USERNAME`, and
-`ADMIN_PASSWORD`; set `COOKIE_SECURE=true`, `TRUST_PROXY_HEADERS=true`, and
-the HTTPS `PUBLIC_ORIGIN`. Configure nginx and request the certificate before
+requires `ENV=production`, `DATABASE_URL`, `ADMIN_USERNAME`,
+`ADMIN_PASSWORD`, and `PUBLIC_ORIGIN`, the HTTPS origin of the site without a
+path (for example `https://raid.example.org`); the server refuses to start
+without it, because the WebAuthn relying party comes only from it (SC-007). Also
+set `COOKIE_SECURE=true` and `TRUST_PROXY_HEADERS=true`. Configure nginx and request the certificate before
 starting the service.
 
 Push notifications (FR-32) are optional and stay off until both
@@ -85,6 +87,10 @@ certbot certonly --webroot --webroot-path /var/www/certbot --email you@example.c
 install -m 0644 deploy/nginx/raid-website.conf /etc/nginx/sites-available/raid-website
 nginx -t && systemctl reload nginx
 ```
+
+The HTTPS template serves the site only on `bratwurst-des-schicksals.de` and
+redirects `www.` there, because security keys work only on the `PUBLIC_ORIGIN`
+host (SC-007).
 
 Build and install the application only after the frontend build has completed:
 

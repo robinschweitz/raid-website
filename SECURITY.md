@@ -20,7 +20,7 @@ and open security decisions. All security controls are written here; other files
 - **Trust boundaries:** TB-1 to TB-7 in `ARCHITECTURE.md`. Threats: `THREAT_MODEL.md` (specification, T-001 to T-050) and `THREAT_MODEL_CODE.md` (implementation, CT-001 to CT-030).
 - **Material gaps:** none; the off-server backup storage and key holder were decided on 2026-10-24 (OD-007, ADR 099).
 - **Conflicts found:** the client address can be forged behind nginx (SC-006, fixed in PR #44);
-  production does not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007); `main` was
+  production did not require `PUBLIC_ORIGIN` although WebAuthn depends on it (SC-007, fixed #71); `main` was
   not protected although ADR 071/072 require it (SC-039, T-012, fixed 2026-10-23); the deploy
   scripts that `deploy/README.md` installs were not in the repository (SC-037, T-013, fixed #105).
 
@@ -92,7 +92,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** In production, startup MUST fail without a valid HTTPS `PUBLIC_ORIGIN`, and the WebAuthn RP ID and origin MUST come only from it, never from `Host`, `X-Forwarded-Host`, or `X-Forwarded-Proto`.
 - **Enforcement:** `internal/config`; `webAuthnRelyingParty`.
-- **Evidence:** ADR 046, `deploy/README.md`. Code: **not compliant** — production starts without `PUBLIC_ORIGIN`, and the fallback trusts forwarded headers that nginx does not overwrite. Threats: T-008.
+- **Evidence:** ADR 046, `deploy/README.md`. Code: compliant since #71 — `config.Load` stops production without an HTTPS `PUBLIC_ORIGIN` (origin only: no path, query, or user info), and `webAuthnRelyingParty` reads only it; forwarded headers are never read, and only development without `PUBLIC_ORIGIN` falls back to the request's own host. Tests `TestProductionPublicOrigin`, `TestReqAuth022_*`. Threats: T-008.
 - **Verification:** `ENV=production` without `PUBLIC_ORIGIN` stops startup; a forged `X-Forwarded-Host` does not change the WebAuthn origin.
 
 **SC-008 - Login throttling**
@@ -279,8 +279,8 @@ chapter level only; requirement IDs are not cited until each is verified against
 **SC-032 - Anonymisation**
 - **Status:** ACTIVE
 - **Rule:** Anonymisation (FR-30.2–30.4) MUST run in one transaction and MUST remove every credential row of the player: password hash, sessions, MFA settings, recovery codes, WebAuthn credentials (SC-017), and push subscriptions (SC-053).
-- **Enforcement:** `accountmerge` anonymise operation (not built).
-- **Evidence:** FR-30, AQ-6. Code: not built.
+- **Enforcement:** `accountmerge.Service.Anonymise`, `Repo.AnonymiseAccount`; `audit.Repo.List` (display).
+- **Evidence:** FR-30, AQ-6. Code: compliant since #85 — one transaction deletes sessions, WebAuthn and MFA rows, push subscriptions, the player's login attempts, and clears the Rising-Gods profile fields on the player's characters and registration requests (unused codes of those requests are revoked); the login name and password hash are cleared and the role becomes GUEST. It answers `409 last_admin` (SC-047) and `409 already_anonymised`. Tests `TestReqPrivacy011_*`, `TestReqPrivacy011_AC05` in `internal/accountmerge`.
 - **Verification:** After anonymisation no row links the player to a login, secret, or external profile; old sessions return 401.
 
 **SC-033 - Secrets in configuration**
@@ -387,7 +387,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** A role change, deactivation, merge, or anonymisation that would leave no active ADMIN MUST be rejected with `409 last_admin`.
 - **Enforcement:** `auth.SetCredentials`, `accountmerge`, the anonymise operation.
-- **Evidence:** FR-5.9; `THREAT_MODEL_CODE.md` CT-006. Code: compliant for role change and merge since #80 — `auth.SetCredentials` and `accountmerge.Merge` count active Admins inside the write transaction and answer `409 last_admin` (`player.ErrLastAdmin`); a merge into an active Admin target passes. No code path deactivates a player yet; the anonymise operation (REQ-PRIVACY-011) must call the same check. Tests `TestReqAccount015_AC01` to `AC03`, frontend message test. Threats: T-044.
+- **Evidence:** FR-5.9; `THREAT_MODEL_CODE.md` CT-006. Code: compliant for role change and merge since #80 — `auth.SetCredentials` and `accountmerge.Merge` count active Admins inside the write transaction and answer `409 last_admin` (`player.ErrLastAdmin`); a merge into an active Admin target passes. No code path deactivates a player yet; the anonymise operation (REQ-PRIVACY-011) calls the same check. Tests `TestReqAccount015_AC01` to `AC03`, frontend message test. Threats: T-044.
 - **Verification:** Demoting the only Admin returns 409 and changes nothing.
 
 **SC-048 - Cloned security keys are rejected**

@@ -31,33 +31,22 @@ func clientAddress(r *http.Request, trustProxyHeaders bool) string {
 	return host
 }
 
-func webAuthnRelyingParty(publicOrigin string, r *http.Request, trustProxyHeaders bool) (rpID, origin string, ok bool) {
+// webAuthnRelyingParty takes the relying party only from PUBLIC_ORIGIN
+// (SC-007). Only development, where config allows it to be empty, falls back
+// to the request's own host; forwarded headers are never read.
+func webAuthnRelyingParty(publicOrigin string, r *http.Request) (rpID, origin string, ok bool) {
 	if publicOrigin != "" {
 		u, err := url.Parse(publicOrigin)
-		if err != nil || u.Scheme == "" || u.Host == "" {
+		if err != nil || u.Scheme == "" || u.Host == "" || u.Hostname() == "" {
 			return "", "", false
 		}
-		host := u.Hostname()
-		if host == "" {
-			return "", "", false
-		}
-		return host, u.Scheme + "://" + u.Host, true
+		return u.Hostname(), u.Scheme + "://" + u.Host, true
 	}
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
 	}
-	if trustProxyHeaders {
-		if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); forwarded != "" {
-			scheme = strings.ToLower(strings.Split(forwarded, ",")[0])
-		}
-	}
 	host := r.Host
-	if trustProxyHeaders {
-		if forwardedHost := strings.TrimSpace(r.Header.Get("X-Forwarded-Host")); forwardedHost != "" {
-			host = strings.Split(forwardedHost, ",")[0]
-		}
-	}
 	if host == "" {
 		return "", "", false
 	}

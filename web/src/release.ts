@@ -1,8 +1,15 @@
-export const appVersion = '1.0.60'
+export const appVersion = '1.0.61'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Beute ohne Empfänger direkt beim Loot erfassen',
+    changes: [
+      'Unter „Loot erfassen“ wählt die Raidleitung jetzt zuerst die Art: an einen Spieler vergeben oder entzaubert, für die Gildenbank oder von niemandem gewollt. Der eigene Kasten zum Eintragen unter „Beute ohne Empfänger“ entfällt; die Liste bleibt dort.',
+    ],
+  },
+  {
+    version: '1.0.60',
     title: 'Umfrage-Optionen in richtiger Reihenfolge',
     changes: [
       'In der Umfrageliste stehen die Antwortoptionen wieder in der eingestellten Reihenfolge, auch nachdem eine Umfrage bearbeitet und Optionen umsortiert wurden.',

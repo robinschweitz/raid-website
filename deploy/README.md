@@ -88,6 +88,10 @@ install -m 0644 deploy/nginx/raid-website.conf /etc/nginx/sites-available/raid-w
 nginx -t && systemctl reload nginx
 ```
 
+The HTTPS template serves the site only on `bratwurst-des-schicksals.de` and
+redirects `www.` there, because security keys work only on the `PUBLIC_ORIGIN`
+host (SC-007).
+
 Build and install the application only after the frontend build has completed:
 
 ```sh

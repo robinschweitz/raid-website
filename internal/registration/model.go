@@ -43,6 +43,28 @@ type Request struct {
 	// Linked is filled for redeemed requests in admin lists: the player the code
 	// was used for (ADR 084). It is not stored on the request.
 	Linked *LinkedPlayer `bun:"-" json:"linked_player,omitempty"`
+	// NameMatch is filled for open new-account requests in admin lists when a
+	// player without a login owns a character with the requested name (SC-049).
+	NameMatch *NameMatch `bun:"-" json:"name_match,omitempty"`
+}
+
+// NameMatch is the player an Admin must confirm or refuse before a code is created.
+type NameMatch struct {
+	PlayerID   int64  `json:"player_id"`
+	PlayerName string `json:"player_name"`
+}
+
+// Match choices stored with a code (SC-049). The empty choice means there was
+// no name match to decide on.
+const (
+	MatchAttach = "ATTACH"
+	MatchNew    = "NEW"
+)
+
+// MatchChoiceInput is the Admin's decision when creating a code.
+type MatchChoiceInput struct {
+	Choice   string
+	PlayerID int64
 }
 
 // LinkedPlayer names the player a redeemed code was used for.
@@ -106,6 +128,8 @@ type Code struct {
 	UsedByPlayerID    *int64     `bun:"used_by_player_id,nullzero" json:"used_by_player_id"`
 	UsedByUsername    *string    `bun:"used_by_username,scanonly" json:"used_by_username"`
 	RevokedAt         *time.Time `bun:"revoked_at,nullzero" json:"revoked_at"`
+	MatchChoice       string     `bun:"match_choice,notnull" json:"match_choice"`
+	MatchPlayerID     *int64     `bun:"match_player_id,nullzero" json:"match_player_id"`
 }
 
 type CodeWithRequest struct {

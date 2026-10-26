@@ -373,9 +373,9 @@ export function GuidePage() {
       <h3>Neue Leute freischalten</h3>
       <ol>
         <li>Die Person fordert auf der Login-Seite einen Code an.</li>
-        <li>Unter <strong>Registrierung</strong> erscheint die Anfrage. Erstelle einen Code. Er wird nur einmal angezeigt.</li>
+        <li>Unter <strong>Registrierung</strong> erscheint die Anfrage. Besitzt ein Spieler ohne Login schon einen Charakter mit diesem Namen, zeigt die Anfrage ihn an. Wähle dann <strong>Diesem Spieler zuordnen</strong> oder <strong>Neuer Spieler</strong>. Erst danach entsteht der Code. Er wird nur einmal angezeigt.</li>
         <li>Schick den Code ingame an genau diesen Charakter und markiere ihn als gesendet.</li>
-        <li>Die Person registriert sich. Gibt es den Charakter schon (z. B. aus der alten Liste), bekommt <strong>der Spieler, dem der Charakter gehört</strong>, den Login, sonst entsteht ein neuer Spieler. In beiden Fällen ist die Person danach <strong>Mitglied</strong> (eine höhere Rolle bleibt).</li>
+        <li>Die Person registriert sich. Der Login geht an den Spieler, den du beim Erstellen des Codes gewählt hast (oder dem das Rising-Gods-Profil schon gehört), sonst entsteht ein neuer Spieler. Allein wegen eines gleichen Namens wird nie zugeordnet. In beiden Fällen ist die Person danach <strong>Mitglied</strong> (eine höhere Rolle bleibt).</li>
         <li>Ist die Person noch <strong>Gast</strong> (z. B. ein älteres Konto), mach sie zum <strong>Mitglied</strong> (nächster Schritt).</li>
       </ol>
       <p>Im Reiter <strong>Verlauf</strong> zeigt die Spalte <strong>Verknüpfter Spieler</strong>, für welchen Spieler ein Code eingelöst wurde, mit Login-Namen und Datum.</p>

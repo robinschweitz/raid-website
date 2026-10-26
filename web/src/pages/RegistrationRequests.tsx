@@ -50,11 +50,13 @@ export function RegistrationRequestsPage() {
     setCodes({})
   }
 
-  const createCode = async (request: RegistrationRequest) => {
+  const createCode = async (request: RegistrationRequest, choice?: 'ATTACH' | 'NEW') => {
     await submit(async () => {
       setError('')
       try {
-        const result = await api.post<GeneratedRegistrationCode>(`/api/v1/registration-requests/${request.id}/code`)
+        // SC-049: with a name match the Admin's choice decides what the code does.
+        const body = choice && request.name_match ? { match_choice: choice, match_player_id: choice === 'ATTACH' ? request.name_match.player_id : 0 } : undefined
+        const result = await api.post<GeneratedRegistrationCode>(`/api/v1/registration-requests/${request.id}/code`, body)
         if (!isActive()) return
         setGenerated((values) => ({ ...values, [request.id]: { code: result.code, codeId: result.code_record.id, characterName: request.character_name } }))
         setCodes((values) => ({ ...values, [request.id]: [result.code_record, ...(values[request.id] ?? [])] }))
@@ -184,10 +186,19 @@ export function RegistrationRequestsPage() {
           <td>{linkedPlayerCell(request)}</td>
           <td><button type="button" className="registration-details" aria-expanded={openRequestID === request.id} onClick={() => toggleDetails(request)}>{openRequestID === request.id ? 'Schließen' : 'Details'}</button></td>
           <td className="actions">
-            <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void createCode(request)}>Code erstellen</button>
+            <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED' || !!request.name_match} title={request.name_match ? 'Bitte zuerst unten wählen, ob der Spieler zugeordnet wird.' : undefined} onClick={() => void createCode(request)}>Code erstellen</button>
             <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void reject(request)}>Ablehnen</button>
           </td>
         </tr>
+        {request.name_match && (request.status === 'PENDING' || request.status === 'APPROVED') && <tr className="registration-match-row"><td colSpan={6}>
+          <div className="registration-match" role="group" aria-label={`Namensübereinstimmung für ${request.character_name}`}>
+            <p><strong>Namensübereinstimmung:</strong> Der Spieler <Link to={`/players/${request.name_match.player_id}`}>{request.name_match.player_name}</Link> hat noch kein Login und besitzt bereits einen Charakter „{request.character_name}“. Soll das neue Konto diesem Spieler zugeordnet werden?</p>
+            <div className="actions">
+              <button disabled={pending} onClick={() => void createCode(request, 'ATTACH')}>Diesem Spieler zuordnen</button>
+              <button disabled={pending} onClick={() => void createCode(request, 'NEW')}>Neuer Spieler</button>
+            </div>
+          </div>
+        </td></tr>}
         {openRequestID === request.id && <tr className="registration-details-row"><td colSpan={6}>
           <div className="registration-details-content">
             <p><a href={request.external_profile_url} target="_blank" rel="noreferrer">Rising-Gods-Profil öffnen</a></p>

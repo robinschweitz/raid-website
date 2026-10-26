@@ -612,7 +612,7 @@ func TestRegistrationClaimsImportedCharacterOwner(t *testing.T) {
 	if err := json.Unmarshal(body, &requestOut); err != nil {
 		t.Fatalf("decode request: %v", err)
 	}
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/registration-requests/%d/code", srv.URL, requestOut.Data.ID), adminToken, nil)
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/registration-requests/%d/code", srv.URL, requestOut.Data.ID), adminToken, map[string]any{"match_choice": "ATTACH", "match_player_id": importedOwner.ID})
 	if status != http.StatusCreated {
 		t.Fatalf("create code: status %d body %s", status, body)
 	}

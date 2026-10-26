@@ -3,6 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { createHmac } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 
 export const admin = { username: 'e2e-admin', password: 'e2e-admin-password' }
 export const assistant = { username: 'e2e-raidassistent', password: 'raidassistent-password' }
@@ -87,7 +88,8 @@ export async function seedGuild(request: APIRequestContext) {
   const people: Record<string, number> = {}
   for (const [user, role, name] of [[assistant, 'RAIDASSISTENT', 'Raidassistent'], [member, 'MEMBER', 'Mitglied']] as const) {
     const created = await api.post('/api/v1/players', { name })
-    await api.put(`/api/v1/players/${created.id}/account`, { username: user.username, password: user.password, role })
+    await api.put(`/api/v1/players/${created.id}/account`, { username: user.username, role })
+    seedAccountPassword(created.id, user.password)
     people[role] = created.id
   }
   const db = new DatabaseSync(databasePath)
@@ -103,7 +105,8 @@ export interface MemberSetup { username: string; password: string; name: string;
 export async function createMember(request: APIRequestContext, setup: MemberSetup) {
   const api = await apiAs(request, admin)
   const created = await api.post('/api/v1/players', { name: setup.name })
-  await api.put(`/api/v1/players/${created.id}/account`, { username: setup.username, password: setup.password, role: 'MEMBER' })
+  await api.put(`/api/v1/players/${created.id}/account`, { username: setup.username, role: 'MEMBER' })
+  seedAccountPassword(created.id, setup.password)
   const db = new DatabaseSync(databasePath)
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '+00:00')
   const character = db.prepare('INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)').run(created.id, setup.character, setup.characterClass, setup.mainSpec, setup.secondSpec, now, now)
@@ -158,4 +161,14 @@ export async function snapshot(page: Page, testInfo: TestInfo, name: string, foc
 export function berlinDate(days: number) {
   const date = new Date(Date.now() + days * 86_400_000)
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(date)
+}
+
+
+// Set up an initial fixture password directly, like the existing character
+// fixture. The HTTP account endpoint intentionally cannot reset other players.
+export function seedAccountPassword(playerID: number, password: string) {
+  const hash = execFileSync('go', ['run', path.join(import.meta.dirname, 'hash-password.go')], { cwd: path.join(import.meta.dirname, '../..'), input: password, encoding: 'utf8' }).trim()
+  const db = new DatabaseSync(databasePath)
+  db.prepare('UPDATE players SET password_hash = ? WHERE id = ?').run(hash, playerID)
+  db.close()
 }

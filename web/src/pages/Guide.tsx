@@ -429,7 +429,7 @@ export function GuidePage() {
         <dt>Warum habe ich keine +10 EP bekommen?</dt>
         <dd>Wahrscheinlich hast du ein Main-Spec- oder Enhanced-Item bekommen. Schau in deinem Profil unter EP in die Historie.</dd>
         <dt>Passwort vergessen?</dt>
-        <dd>Bitte einen Admin ingame um einen Reset-Code für deinen Main-Charakter. Der Code gilt 72 Stunden. Beim Einlösen werden dein Passwort geändert, alle Sitzungen beendet und MFA entfernt; richte danach deinen zweiten Faktor erneut ein.</dd>
+        <dd>Bitte einen Admin ingame um einen Reset-Code für deinen Main-Charakter. Der Code gilt 72 Stunden. Öffne bei der Anmeldung <strong>Passwort vergessen? Reset-Code einlösen</strong> und gib Code und neues Passwort ein. Beim Einlösen werden dein Passwort geändert, alle Sitzungen beendet und MFA entfernt; richte danach deinen zweiten Faktor erneut ein.</dd>
       </dl>
     </Section>
   </div>

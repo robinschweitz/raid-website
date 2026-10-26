@@ -211,7 +211,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Error responses MUST use the `{"error": {"code", "message"}}` envelope with a stable code. 5xx messages MUST be generic and MUST NOT contain error chains, SQL, file paths, stack traces, or upstream responses.
 - **Enforcement:** `WriteError` call sites in `internal/httpapi/v1`.
-- **Evidence:** FR-7.5, ADR 053. Code: compliant; some 4xx messages pass domain sentinel texts (`err.Error()`), which contain no internal data.
+- **Evidence:** FR-7.5, ADR 053. Code: compliant since #113: known domain errors use stable codes and fixed German messages; unexpected account-save failures are logged and return generic `500 internal`. No response writer uses `err.Error()`.
 - **Verification:** Forced repository failure returns `internal` with a generic message.
 
 ### Web frontend and transport (V3, V12)

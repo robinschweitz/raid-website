@@ -179,13 +179,13 @@ func (a *API) mergePlayer(w http.ResponseWriter, r *http.Request) {
 	if err := a.AccountMerge.Merge(r.Context(), targetID, req.SourcePlayerID, actor.ID, req.Reason); err != nil {
 		switch {
 		case errors.Is(err, accountmerge.ErrSamePlayer), errors.Is(err, accountmerge.ErrSourceRequired):
-			WriteError(w, http.StatusUnprocessableEntity, "invalid_merge", err.Error())
+			WriteError(w, http.StatusUnprocessableEntity, "invalid_merge", stableErrorMessage("invalid_merge"))
 		case errors.Is(err, accountmerge.ErrSourceInactive):
-			WriteError(w, http.StatusConflict, "source_inactive", err.Error())
+			WriteError(w, http.StatusConflict, "source_inactive", stableErrorMessage("source_inactive"))
 		case errors.Is(err, player.ErrLastAdmin):
 			WriteError(w, http.StatusConflict, "last_admin", lastAdminMessage)
 		case errors.Is(err, accountmerge.ErrLockConflict):
-			WriteError(w, http.StatusConflict, "lock_conflict", err.Error())
+			WriteError(w, http.StatusConflict, "lock_conflict", stableErrorMessage("lock_conflict"))
 		case isNotFound(err):
 			WriteError(w, http.StatusNotFound, "not_found", "player not found")
 		default:

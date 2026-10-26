@@ -1,8 +1,13 @@
-export const appVersion = '1.0.60'
+export const appVersion = '1.0.61'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Verständliche Fehlermeldungen ohne interne Details',
+    changes: ['Fehler beim Kontospeichern und bei Korrekturen zeigen feste deutsche Meldungen. Interne Datenbankfehler bleiben im Serverprotokoll.'],
+  },
+  {
+    version: '1.0.60',
     title: 'Umfrage-Optionen in richtiger Reihenfolge',
     changes: [
       'In der Umfrageliste stehen die Antwortoptionen wieder in der eingestellten Reihenfolge, auch nachdem eine Umfrage bearbeitet und Optionen umsortiert wurden.',

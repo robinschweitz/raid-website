@@ -371,10 +371,15 @@ func (r *Repo) MigrateTOTPSecrets(ctx context.Context) error {
 			}
 			plain := row.TOTPSecret
 			if strings.HasPrefix(plain, "v1:") {
-				if _, err := r.encryption.decrypt(row.PlayerID, plain); err != nil {
+				decoded, err := r.encryption.decrypt(row.PlayerID, plain)
+				if err != nil {
 					failures++
+					continue
 				}
-				continue
+				if strings.HasPrefix(plain, "v1:"+r.encryption.keyID+":") {
+					continue
+				}
+				plain = decoded
 			}
 			stored, err := r.encryption.encrypt(row.PlayerID, plain)
 			if err != nil {
@@ -394,6 +399,10 @@ func (r *Repo) MigrateTOTPSecrets(ctx context.Context) error {
 			return fmt.Errorf("TOTP migration failed for %d row(s)", 1)
 		}
 		for _, row := range rows {
+			if row.TOTPSecret != "" && !strings.HasPrefix(row.TOTPSecret, "v1:"+r.encryption.keyID+":") {
+				failures++
+				continue
+			}
 			if _, err := r.encryption.decrypt(row.PlayerID, row.TOTPSecret); err != nil {
 				failures++
 			}

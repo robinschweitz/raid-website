@@ -75,7 +75,7 @@ func run() (err error) {
 		log.Printf("web push off: VAPID_PRIVATE_KEY is not set")
 	}
 	risingGods := registration.RisingGodsClient{ProxyURL: cfg.RisingGodsProxyURL, ProxyToken: cfg.RisingGodsProxyToken}
-	totpEncryption, err := auth.NewTOTPEncryption(cfg.TOTPEncryptionKey)
+	totpEncryption, err := auth.NewTOTPEncryptionWithPrevious(cfg.TOTPEncryptionKey, cfg.TOTPEncryptionKeysPrevious)
 	if err != nil {
 		return err
 	}

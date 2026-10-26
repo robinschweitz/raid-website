@@ -146,7 +146,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | Web client (`web/src`) | Pages, forms, hash routing, German UI, local drafts | None authoritative; convenience checks only | Browser drafts (`localStorage`) | FR-28, `DESIGN.md` | SUPPORTED |
 | HTTP layer (`httpapi`, `httpapi/v1`) | Middleware chain, route guards, DTOs, error mapping, SPA and health, server timeouts | Role matrix, session presence, CSRF, body size | None | FR-1, FR-2.8, NFR-4.1, NFR-4.2 | SUPPORTED |
 | `auth` | Login, sessions, passwords, TOTP, recovery codes, WebAuthn, bootstrap admin | Password length, login rate limit, MFA challenge expiry | sessions, login attempts, MFA secrets and credentials, password hash | FR-2, FR-3 | SUPPORTED |
-| `registration` | Rising-Gods client and cache; registration requests, codes, claims; visitor search counter | Alliance level-80 filter, request deduplication, code expiry, visitor search limit | registration requests, codes, external profiles | FR-4, FR-7 | SUPPORTED (search limit not built; unused warmer to delete) |
+| `registration` | Rising-Gods client and cache; registration requests, codes, claims; visitor search counter | Alliance level-80 filter, request deduplication, code expiry, visitor search limit | registration requests, codes, external profiles | FR-4, FR-7 | SUPPORTED (search limit not built) |
 | `player` | Players, roles, public player view | Public field subset | players | FR-1.3, FR-1.9, FR-5.1–5.2 | SUPPORTED |
 | `character` | Characters, name history, merge aliases, transfer | Rising-Gods provenance uniqueness, merge conflicts | characters, name history, aliases | FR-6 | SUPPORTED |
 | `accountmerge` | Player merge; player anonymisation | Same-item lock conflict, credential retention; data deleted versus kept | (coordinator) | FR-5.3–5.7, FR-30.2–30.5 | SUPPORTED |
@@ -303,8 +303,7 @@ sequenceDiagram
   (`go mod tidy`), so direct dependencies are not marked `// indirect`; CI runs
   `go mod tidy` and fails on any diff (Owner 2026-10-22, AQ-8; CI check built with REQ-ARCH-012).
 - **DR-12** Code that nothing imports or calls is deleted, not kept switched off; Git history keeps
-  it. Not yet followed by `internal/registration/rising_gods_warm.go` and `internal/logger`
-  (Owner 2026-10-22, AQ-4 and AQ-8).
+  it (Owner 2026-10-22, AQ-4 and AQ-8).
 - **DR-13** The embedded web build (`index.html`) is checked at startup like the catalog and addon
   bundles; the production rule is NFR-1.1. Development without a web build keeps working
   (Owner 2026-10-22, AQ-3).

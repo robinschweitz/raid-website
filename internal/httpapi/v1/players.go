@@ -221,7 +221,7 @@ func (a *API) anonymisePlayer(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, player.ErrLastAdmin):
 			WriteError(w, http.StatusConflict, "last_admin", lastAdminMessage)
 		case errors.Is(err, accountmerge.ErrAlreadyAnonymised):
-			WriteError(w, http.StatusConflict, "already_anonymised", err.Error())
+			WriteError(w, http.StatusConflict, "already_anonymised", "Dieser Spieler wurde bereits anonymisiert.")
 		case isNotFound(err):
 			WriteError(w, http.StatusNotFound, "not_found", "player not found")
 		default:

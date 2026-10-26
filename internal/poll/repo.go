@@ -65,7 +65,7 @@ func (r *Repo) GetPoll(ctx context.Context, id int64) (*Poll, error) {
 
 func (r *Repo) ListOptions(ctx context.Context, pollID int64) ([]Option, error) {
 	var opts []Option
-	err := r.db.NewSelect().Model(&opts).Where("poll_id = ?", pollID).Order("sort_order ASC, id ASC").Scan(ctx)
+	err := r.db.NewSelect().Model(&opts).Where("poll_id = ?", pollID).Order("sort_order ASC", "id ASC").Scan(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (r *Repo) FindVote(ctx context.Context, pollID, playerID int64) (*Vote, err
 
 func (r *Repo) ListVoteChoices(ctx context.Context, voteID int64) ([]string, error) {
 	var choices []VoteChoice
-	if err := r.db.NewSelect().Model(&choices).Where("vote_id = ?", voteID).Order("sort_order ASC, id ASC").Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(&choices).Where("vote_id = ?", voteID).Order("sort_order ASC", "id ASC").Scan(ctx); err != nil {
 		return nil, err
 	}
 	labels := make([]string, 0, len(choices))
@@ -221,7 +221,7 @@ func (r *Repo) loadOptions(ctx context.Context, polls []Poll) error {
 		byID[polls[i].ID] = &polls[i]
 	}
 	var opts []Option
-	if err := r.db.NewSelect().Model(&opts).Where("poll_id IN (?)", bun.List(ids)).Order("poll_id ASC, sort_order ASC, id ASC").Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(&opts).Where("poll_id IN (?)", bun.List(ids)).Order("poll_id ASC", "sort_order ASC", "id ASC").Scan(ctx); err != nil {
 		return err
 	}
 	for _, opt := range opts {
@@ -244,7 +244,7 @@ func (r *Repo) loadVoteChoices(ctx context.Context, votes []Vote) error {
 		byID[votes[i].ID] = &votes[i]
 	}
 	var choices []VoteChoice
-	if err := r.db.NewSelect().Model(&choices).Where("vote_id IN (?)", bun.List(ids)).Order("vote_id ASC, sort_order ASC, id ASC").Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(&choices).Where("vote_id IN (?)", bun.List(ids)).Order("vote_id ASC", "sort_order ASC", "id ASC").Scan(ctx); err != nil {
 		return err
 	}
 	for _, choice := range choices {

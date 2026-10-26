@@ -1,6 +1,7 @@
 import { expect, type APIRequestContext, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { DatabaseSync } from 'node:sqlite'
-import { createHmac } from 'node:crypto'
+import { createHmac, createCipheriv, createHash, randomBytes } from 'node:crypto'
+import { e2eTOTPKey } from './totp-key'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 
@@ -40,9 +41,18 @@ export function totpCode(secret = adminTOTPSecret): string {
 function ensureAdminTOTP() {
   const db = new DatabaseSync(databasePath)
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '+00:00')
+  const player = db.prepare('SELECT id FROM players WHERE username = ?').get(admin.username) as { id: number } | undefined
+  if (!player) throw new Error('e2e Admin is missing')
+  const key = Buffer.from(e2eTOTPKey, 'base64')
+  const nonce = randomBytes(12)
+  const cipher = createCipheriv('aes-256-gcm', key, nonce)
+  cipher.setAAD(Buffer.from(String(player.id)))
+  const encrypted = Buffer.concat([cipher.update(adminTOTPSecret, 'utf8'), cipher.final()])
+  const keyID = createHash('sha256').update(key).digest('hex').slice(0, 8)
+  const stored = `v1:${keyID}:${Buffer.concat([nonce, encrypted, cipher.getAuthTag()]).toString('base64')}`
   db.prepare(`INSERT INTO player_mfa_settings (player_id, totp_secret, totp_enabled_at, created_at, updated_at)
-    SELECT id, ?, ?, ?, ? FROM players WHERE username = ?
-    ON CONFLICT(player_id) DO UPDATE SET totp_secret = excluded.totp_secret, totp_enabled_at = excluded.totp_enabled_at, totp_last_step = NULL`).run(adminTOTPSecret, now, now, now, admin.username)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(player_id) DO UPDATE SET totp_secret = excluded.totp_secret, totp_enabled_at = excluded.totp_enabled_at, totp_last_step = NULL`).run(player.id, stored, now, now, now)
   db.close()
 }
 

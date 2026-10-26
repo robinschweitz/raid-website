@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"raid-website/internal/auth"
@@ -134,14 +135,17 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, auth.ErrLoginRateLimited) {
+			a.securityEvent(w, r, "login_blocked", slog.String("username", normalisedUsername(req.Username)))
 			WriteError(w, http.StatusTooManyRequests, "login_rate_limited", "too many failed login attempts; please try again later")
 			return
 		}
 		if errors.Is(err, auth.ErrInactive) {
+			a.securityEvent(w, r, "login_failed", slog.String("username", normalisedUsername(req.Username)), slog.String("reason", "inactive"))
 			WriteError(w, http.StatusForbidden, "inactive", "account is inactive")
 			return
 		}
 		if errors.Is(err, auth.ErrInvalidCredentials) {
+			a.securityEvent(w, r, "login_failed", slog.String("username", normalisedUsername(req.Username)), slog.String("reason", "invalid_credentials"))
 			WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid username or password")
 			return
 		}
@@ -167,10 +171,12 @@ func (a *API) verifyMFA(w http.ResponseWriter, r *http.Request) {
 	token, p, err := a.Auth.VerifyMFAChallenge(r.Context(), req.Challenge, req.Code)
 	if err != nil {
 		if errors.Is(err, auth.ErrMFAChallengeInvalid) {
+			a.securityEvent(w, r, "mfa_challenge_invalid", playerAttrs(err)...)
 			WriteError(w, http.StatusUnauthorized, "mfa_challenge_invalid", "MFA challenge is no longer valid; log in again")
 			return
 		}
 		if errors.Is(err, auth.ErrInvalidMFA) {
+			a.securityEvent(w, r, "mfa_failed", append(playerAttrs(err), slog.String("method", "code"))...)
 			WriteError(w, http.StatusUnauthorized, "invalid_mfa_code", "invalid MFA code")
 			return
 		}
@@ -229,6 +235,7 @@ func (a *API) enableTOTP(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not enable MFA")
 		return
 	}
+	a.securityEvent(w, r, "mfa_enabled", slog.Int64("player_id", actor.ID), slog.String("method", "totp"))
 	WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"recovery_codes": codes}})
 }
 
@@ -268,6 +275,7 @@ func (a *API) disableTOTP(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not disable TOTP")
 		return
 	}
+	a.securityEvent(w, r, "mfa_disabled", slog.Int64("player_id", actor.ID), slog.String("method", "totp"))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -326,6 +334,7 @@ func (a *API) finishWebAuthnRegistration(w http.ResponseWriter, r *http.Request)
 		WriteError(w, http.StatusUnprocessableEntity, "webauthn_invalid", "security key registration failed")
 		return
 	}
+	a.securityEvent(w, r, "mfa_enabled", slog.Int64("player_id", actor.ID), slog.String("method", "webauthn"))
 	WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]bool{"enabled": true}})
 }
 
@@ -360,6 +369,7 @@ func (a *API) deleteWebAuthnCredential(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not remove security key")
 		return
 	}
+	a.securityEvent(w, r, "mfa_disabled", slog.Int64("player_id", actor.ID), slog.String("method", "webauthn"))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -400,8 +410,12 @@ func (a *API) finishWebAuthnMFA(w http.ResponseWriter, r *http.Request) {
 	token, p, err := a.Auth.FinishWebAuthnMFA(r.Context(), req.Session, req.Response, rpID, origin)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidMFA) {
+			a.securityEvent(w, r, "mfa_failed", append(playerAttrs(err), slog.String("method", "webauthn"))...)
 			WriteError(w, http.StatusUnauthorized, "invalid_mfa_code", "invalid MFA challenge")
 			return
+		}
+		if _, known := auth.PlayerIDFromError(err); known {
+			a.securityEvent(w, r, "mfa_failed", append(playerAttrs(err), slog.String("method", "webauthn"))...)
 		}
 		WriteError(w, http.StatusUnprocessableEntity, "webauthn_invalid", "security key login failed")
 		return
@@ -475,6 +489,7 @@ func (a *API) changeOwnPassword(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not change password")
 		return
 	}
+	a.securityEvent(w, r, "password_changed", slog.Int64("player_id", actor.ID))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -523,5 +538,7 @@ func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusUnprocessableEntity, "invalid_request", err.Error())
 		return
 	}
+	a.securityEvent(w, r, "account_changed", slog.Int64("player_id", id), slog.Int64("actor_id", actorID),
+		slog.Bool("password_set", req.Password != ""), slog.String("role", string(role)))
 	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(accountViewer(r), p)})
 }

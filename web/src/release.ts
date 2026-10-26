@@ -1,8 +1,15 @@
-export const appVersion = '1.0.55'
+export const appVersion = '1.0.56'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Lesbarere kleine Schrift',
+    changes: [
+      'Kleine Texte wie Abzeichen, Beschriftungen und Tabellenhinweise sind jetzt mindestens 12 Pixel groß und damit besser lesbar.',
+    ],
+  },
+  {
+    version: '1.0.55',
     title: 'Namensübereinstimmung bei der Registrierung',
     changes: [
       'Besitzt ein Spieler ohne Login schon einen Charakter mit dem angefragten Namen, zeigt die Registrierungsanfrage diesen Spieler an. Der Admin wählt „Diesem Spieler zuordnen“ oder „Neuer Spieler“, bevor der Code entsteht.',

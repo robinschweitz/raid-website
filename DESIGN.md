@@ -324,7 +324,7 @@ One dark theme only (`color-scheme: dark`); there is no light mode.
 - **Caption:** sidebar captions and eyebrows are 12px, weight 650, uppercase, letter spacing
   0.14em.
 - **Minimum size:** no text is smaller than 12px, including badges, captions and table notes
-  (Owner 2026-10-22, DQ-3). The code still has 10–11.5px text.
+  (Owner 2026-10-22, DQ-3).
 - **Figures:** big numbers (`stat`) are 2rem bold in `primary`.
 - No web fonts are loaded; the page uses only fonts on the device.
 

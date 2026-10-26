@@ -207,7 +207,7 @@ test('every WotLK class has a distinct class icon and unknown classes fall back'
     const tree = ClassEmblem({ characterClass })
     assert.equal(tree.type, 'img')
     assert.equal(tree.props['aria-hidden'], 'true')
-    assert.match(tree.props.src, /^https:\/\/wow\.zamimg\.com\/images\/wow\/icons\/large\/classicon_[a-z]+\.jpg$/)
+    assert.match(tree.props.src, /^\/class-icons\/classicon_[a-z]+\.jpg$/)
     return tree.props.src
   })
   assert.equal(new Set(graphics).size, 10)
@@ -3900,4 +3900,12 @@ test('TestReqStats011_AC03 a failing endpoint shows the shared error component',
   const errors = nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'ErrorMessage')
   assert.equal(errors.length, 1)
   assert.match(text(errors[0]), /Statistiken konnten nicht geladen werden/)
+})
+
+test('the class icons are bundled with the site', () => {
+  const fs = require('node:fs')
+  const path = require('node:path')
+  for (const name of ['deathknight', 'druid', 'hunter', 'mage', 'paladin', 'priest', 'shaman', 'rogue', 'warlock', 'warrior']) {
+    assert.ok(fs.statSync(path.join(__dirname, '..', 'public', 'class-icons', `classicon_${name}.jpg`)).size > 0)
+  }
 })

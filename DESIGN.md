@@ -390,8 +390,8 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
   Save and Cancel, never in a detached editor (ADR 032).
 - **Table:** full width, rule under each row, left-aligned; `small` variant for dense lists.
 - **Class emblem:** the ten Blizzard class icons, stored in the repository and served by the
-  site itself; no class image is loaded from another server (Owner 2026-10-22, DQ-2). Unknown classes show
-  the neutral fallback. The code still hotlinks `wow.zamimg.com`.
+  site itself from `web/public/class-icons/`; no class image is loaded from another server
+  (Owner 2026-10-22, DQ-2, ADR 103). Unknown classes show the neutral fallback.
 - **Character chip:** name in class colour plus class emblem, owner and spec as muted
   text; `#ID` only when two names would look the same (ADR 069).
 - **Empty state:** short muted sentence; for roles that can act, it names the action to take
@@ -425,7 +425,8 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
 - Do show only stored data; show an explicit loading, empty or error state instead of a guess.
 - Do keep one primary action per panel and keep destructive actions visually quiet.
 - Do keep the crest, class colours and frost accents original; reuse existing tokens.
-- Do serve every image from the site itself; don't load images from other servers.
+- Do serve every image from the site itself; don't load images from other servers. The only
+  exception is the Wowhead item icons of the loot catalog on `wow.zamimg.com` (ADR 103).
 - Don't reproduce a screenshot or game art as the page background or as UI chrome.
 - Don't add fake progression, RSVP percentages, notifications or performance statistics.
 - Don't add a CSS framework, component library, icon font or web font without owner approval.
@@ -469,8 +470,9 @@ Target: WCAG 2.2 level AA.
   (FR-3.7, FR-3.8).
 - **External links:** Rising-Gods profiles, Wowhead items and full-size screenshots open in a new
   tab with `rel="noreferrer"`.
-- **External assets:** every image comes from the site itself (Owner 2026-10-22, DQ-2); the
-  content security policy that enforces it is SC-024.
+- **External assets:** class icons, boss portraits and all other images come from the site
+  itself (Owner 2026-10-22, DQ-2). Item icons in the loot catalog stay on `wow.zamimg.com`
+  (Owner 2026-10-26, ADR 103); the content security policy is SC-024.
 - **Visible role gating:** controls a role cannot use are hidden or explained; the server check
   is SC-001.
 
@@ -480,7 +482,7 @@ None open. The owner resolved DQ-1 to DQ-5 on 2026-10-22; the answers are in the
 "Owner 2026-10-22". IDs are not reused.
 
 - **DQ-1** Control borders use `outline-control` `#5989a3`.
-- **DQ-2** Class icons are served from the site; CSP drops `wow.zamimg.com`.
+- **DQ-2** Class icons are served from the site. Amended 2026-10-26 (ADR 103): `wow.zamimg.com` stays in the CSP for item icons only.
 - **DQ-3** No text below 12px.
 - **DQ-4** New screens are designed in their implementation issues.
 - **DQ-5** One shared error component with `role="alert"`.

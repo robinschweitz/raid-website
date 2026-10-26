@@ -1,8 +1,15 @@
-export const appVersion = '1.0.50'
+export const appVersion = '1.0.51'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Klassen-Symbole von der eigenen Seite',
+    changes: [
+      'Die Klassen-Symbole der Charaktere werden jetzt von dieser Seite geladen und nicht mehr von wow.zamimg.com. Dadurch erfährt kein fremder Server mehr, wer die Seite besucht. Nur die Item-Symbole im Loot-Katalog kommen weiter von dort.',
+    ],
+  },
+  {
+    version: '1.0.50',
     title: 'Aufgeräumte Statistik-Seite',
     changes: [
       'Auf der Statistik-Seite zeigen „Historische Rollen“ und „Loot-Verteilung“ jetzt Diagramme wie die Kacheln darüber. Dadurch sind alle Kacheln einer Zeile gleich hoch und es gibt keine leere Fläche mehr.',

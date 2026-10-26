@@ -410,7 +410,11 @@ func (a *API) finishWebAuthnMFA(w http.ResponseWriter, r *http.Request) {
 	token, p, err := a.Auth.FinishWebAuthnMFA(r.Context(), req.Session, req.Response, rpID, origin)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidMFA) {
-			a.securityEvent(w, r, "mfa_failed", append(playerAttrs(err), slog.String("method", "webauthn"))...)
+			attrs := append(playerAttrs(err), slog.String("method", "webauthn"))
+			if errors.Is(err, auth.ErrClonedSecurityKey) {
+				attrs = append(attrs, slog.String("reason", "cloned_key"))
+			}
+			a.securityEvent(w, r, "mfa_failed", attrs...)
 			WriteError(w, http.StatusUnauthorized, "invalid_mfa_code", "invalid MFA challenge")
 			return
 		}

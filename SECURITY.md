@@ -394,7 +394,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** When the WebAuthn library reports a clone warning (the signature counter did not increase), the login MUST be rejected, the event logged (SC-041), and the counter left unchanged.
 - **Enforcement:** `auth.FinishWebAuthnMFA`.
-- **Evidence:** `THREAT_MODEL_CODE.md` CT-008: the warning is never checked. Code: **not compliant**. Threats: T-045.
+- **Evidence:** `THREAT_MODEL_CODE.md` CT-008. Code: compliant since #70 — `auth.FinishWebAuthnMFA` rejects a login whose credential carries the clone warning with `ErrInvalidMFA` (`401 invalid_mfa_code`) before the counter is stored; the `mfa_failed` journal line carries `reason=cloned_key`. Authenticators that always report counter 0 are not flagged by the library. Threats: T-045.
 - **Verification:** An assertion with a lower counter than stored fails.
 
 **SC-049 - The Admin confirms a match by character name**

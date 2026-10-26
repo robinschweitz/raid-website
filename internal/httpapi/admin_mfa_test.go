@@ -142,3 +142,41 @@ func TestReqAuth020_AC05_AdminWithoutMFAKeepsLowerRoleAccess(t *testing.T) {
 		t.Fatalf("staff route gated by Admin MFA: %s", body)
 	}
 }
+
+// TestReqAuth020_AC07_AdminWithoutMFASeesNoAccountFields: an Admin without a
+// second factor cannot read other players' login names or roles through the
+// shared player read; with MFA the fields are back (SC-040).
+func TestReqAuth020_AC07_AdminWithoutMFASeesNoAccountFields(t *testing.T) {
+	srv, bdb := setupServer(t)
+	client := srv.Client()
+	adminID := seedAccount(t, bdb, "admin", "admin-password", validation.RoleAdmin)
+	memberID := seedAccount(t, bdb, "member", "member-password", validation.RoleMember)
+	token := login(t, client, srv, "admin", "admin-password")
+	memberURL := srv.URL + "/api/v1/players/" + strconv.FormatInt(memberID, 10)
+
+	readAccount := func() (username, role any) {
+		t.Helper()
+		status, body := do(t, client, http.MethodGet, memberURL, token, nil)
+		if status != http.StatusOK {
+			t.Fatalf("get player: status %d body %s", status, body)
+		}
+		var payload struct {
+			Data map[string]any `json:"data"`
+		}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload.Data["username"], payload.Data["role"]
+	}
+	if username, role := readAccount(); username != "member" || role != string(validation.RoleMember) {
+		t.Fatalf("with MFA: username %v role %v", username, role)
+	}
+	removeMFA(t, bdb, adminID)
+	if username, role := readAccount(); username != nil || role != nil {
+		t.Fatalf("without MFA: username %v role %v, want both hidden", username, role)
+	}
+	status, body := do(t, client, http.MethodGet, srv.URL+"/api/v1/players/"+strconv.FormatInt(adminID, 10), token, nil)
+	if status != http.StatusOK || !strings.Contains(string(body), `"username":"admin"`) {
+		t.Fatalf("own account without MFA: status %d body %s", status, body)
+	}
+}

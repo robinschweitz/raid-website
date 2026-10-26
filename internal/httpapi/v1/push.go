@@ -2,6 +2,8 @@ package v1
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"time"
@@ -20,6 +22,10 @@ type pushUnsubscribeRequest struct {
 	Endpoint string `json:"endpoint"`
 }
 
+type pushStatusResponse struct {
+	Active bool `json:"active"`
+}
+
 type pushConfigResponse struct {
 	Enabled   bool   `json:"enabled"`
 	PublicKey string `json:"public_key"`
@@ -36,6 +42,36 @@ func (a *API) registerPush(mux *http.ServeMux) {
 	// Any signed-in player may remove their own subscription, also after a
 	// demotion below MEMBER.
 	mux.HandleFunc("DELETE /api/v1/push/subscriptions", RequireAuth(a.unsubscribePush))
+	// The endpoint is a bearer secret of the browser, so it goes in the body,
+	// never in a URL that proxies log. Any signed-in player may call it, so a
+	// GUEST who signs in on a shared browser also clears the last player's opt-in.
+	mux.HandleFunc("POST /api/v1/push/subscriptions/sync", RequireAuth(a.syncPush))
+}
+
+// syncPush is the browser checking in with its own subscription after a
+// sign-in or when the account tab opens (FR-32.3, ADR 103).
+func (a *API) syncPush(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "login required")
+		return
+	}
+	var req pushUnsubscribeRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	deviceHash, err := a.ensureDevice(w, r)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not identify device")
+		return
+	}
+	active, err := a.Push.Sync(r.Context(), actor, deviceHash, req.Endpoint)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not read push subscription")
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": pushStatusResponse{Active: active}})
 }
 
 func (a *API) pushConfig(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +89,12 @@ func (a *API) subscribePush(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	sub, err := a.Push.Subscribe(r.Context(), actor, push.SubscriptionInput{Endpoint: req.Endpoint, P256dh: req.P256dh, Auth: req.Auth})
+	deviceHash, err := a.ensureDevice(w, r)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not identify device")
+		return
+	}
+	sub, err := a.Push.Subscribe(r.Context(), actor, deviceHash, push.SubscriptionInput{Endpoint: req.Endpoint, P256dh: req.P256dh, Auth: req.Auth})
 	if err != nil {
 		writePushError(w, err)
 		return
@@ -77,6 +118,49 @@ func (a *API) unsubscribePush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// deviceCookieName names the HttpOnly cookie that identifies a browser for
+// push (ADR 103). It carries no account data; the server stores its hash.
+const deviceCookieName = "raid_device"
+
+// deviceCookieMaxAge is the longest lifetime browsers accept for a cookie.
+const deviceCookieMaxAge = 400 * 24 * 60 * 60
+
+// deviceHash returns the hash of this browser's device cookie, or "" without one.
+func deviceHash(r *http.Request) string {
+	cookie, err := r.Cookie(deviceCookieName)
+	if err != nil || cookie.Value == "" {
+		return ""
+	}
+	return push.HashDevice(cookie.Value)
+}
+
+// ensureDevice returns the device hash, giving the browser a new random device
+// cookie first when it has none. An existing cookie is sent again with a fresh
+// lifetime, so a device that signs in now and then never loses its identity to
+// cookie expiry (ADR 103).
+func (a *API) ensureDevice(w http.ResponseWriter, r *http.Request) (string, error) {
+	value := ""
+	if cookie, err := r.Cookie(deviceCookieName); err == nil && cookie.Value != "" {
+		value = cookie.Value
+	} else {
+		raw := make([]byte, 32)
+		if _, err := rand.Read(raw); err != nil {
+			return "", err
+		}
+		value = base64.RawURLEncoding.EncodeToString(raw)
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     deviceCookieName,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   a.CookieSecure,
+		MaxAge:   deviceCookieMaxAge,
+	})
+	return push.HashDevice(value), nil
 }
 
 func writePushError(w http.ResponseWriter, err error) {

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError } from './api'
-import { browserHasPushAPI, disablePushOnLogout } from './pushNotifications'
+import { browserHasPushAPI, checkInPush, disablePushOnLogout } from './pushNotifications'
 import type { Player } from './types'
 import { getWebAuthnCredential, type WebAuthnBeginResponse } from './webauthn'
 
@@ -35,6 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError('')
     try {
       const current = await api.get<Player>('/api/v1/auth/me')
+      // The push check-in finishes before the player is shown as signed in (ADR 103).
+      await checkInPush()
       if (requestVersion === version.current) setPlayer(current)
     } catch (err) {
       if (requestVersion !== version.current) return
@@ -61,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (requestVersion === version.current) setLoading(false)
       return { mfaRequired: true, challenge: result.challenge, factors: result.factors }
     }
+    await checkInPush()
     if (requestVersion === version.current) {
       setPlayer(result)
       setError('')
@@ -72,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const verifyMFA = async (challenge: string, code: string) => {
     const requestVersion = ++version.current
     const p = await api.post<Player>('/api/v1/auth/mfa/verify', { challenge, code })
+    await checkInPush()
     if (requestVersion === version.current) {
       setPlayer(p)
       setError('')
@@ -84,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const begin = await api.post<WebAuthnBeginResponse<Parameters<typeof getWebAuthnCredential>[0]>>('/api/v1/auth/mfa/webauthn/login/begin', { challenge })
     const response = await getWebAuthnCredential(begin.options)
     const p = await api.post<Player>('/api/v1/auth/mfa/webauthn/login/finish', { session: begin.session, response })
+    await checkInPush()
     if (requestVersion === version.current) {
       setPlayer(p)
       setError('')

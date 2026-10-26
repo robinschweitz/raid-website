@@ -60,6 +60,11 @@ func run() (err error) {
 	if err := reportInvalidRecruitmentSlots(ctx, bdb.DB); err != nil {
 		return fmt.Errorf("recruitment slot report: %w", err)
 	}
+	if removed, err := push.NewService(push.NewRepo(bdb.DB), nil, log.Printf).DeleteUnclaimed(ctx); err != nil {
+		return fmt.Errorf("push cleanup: %w", err)
+	} else if removed > 0 {
+		log.Printf("push: removed %d subscription(s) that never got a device", removed)
+	}
 	var vapidKey *push.VAPIDKey
 	if cfg.VAPIDPrivateKey != "" {
 		if vapidKey, err = push.ParseVAPIDKey(cfg.VAPIDPrivateKey, cfg.VAPIDSubject); err != nil {

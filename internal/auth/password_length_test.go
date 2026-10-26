@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -37,14 +38,14 @@ func TestReqAuth023_AC02_Accepts1024Bytes(t *testing.T) {
 			if err := ValidatePassword(password); err != nil {
 				t.Fatalf("ValidatePassword(%d bytes) = %v, want nil", len(password), err)
 			}
-			hash, err := HashPassword(password)
+			hash, err := HashPassword(context.Background(), password)
 			if err != nil {
-				t.Fatalf("HashPassword(%d bytes) = %v, want nil", len(password), err)
+				t.Fatalf("HashPassword(context.Background(), %d bytes) = %v, want nil", len(password), err)
 			}
-			if err := verifyStoredPassword(hash, password); err != nil {
+			if err := verifyStoredPassword(context.Background(), hash, password); err != nil {
 				t.Fatalf("verify %d bytes: %v", len(password), err)
 			}
-			if err := verifyStoredPassword(hash, password[:len(password)-1]); err == nil {
+			if err := verifyStoredPassword(context.Background(), hash, password[:len(password)-1]); err == nil {
 				t.Fatalf("a %d-byte password matched without its last byte", len(password))
 			}
 		})

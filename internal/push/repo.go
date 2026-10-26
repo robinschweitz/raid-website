@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -60,6 +61,29 @@ func (r *Repo) ListByPlayer(ctx context.Context, playerID int64) ([]Subscription
 	return subs, err
 }
 
+// DeleteUnclaimedBefore removes subscriptions that never got a device and are
+// older than cutoff, and returns how many it removed.
+func (r *Repo) DeleteUnclaimedBefore(ctx context.Context, cutoff time.Time) (int64, error) {
+	result, err := r.db.NewDelete().Model((*Subscription)(nil)).Where("device_hash IS NULL").Where("created_at < ?", cutoff).Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// ListByDevice returns the subscriptions stored for one device.
+func (r *Repo) ListByDevice(ctx context.Context, deviceHash string) ([]Subscription, error) {
+	subs := []Subscription{}
+	err := r.db.NewSelect().Model(&subs).Where("device_hash = ?", deviceHash).Order("id ASC").Scan(ctx)
+	return subs, err
+}
+
+// SetDevice attaches a subscription to a device.
+func (r *Repo) SetDevice(ctx context.Context, id int64, deviceHash string) error {
+	_, err := r.db.NewUpdate().Model((*Subscription)(nil)).Set("device_hash = ?", deviceHash).Where("id = ?", id).Exec(ctx)
+	return err
+}
+
 // TrimPlayer deletes a player's oldest subscriptions beyond keep and returns
 // what it deleted.
 func (r *Repo) TrimPlayer(ctx context.Context, playerID int64, keep int) ([]Subscription, error) {
@@ -84,6 +108,9 @@ func (r *Repo) ListRecipients(ctx context.Context, actorID int64, playerIDs []in
 	q := r.db.NewSelect().Model(&subs).
 		Join("JOIN players AS p ON p.id = subscription.player_id").
 		Where("p.active = ?", true).
+		// A row without a device cannot take part in device revocation, so it
+		// gets nothing until its own player's browser claims it (ADR 103).
+		Where("subscription.device_hash IS NOT NULL").
 		Where("p.username IS NOT NULL").
 		Where("p.role IN (?)", bun.List([]validation.Role{validation.RoleMember, validation.RoleRaidassistent, validation.RoleRaidleader, validation.RoleAdmin})).
 		Where("subscription.player_id <> ?", actorID).

@@ -49,11 +49,22 @@ export async function currentPushSubscription(): Promise<PushSubscription | null
 
 // Push changes run one after another, so a status read, an enable, a disable
 // and the logout clean-up can never interleave and act on a stale browser
-// subscription (ADR 103). A failed step does not block the next one.
+// subscription (ADR 103). A failed step does not block the next one, and no
+// step waits longer than waitMs for the one before it, so one stalled browser
+// call cannot hold every later push change.
+const queueWaitMs = 10000
 let pushQueue: Promise<unknown> = Promise.resolve()
 
-export function runExclusive<T>(step: () => Promise<T>): Promise<T> {
-  const result = pushQueue.then(step, step)
+function settledOrAfter(previous: Promise<unknown>, ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms)
+    const done = () => { clearTimeout(timer); resolve() }
+    previous.then(done, done)
+  })
+}
+
+export function runExclusive<T>(step: () => Promise<T>, waitMs = queueWaitMs): Promise<T> {
+  const result = settledOrAfter(pushQueue, waitMs).then(step)
   pushQueue = result.catch(() => undefined)
   return result
 }
@@ -72,59 +83,79 @@ export function pushActiveOnThisDevice(): Promise<boolean> {
   })
 }
 
-// How long a sign-in waits for the push check-in before it gives up on it.
-const checkInTimeoutMs = 5000
+// The whole push check-in of a sign-in, queue wait included, ends after this.
+const checkInDeadlineMs = 5000
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('timeout')), ms)
-    promise.then((value) => { clearTimeout(timer); resolve(value) }, (err) => { clearTimeout(timer); reject(err) })
-  })
+type BrowserSubscription = { endpoint: string; unsubscribe: () => Promise<boolean> }
+
+export type CheckInOutcome = 'none' | 'active' | 'dropped' | 'timeout'
+
+export type CheckInDeps = {
+  queue: <T>(step: () => Promise<T>) => Promise<T>
+  getSubscription: () => Promise<BrowserSubscription | null>
+  ask: (endpoint: string, signal: AbortSignal) => Promise<boolean>
+  deadlineMs: number
 }
 
-export type CheckInOutcome = 'none' | 'active' | 'dropped'
+// dropInBackground ends a browser subscription without waiting for it: a
+// stalled browser call must neither hold the sign-in nor the push queue. The
+// push service answers 410 for it later and the server deletes the row.
+function dropInBackground(subscription: BrowserSubscription): void {
+  void subscription.unsubscribe().catch(() => false)
+}
 
-// checkInSubscription keeps this browser's subscription only when the server
-// confirms it belongs to the signed-in player. Anything else drops it in the
-// browser: a subscription of another player, an unknown one, and also a
-// check-in that failed or took too long. It fails closed, so a previous
-// player's opt-in can never stay active for the person using the browser now
-// (FR-32.3, ADR 103). Signing in itself never depends on it.
-export async function checkInSubscription(
-  subscription: { endpoint: string; unsubscribe: () => Promise<boolean> } | null,
-  ask: (endpoint: string) => Promise<boolean>,
-  timeoutMs: number,
-): Promise<CheckInOutcome> {
-  if (!subscription) return 'none'
-  let active = false
-  try {
-    active = await withTimeout(ask(subscription.endpoint), timeoutMs)
-  } catch {
-    active = false
+// checkInWithDeadline keeps this browser's subscription only when the server
+// confirms it belongs to the signed-in player, within one deadline that covers
+// the queue wait, the server request, and the decision. Anything else drops
+// it: another player's or an unknown subscription, a failed check-in, and a
+// check-in that missed the deadline. At the deadline the request is aborted
+// and a late answer changes nothing, so the outcome stays "dropped" (fail
+// closed, FR-32.3, ADR 103). Signing in never depends on it.
+export async function checkInWithDeadline(deps: CheckInDeps): Promise<CheckInOutcome> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<CheckInOutcome>((resolve) => { timer = setTimeout(() => resolve('timeout'), deps.deadlineMs) })
+  const work = deps.queue(async (): Promise<CheckInOutcome> => {
+    if (controller.signal.aborted) return 'timeout'
+    const subscription = await deps.getSubscription()
+    if (!subscription) return 'none'
+    let active = false
+    try {
+      active = await deps.ask(subscription.endpoint, controller.signal)
+    } catch {
+      active = false
+    }
+    // Past the deadline the decision is already made; a late answer changes nothing.
+    if (controller.signal.aborted) return 'timeout'
+    if (active) return 'active'
+    dropInBackground(subscription)
+    return 'dropped'
+  }).catch((): CheckInOutcome => 'dropped')
+  const outcome = await Promise.race([work, deadline])
+  clearTimeout(timer)
+  if (outcome === 'timeout') {
+    controller.abort()
+    void deps.getSubscription().then((subscription) => { if (subscription) dropInBackground(subscription) }).catch(() => undefined)
   }
-  if (active) return 'active'
-  await subscription.unsubscribe().catch(() => false)
-  return 'dropped'
+  return outcome
 }
 
 // checkInPush runs before the web client shows a player as signed in, after
 // every login, MFA step, security key, and session load. The server already
 // removes another player's subscription during the login when it knows the
 // device; this step covers a browser that lost its device cookie. It never
-// throws.
+// throws and never takes longer than checkInDeadlineMs.
 export async function checkInPush(): Promise<void> {
   if (!browserHasPushAPI()) return
-  try {
-    await runExclusive(async () => {
-      const subscription = await withTimeout(currentPushSubscription(), checkInTimeoutMs).catch(() => null)
-      await checkInSubscription(subscription, async (endpoint) => {
-        const status = await api.post<{ active: boolean }>('/api/v1/push/subscriptions/sync', { endpoint })
-        return status.active
-      }, checkInTimeoutMs)
-    })
-  } catch {
-    // Nothing to keep: checkInSubscription already dropped what it could not confirm.
-  }
+  await checkInWithDeadline({
+    queue: (step) => runExclusive(step),
+    getSubscription: currentPushSubscription,
+    ask: async (endpoint, signal) => {
+      const status = await api.post<{ active: boolean }>('/api/v1/push/subscriptions/sync', { endpoint }, { signal })
+      return status.active
+    },
+    deadlineMs: checkInDeadlineMs,
+  }).catch(() => undefined)
 }
 
 export async function enablePush(config: PushConfig): Promise<void> {

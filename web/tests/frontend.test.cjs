@@ -3870,30 +3870,71 @@ test('push changes run one at a time and a failed one does not block the next (A
   assert.deepEqual(events, ['first:start', 'first:end', 'second:start', 'third:start'])
 })
 
+const pushCheckInHarness = () => {
+  const subscription = { endpoint: 'https://fcm.googleapis.com/x', drops: 0, unsubscribe: () => { subscription.drops++; return Promise.resolve(true) } }
+  return subscription
+}
+const immediateQueue = (step) => step()
+const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
 test('the push check-in keeps only a subscription the server confirms and fails closed (FR-32.3, ADR 103)', async () => {
   const s = setup({ id: 1, role: 'MEMBER' })
-  const { checkInSubscription } = s.load('pushNotifications.ts')
-  const browserSubscription = () => {
-    const sub = { endpoint: 'https://fcm.googleapis.com/x', dropped: 0, unsubscribe: () => { sub.dropped++; return Promise.resolve(true) } }
-    return sub
-  }
-  assert.equal(await checkInSubscription(null, () => Promise.resolve(true), 1000), 'none')
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const run = (subscription, ask, deadlineMs = 1000) => checkInWithDeadline({ queue: immediateQueue, getSubscription: () => Promise.resolve(subscription), ask, deadlineMs })
 
-  const own = browserSubscription()
-  assert.equal(await checkInSubscription(own, () => Promise.resolve(true), 1000), 'active')
-  assert.equal(own.dropped, 0)
+  assert.equal(await run(null, () => Promise.resolve(true)), 'none')
+  const own = pushCheckInHarness()
+  assert.equal(await run(own, () => Promise.resolve(true)), 'active')
+  assert.equal(own.drops, 0)
+  const foreign = pushCheckInHarness()
+  assert.equal(await run(foreign, () => Promise.resolve(false)), 'dropped')
+  assert.equal(foreign.drops, 1)
+  const failed = pushCheckInHarness()
+  assert.equal(await run(failed, () => Promise.reject(new Error('offline'))), 'dropped')
+  assert.equal(failed.drops, 1)
+  let signal
+  const hanging = pushCheckInHarness()
+  assert.equal(await run(hanging, (_endpoint, given) => { signal = given; return new Promise(() => {}) }, 20), 'timeout')
+  await settle(5)
+  assert.equal(hanging.drops, 1)
+  assert.equal(signal.aborted, true)
+})
 
-  const foreign = browserSubscription()
-  assert.equal(await checkInSubscription(foreign, () => Promise.resolve(false), 1000), 'dropped')
-  assert.equal(foreign.dropped, 1)
+test('a stalled unsubscribe never holds the check-in (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const stalled = { endpoint: 'https://fcm.googleapis.com/x', drops: 0, unsubscribe: () => { stalled.drops++; return new Promise(() => {}) } }
+  const started = Date.now()
+  const outcome = await checkInWithDeadline({ queue: immediateQueue, getSubscription: () => Promise.resolve(stalled), ask: () => Promise.resolve(false), deadlineMs: 1000 })
+  assert.equal(outcome, 'dropped')
+  assert.equal(stalled.drops, 1)
+  assert.ok(Date.now() - started < 500, 'the check-in waited for unsubscribe')
+})
 
-  const failed = browserSubscription()
-  assert.equal(await checkInSubscription(failed, () => Promise.reject(new Error('offline')), 1000), 'dropped')
-  assert.equal(failed.dropped, 1)
+test('a push step that never finishes ends at the deadline and still drops the subscription (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline, runExclusive } = s.load('pushNotifications.ts')
+  const subscription = pushCheckInHarness()
+  const blocked = () => new Promise(() => {})
+  let asked = false
+  const outcome = await checkInWithDeadline({ queue: blocked, getSubscription: () => Promise.resolve(subscription), ask: () => { asked = true; return Promise.resolve(true) }, deadlineMs: 20 })
+  assert.equal(outcome, 'timeout')
+  await settle(5)
+  assert.equal(subscription.drops, 1)
+  assert.equal(asked, false)
+  // The real queue does not let one stalled step hold the next one forever.
+  void runExclusive(() => new Promise(() => {}), 20)
+  assert.equal(await runExclusive(async () => 'next', 20), 'next')
+})
 
-  const stuck = browserSubscription()
-  assert.equal(await checkInSubscription(stuck, () => new Promise(() => {}), 20), 'dropped')
-  assert.equal(stuck.dropped, 1)
+test('a late check-in answer after the deadline changes nothing (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const subscription = pushCheckInHarness()
+  const outcome = await checkInWithDeadline({ queue: immediateQueue, getSubscription: () => Promise.resolve(subscription), ask: () => settle(60).then(() => true), deadlineMs: 20 })
+  assert.equal(outcome, 'timeout')
+  await settle(80)
+  assert.equal(subscription.drops, 1, 'dropped once at the deadline and not kept by the late answer')
 })
 
 test('every sign-in path checks push in before the player is shown as signed in (ADR 103)', () => {

@@ -40,9 +40,13 @@ func newCloneTestKey(t *testing.T) cloneTestKey {
 }
 
 // coseKey encodes the public key as a COSE EC2 key (CBOR map of five entries).
-func (k cloneTestKey) coseKey() []byte {
-	x := k.key.PublicKey.X.FillBytes(make([]byte, 32))
-	y := k.key.PublicKey.Y.FillBytes(make([]byte, 32))
+func (k cloneTestKey) coseKey(t *testing.T) []byte {
+	t.Helper()
+	point, err := k.key.PublicKey.Bytes() // uncompressed: 0x04 || X || Y
+	if err != nil {
+		t.Fatal(err)
+	}
+	x, y := point[1:33], point[33:65]
 	out := []byte{0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20}
 	out = append(out, x...)
 	out = append(out, 0x22, 0x58, 0x20)
@@ -119,7 +123,7 @@ func TestReqAuth021_AC01(t *testing.T) {
 		t.Fatal(err)
 	}
 	key := newCloneTestKey(t)
-	credentialJSON, err := json.Marshal(wan.Credential{ID: key.id, PublicKey: key.coseKey(), Authenticator: wan.Authenticator{SignCount: 10}})
+	credentialJSON, err := json.Marshal(wan.Credential{ID: key.id, PublicKey: key.coseKey(t), Authenticator: wan.Authenticator{SignCount: 10}})
 	if err != nil {
 		t.Fatal(err)
 	}

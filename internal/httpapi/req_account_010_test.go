@@ -16,6 +16,12 @@ import (
 // registrationCode creates a request for the profile and returns its code.
 func registrationCode(t *testing.T, srv interface{ Client() *http.Client }, baseURL, adminToken, profileID string) string {
 	t.Helper()
+	return registrationCodeWith(t, srv, baseURL, adminToken, profileID, nil)
+}
+
+// registrationCodeWith is registrationCode with the Admin's name-match choice (SC-049).
+func registrationCodeWith(t *testing.T, srv interface{ Client() *http.Client }, baseURL, adminToken, profileID string, choice map[string]any) string {
+	t.Helper()
 	client := srv.Client()
 	status, body := do(t, client, http.MethodPost, baseURL+"/api/v1/auth/registration-requests", "", map[string]any{"profile_id": profileID})
 	if status != http.StatusCreated {
@@ -27,7 +33,7 @@ func registrationCode(t *testing.T, srv interface{ Client() *http.Client }, base
 	if err := json.Unmarshal(body, &req); err != nil {
 		t.Fatalf("decode request: %v", err)
 	}
-	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/registration-requests/%d/code", baseURL, req.Data.ID), adminToken, nil)
+	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/registration-requests/%d/code", baseURL, req.Data.ID), adminToken, choice)
 	if status != http.StatusCreated {
 		t.Fatalf("create code: status %d body %s", status, body)
 	}

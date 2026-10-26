@@ -9,6 +9,14 @@ export const changelog = [
     ],
   },
   {
+    version: '1.0.55',
+    title: 'Namensübereinstimmung bei der Registrierung',
+    changes: [
+      'Besitzt ein Spieler ohne Login schon einen Charakter mit dem angefragten Namen, zeigt die Registrierungsanfrage diesen Spieler an. Der Admin wählt „Diesem Spieler zuordnen“ oder „Neuer Spieler“, bevor der Code entsteht.',
+      'Beim Einlösen wird nur noch die gespeicherte Wahl befolgt. Ein gleicher Name allein verknüpft kein Konto mehr.',
+    ],
+  },
+  {
     version: '1.0.54',
     title: 'Bosskills im Raid und in der Übersicht',
     changes: [

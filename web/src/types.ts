@@ -83,6 +83,8 @@ export interface RegistrationRequest {
   updated_at: string
   // Redeemed requests: the player the code was used for (ADR 084).
   linked_player?: { player_id: number, player_name: string, username: string | null, used_at: string }
+  // Open new-account requests: a player without login owns a character with this name (SC-049).
+  name_match?: { player_id: number, player_name: string }
 }
 
 // Admin-only account overview (ADR 084).
@@ -112,6 +114,8 @@ export interface RegistrationCode {
   used_by_player_id: number | null
   used_by_username: string | null
   revoked_at: string | null
+  match_choice: '' | 'ATTACH' | 'NEW'
+  match_player_id: number | null
 }
 
 export interface AuditLogEntry {

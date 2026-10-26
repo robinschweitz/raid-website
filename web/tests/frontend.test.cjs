@@ -1983,6 +1983,22 @@ test('registration history names the player a redeemed code was linked to', asyn
   assert.ok(nodes(view.tree, (n) => n.props && n.props.to === '/players/3').length > 0, 'links to the player')
 })
 
+test('a name match shows the player and creates the code only with the Admin choice', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RegistrationRequests.tsx').RegistrationRequestsPage)
+  const request = { id: 9, requester_player_id: null, status: 'PENDING', purpose: 'NEW_ACCOUNT', external_source: 'rising-gods', external_profile_id: '5', external_profile_url: '', character_name: 'Mirabelle', class: 'Paladin', main_spec: 'Heilig', second_spec: '', level: 80, race: '', faction: '', created_at: '2026-10-12T10:00:00Z', updated_at: '2026-10-12T10:00:00Z', name_match: { player_id: 3, player_name: 'Mira' } }
+  s.requests.forEach((r) => r.resolve([request]))
+  await flush(view)
+  assert.match(text(view.tree), /Namensübereinstimmung/)
+  assert.equal(button(view, 'Code erstellen').props.disabled, true)
+  assert.ok(nodes(view.tree, (n) => n.props && n.props.to === '/players/3').length > 0, 'links to the matching player')
+  const attach = button(view, 'Diesem Spieler zuordnen').props.onClick()
+  const write = s.requests.find((r) => r.method === 'post')
+  assert.deepEqual(write.body, { match_choice: 'ATTACH', match_player_id: 3 })
+  write.reject(new Error('stop'))
+  await attach
+})
+
 test('guests get no wishlist controls and no wishlist reads in the catalog', async () => {
   const s = setup({ id: 4, role: 'GUEST' })
   const view = s.mount(s.load('pages/LootCatalog.tsx').LootCatalogPage)

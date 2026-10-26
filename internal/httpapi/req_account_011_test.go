@@ -126,7 +126,12 @@ func TestReqAccount011_AC03(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			srv, bdb, adminToken := req011Setup(t)
 			playerID := seedLoginlessGuest(t, bdb, "Firsthero", tc.profileID)
-			code := registrationCode(t, srv, srv.URL, adminToken, "1")
+			var choice map[string]any
+			if tc.profileID == "" {
+				// SC-049: a name match attaches only after the Admin confirmed it.
+				choice = map[string]any{"match_choice": "ATTACH", "match_player_id": playerID}
+			}
+			code := registrationCodeWith(t, srv, srv.URL, adminToken, "1", choice)
 			status, body := redeemNewAccount(t, srv, code, "attachedname")
 			if status != http.StatusOK {
 				t.Fatalf("redeem: status %d body %s", status, body)

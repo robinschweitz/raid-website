@@ -1,10 +1,12 @@
 package httpapi_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -118,11 +120,90 @@ func endpointFor(name string) string {
 
 func (f *pushFixture) subscribe(token, endpoint string, want int) []byte {
 	f.t.Helper()
-	status, body := do(f.t, f.srv.Client(), http.MethodPost, f.srv.URL+"/api/v1/push/subscriptions", token, map[string]any{"endpoint": endpoint, "p256dh": testP256dh, "auth": testAuth})
+	status, body, _ := f.deviceDo(http.MethodPost, "/api/v1/push/subscriptions", token, deviceFor(token), map[string]any{"endpoint": endpoint, "p256dh": testP256dh, "auth": testAuth})
 	if status != want {
 		f.t.Fatalf("subscribe %s: status %d body %s", endpoint, status, body)
 	}
 	return body
+}
+
+// deviceFor gives each test session its own browser, so helpers that do not
+// care about devices still subscribe from a stable one.
+func deviceFor(token string) string {
+	return "device-of-" + token
+}
+
+// deviceDo sends a request with the session cookie and, when device is not
+// empty, the raid_device cookie of that browser. It returns the device cookie
+// the server set, if any.
+func (f *pushFixture) deviceDo(method, path, token, device string, body any) (int, []byte, string) {
+	f.t.Helper()
+	var reader io.Reader = http.NoBody
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		reader = bytes.NewReader(raw)
+	}
+	req, err := http.NewRequest(method, f.srv.URL+path, reader)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
+	}
+	if device != "" {
+		req.AddCookie(&http.Cookie{Name: "raid_device", Value: device})
+	}
+	addCSRF(req)
+	resp, err := f.srv.Client().Do(req)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	setDevice := ""
+	for _, c := range resp.Cookies() {
+		if c.Name == "raid_device" {
+			setDevice = c.Value
+		}
+	}
+	return resp.StatusCode, raw, setDevice
+}
+
+// deviceLogin signs a player in from the browser device and returns the session token.
+func (f *pushFixture) deviceLogin(username, device string) string {
+	f.t.Helper()
+	req, err := http.NewRequest(http.MethodPost, f.srv.URL+"/api/v1/auth/login", strings.NewReader(fmt.Sprintf(`{"username":%q,"password":"password"}`, username)))
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: "raid_device", Value: device})
+	addCSRF(req)
+	resp, err := f.srv.Client().Do(req)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	for _, c := range resp.Cookies() {
+		if c.Name == auth.CookieName && c.Value != "" {
+			return c.Value
+		}
+	}
+	f.t.Fatalf("login %s: status %d, no session", username, resp.StatusCode)
+	return ""
+}
+
+// pollSent creates a poll as staff and returns which endpoints got a message.
+func (f *pushFixture) pollSent(title string) map[string][]push.Kind {
+	f.t.Helper()
+	if status, raw := do(f.t, f.srv.Client(), http.MethodPost, f.srv.URL+"/api/v1/polls", f.staffToken, map[string]any{"title": title}); status != http.StatusCreated {
+		f.t.Fatalf("create poll: %d %s", status, raw)
+	}
+	return kindsByEndpoint(f.sender.take())
 }
 
 func (f *pushFixture) subscriptionCount(endpoint string) int {
@@ -347,5 +428,229 @@ func TestReqPush010_DisabledWithoutKey(t *testing.T) {
 	status, raw = do(t, srv.Client(), http.MethodPost, srv.URL+"/api/v1/push/subscriptions", token, map[string]any{"endpoint": endpointFor("x"), "p256dh": testP256dh, "auth": testAuth})
 	if status != http.StatusConflict || errorCode(t, raw) != "push_disabled" {
 		t.Fatalf("subscribe: %d %s", status, raw)
+	}
+}
+
+// TestReqPush011_OptInSurvivesSignInOnTheSameDevice: the opt-in belongs to the
+// player on this device. After the session ends (expiry) and the same player
+// signs in again there, messages keep coming without a new opt-in (FR-32.3).
+func TestReqPush011_OptInSurvivesSignInOnTheSameDevice(t *testing.T) {
+	f := newPushFixture(t)
+	const phone = "member-phone"
+	token := f.deviceLogin("push-member", phone)
+	if status, raw, _ := f.deviceDo(http.MethodPost, "/api/v1/push/subscriptions", token, phone, map[string]any{"endpoint": endpointFor("phone"), "p256dh": testP256dh, "auth": testAuth}); status != http.StatusCreated {
+		t.Fatalf("subscribe: %d %s", status, raw)
+	}
+	if _, err := f.db.NewDelete().Table("sessions").Where("player_id = ?", f.member).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.deviceLogin("push-member", phone)
+	if got := f.pollSent("Nach neuer Anmeldung"); len(got[endpointFor("phone")]) != 1 {
+		t.Fatalf("sent = %v, want the phone after signing in again", got)
+	}
+}
+
+// TestReqPush012_AnotherPlayerOnTheDeviceEndsTheOptIn: when another player
+// signs in on that browser, the server removes the previous player's
+// subscription in the login itself; it never moves to the new player.
+func TestReqPush012_AnotherPlayerOnTheDeviceEndsTheOptIn(t *testing.T) {
+	f := newPushFixture(t)
+	const shared = "shared-browser"
+	token := f.deviceLogin("push-member", shared)
+	if status, raw, _ := f.deviceDo(http.MethodPost, "/api/v1/push/subscriptions", token, shared, map[string]any{"endpoint": endpointFor("shared"), "p256dh": testP256dh, "auth": testAuth}); status != http.StatusCreated {
+		t.Fatalf("subscribe: %d %s", status, raw)
+	}
+	f.deviceLogin("push-other", shared)
+	if f.subscriptionCount(endpointFor("shared")) != 0 {
+		t.Fatal("the previous player's subscription survived another player's sign-in")
+	}
+	if got := f.pollSent("Fremdes Gerät"); len(got) != 0 {
+		t.Fatalf("sent = %v, want nothing", got)
+	}
+	var reason string
+	if err := f.db.NewSelect().Table("audit_log").Column("reason").Where("entity_type = ? AND action = ?", "push_subscription", "remove").Scan(context.Background(), &reason); err != nil || reason == "" {
+		t.Fatalf("audit reason = %q, %v", reason, err)
+	}
+}
+
+// TestReqPush014_SyncReportsAndClears: the browser checks in after a sign-in.
+// Its own subscription is active and gets this device attached (rows from
+// before migration 081); another player's subscription is removed, also when
+// the browser has no device cookie any more.
+func TestReqPush014_SyncReportsAndClears(t *testing.T) {
+	f := newPushFixture(t)
+	legacy := &push.Subscription{PlayerID: f.member, Endpoint: endpointFor("legacy"), P256dh: testP256dh, Auth: testAuth, CreatedAt: time.Now().UTC()}
+	if _, err := f.db.NewInsert().Model(legacy).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	sync := func(token, device, endpoint string) (bool, string) {
+		t.Helper()
+		status, raw, setDevice := f.deviceDo(http.MethodPost, "/api/v1/push/subscriptions/sync", token, device, map[string]any{"endpoint": endpoint})
+		var out struct {
+			Data struct {
+				Active bool `json:"active"`
+			} `json:"data"`
+		}
+		if status != http.StatusOK || json.Unmarshal(raw, &out) != nil {
+			t.Fatalf("sync: %d %s", status, raw)
+		}
+		return out.Data.Active, setDevice
+	}
+	active, newDevice := sync(f.memberToken, "", endpointFor("legacy"))
+	if !active || newDevice == "" {
+		t.Fatalf("own legacy subscription: active %v, device cookie %q", active, newDevice)
+	}
+	var stored string
+	if err := f.db.NewSelect().Table("push_subscriptions").Column("device_hash").Where("id = ?", legacy.ID).Scan(context.Background(), &stored); err != nil || stored != push.HashDevice(newDevice) {
+		t.Fatalf("device hash = %q, %v", stored, err)
+	}
+	if active, _ := sync(f.otherToken, "", endpointFor("legacy")); active {
+		t.Fatal("another player's subscription reported active")
+	}
+	if f.subscriptionCount(endpointFor("legacy")) != 0 {
+		t.Fatal("another player's subscription was kept for the browser now used by someone else")
+	}
+	if active, _ := sync(f.memberToken, newDevice, endpointFor("unknown")); active {
+		t.Fatal("unknown endpoint reported active")
+	}
+	if status, raw, _ := f.deviceDo(http.MethodPost, "/api/v1/push/subscriptions/sync", "", newDevice, map[string]any{"endpoint": endpointFor("legacy")}); status != http.StatusUnauthorized {
+		t.Fatalf("without session: %d %s", status, raw)
+	}
+}
+
+// TestReqPush015_SignOutAndAccountChanges: signing out ends the opt-in on that
+// device only; an own password change ends it on the other devices; an Admin
+// password change ends it everywhere (FR-2.13, FR-2.14, FR-32.3).
+func TestReqPush015_SignOutAndAccountChanges(t *testing.T) {
+	f := newPushFixture(t)
+	devices := map[string]string{"phone": "dev-phone", "laptop": "dev-laptop", "tablet": "dev-tablet"}
+	tokens := map[string]string{}
+	for name, device := range devices {
+		tokens[name] = f.deviceLogin("push-member", device)
+		if status, raw, _ := f.deviceDo(http.MethodPost, "/api/v1/push/subscriptions", tokens[name], device, map[string]any{"endpoint": endpointFor(name), "p256dh": testP256dh, "auth": testAuth}); status != http.StatusCreated {
+			t.Fatalf("subscribe %s: %d %s", name, status, raw)
+		}
+	}
+	if status, raw, _ := f.deviceDo(http.MethodPost, "/api/v1/auth/logout", tokens["phone"], devices["phone"], nil); status != http.StatusNoContent {
+		t.Fatalf("logout: %d %s", status, raw)
+	}
+	if f.subscriptionCount(endpointFor("phone")) != 0 || f.subscriptionCount(endpointFor("laptop")) != 1 {
+		t.Fatal("signing out did not end exactly the phone's subscription")
+	}
+	if status, raw, _ := f.deviceDo(http.MethodPost, "/api/v1/auth/password", tokens["laptop"], devices["laptop"], map[string]any{"current_password": "password", "new_password": "a-new-long-password"}); status != http.StatusNoContent && status != http.StatusOK {
+		t.Fatalf("password change: %d %s", status, raw)
+	}
+	if f.subscriptionCount(endpointFor("laptop")) != 1 || f.subscriptionCount(endpointFor("tablet")) != 0 {
+		t.Fatal("own password change must keep this device and end the others")
+	}
+	if err := push.RevokeForPlayer(context.Background(), f.db, f.staff, f.member, ""); err != nil {
+		t.Fatal(err)
+	}
+	if f.subscriptionCount(endpointFor("laptop")) != 0 {
+		t.Fatal("an account change by an Admin must end every device")
+	}
+}
+
+// TestReqPush013_RepeatedSubscribeIsQuiet: subscribing the same browser again
+// for the same player and device writes nothing new.
+func TestReqPush013_RepeatedSubscribeIsQuiet(t *testing.T) {
+	f := newPushFixture(t)
+	f.subscribe(f.memberToken, endpointFor("member"), http.StatusCreated)
+	f.subscribe(f.memberToken, endpointFor("member"), http.StatusCreated)
+	count, err := f.db.NewSelect().Table("audit_log").Where("entity_type = ?", "push_subscription").Count(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("audit entries = %d, want 1", count)
+	}
+}
+
+// loginDeviceCookie signs a player in with the given device cookie (empty for
+// none) and returns the raid_device cookie the login response set.
+func (f *pushFixture) loginDeviceCookie(username, device string) string {
+	f.t.Helper()
+	req, err := http.NewRequest(http.MethodPost, f.srv.URL+"/api/v1/auth/login", strings.NewReader(fmt.Sprintf(`{"username":%q,"password":"password"}`, username)))
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if device != "" {
+		req.AddCookie(&http.Cookie{Name: "raid_device", Value: device})
+	}
+	addCSRF(req)
+	resp, err := f.srv.Client().Do(req)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		f.t.Fatalf("login %s: status %d", username, resp.StatusCode)
+	}
+	for _, c := range resp.Cookies() {
+		if c.Name == "raid_device" {
+			return c.Value
+		}
+	}
+	return ""
+}
+
+// TestReqPush016_SignInWithoutDeviceCookie: a browser that lost its device
+// cookie still holds the previous player's push subscription. The login gives
+// it a new device cookie; the server cannot know which subscription the
+// browser holds, so the check-in of the new player removes it. Until then the
+// old row stays, which is why the web client checks in before it shows the new
+// player as signed in and drops the subscription itself if that fails.
+// A login with a device cookie renews it.
+func TestReqPush016_SignInWithoutDeviceCookie(t *testing.T) {
+	f := newPushFixture(t)
+	const original = "lost-device"
+	token := f.deviceLogin("push-member", original)
+	if status, raw, _ := f.deviceDo(http.MethodPost, "/api/v1/push/subscriptions", token, original, map[string]any{"endpoint": endpointFor("lost"), "p256dh": testP256dh, "auth": testAuth}); status != http.StatusCreated {
+		t.Fatalf("subscribe: %d %s", status, raw)
+	}
+	if renewed := f.loginDeviceCookie("push-member", original); renewed != original {
+		t.Fatalf("login with a device cookie set %q, want the same cookie renewed", renewed)
+	}
+
+	fresh := f.loginDeviceCookie("push-other", "")
+	if fresh == "" || fresh == original {
+		t.Fatalf("login without a device cookie set %q, want a new one", fresh)
+	}
+	otherToken := f.deviceLogin("push-other", fresh)
+	status, raw, _ := f.deviceDo(http.MethodPost, "/api/v1/push/subscriptions/sync", otherToken, fresh, map[string]any{"endpoint": endpointFor("lost")})
+	if status != http.StatusOK || !strings.Contains(string(raw), `"active":false`) {
+		t.Fatalf("check-in: %d %s", status, raw)
+	}
+	if f.subscriptionCount(endpointFor("lost")) != 0 {
+		t.Fatal("the previous player's subscription survived the new player's check-in")
+	}
+	if got := f.pollSent("Nach dem Wechsel"); len(got) != 0 {
+		t.Fatalf("sent = %v, want nothing", got)
+	}
+}
+
+// TestReqPush017_UnclaimedRowsGetNothingAndExpire: a subscription without a
+// device (from before migration 081) gets no messages until its own player's
+// browser claims it, and is deleted after 30 days unclaimed (ADR 103).
+func TestReqPush017_UnclaimedRowsGetNothingAndExpire(t *testing.T) {
+	f := newPushFixture(t)
+	now := time.Now().UTC()
+	old := &push.Subscription{PlayerID: f.member, Endpoint: endpointFor("old"), P256dh: testP256dh, Auth: testAuth, CreatedAt: now.Add(-push.UnclaimedLifetime - time.Hour)}
+	recent := &push.Subscription{PlayerID: f.member, Endpoint: endpointFor("recent"), P256dh: testP256dh, Auth: testAuth, CreatedAt: now}
+	for _, sub := range []*push.Subscription{old, recent} {
+		if _, err := f.db.NewInsert().Model(sub).Exec(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := f.pollSent("Ohne Gerät"); len(got) != 0 {
+		t.Fatalf("sent = %v, want nothing for rows without a device", got)
+	}
+	removed, err := push.NewService(push.NewRepo(f.db), nil, t.Logf).DeleteUnclaimed(context.Background())
+	if err != nil || removed != 1 {
+		t.Fatalf("removed %d, %v; want 1", removed, err)
+	}
+	if f.subscriptionCount(endpointFor("old")) != 0 || f.subscriptionCount(endpointFor("recent")) != 1 {
+		t.Fatal("cleanup must remove only rows unclaimed for 30 days")
 	}
 }

@@ -115,6 +115,10 @@ export function RaidRecruitment({ raidID, seriesID, attendance: initialAttendanc
     }
   }
 
+  // Editing waits for the saved template: otherwise its late arrival would
+  // overwrite what the raid lead already changed.
+  if (!loaded) return <p className="muted" role="status">Vorlage wird geladen …</p>
+
   return <div>
     <p className="muted">Die Zahlen werden aus der gespeicherten Raidaufstellung berechnet und alle 15 Sekunden aktualisiert. Ersatzbank-Spieler zählen nicht als besetzte Plätze.</p>
     <p className="muted">Vorlage und Soll-Besetzung gelten {seriesID ? 'für die ganze Raidserie' : 'für diesen Raid'} und werden mit „Vorlage speichern“ für alle Raidleiter gespeichert.{savedAt ? ` Zuletzt gespeichert: ${savedAt}.` : ''}</p>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import { isIOSDevice, isStandaloneDisplay } from '../installHint'
-import { browserHasPushAPI, currentPushSubscription, disablePush, enablePush, pushAvailability, type PushAvailability, type PushConfig } from '../pushNotifications'
+import { browserHasPushAPI, disablePush, enablePush, pushActiveOnThisDevice, pushAvailability, type PushAvailability, type PushConfig } from '../pushNotifications'
 import { useSubmission } from '../useSubmission'
 import { ErrorMessage } from './ErrorMessage'
 
@@ -27,13 +27,21 @@ export function PushNotificationSettings() {
         permission: hasPushAPI ? Notification.permission : 'unsupported',
         serverEnabled: loaded.enabled,
       }))
-      setIsSubscribed(hasPushAPI && (await currentPushSubscription()) !== null)
+      setIsSubscribed(hasPushAPI && loaded.enabled && (await pushActiveOnThisDevice()))
     } catch {
       setAvailability('unsupported')
     }
   }, [])
 
   useEffect(() => { void refresh() }, [refresh])
+
+  // Another tab may have turned push on or off meanwhile; the server state is
+  // read again whenever this tab becomes visible (ADR 103).
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [refresh])
 
   const enable = () => submit(async () => {
     if (!config) return

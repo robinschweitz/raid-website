@@ -15,6 +15,17 @@ import (
 const sessionMaxAgeSeconds = 30 * 24 * 60 * 60
 const csrfCookieName = "raid_csrf"
 
+// writePasswordBusy answers 503 when no password hashing slot became free in
+// time (SC-005). The client may simply try again.
+func writePasswordBusy(w http.ResponseWriter, err error) bool {
+	if !errors.Is(err, auth.ErrPasswordHashBusy) {
+		return false
+	}
+	w.Header().Set("Retry-After", "5")
+	WriteError(w, http.StatusServiceUnavailable, "server_busy", "Der Server ist gerade ausgelastet. Bitte versuche es in ein paar Sekunden erneut.")
+	return true
+}
+
 // passwordTooLongMessage is shown for passwords above the 1024-byte limit (SC-005).
 // Multibyte characters count several bytes, which is why the hint says so.
 const passwordTooLongMessage = "Das Passwort darf höchstens 1024 Bytes lang sein. Umlaute und Sonderzeichen zählen mehrfach."
@@ -73,6 +84,29 @@ func (a *API) setSessionCookie(w http.ResponseWriter, token string, maxAge int) 
 	})
 }
 
+// startSession hands the new session cookie to the browser. First it removes
+// push subscriptions of other players on this device, so the last player's
+// opt-in never reaches the one signing in now (FR-32.3, ADR 103); if that
+// fails, the browser gets no session. A browser without a device cookie gets
+// one here; which subscription it holds only the browser knows, so the web
+// client checks in before it shows the player as signed in.
+func (a *API) startSession(w http.ResponseWriter, r *http.Request, token string, playerID int64) bool {
+	hadDevice := deviceHash(r) != ""
+	hash, err := a.ensureDevice(w, r)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not create login session")
+		return false
+	}
+	if hadDevice {
+		if err := a.Push.ClaimDevice(r.Context(), playerID, hash); err != nil {
+			WriteError(w, http.StatusInternalServerError, "internal", "could not create login session")
+			return false
+		}
+	}
+	a.setSessionCookie(w, token, sessionMaxAgeSeconds)
+	return true
+}
+
 func (a *API) csrfToken(w http.ResponseWriter, r *http.Request) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -96,6 +130,9 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := a.Auth.StartLogin(r.Context(), req.Username, req.Password, clientAddress(r, a.TrustProxyHeaders))
 	if err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
 		if errors.Is(err, auth.ErrLoginRateLimited) {
 			WriteError(w, http.StatusTooManyRequests, "login_rate_limited", "too many failed login attempts; please try again later")
 			return
@@ -115,7 +152,9 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"mfa_required": true, "challenge": result.MFAChallenge, "factors": result.MFAFactors}})
 		return
 	}
-	a.setSessionCookie(w, result.Token, sessionMaxAgeSeconds)
+	if !a.startSession(w, r, result.Token, result.Player.ID) {
+		return
+	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(result.Player, result.Player)})
 }
 
@@ -138,7 +177,9 @@ func (a *API) verifyMFA(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not verify MFA")
 		return
 	}
-	a.setSessionCookie(w, token, sessionMaxAgeSeconds)
+	if !a.startSession(w, r, token, p.ID) {
+		return
+	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(p, p)})
 }
 
@@ -154,6 +195,9 @@ func (a *API) setupTOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.Auth.VerifyPassword(r.Context(), actor.ID, req.CurrentPassword); err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
 		WriteError(w, http.StatusUnauthorized, "invalid_credentials", "current password is invalid")
 		return
 	}
@@ -214,6 +258,9 @@ func (a *API) disableTOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.Auth.DisableTOTP(r.Context(), actor.ID, req.CurrentPassword); err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			WriteError(w, http.StatusUnauthorized, "invalid_credentials", "current password is invalid")
 			return
@@ -236,6 +283,9 @@ func (a *API) beginWebAuthnRegistration(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err := a.Auth.VerifyPassword(r.Context(), actor.ID, req.CurrentPassword); err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
 		WriteError(w, http.StatusUnauthorized, "invalid_credentials", "current password is invalid")
 		return
 	}
@@ -296,6 +346,9 @@ func (a *API) deleteWebAuthnCredential(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.Auth.DeleteWebAuthnCredential(r.Context(), actor.ID, id, req.CurrentPassword); err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			WriteError(w, http.StatusUnauthorized, "invalid_credentials", "current password is invalid")
 			return
@@ -353,11 +406,22 @@ func (a *API) finishWebAuthnMFA(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusUnprocessableEntity, "webauthn_invalid", "security key login failed")
 		return
 	}
-	a.setSessionCookie(w, token, sessionMaxAgeSeconds)
+	if !a.startSession(w, r, token, p.ID) {
+		return
+	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(p, p)})
 }
 
 func (a *API) logout(w http.ResponseWriter, r *http.Request) {
+	// Signing out ends this player's notifications on this device (FR-32.3).
+	if actor, ok := ActorID(r); ok {
+		if hash := deviceHash(r); hash != "" {
+			if err := a.Push.ForgetDevice(r.Context(), actor, hash); err != nil {
+				WriteError(w, http.StatusInternalServerError, "internal", "could not end session")
+				return
+			}
+		}
+	}
 	if c, err := r.Cookie(auth.CookieName); err == nil && c.Value != "" {
 		if err := a.Auth.Logout(r.Context(), c.Value); err != nil {
 			WriteError(w, http.StatusInternalServerError, "internal", "could not end session")
@@ -392,7 +456,10 @@ func (a *API) changeOwnPassword(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(auth.CookieName); err == nil {
 		currentToken = c.Value
 	}
-	if err := a.Auth.ChangeOwnPassword(r.Context(), actor.ID, currentToken, req.CurrentPassword, req.NewPassword); err != nil {
+	if err := a.Auth.ChangeOwnPassword(r.Context(), actor.ID, currentToken, deviceHash(r), req.CurrentPassword, req.NewPassword); err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			WriteError(w, http.StatusUnauthorized, "invalid_credentials", "current password is invalid")
 			return
@@ -434,6 +501,9 @@ func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := a.Auth.SetCredentials(r.Context(), id, req.Username, req.Password, role, actorID)
 	if err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
 		if isNotFound(err) {
 			WriteError(w, http.StatusNotFound, "not_found", "player not found")
 			return
@@ -453,6 +523,5 @@ func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusUnprocessableEntity, "invalid_request", err.Error())
 		return
 	}
-	actor, _ := CurrentPlayer(r)
-	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(actor, p)})
+	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(accountViewer(r), p)})
 }

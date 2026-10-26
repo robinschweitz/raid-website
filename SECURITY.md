@@ -218,9 +218,9 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-024 - Security headers**
 - **Status:** ACTIVE
-- **Rule:** Every response MUST carry `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, the restrictive `Permissions-Policy`, and a CSP with `default-src 'self'`, `script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`, `form-action 'self'`, `connect-src 'self'`. `img-src` MUST be `'self' data:` once the class icons are local (DQ-2). HSTS (`max-age=31536000; includeSubDomains`) MUST be sent in production.
+- **Rule:** Every response MUST carry `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, the restrictive `Permissions-Policy`, and a CSP with `default-src 'self'`, `script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`, `form-action 'self'`, `connect-src 'self'`. `img-src` MUST be `'self' data: https://wow.zamimg.com`: class icons are local (DQ-2), and the host stays only for the item icons of the loot catalog (ADR 104). HSTS (`max-age=31536000; includeSubDomains`) MUST be sent in production.
 - **Enforcement:** `securityHeaders` middleware.
-- **Evidence:** ADR 046, `DESIGN.md`. Code: compliant; `img-src` still allows `https://wow.zamimg.com`; `style-src` allows `'unsafe-inline'`. Threats: T-009, T-024, T-027.
+- **Evidence:** ADR 046, `DESIGN.md`. ADR 104. Code: compliant; class icons are served from `/class-icons/`, `img-src` allows `https://wow.zamimg.com` for item icons only; `style-src` allows `'unsafe-inline'`. Threats: T-009, T-024, T-027.
 - **Verification:** Header assertions in an HTTP test.
 
 **SC-025 - TLS at the edge only**

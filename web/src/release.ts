@@ -1,8 +1,15 @@
-export const appVersion = '1.0.51'
+export const appVersion = '1.0.53'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Klassen-Symbole von der eigenen Seite',
+    changes: [
+      'Die Klassen-Symbole der Charaktere werden jetzt von dieser Seite geladen und nicht mehr von wow.zamimg.com. Dadurch erfährt kein fremder Server mehr, wer die Seite besucht. Nur die Item-Symbole im Loot-Katalog kommen weiter von dort.',
+    ],
+  },
+  {
+    version: '1.0.51',
     title: 'Sicherere Anmeldung und Benachrichtigungen',
     changes: [
       'Die Sperre nach zu vielen falschen Passwörtern greift jetzt auch, wenn viele Anmeldeversuche gleichzeitig kommen.',

@@ -167,7 +167,7 @@ func TestDomainNewEnhancedAwardsRequireRequestID(t *testing.T) {
 					if completed && directLoot {
 						continue
 					}
-					award := &loot.Award{RaidID: f.raidID, CatalogBossID: &f.tokenBoss, ItemID: f.tokenItem, AwardMethod: loot.Enhanced, AwardedToPlayerID: f.first, AwardedToCharacterID: &f.firstChar, AwardedByPlayerID: f.actor, RequestID: key}
+					award := &loot.Award{Difficulty: "NORMAL", RaidID: f.raidID, CatalogBossID: &f.tokenBoss, ItemID: f.tokenItem, AwardMethod: loot.Enhanced, AwardedToPlayerID: f.first, AwardedToCharacterID: &f.firstChar, AwardedByPlayerID: f.actor, RequestID: key}
 					var err error
 					if directLoot {
 						err = loot.NewService(loot.NewRepo(f.db)).Award(context.Background(), award)
@@ -200,7 +200,7 @@ func TestEnteringEnhancedRequiresHistoricalRecipientInRoster(t *testing.T) {
 			f.seedPoints(f.first, 70)
 			f.legacyCompleted()
 			now := time.Now().UTC()
-			old := &loot.Award{RaidID: f.raidID, AwardedToPlayerID: f.first, AwardedByPlayerID: f.actor, Source: "legacy_import", ItemName: "Weiheabzeichen des Eroberers", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
+			old := &loot.Award{Difficulty: "NORMAL", RaidID: f.raidID, AwardedToPlayerID: f.first, AwardedByPlayerID: f.actor, Source: "legacy_import", ItemName: "Weiheabzeichen des Eroberers", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
 			if !nullable {
 				old.AwardedToCharacterID = &f.firstChar
 			}
@@ -448,7 +448,7 @@ func TestHistoricalNullableRecipientPreservedUntilRecipientChange(t *testing.T) 
 	f := newCorrectionFixture(t)
 	f.legacyCompleted()
 	now := time.Now().UTC()
-	old := &loot.Award{RaidID: f.raidID, AwardedToPlayerID: f.first, AwardedByPlayerID: f.actor, Source: "legacy_import", ItemName: "historical", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
+	old := &loot.Award{Difficulty: "NORMAL", RaidID: f.raidID, AwardedToPlayerID: f.first, AwardedByPlayerID: f.actor, Source: "legacy_import", ItemName: "historical", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
 	if err := loot.NewRepo(f.db).CreateAward(context.Background(), old); err != nil {
 		t.Fatal(err)
 	}

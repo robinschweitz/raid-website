@@ -337,6 +337,7 @@ export function GuidePage() {
 
     <Section id="loot" audience="raidleitung" title="Loot eintragen und archivieren">
       <h3>Loot eintragen</h3>
+      <p>Für einen Boss ohne Kill wird der Kill mit der gewählten Schwierigkeit zusammen mit der Beute gespeichert. Bei einer widersprüchlichen Schwierigkeit wird nichts gespeichert; lade dann den Raid neu.</p>
       <p>Gewürfelt wird im Spiel. Hier wird nur eingetragen, wer was bekommen hat: Reiter <strong>Loot</strong>, <strong>Loot erfassen</strong>, Boss und Modus wählen, Item suchen, Empfänger und Vergabeart wählen.</p>
       <div className="table-scroll">
         <table className="table">

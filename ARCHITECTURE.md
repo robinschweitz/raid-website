@@ -170,7 +170,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `push` | Push subscriptions, RFC 8291/8292, delivery after commit | Endpoint allowlist, MEMBER recipients, neutral payload, 404/410 clean-up | push subscriptions | FR-32 | SUPPORTED |
 | `audit` | Audit writer and Admin reader | Append-only, no secrets in snapshots | audit log | FR-26 | SUPPORTED |
 | Statistics (`GET /api/v1/statistics`, `internal/statistics`) | Public aggregates computed on the server | Public field subset (FR-27.2) | none (derived, read-only) | FR-27 | SUPPORTED |
-| `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (loot and import integration not built) |
+| `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (manual loot integration built in #95; addon import tracked in #96) |
 | Privacy page | Static page with contact from configuration | None | none | FR-30.1 | SUPPORTED (not built) |
 | Infrastructure (`config`, `db`, `migrations`, `validation`, `webui`) | Environment config, DB open, schema, enums, embedded SPA | Production config rules, foreign keys, SPA present in production | schema | NFR-1 | SUPPORTED |
 | Rising-Gods Worker (`workers/`) | Authenticated fixed-origin GET proxy to `db.rising-gods.de` | Fixed origin and shared token (SC-029) | none | FR-7, ADR 048, ADR 053 | SUPPORTED |

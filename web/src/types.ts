@@ -313,6 +313,7 @@ export interface ArchiveResponse {
 }
 
 export interface LootAward {
+  difficulty?: string
   id: number
   raid_id: number
   boss: string

@@ -329,17 +329,23 @@ func (s *Service) RemoveAttendance(ctx context.Context, raidID, id, actor int64)
 
 // SaveLoot applies ordinary active-raid additions or explicit audited corrections.
 func (s *Service) SaveLoot(ctx context.Context, row *loot.Award, actor int64, reason string) error {
-	return s.saveLoot(ctx, row, actor, reason, nil)
+	return s.saveLoot(ctx, row, actor, reason, nil, false)
+}
+
+// SaveImportedLoot retains the existing addon import behavior until its
+// transactional per-boss difficulty flow is introduced in #96.
+func (s *Service) SaveImportedLoot(ctx context.Context, row *loot.Award, actor int64, reason string) error {
+	return s.saveLoot(ctx, row, actor, reason, nil, true)
 }
 
 // CorrectLoot loads and patches the award within the correction transaction.
 func (s *Service) CorrectLoot(ctx context.Context, raidID, id, actor int64, reason string, patch func(*loot.Award)) (*loot.Award, error) {
 	row := &loot.Award{ID: id, RaidID: raidID}
-	err := s.saveLoot(ctx, row, actor, reason, patch)
+	err := s.saveLoot(ctx, row, actor, reason, patch, false)
 	return row, err
 }
 
-func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, reason string, patch func(*loot.Award)) error {
+func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, reason string, patch func(*loot.Award), imported bool) error {
 	return s.repo.InTransaction(ctx, func(r *Repo) error {
 		if row.ID == 0 {
 			row.AwardedByPlayerID = actor
@@ -364,6 +370,7 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 				row.ID = old.ID
 				row.RaidID = old.RaidID
 			}
+			row.Difficulty = old.Difficulty
 			row.CreatedAt = old.CreatedAt
 			row.AwardedAt = old.AwardedAt
 			row.AwardedByPlayerID = old.AwardedByPlayerID
@@ -380,13 +387,18 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		if err != nil {
 			return err
 		}
+		if row.ID == 0 && !imported {
+			if err := loot.EnsureBossKill(ctx, r.loot, row, reason); err != nil {
+				return err
+			}
+		}
 		if !completed && row.ID == 0 {
 			row.UpdatedAt = time.Now().UTC()
 			row.CreatedAt = row.UpdatedAt
 			row.AwardedAt = row.UpdatedAt
 			row.AwardedByPlayerID = actor
 			row.Source = "manual"
-			if err := loot.AwardInTransaction(ctx, r.loot, row, reason); err != nil {
+			if err := loot.AwardPreparedInTransaction(ctx, r.loot, row, reason); err != nil {
 				return err
 			}
 			return nil

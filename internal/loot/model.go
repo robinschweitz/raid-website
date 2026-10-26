@@ -1,12 +1,14 @@
 package loot
 
 import (
+	"raid-website/internal/bosskill"
 	"time"
 
 	"github.com/uptrace/bun"
 )
 
 type Award struct {
+	Difficulty    bosskill.Difficulty `json:"difficulty"`
 	bun.BaseModel `bun:"table:loot_awards"`
 
 	ID                     int64      `bun:"id,pk,autoincrement" json:"id"`

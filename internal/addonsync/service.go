@@ -317,7 +317,7 @@ func (s *Service) importLine(ctx context.Context, rd *raid.Raid, actorID int64, 
 		CreatedAt:            now,
 		UpdatedAt:            now,
 	}
-	if err := s.corrections.SaveLoot(ctx, award, actorID, ""); err != nil {
+	if err := s.corrections.SaveImportedLoot(ctx, award, actorID, ""); err != nil {
 		return nil, err
 	}
 	return award, nil

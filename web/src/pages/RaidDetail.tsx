@@ -78,6 +78,8 @@ function raidError(err: unknown, fallback: string): string {
     attendance_has_loot: 'Dieser Charakter hat in diesem Raid schon Loot erhalten. Bitte zuerst den Loot zurückziehen.',
     name_not_editable: 'Raidnamen aus einer Raidserie können nicht direkt geändert werden.',
     invalid_scheduled_start: 'Bitte einen gültigen geplanten Start angeben.',
+    difficulty_required: 'Bitte die Schwierigkeit des Boss-Kills wählen.',
+    kill_difficulty_conflict: 'Die gespeicherte Schwierigkeit des Boss-Kills hat sich geändert. Bitte neu laden.',
     roster_incomplete: 'Die Teilnahme ist unvollständig. Bitte die betroffenen Zeilen korrigieren: gespeicherter Charaktername, gültige Klasse, tatsächlicher Spec und Rolle sind zum Archivieren erforderlich.',
     occurrence_conflict: 'Der nächste Serientermin existiert bereits. Das Archivieren wurde nicht gespeichert.',
     local_time_nonexistent: 'Die nächste Startzeit existiert wegen der Zeitumstellung nicht. Ein Admin muss die Serienzeit korrigieren.',
@@ -581,6 +583,7 @@ function RaidDetail({ raidID, initialView }: Props) {
       setEpWarning(null)
       try {
         const body = {
+          ...(!lootEditing ? { difficulty: catalogDifficulty } : {}),
           ...(!lootEditing || lootItemID !== lootEditing.item_id ? { item_id: lootItemID } : {}),
           ...(catalogBoss && (!lootEditing || catalogBoss !== (lootEditing.catalog_boss_id ?? '')) ? { catalog_boss_id: catalogBoss } : {}),
           ...(!lootEditing || lootMethod !== awardMethod(lootEditing) ? { award_method: lootMethod } : {}),
@@ -993,7 +996,7 @@ function RaidDetail({ raidID, initialView }: Props) {
                   {catalogBoss && !catalogBosses.some((boss) => boss.id === catalogBoss) && <option value={catalogBoss}>Gespeicherter Boss (derzeit nicht verfügbar)</option>}
                   {catalogBosses.map((boss) => <option key={boss.id} value={boss.id}>{boss.name}</option>)}
                 </select></label>
-                <label>Modus<select aria-label="Loot-Modus" disabled={pending || catalogDifficulties.length === 0} value={catalogDifficulty} onChange={(e) => changeLoot(() => {
+                <label>Schwierigkeit des Boss-Kills<select aria-label="Loot-Modus" disabled={pending || catalogDifficulties.length === 0} value={catalogDifficulty} onChange={(e) => changeLoot(() => {
                   if (renderedCatalogVersion !== catalogVersion.current) return
                   if (!catalogDifficulties.includes(e.target.value as keyof typeof catalogModeLabels)) return
                   setCatalogDifficulty(e.target.value)
@@ -1002,6 +1005,7 @@ function RaidDetail({ raidID, initialView }: Props) {
                   {catalogDifficulties.length === 0 && <option value="">Zuerst Boss wählen</option>}
                   {catalogDifficulties.map((difficulty) => <option key={difficulty} value={difficulty}>{catalogModeLabels[difficulty]}</option>)}
                 </select></label>
+                {!lootEditing && <p className="field-hint">Falls für diesen Boss noch kein Kill eingetragen ist, wird er mit dieser Schwierigkeit zusammen mit der Beute gespeichert.</p>}
                 <label className="picker-field">Item auswählen<span className="picker-row"><input ref={lootItemInput} type="search" list="loot-item-options" aria-label="Loot-Item" autoComplete="off" disabled={pending || catalogItems.length === 0} value={catalogSearch} onChange={(e) => changeLoot(() => {
                   if (renderedCatalogVersion !== catalogVersion.current) return
                   const typed = e.target.value

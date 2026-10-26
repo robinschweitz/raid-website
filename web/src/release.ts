@@ -1,8 +1,13 @@
-export const appVersion = '1.0.60'
+export const appVersion = '1.0.66'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Boss-Kill zusammen mit Beute erfassen',
+    changes: ['Beim ersten Beuteeintrag eines Bosses wird der Kill mit der gewählten Schwierigkeit in derselben Transaktion erfasst. Bei widersprüchlicher Schwierigkeit wird nichts gespeichert.'],
+  },
+  {
+    version: '1.0.60',
     title: 'Umfrage-Optionen in richtiger Reihenfolge',
     changes: [
       'In der Umfrageliste stehen die Antwortoptionen wieder in der eingestellten Reihenfolge, auch nachdem eine Umfrage bearbeitet und Optionen umsortiert wurden.',

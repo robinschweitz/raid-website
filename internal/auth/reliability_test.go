@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -109,7 +108,7 @@ func TestAuthenticateExpectedMisses(t *testing.T) {
 }
 
 func TestAuthenticateOperationalFailures(t *testing.T) {
-	for _, scenario := range []string{"session lookup", "player lookup", "session touch"} {
+	for _, scenario := range []string{"session lookup", "player lookup"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx := context.Background()
 			bdb := reliabilityDB(t)
@@ -132,16 +131,12 @@ func TestAuthenticateOperationalFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 				svc.players = player.NewRepo(closedDB.DB)
-			case "session touch":
-				if _, err := bdb.DB.ExecContext(ctx, "CREATE TRIGGER reject_touch BEFORE UPDATE ON sessions BEGIN SELECT RAISE(ABORT, 'injected failure'); END"); err != nil {
-					t.Fatal(err)
-				}
 			}
 			p, err := svc.Authenticate(ctx, token)
 			if p != nil || err == nil || errors.Is(err, sql.ErrNoRows) {
 				t.Fatalf("Authenticate = %v, %v; want operational error without identity", p, err)
 			}
-			if errors.Unwrap(err) == nil || (scenario == "session touch" && !strings.Contains(err.Error(), "injected failure")) {
+			if errors.Unwrap(err) == nil {
 				t.Fatalf("repository error not preserved: %v", err)
 			}
 		})

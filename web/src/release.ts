@@ -1,8 +1,13 @@
-export const appVersion = '1.0.60'
+export const appVersion = '1.0.61'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Sitzungen enden nach sieben Tagen ohne Nutzung',
+    changes: ['Nach sieben Tagen ohne Nutzung ist eine neue Anmeldung nötig. Aktive Sitzungen enden weiterhin spätestens nach 30 Tagen.'],
+  },
+  {
+    version: '1.0.60',
     title: 'Umfrage-Optionen in richtiger Reihenfolge',
     changes: [
       'In der Umfrageliste stehen die Antwortoptionen wieder in der eingestellten Reihenfolge, auch nachdem eine Umfrage bearbeitet und Optionen umsortiert wurden.',

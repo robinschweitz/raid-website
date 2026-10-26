@@ -28,12 +28,12 @@ const find = (node, test, found = []) => {
 }
 
 const { BossProgression } = load('components/BossProgression.tsx', {
-  './bossData': { getBossesForInstance: () => [{ name: 'Lord Mark’gar', icon: 'a' }, { name: 'Professor Seuchenfaust', icon: 'b' }] },
+  './bossData': { getBossesForInstance: () => [{ name: 'Lord Mark’gar', icon: 'a', id: 'ICCLordMarrowgar' }, { name: 'Professor Seuchenfaust', icon: 'b', id: 'ICCPutricide' }] },
   '../types': { catalogModeLabels: { NORMAL: 'Normal', HEROIC: 'Heroisch', HARDMODE: 'Hardmode' } },
 })
 
 test('TestReqRaid018_AC01 recorded kills mark their boss and show the difficulty', () => {
-  const tree = BossProgression({ catalogInstanceId: '631', kills: [{ id: 1, boss: 'Professor Seuchenfaust', difficulty: 'HEROIC' }] })
+  const tree = BossProgression({ catalogInstanceId: '631', kills: [{ id: 1, boss: 'Professor Seuchenmord', catalog_boss_id: 'ICCPutricide', difficulty: 'HEROIC' }] })
   const killed = find(tree, (n) => n.type === 'li' && /killed/.test(n.props.className))
   assert.equal(killed.length, 1)
   assert.match(text(killed[0]), /Professor Seuchenfaust · getötet \(Heroisch\)/)
@@ -56,4 +56,25 @@ test('TestReqRaid018_AC03 manage controls render only for staff', () => {
     assert.match(source.slice(Math.max(0, at - 400), at), /canWrite/)
   }
   assert.match(source, /Für diesen Raid sind keine Kills erfasst/)
+})
+
+test('TestReqRaid018_AC01 every ICC encounter carries the ID of a catalog boss, so differently spelled names still match', () => {
+  const source = fs.readFileSync(path.join(srcDir, 'components/bossData.ts'), 'utf8')
+  const exports = {}
+  new Function('exports', ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(exports)
+  const catalog = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../scripts/data/catalog-wotlk335.json'), 'utf8'))
+  const catalogNames = new Map()
+  const walk = (node) => {
+    if (Array.isArray(node)) node.forEach(walk)
+    else if (node && typeof node === 'object') {
+      if (typeof node.id === 'string' && /^ICC/.test(node.id) && node.names && node.names.deDE) catalogNames.set(node.id, node.names.deDE)
+      Object.values(node).forEach(walk)
+    }
+  }
+  walk(catalog)
+  const bosses = exports.getBossesForInstance('631')
+  assert.equal(bosses.length, 12)
+  for (const boss of bosses) assert.ok(catalogNames.has(boss.id), `${boss.name}: ${boss.id}`)
+  assert.equal(new Set(bosses.map((boss) => boss.id)).size, 12)
+  for (const id of ['ICCLordMarrowgar', 'ICCLanathel', 'ICCGunshipBattle']) assert.ok(bosses.some((boss) => boss.id === id), id)
 })

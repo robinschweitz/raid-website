@@ -7,8 +7,8 @@ export function BossProgression({ catalogInstanceId, kills = null }: { catalogIn
   const bosses = getBossesForInstance(catalogInstanceId)
   if (bosses.length === 0) return <p className="muted">Keine Bossübersicht für diese Instanz verfügbar.</p>
 
-  const killFor = (name: string) => kills?.find((kill) => kill.boss.toLowerCase() === name.toLowerCase())
-  const killedCount = bosses.filter((boss) => killFor(boss.name)).length
+  const killFor = (id?: string) => id ? kills?.find((kill) => kill.catalog_boss_id === id) : undefined
+  const killedCount = bosses.filter((boss) => killFor(boss.id)).length
   const status = kills === null ? 'Killstatus nicht verfügbar'
     : kills.length === 0 ? 'Keine Kills erfasst'
       : `${killedCount} von ${bosses.length} getötet`
@@ -17,7 +17,7 @@ export function BossProgression({ catalogInstanceId, kills = null }: { catalogIn
     <span className="boss-label">Bosse</span>
     <ul className="boss-icons" aria-label="Bossbegegnungen der Instanz">
       {bosses.map((boss) => {
-        const kill = killFor(boss.name)
+        const kill = killFor(boss.id)
         return <li key={boss.name} className={kill ? 'boss-icon killed' : 'boss-icon'} tabIndex={0}>
           <img src={`/bosses/${boss.icon}.webp`} alt={boss.name} width={40} height={40} />
           <span className="boss-tooltip" role="tooltip">{kill ? `${boss.name} · getötet (${catalogModeLabels[kill.difficulty]})` : boss.name}</span>

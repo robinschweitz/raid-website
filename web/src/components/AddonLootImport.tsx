@@ -41,6 +41,7 @@ export function AddonLootImport({ raidID, onImported }: Props) {
   const [preview, setPreview] = useState<AddonLootPreview | null>(null)
   const [previewedPayload, setPreviewedPayload] = useState('')
   const [choices, setChoices] = useState<Record<string, Choice>>({})
+  const [difficulties, setDifficulties] = useState<Record<string, string>>({})
   const [results, setResults] = useState<AddonLootImportResult[]>([])
   const [error, setError] = useState('')
 
@@ -50,6 +51,7 @@ export function AddonLootImport({ raidID, onImported }: Props) {
     setPreview(result)
     setPreviewedPayload(text)
     setChoices(initialChoices(result))
+    setDifficulties({})
   }
 
   const runPreview = () => submit(async () => {
@@ -63,15 +65,22 @@ export function AddonLootImport({ raidID, onImported }: Props) {
   })
 
   const selectedRows = preview?.rows.filter((row) => row.is_importable && choices[row.line_key]?.isSelected) ?? []
-  const isReady = selectedRows.length > 0 && selectedRows.every((row) => row.is_unclaimed || (choices[row.line_key].bossID && choices[row.line_key].characterID))
+  const missingBosses = (preview?.missing_kills ?? []).filter((boss) => selectedRows.some((row) => choices[row.line_key]?.bossID === boss.boss_id))
+  const isReady = selectedRows.length > 0 && selectedRows.every((row) => choices[row.line_key].bossID && (row.is_unclaimed || choices[row.line_key].characterID)) && missingBosses.every((boss) => boss.difficulties.includes(difficulties[boss.boss_id]))
 
   const apply = () => submit(async () => {
     if (!preview || !isReady) return
     setError('')
+    setResults([])
     try {
-      const selections = selectedRows.map((row) => row.is_unclaimed
-        ? { line_key: row.line_key, catalog_boss_id: choices[row.line_key].bossID }
-        : { line_key: row.line_key, catalog_boss_id: choices[row.line_key].bossID, character_id: Number(choices[row.line_key].characterID), award_method: choices[row.line_key].method })
+      const selections = selectedRows.map((row) => {
+        const choice = choices[row.line_key]
+        const difficulty = difficulties[choice.bossID]
+        const mode = difficulty ? { difficulty } : {}
+        return row.is_unclaimed
+          ? { line_key: row.line_key, catalog_boss_id: choice.bossID, ...mode }
+          : { line_key: row.line_key, catalog_boss_id: choice.bossID, character_id: Number(choice.characterID), award_method: choice.method, ...mode }
+      })
       const imported = await api.post<AddonLootImportResult[]>(`/api/v1/raids/${raidID}/addon-loot-import`, { payload: previewedPayload, selections })
       if (!isActive()) return
       setResults(imported)
@@ -86,7 +95,7 @@ export function AddonLootImport({ raidID, onImported }: Props) {
 
   return <section className="subcard addon-loot-import" aria-label="Loot aus Addon importieren">
     <h3>Loot aus Addon importieren</h3>
-    <p className="muted">Den Export aus RaidLedger („EXPORT“) einfügen, prüfen und Empfänger und Vergabeart je Gegenstand wählen. Hat jemand anderes ein Item per Handel weitergegeben, hier den tatsächlichen Gewinner wählen. Locks, Enhanced-Kosten und Raidkader werden wie bei manueller Erfassung geprüft. Bereits importierte Zeilen werden übersprungen.</p>
+    <p className="muted">Den Export aus RaidLedger („EXPORT“) einfügen, prüfen und Empfänger und Vergabeart je Gegenstand wählen. Hat jemand anderes ein Item per Handel weitergegeben, hier den tatsächlichen Gewinner wählen. Locks, Enhanced-Kosten und Raidkader werden wie bei manueller Erfassung geprüft. Bereits importierte Zeilen werden übersprungen. Für jeden Boss ohne Kill wählst du die Schwierigkeit einmal. Bei einem Fehler wird der gesamte Import zurückgerollt.</p>
     <textarea className="addon-code-export" aria-label="Loot-Export" rows={4} value={payload} disabled={pending} placeholder="RS1|LOOT|…" onChange={(e) => setPayload(e.target.value)} />
     <div className="actions">
       <button type="button" disabled={pending || !payload.trim()} onClick={() => void runPreview()}>Vorschau</button>
@@ -95,6 +104,12 @@ export function AddonLootImport({ raidID, onImported }: Props) {
     {preview && <>
       {preview.warnings.map((warning) => <ErrorMessage key={warning}>{warning}</ErrorMessage>)}
       <p className="muted">Aufgezeichnet von {preview.recorder || 'unbekannt'} · {preview.rows.length} Zeilen</p>
+      {missingBosses.length > 0 && <div className="inline-form" aria-label="Schwierigkeiten für neue Boss-Kills">
+        {missingBosses.map((boss) => <label key={boss.boss_id}>{boss.boss_name}<select aria-label={`Schwierigkeit für ${boss.boss_name}`} disabled={pending} value={difficulties[boss.boss_id] ?? ''} onChange={(event) => setDifficulties((current) => ({ ...current, [boss.boss_id]: event.target.value }))}>
+          <option value="">Schwierigkeit wählen</option>
+          {boss.difficulties.map((mode) => <option key={mode} value={mode}>{({ NORMAL: 'Normal', HEROIC: 'Heroisch', HARDMODE: 'Hardmode' } as Record<string, string>)[mode] ?? mode}</option>)}
+        </select></label>)}
+      </div>}
       <div className="table-scroll">
         <table className="table small">
           <thead><tr><th>Übernehmen</th><th>Gegenstand</th><th>Boss</th><th>Empfänger</th><th>Vergabeart</th><th>Hinweise</th></tr></thead>
@@ -134,7 +149,7 @@ export function AddonLootImport({ raidID, onImported }: Props) {
       </div>
       <div className="actions">
         <button type="button" disabled={pending || !isReady} onClick={() => void apply()}>{selectedRows.length === 1 ? '1 Gegenstand übernehmen' : `${selectedRows.length} Gegenstände übernehmen`}</button>
-        {selectedRows.length > 0 && !isReady && <span className="muted">Bitte für alle ausgewählten Zeilen Boss und Empfänger wählen.</span>}
+        {selectedRows.length > 0 && !isReady && <span className="muted">Bitte für alle ausgewählten Zeilen Boss und Empfänger wählen. Für neue Boss-Kills außerdem die Schwierigkeit wählen.</span>}
       </div>
     </>}
     {results.length > 0 && <ul className="plain-list" role="status" aria-label="Importergebnis">

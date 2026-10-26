@@ -1,8 +1,13 @@
-export const appVersion = '1.0.66'
+export const appVersion = '1.0.67'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Addon-Loot gemeinsam mit Boss-Kills importieren',
+    changes: ['Die Importvorschau fragt einmal pro Boss ohne Kill nach der Schwierigkeit. Bei einem Fehler wird der gesamte Import zurückgerollt, einschließlich Kills, Beute, Locks und EP.'],
+  },
+  {
+    version: '1.0.66',
     title: 'Boss-Kill zusammen mit Beute erfassen',
     changes: ['Beim ersten Beuteeintrag eines Bosses wird der Kill mit der gewählten Schwierigkeit in derselben Transaktion erfasst. Bei widersprüchlicher Schwierigkeit wird nichts gespeichert.'],
   },

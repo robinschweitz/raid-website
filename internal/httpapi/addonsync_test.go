@@ -75,9 +75,12 @@ func (f *correctionFixture) addonPreview(payload string) addonPreview {
 }
 
 func (f *correctionFixture) addonImport(token, payload string, selections []map[string]any) []addonImportResult {
+	return f.addonImportStatus(token, payload, selections, http.StatusOK)
+}
+func (f *correctionFixture) addonImportStatus(token, payload string, selections []map[string]any, want int) []addonImportResult {
 	f.t.Helper()
 	status, body := do(f.t, f.srv.Client(), http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/addon-loot-import", f.srv.URL, f.raidID), token, map[string]any{"payload": payload, "selections": selections})
-	if status != http.StatusOK {
+	if status != want {
 		f.t.Fatalf("import: %d %s", status, body)
 	}
 	var out struct{ Data []addonImportResult }
@@ -285,15 +288,13 @@ func TestAddonLootPreviewReadsRS2RollsAndStates(t *testing.T) {
 	}
 
 	results := f.addonImport(f.token, payload, []map[string]any{
-		{"line_key": rows[1].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": rows[1].AwardMethod},
-		{"line_key": rows[3].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
-		{"line_key": rows[4].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"},
-		{"line_key": rows[6].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
-		{"line_key": rows[7].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
+		{"difficulty": "NORMAL", "line_key": rows[1].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": rows[1].AwardMethod},
+		{"difficulty": "NORMAL", "line_key": rows[6].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
+		{"difficulty": "NORMAL", "line_key": rows[7].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
 	})
-	if len(results) != 5 || results[0].Status != "created" || results[1].Code != "not_importable" || results[2].Code != "not_importable" ||
-		results[3].Status != "created" || results[3].UnclaimedID == nil || results[3].AwardID != nil ||
-		results[4].Status != "created" || results[4].UnclaimedID == nil || results[4].AwardID != nil {
+	if len(results) != 3 || results[0].Status != "created" ||
+		results[1].Status != "created" || results[1].UnclaimedID == nil || results[1].AwardID != nil ||
+		results[2].Status != "created" || results[2].UnclaimedID == nil || results[2].AwardID != nil {
 		t.Fatalf("results: %+v", results)
 	}
 	var unclaimed struct {
@@ -313,8 +314,8 @@ func TestAddonLootPreviewReadsRS2RollsAndStates(t *testing.T) {
 		unclaimed.Data[0].CatalogBossID == nil || *unclaimed.Data[0].CatalogBossID != f.ordinaryBoss {
 		t.Fatalf("unclaimed loot: %+v", unclaimed.Data)
 	}
-	again := f.addonImport(f.token, payload, []map[string]any{{"line_key": rows[6].LineKey, "catalog_boss_id": f.ordinaryBoss}})
-	if len(again) != 1 || again[0].Status != "already_imported" || again[0].UnclaimedID == nil || *again[0].UnclaimedID != *results[3].UnclaimedID {
+	again := f.addonImport(f.token, payload, []map[string]any{{"difficulty": "NORMAL", "line_key": rows[6].LineKey, "catalog_boss_id": f.ordinaryBoss}})
+	if len(again) != 1 || again[0].Status != "already_imported" || again[0].UnclaimedID == nil || *again[0].UnclaimedID != *results[1].UnclaimedID {
 		t.Fatalf("a second import must not record the line again: %+v", again)
 	}
 	if r := f.addonPreview(payload).Rows[6]; r.IsImportable || !strings.Contains(strings.Join(r.Warnings, " "), "Bereits als Beute ohne Empfänger") {
@@ -333,8 +334,8 @@ func TestAddonLootImportIsIdempotentAcrossStaff(t *testing.T) {
 	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1|1760000100|-|%s|%s|given\n2|1760000200|-|%s|%s|given", f.raidID, f.ordinaryItem, first, f.tokenItem, first)
 	preview := f.addonPreview(payload)
 	selections := []map[string]any{
-		{"line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"},
-		{"line_key": preview.Rows[1].LineKey, "catalog_boss_id": f.tokenBoss, "character_id": f.firstChar, "award_method": "SECOND"},
+		{"difficulty": "NORMAL", "line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"},
+		{"difficulty": "NORMAL", "line_key": preview.Rows[1].LineKey, "catalog_boss_id": f.tokenBoss, "character_id": f.firstChar, "award_method": "SECOND"},
 	}
 	results := f.addonImport(f.token, payload, selections)
 	if len(results) != 2 || results[0].Status != "created" || results[1].Status != "created" || results[0].CharacterName != first {
@@ -373,11 +374,11 @@ func TestAddonLootImportReportsFailuresPerLine(t *testing.T) {
 	first := f.characterName(f.firstChar)
 	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1|1760000100|-|%s|%s|given\n2|1760000200|-|%s|%s|given", f.raidID, f.ordinaryItem, first, f.ordinaryItem, first)
 	preview := f.addonPreview(payload)
-	results := f.addonImport(f.token, payload, []map[string]any{
-		{"line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
-		{"line_key": preview.Rows[1].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "ENHANCED"},
-		{"line_key": "raidsync-unknown", "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"},
-	})
+	results := f.addonImportStatus(f.token, payload, []map[string]any{
+		{"difficulty": "NORMAL", "line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
+		{"difficulty": "NORMAL", "line_key": preview.Rows[1].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "ENHANCED"},
+		{"difficulty": "NORMAL", "line_key": "raidsync-unknown", "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"},
+	}, http.StatusUnprocessableEntity)
 	if len(results) != 3 || results[0].Code != "recipient_not_in_roster" || results[1].Code != "insufficient_balance" || results[2].Code != "unknown_line" {
 		t.Fatalf("results: %+v", results)
 	}
@@ -402,7 +403,7 @@ func TestAddonLootImportAppliesItemLock(t *testing.T) {
 		t.Fatalf("lock warning missing: %+v", preview.Rows[0])
 	}
 	results := f.addonImport(f.token, payload, []map[string]any{
-		{"line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "SECOND"},
+		{"difficulty": "NORMAL", "line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "SECOND"},
 	})
 	if len(results) != 1 || results[0].Status != "created" || results[0].CharacterName != f.characterName(f.secondChar) {
 		t.Fatalf("lock owner must receive the item: %+v", results)
@@ -447,7 +448,7 @@ func TestAddonLootReimportAfterTradeKeepsTheAward(t *testing.T) {
 	if len(preview.RecipientOptions) != 2 {
 		t.Fatalf("recipient options: %+v", preview.RecipientOptions)
 	}
-	results := f.addonImport(f.token, held, []map[string]any{{"line_key": row.LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"}})
+	results := f.addonImport(f.token, held, []map[string]any{{"difficulty": "NORMAL", "line_key": row.LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"}})
 	if len(results) != 1 || results[0].Status != "created" {
 		t.Fatalf("first import: %+v", results)
 	}
@@ -461,7 +462,7 @@ func TestAddonLootReimportAfterTradeKeepsTheAward(t *testing.T) {
 	if same := f.addonPreview(held).Rows[0]; len(same.Warnings) != 1 {
 		t.Fatalf("an unchanged imported line only says it was imported: %+v", same)
 	}
-	repeat := f.addonImport(f.token, traded, []map[string]any{{"line_key": again.LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"}})
+	repeat := f.addonImport(f.token, traded, []map[string]any{{"difficulty": "NORMAL", "line_key": again.LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"}})
 	if len(repeat) != 1 || repeat[0].Status != "already_imported" {
 		t.Fatalf("repeat must not create a second award: %+v", repeat)
 	}
@@ -478,11 +479,11 @@ func TestAddonLootImportAcceptsAChosenRecipient(t *testing.T) {
 	// A unique item went to a helper first, who traded it to the winner.
 	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1|1760000100|-|%s|Helfer|given\n2|1760000200|-|%s|-|-", f.raidID, f.ordinaryItem, f.ordinaryItem)
 	preview := f.addonPreview(payload)
-	results := f.addonImport(f.token, payload, []map[string]any{
-		{"line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
-		{"line_key": preview.Rows[1].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": 0, "award_method": "MAIN"},
-	})
-	if len(results) != 2 || results[0].Status != "created" || results[0].CharacterName != f.characterName(f.secondChar) || results[1].Code != "recipient_not_in_roster" {
+	results := f.addonImportStatus(f.token, payload, []map[string]any{
+		{"difficulty": "NORMAL", "line_key": preview.Rows[0].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": f.secondChar, "award_method": "MAIN"},
+		{"difficulty": "NORMAL", "line_key": preview.Rows[1].LineKey, "catalog_boss_id": f.ordinaryBoss, "character_id": 0, "award_method": "MAIN"},
+	}, http.StatusUnprocessableEntity)
+	if len(results) != 2 || results[0].Code != "import_rolled_back" || results[0].CharacterName != f.characterName(f.secondChar) || results[1].Code != "recipient_not_in_roster" {
 		t.Fatalf("results: %+v", results)
 	}
 }
@@ -701,7 +702,7 @@ func TestAddonLootImportConcurrentStaffCreateOneAward(t *testing.T) {
 	assistant := login(t, f.srv.Client(), f.srv, "parallel-assistant", "password")
 	payload := fmt.Sprintf("RS1|LOOT|%d|Recorder|1760000000\n1|1760000100|-|%s|%s|given", f.raidID, f.ordinaryItem, f.characterName(f.firstChar))
 	key := f.addonPreview(payload).Rows[0].LineKey
-	selections := []map[string]any{{"line_key": key, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"}}
+	selections := []map[string]any{{"difficulty": "NORMAL", "line_key": key, "catalog_boss_id": f.ordinaryBoss, "character_id": f.firstChar, "award_method": "MAIN"}}
 	start := make(chan struct{})
 	results := make([][]addonImportResult, 2)
 	var wg sync.WaitGroup

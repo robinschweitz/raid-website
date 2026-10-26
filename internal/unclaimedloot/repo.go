@@ -47,6 +47,12 @@ func (r *Repo) get(ctx context.Context, id int64) (*Entry, error) {
 
 // insert stores a new entry and its audit entry in one transaction.
 func (r *Repo) insert(ctx context.Context, entry *Entry, actorID int64, reason string) error {
+	if _, bound := r.db.(bun.Tx); bound {
+		if _, err := r.db.NewInsert().Model(entry).Exec(ctx); err != nil {
+			return err
+		}
+		return audit.NewRepo(r.db).Record(ctx, actorID, "unclaimed_loot", entry.ID, "create", nil, entry, reason)
+	}
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewInsert().Model(entry).Exec(ctx); err != nil {
 			return err

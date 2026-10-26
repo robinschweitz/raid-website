@@ -34,6 +34,10 @@ body {
   min-width: 320px;
 }
 
+small {
+  font-size: 12px;
+}
+
 a {
   color: var(--accent);
   text-decoration: none;

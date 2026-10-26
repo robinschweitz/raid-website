@@ -35,3 +35,11 @@ test('inline font sizes in TSX are at least 12px', () => {
   walk(path.join(__dirname, '..', 'src'))
   assert.deepEqual(tooSmall, [])
 })
+
+test('a global small rule keeps unstyled <small> text at 12px or more', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.css'), 'utf8')
+  const rule = css.match(/(?:^|\n)small\s*\{([^}]*)\}/)
+  assert.ok(rule, 'index.css needs a global small rule')
+  const size = rule[1].match(/font-size:\s*([0-9.]+)px/)
+  assert.ok(size && Number(size[1]) >= 12)
+})

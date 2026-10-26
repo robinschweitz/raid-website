@@ -24,6 +24,9 @@ type claimCodeRequest struct {
 }
 
 func registrationError(w http.ResponseWriter, err error) {
+	if writePasswordBusy(w, err) {
+		return
+	}
 	switch {
 	case errors.Is(err, registration.ErrInvalidCode):
 		WriteError(w, http.StatusBadRequest, "registration_code_invalid", "Code ungültig oder abgelaufen.")
@@ -217,7 +220,9 @@ func (a *API) registerWithCode(w http.ResponseWriter, r *http.Request) {
 		registrationError(w, err)
 		return
 	}
-	a.setSessionCookie(w, token, sessionMaxAgeSeconds)
+	if !a.startSession(w, r, token, p.ID) {
+		return
+	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(p, p)})
 }
 

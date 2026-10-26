@@ -56,7 +56,14 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
 - **Web Push (ADR 102).** The `push` package owns `push_subscriptions` and implements RFC 8291
   encryption and RFC 8292 VAPID with the standard library (`crypto/ecdh`, `crypto/hkdf`,
   AES-GCM, ECDSA). `GET /api/v1/push/config` and `POST /api/v1/push/subscriptions` need
-  MEMBER, `DELETE /api/v1/push/subscriptions` a session. The handlers that create a poll, plan
+  MEMBER, `DELETE /api/v1/push/subscriptions` a session. Each subscription belongs to a
+  player on one device, identified by the hash of the HttpOnly `raid_device` cookie
+  (`device_hash`). Session start removes other players' subscriptions on that device, logout
+  removes the actor's, `auth` removes them with the sessions on password and account changes
+  (`push.RevokeForPlayer` in the same transaction), and `POST /api/v1/push/subscriptions/sync`
+  lets the browser check in after each sign-in, before the client shows the player as signed
+  in; an unconfirmed or failed check-in drops the browser's subscription. Rows without a device
+  get no messages, and `cmd/server` deletes them after 30 days at startup (ADR 103). The handlers that create a poll, plan
   or create raids, or add roster rows write their answer, flush it, and then call
   `push.Service.Notify`/`NotifyPlayers` in the same request: at most four parallel posts with a
   `sync.WaitGroup`, 15 s in total, on a context detached from the client's cancellation.

@@ -11,11 +11,11 @@ import (
 // SC-005: new hashes are Argon2id in PHC format with a fresh salt each time.
 func TestArgon2idRoundTrip(t *testing.T) {
 	password := "a-secure-long-password"
-	first, err := HashPassword(password)
+	first, err := HashPassword(context.Background(), password)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := HashPassword(password)
+	second, err := HashPassword(context.Background(), password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,13 +25,13 @@ func TestArgon2idRoundTrip(t *testing.T) {
 	if !strings.HasPrefix(first, argonPrefix) {
 		t.Fatalf("hash %q does not start with %q", first, argonPrefix)
 	}
-	if err := verifyStoredPassword(first, password); err != nil {
+	if err := verifyStoredPassword(context.Background(), first, password); err != nil {
 		t.Fatalf("correct password rejected: %v", err)
 	}
-	if err := verifyStoredPassword(first, "wrong-password"); err == nil {
+	if err := verifyStoredPassword(context.Background(), first, "wrong-password"); err == nil {
 		t.Fatal("wrong password accepted")
 	}
-	if err := verifyStoredPassword(first+"x", password); err == nil {
+	if err := verifyStoredPassword(context.Background(), first+"x", password); err == nil {
 		t.Fatal("corrupted hash accepted")
 	}
 }
@@ -39,20 +39,20 @@ func TestArgon2idRoundTrip(t *testing.T) {
 // A stored hash with out-of-bounds parameters is rejected before hashing, so a
 // corrupted row cannot make one login allocate unbounded memory.
 func TestArgon2idRejectsUnsafeParameters(t *testing.T) {
-	valid, err := HashPassword("a-secure-long-password")
+	valid, err := HashPassword(context.Background(), "a-secure-long-password")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, params := range []string{"m=4194304,t=3,p=1", "m=65536,t=0,p=1", "m=65536,t=100,p=1", "m=65536,t=3,p=0", "m=65536,t=03,p=1"} {
 		hash := strings.Replace(valid, "m=65536,t=3,p=1", params, 1)
-		if err := verifyStoredPassword(hash, "a-secure-long-password"); err == nil {
+		if err := verifyStoredPassword(context.Background(), hash, "a-secure-long-password"); err == nil {
 			t.Errorf("parameters %s accepted", params)
 		}
 	}
 }
 
 func TestNeedsRehash(t *testing.T) {
-	current, err := HashPassword("a-secure-long-password")
+	current, err := HashPassword(context.Background(), "a-secure-long-password")
 	if err != nil {
 		t.Fatal(err)
 	}

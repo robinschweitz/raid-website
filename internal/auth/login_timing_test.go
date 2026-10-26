@@ -13,9 +13,9 @@ func recordPasswordChecks(t *testing.T) *[]string {
 	t.Helper()
 	var hashes []string
 	original := comparePassword
-	comparePassword = func(hash, password []byte) error {
+	comparePassword = func(ctx context.Context, hash, password []byte) error {
 		hashes = append(hashes, string(hash))
-		return verifyStoredPassword(string(hash), string(password))
+		return verifyStoredPassword(ctx, string(hash), string(password))
 	}
 	t.Cleanup(func() { comparePassword = original })
 	return &hashes
@@ -26,7 +26,7 @@ func TestDummyPasswordHashUsesCurrentParameters(t *testing.T) {
 	if !strings.HasPrefix(dummyPasswordHash, argonPrefix) {
 		t.Fatalf("dummy hash %q does not use the current Argon2id parameters %q", dummyPasswordHash, argonPrefix)
 	}
-	if err := verifyStoredPassword(dummyPasswordHash, "any password"); !errors.Is(err, errPasswordMismatch) {
+	if err := verifyStoredPassword(context.Background(), dummyPasswordHash, "any password"); !errors.Is(err, errPasswordMismatch) {
 		t.Fatalf("dummy hash check = %v, want a plain mismatch", err)
 	}
 }

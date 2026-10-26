@@ -1,4 +1,4 @@
-# ADR 103: Class icons served locally, item icons stay on wow.zamimg.com
+# ADR 104: Class icons served locally, item icons stay on wow.zamimg.com
 
 Status: Accepted. Amends DQ-2 (Owner 2026-10-22).
 

@@ -131,8 +131,7 @@ func (a *API) createPlayer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not create player")
 		return
 	}
-	actor, _ := CurrentPlayer(r)
-	WriteJSON(w, http.StatusCreated, map[string]any{"data": visiblePlayerPtr(actor, p)})
+	WriteJSON(w, http.StatusCreated, map[string]any{"data": visiblePlayerPtr(accountViewer(r), p)})
 }
 
 func (a *API) getPlayer(w http.ResponseWriter, r *http.Request) {
@@ -150,8 +149,7 @@ func (a *API) getPlayer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not load player")
 		return
 	}
-	actor, _ := CurrentPlayer(r)
-	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(actor, p)})
+	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(accountViewer(r), p)})
 }
 
 func (a *API) mergePlayer(w http.ResponseWriter, r *http.Request) {

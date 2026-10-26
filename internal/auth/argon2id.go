@@ -1,12 +1,14 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/bcrypt"
@@ -34,21 +36,43 @@ var argonPrefix = fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$", argon2.Version, 
 // logins cannot claim more than slots × 64 MiB of memory on the host.
 var argonSlots = make(chan struct{}, 2)
 
+// argonSlotWait bounds how long a request waits for a free slot. A flood of
+// logins then gets ErrPasswordHashBusy quickly instead of a queue that holds
+// every later login until the write timeout (SC-005). Tests shorten it.
+var argonSlotWait = 5 * time.Second
+
 var errPasswordMismatch = errors.New("password mismatch")
 
-func argonKey(password, salt []byte, time, memory uint32, threads uint8, keyLen uint32) []byte {
-	argonSlots <- struct{}{}
+// ErrPasswordHashBusy is returned when no Argon2id slot became free in time
+// or the request ended while it waited. No password was checked, so it is
+// never counted as a failed login.
+var ErrPasswordHashBusy = errors.New("password hashing busy")
+
+func argonKey(ctx context.Context, password, salt []byte, passes, memory uint32, threads uint8, keyLen uint32) ([]byte, error) {
+	wait := time.NewTimer(argonSlotWait)
+	defer wait.Stop()
+	select {
+	case argonSlots <- struct{}{}:
+	case <-wait.C:
+		return nil, ErrPasswordHashBusy
+	case <-ctx.Done():
+		// A client that gave up must not keep its place in the queue.
+		return nil, fmt.Errorf("%w: %w", ErrPasswordHashBusy, ctx.Err())
+	}
 	defer func() { <-argonSlots }()
-	return argon2.IDKey(password, salt, time, memory, threads, keyLen)
+	return argon2.IDKey(password, salt, passes, memory, threads, keyLen), nil
 }
 
 // HashPassword derives an Argon2id hash in PHC string format for storage.
-func HashPassword(password string) (string, error) {
+func HashPassword(ctx context.Context, password string) (string, error) {
 	salt := make([]byte, argonSaltLen)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("generate password salt: %w", err)
 	}
-	key := argonKey([]byte(password), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
+	key, err := argonKey(ctx, []byte(password), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
+	if err != nil {
+		return "", err
+	}
 	encoding := base64.RawStdEncoding
 	return argonPrefix + encoding.EncodeToString(salt) + "$" + encoding.EncodeToString(key), nil
 }
@@ -62,7 +86,7 @@ func needsRehash(hash string) bool {
 // verifyStoredPassword checks a password against an Argon2id PHC hash or a
 // legacy bcrypt hash. Parameters outside sane bounds are rejected, so a
 // corrupted row cannot make one login allocate unbounded memory.
-func verifyStoredPassword(hash, password string) error {
+func verifyStoredPassword(ctx context.Context, hash, password string) error {
 	if strings.HasPrefix(hash, "$2a$") || strings.HasPrefix(hash, "$2b$") || strings.HasPrefix(hash, "$2y$") {
 		return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	}
@@ -87,7 +111,10 @@ func verifyStoredPassword(hash, password string) error {
 	if err != nil || len(expected) < 16 || len(expected) > 64 {
 		return errors.New("invalid argon2 key")
 	}
-	actual := argonKey([]byte(password), salt, time, memory, threads, uint32(len(expected)))
+	actual, err := argonKey(ctx, []byte(password), salt, time, memory, threads, uint32(len(expected)))
+	if err != nil {
+		return err
+	}
 	if subtle.ConstantTimeCompare(actual, expected) != 1 {
 		return errPasswordMismatch
 	}

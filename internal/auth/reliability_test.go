@@ -191,7 +191,7 @@ func TestConcurrentCredentialsPreservePassword(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := verifyStoredPassword(after.PasswordHash, "replacement-password"); err != nil {
+	if err := verifyStoredPassword(context.Background(), after.PasswordHash, "replacement-password"); err != nil {
 		t.Fatalf("blank-password update lost the replacement hash: %v", err)
 	}
 	if after.Name != before.Name || after.Active != before.Active || !after.CreatedAt.Equal(before.CreatedAt) || after.Role != validation.RoleMember {
@@ -343,7 +343,7 @@ func TestDeleteWebAuthnCredentialRejectsOtherOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherPassword, err := HashPassword("other-password")
+	otherPassword, err := HashPassword(context.Background(), "other-password")
 	if err != nil {
 		t.Fatal(err)
 	}

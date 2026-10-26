@@ -1,4 +1,4 @@
-export const appVersion = '1.0.51'
+export const appVersion = '1.0.53'
 
 export const changelog = [
   {
@@ -6,6 +6,17 @@ export const changelog = [
     title: 'Klassen-Symbole von der eigenen Seite',
     changes: [
       'Die Klassen-Symbole der Charaktere werden jetzt von dieser Seite geladen und nicht mehr von wow.zamimg.com. Dadurch erfährt kein fremder Server mehr, wer die Seite besucht. Nur die Item-Symbole im Loot-Katalog kommen weiter von dort.',
+    ],
+  },
+  {
+    version: '1.0.51',
+    title: 'Sicherere Anmeldung und Benachrichtigungen',
+    changes: [
+      'Die Sperre nach zu vielen falschen Passwörtern greift jetzt auch, wenn viele Anmeldeversuche gleichzeitig kommen.',
+      'Ist der Server gerade ausgelastet, meldet die Anmeldung das nach wenigen Sekunden, statt lange zu warten. Einfach kurz danach noch einmal versuchen.',
+      'Benachrichtigungen bleiben auf deinem Gerät eingeschaltet, auch wenn du dich dort später neu anmeldest. Meldet sich jemand anderes auf dem Gerät an oder meldest du dich ab, enden sie dort. Nach einer Passwortänderung enden sie auf deinen anderen Geräten.',
+      'Wer sich mit einem Code registriert und dabei einen schon vorhandenen Spieler übernimmt, ist jetzt auch Mitglied und kann sich sofort für Raids anmelden.',
+      'Admins ohne zweiten Faktor sehen Logins und Rollen anderer Spieler erst, wenn sie die Zwei-Faktor-Anmeldung eingerichtet haben.',
     ],
   },
   {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"raid-website/internal/player"
+	"raid-website/internal/validation"
 )
 
 type playerCtxKey struct{}
@@ -20,6 +21,19 @@ func WithAdminSecondFactor(ctx context.Context, has bool) context.Context {
 func adminHasSecondFactor(r *http.Request) bool {
 	has, _ := r.Context().Value(adminMFACtxKey{}).(bool)
 	return has
+}
+
+// accountViewer returns the player whose rights decide which account fields
+// (login name, role, timestamps) a response shows. An ADMIN without a second
+// factor sees them like a RAIDLEADER does, only for the own account (SC-040).
+func accountViewer(r *http.Request) *player.Player {
+	p, _ := CurrentPlayer(r)
+	if p != nil && p.Role == validation.RoleAdmin && !adminHasSecondFactor(r) {
+		limited := *p
+		limited.Role = validation.RoleRaidleader
+		return &limited
+	}
+	return p
 }
 
 // WithActor stores the authenticated player on the context.

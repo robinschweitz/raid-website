@@ -3473,6 +3473,18 @@ test('completed raids do not offer removing participants', async () => {
   assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Aus dem Raid entfernen').length, 0)
 })
 
+test('the recruitment editor waits for the saved template, so a late load cannot overwrite edits', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const { RaidRecruitment } = s.load('pages/Recruitment.tsx')
+  const view = s.mount(RaidRecruitment, { raidID: 8, seriesID: 3, attendance: [] })
+  assert.match(text(view.tree), /Vorlage wird geladen/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Setup leeren').length, 0, 'no editing before the template arrived')
+  const setupGrid = Array.from({ length: 5 }, () => ['Maintank', 'Offtank', 'Leer', 'Irgendein MDD', 'Irgendein RDD'])
+  resolveIf(s, '/api/v1/raids/8/recruitment-template', { text: 'Gespeichert', setup: setupGrid, updated_by: 1, updated_at: '2030-01-01T10:00:00Z' })
+  await flush(view)
+  assert.equal(button(view, 'Setup leeren').props.disabled, undefined)
+})
+
 test('recruitment template is loaded from the server, saved explicitly and the refresh only reloads the roster', async () => {
   const s = setup({ id: 1, role: 'RAIDASSISTENT' })
   const { RaidRecruitment } = s.load('pages/Recruitment.tsx')
@@ -3851,6 +3863,203 @@ test('push opt-in states, including iPhone without installation (FR-32)', () => 
   assert.equal(pushAvailability({ ...base, permission: 'denied' }), 'denied')
   assert.deepEqual(Array.from(base64URLToBytes('-_8')), [0xfb, 0xff])
   assert.deepEqual(subscriptionBody({ endpoint: 'https://fcm.googleapis.com/x', expirationTime: null, keys: { p256dh: 'p', auth: 'a' } }), { endpoint: 'https://fcm.googleapis.com/x', p256dh: 'p', auth: 'a' })
+})
+
+test('push changes run one at a time and a failed one does not block the next (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { runExclusive } = s.load('pushNotifications.ts')
+  const events = []
+  let releaseFirst
+  const first = runExclusive(() => new Promise((resolve) => { events.push('first:start'); releaseFirst = () => { events.push('first:end'); resolve('a') } }))
+  const second = runExclusive(async () => { events.push('second:start'); throw new Error('boom') })
+  const third = runExclusive(async () => { events.push('third:start'); return 'c' })
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(events, ['first:start'])
+  releaseFirst()
+  assert.equal(await first, 'a')
+  await assert.rejects(second, /boom/)
+  assert.equal(await third, 'c')
+  assert.deepEqual(events, ['first:start', 'first:end', 'second:start', 'third:start'])
+})
+
+const pushCheckInHarness = () => {
+  const subscription = { endpoint: 'https://fcm.googleapis.com/x', drops: 0, unsubscribe: () => { subscription.drops++; return Promise.resolve(true) } }
+  return subscription
+}
+const immediateQueue = (step) => step(new AbortController().signal)
+const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+test('the push check-in keeps only a subscription the server confirms and fails closed (FR-32.3, ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const run = (subscription, ask, deadlineMs = 1000) => checkInWithDeadline({ queue: immediateQueue, getSubscription: () => Promise.resolve(subscription), ask, deadlineMs })
+
+  assert.equal(await run(null, () => Promise.resolve(true)), 'none')
+  const own = pushCheckInHarness()
+  assert.equal(await run(own, () => Promise.resolve(true)), 'active')
+  assert.equal(own.drops, 0)
+  const foreign = pushCheckInHarness()
+  assert.equal(await run(foreign, () => Promise.resolve(false)), 'dropped')
+  assert.equal(foreign.drops, 1)
+  const failed = pushCheckInHarness()
+  assert.equal(await run(failed, () => Promise.reject(new Error('offline'))), 'dropped')
+  assert.equal(failed.drops, 1)
+  let signal
+  const hanging = pushCheckInHarness()
+  assert.equal(await run(hanging, (_endpoint, given) => { signal = given; return new Promise(() => {}) }, 20), 'timeout')
+  await settle(5)
+  assert.equal(hanging.drops, 1)
+  assert.equal(signal.aborted, true)
+})
+
+test('a stalled unsubscribe never holds the check-in (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const stalled = { endpoint: 'https://fcm.googleapis.com/x', drops: 0, unsubscribe: () => { stalled.drops++; return new Promise(() => {}) } }
+  const started = Date.now()
+  const outcome = await checkInWithDeadline({ queue: immediateQueue, getSubscription: () => Promise.resolve(stalled), ask: () => Promise.resolve(false), deadlineMs: 1000 })
+  assert.equal(outcome, 'dropped')
+  assert.equal(stalled.drops, 1)
+  assert.ok(Date.now() - started < 500, 'the check-in waited for unsubscribe')
+})
+
+test('a push step that never finishes ends at the deadline and still drops the subscription (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline, runExclusive } = s.load('pushNotifications.ts')
+  const subscription = pushCheckInHarness()
+  const blocked = () => new Promise(() => {})
+  let asked = false
+  const outcome = await checkInWithDeadline({ queue: blocked, getSubscription: () => Promise.resolve(subscription), ask: () => { asked = true; return Promise.resolve(true) }, deadlineMs: 20 })
+  assert.equal(outcome, 'timeout')
+  await settle(5)
+  assert.equal(subscription.drops, 1)
+  assert.equal(asked, false)
+  // The real queue does not let one stalled step hold the next one forever.
+  void runExclusive(() => new Promise(() => {}), 20)
+  assert.equal(await runExclusive(async () => 'next', 20), 'next')
+})
+
+test('a timed-out check-in leaves a subscription alone that a newer change created (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const previous = { ...pushCheckInHarness(), endpoint: 'https://fcm.googleapis.com/previous' }
+  const newer = { ...pushCheckInHarness(), endpoint: 'https://fcm.googleapis.com/newer' }
+  let held = previous
+  newer.unsubscribe = () => { newer.drops++; return Promise.resolve(true) }
+  const outcome = await checkInWithDeadline({
+    queue: immediateQueue,
+    getSubscription: () => Promise.resolve(held),
+    // While the server does not answer, the player turns push on again and the browser gets a new subscription.
+    ask: () => { held = newer; return new Promise(() => {}) },
+    deadlineMs: 20,
+  })
+  assert.equal(outcome, 'timeout')
+  await settle(5)
+  assert.equal(newer.drops, 0, 'the newer subscription was dropped by the old check-in')
+})
+
+test('a push change that starts after the wait limit cancels the stalled one (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { runExclusive } = s.load('pushNotifications.ts')
+  let stalledSignal
+  const stalled = runExclusive((signal) => { stalledSignal = signal; return settle(60).then(() => signal.aborted) }, 20)
+  const newer = await runExclusive(async (signal) => signal.aborted, 20)
+  assert.equal(newer, false, 'the newer change runs normally')
+  assert.equal(await stalled, true, 'the stalled change sees it was cancelled')
+  assert.equal(stalledSignal.aborted, true)
+  // A read-only step waits the same way but cancels nothing.
+  let readSignal
+  const slow = runExclusive((signal) => { readSignal = signal; return settle(60) }, 20)
+  await runExclusive(async () => undefined, 20, false)
+  await slow
+  assert.equal(readSignal.aborted, false)
+})
+
+test('a cancelled enable keeps a subscription that existed before and removes only one it created (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { enableSubscription } = s.load('pushNotifications.ts')
+  const browserSub = (endpoint) => {
+    const sub = { endpoint, drops: 0, unsubscribe: () => { sub.drops++; return Promise.resolve(true) }, toJSON: () => ({ endpoint, keys: { p256dh: 'p', auth: 'a' } }) }
+    return sub
+  }
+
+  // An existing subscription, a stalled enable, and a newer change that cancels it.
+  const existing = browserSub('https://fcm.googleapis.com/existing')
+  let controller = new AbortController()
+  let registered = 0
+  const stalledExisting = enableSubscription({
+    getSubscription: () => settle(30).then(() => existing),
+    subscribe: () => Promise.reject(new Error('must not subscribe')),
+    register: () => { registered++; return Promise.resolve() },
+  }, controller.signal)
+  controller.abort()
+  await assert.rejects(stalledExisting, /superseded/)
+  assert.equal(existing.drops, 0, 'the existing subscription was removed by the cancelled enable')
+  assert.equal(registered, 0)
+
+  // Cancelled while the browser created a new subscription: that one is removed again.
+  const fresh = browserSub('https://fcm.googleapis.com/fresh')
+  controller = new AbortController()
+  const stalledCreate = enableSubscription({
+    getSubscription: () => Promise.resolve(null),
+    subscribe: () => settle(30).then(() => fresh),
+    register: () => { registered++; return Promise.resolve() },
+  }, controller.signal)
+  await settle(5)
+  controller.abort()
+  await assert.rejects(stalledCreate, /superseded/)
+  assert.equal(fresh.drops, 1)
+  assert.equal(registered, 0)
+
+  // Cancelled before anything happened: nothing is created.
+  controller = new AbortController()
+  controller.abort()
+  let subscribed = 0
+  await assert.rejects(enableSubscription({ getSubscription: () => Promise.resolve(null), subscribe: () => { subscribed++; return Promise.resolve(fresh) }, register: () => Promise.resolve() }, controller.signal), /superseded/)
+  assert.equal(subscribed, 0)
+
+  // Cancelled while the server request runs: an existing subscription still stays.
+  const kept = browserSub('https://fcm.googleapis.com/kept')
+  controller = new AbortController()
+  const cancelledRegister = enableSubscription({
+    getSubscription: () => Promise.resolve(kept),
+    subscribe: () => Promise.reject(new Error('must not subscribe')),
+    register: (_sub, signal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))),
+  }, controller.signal)
+  await settle(5)
+  controller.abort()
+  await assert.rejects(cancelledRegister, /aborted/)
+  assert.equal(kept.drops, 0)
+
+  // Not cancelled: a failed registration removes the subscription the server does not know.
+  const unknown = browserSub('https://fcm.googleapis.com/unknown')
+  await assert.rejects(enableSubscription({ getSubscription: () => Promise.resolve(unknown), subscribe: () => Promise.reject(new Error('no')), register: () => Promise.reject(new Error('server')) }, new AbortController().signal), /server/)
+  assert.equal(unknown.drops, 1)
+})
+
+test('a late check-in answer after the deadline changes nothing (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const subscription = pushCheckInHarness()
+  const outcome = await checkInWithDeadline({ queue: immediateQueue, getSubscription: () => Promise.resolve(subscription), ask: () => settle(60).then(() => true), deadlineMs: 20 })
+  assert.equal(outcome, 'timeout')
+  await settle(80)
+  assert.equal(subscription.drops, 1, 'dropped once at the deadline and not kept by the late answer')
+})
+
+test('every sign-in path checks push in before the player is shown as signed in (ADR 103)', () => {
+  const read = (file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8')
+  const auth = read('src/auth.tsx')
+  // login, MFA code, security key, and session load: each awaits the check-in before setPlayer.
+  assert.equal((auth.match(/await checkInPush\(\)\s*\n(\s*\/\/[^\n]*\n)?\s*if \(requestVersion === version\.current\)/g) ?? []).length, 4)
+  const push = read('src/pushNotifications.ts')
+  assert.doesNotMatch(push, /localStorage/)
+  assert.match(push, /\/api\/v1\/push\/subscriptions\/sync/)
+  const settings = read('src/components/PushNotificationSettings.tsx')
+  assert.match(settings, /await pushActiveOnThisDevice\(\)/)
+  assert.match(settings, /addEventListener\('visibilitychange'/)
+  // The permission prompt stays outside the queue so it still belongs to the click.
+  assert.match(push, /requestPermission\(\)[\s\S]*await runExclusive\(/)
 })
 
 test('the browser is asked for notification permission only after a click (FR-32)', () => {

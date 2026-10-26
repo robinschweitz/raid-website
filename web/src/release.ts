@@ -1,4 +1,4 @@
-export const appVersion = '1.0.52'
+export const appVersion = '1.0.54'
 
 export const changelog = [
   {
@@ -7,6 +7,13 @@ export const changelog = [
     changes: [
       'Im Reiter „Loot“ eines Raids stehen jetzt die Bosskills mit Schwierigkeit. Die Raidleitung kann Kills eintragen, die Schwierigkeit ändern und Kills entfernen. Ohne Kills steht dort, dass keine erfasst sind.',
       'Auf der Übersicht sind getötete Bosse des nächsten Raids hervorgehoben. Angezeigt werden nur eingetragene Kills.',
+    ],
+  },
+  {
+    version: '1.0.53',
+    title: 'Klassen-Symbole von der eigenen Seite',
+    changes: [
+      'Die Klassen-Symbole der Charaktere werden jetzt von dieser Seite geladen und nicht mehr von wow.zamimg.com. Dadurch erfährt kein fremder Server mehr, wer die Seite besucht. Nur die Item-Symbole im Loot-Katalog kommen weiter von dort.',
     ],
   },
   {

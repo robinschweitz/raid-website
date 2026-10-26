@@ -415,7 +415,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** A command `cmd/reset-code`, run on the server as the application user, MUST create a reset code (SC-042) for a named player and print it once. It MUST open the database directly, MUST NOT be reachable over HTTP, MUST write an audit entry with the actor "server operator", and MUST be logged as a security event (SC-041). It MUST NOT set a password or remove MFA itself; that happens only when the code is redeemed.
 - **Enforcement:** `cmd/reset-code` (new) using the `registration` reset-code service.
-- **Evidence:** FR-3.11, OD-019 (owner, 2026-10-23). Code: **not built**. Threats: T-049.
+- **Evidence:** FR-3.11, OD-019 (owner, 2026-10-23). Code: built in #83: `cmd/reset-code` uses the shared reset service, audits as "server operator", logs a security event without the code and prints it once. Threats: T-049.
 - **Verification:** Running the command for the only Admin prints a code that works once within 72 hours; the audit log shows the operator entry; no HTTP route reaches the command.
 
 **SC-052 - Service worker without cache; push shows fixed texts only**

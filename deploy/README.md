@@ -367,3 +367,21 @@ and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
    was rotated. Check the audit log for changes made during the incident and
    correct them as Admin. Re-enable `raid-website-update.timer`. Record any
    spec gap you found in `SECURITY.md` or `THREAT_MODEL.md`.
+
+### Recover the only Admin with a reset code (SC-051)
+
+Use the deployed version after its database migrations have completed. With the
+same protected environment and service user as the server, run:
+
+```sh
+go run ./cmd/reset-code --player-id 123
+# Or use an unambiguous exact player name / login:
+go run ./cmd/reset-code --player 'Player name'
+```
+
+The command prints the 72-hour code once and revokes earlier unused codes. Send
+it ingame to that player's main character; do not paste it into a ticket or log.
+Unknown/ambiguous names fail without a write; use the numeric ID when needed.
+The audit identifies the actor as `server operator`; the security event contains
+only the player ID. Redemption requires #82 and removes MFA and all sessions.
+The Admin must set up MFA again before using Admin functions (SC-040).

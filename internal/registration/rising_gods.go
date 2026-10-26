@@ -158,22 +158,6 @@ func (c RisingGodsClient) SearchCharacters(ctx context.Context, query string) ([
 	return rowsAny.([]ExternalCharacter), nil
 }
 
-// WarmSearch makes sure the cache holds a fresh result for query. Unlike
-// SearchCharacters it waits for the upstream fetch instead of serving a stale
-// entry, so the caller controls how many upstream requests run at once.
-func (c RisingGodsClient) WarmSearch(ctx context.Context, query string) error {
-	q := strings.TrimSpace(query)
-	if len([]rune(q)) < 3 {
-		return ErrExternalInvalid
-	}
-	cacheKey := "search:" + strings.ToLower(q)
-	if _, fresh, ok := c.sharedCache().getSearch(cacheKey); ok && fresh {
-		return nil
-	}
-	_, err := c.sharedCache().do(ctx, cacheKey, c.refreshSearch(ctx, cacheKey, q))
-	return err
-}
-
 func (c RisingGodsClient) refreshSearch(ctx context.Context, cacheKey, q string) func() (any, error) {
 	return func() (any, error) {
 		if rows, fresh, ok := c.sharedCache().getSearch(cacheKey); ok && fresh {

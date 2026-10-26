@@ -113,6 +113,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/players/{id}", RequireAuth(a.getPlayer))
 	mux.HandleFunc("PUT /api/v1/players/{id}/account", RequireRole(validation.RoleAdmin, a.setAccount))
 	mux.HandleFunc("POST /api/v1/players/{id}/merge", RequireRole(validation.RoleAdmin, a.mergePlayer))
+	mux.HandleFunc("POST /api/v1/players/{id}/anonymise", RequireRole(validation.RoleAdmin, a.anonymisePlayer))
 	mux.HandleFunc("GET /api/v1/players/{id}/characters", RequireAuth(a.listPlayerCharacters))
 	mux.HandleFunc("POST /api/v1/players/{id}/characters", RequireRole(validation.RoleAdmin, a.createCharacter))
 

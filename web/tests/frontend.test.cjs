@@ -4134,3 +4134,29 @@ test('the class icons are bundled with the site', () => {
     assert.ok(fs.statSync(path.join(__dirname, '..', 'public', 'class-icons', `classicon_${name}.jpg`)).size > 0)
   }
 })
+
+test('an Admin confirms before anonymising another player and a declined confirmation sends nothing (FR-30.2)', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(s, 2)
+  await flush(view)
+  const anonymiseForm = () => nodes(view.tree, (node) => node.type === 'form' && node.props.onSubmit && nodes(node, (child) => child.type === 'button').some((b) => text(b) === 'Spieler anonymisieren'))[0]
+  assert.ok(anonymiseForm(), 'the anonymise form is shown to Admins on other profiles')
+  s.confirmAnswers.push(false)
+  await anonymiseForm().props.onSubmit({ preventDefault() {} })
+  assert.match(s.confirms[0], /anonymisieren/)
+  assert.equal(writes(s).length, 0)
+  void anonymiseForm().props.onSubmit({ preventDefault() {} })
+  await flush(view)
+  assert.equal(writes(s).length, 1)
+  assert.equal(writes(s)[0].url, '/api/v1/players/2/anonymise')
+  writes(s)[0].resolve({})
+})
+
+test('the own profile offers no anonymise action', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
+  resolvePlayer(s, 1)
+  await flush(view)
+  assert.equal(button(view, 'Spieler anonymisieren'), undefined)
+})

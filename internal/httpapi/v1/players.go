@@ -195,3 +195,39 @@ func (a *API) mergePlayer(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+type anonymisePlayerRequest struct {
+	Reason string `json:"reason"`
+}
+
+func (a *API) anonymisePlayer(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid player id")
+		return
+	}
+	var req anonymisePlayerRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	actor, ok := CurrentPlayer(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "authentication required")
+		return
+	}
+	if err := a.AccountMerge.Anonymise(r.Context(), id, actor.ID, req.Reason); err != nil {
+		switch {
+		case errors.Is(err, player.ErrLastAdmin):
+			WriteError(w, http.StatusConflict, "last_admin", lastAdminMessage)
+		case errors.Is(err, accountmerge.ErrAlreadyAnonymised):
+			WriteError(w, http.StatusConflict, "already_anonymised", err.Error())
+		case isNotFound(err):
+			WriteError(w, http.StatusNotFound, "not_found", "player not found")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "could not anonymise player")
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

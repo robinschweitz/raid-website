@@ -96,7 +96,10 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
 - **Operator reset command.** A new `cmd/reset-code` opens the database with the server's
   configuration and calls the `registration` reset-code service directly, like `cmd/sync-addons`
   calls `internal/addons`; it has no HTTP surface (SC-051, OD-019). Not built.
-- **Privacy.** `accountmerge` gains an Admin-only anonymise operation (FR-30.2–30.5). The privacy
+- **Privacy.** `accountmerge.Anonymise` (`POST /api/v1/players/{id}/anonymise`, Admin only) is built
+  (FR-30.2–30.5, SC-032). It runs in one transaction, reuses the last-Admin check, and writes the
+  audit entry `player_anonymise`; the audit reader (`audit.Repo.List`) uses that entry to hide the
+  actor name and the name in the player's own snapshots. The privacy
   page is a static frontend page; its contact name and address come from two new configuration
   values, read by `internal/config`, and reach the page through a public read endpoint
   `GET /api/v1/privacy-contact` (Owner 2026-10-22, AQ-6; endpoint confirmed 2026-10-23, backlog #49).
@@ -146,7 +149,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `registration` | Rising-Gods client and cache; registration requests, codes, claims; visitor search counter | Alliance level-80 filter, request deduplication, code expiry, visitor search limit | registration requests, codes, external profiles | FR-4, FR-7 | SUPPORTED (search limit not built; unused warmer to delete) |
 | `player` | Players, roles, public player view | Public field subset | players | FR-1.3, FR-1.9, FR-5.1–5.2 | SUPPORTED |
 | `character` | Characters, name history, merge aliases, transfer | Rising-Gods provenance uniqueness, merge conflicts | characters, name history, aliases | FR-6 | SUPPORTED |
-| `accountmerge` | Player merge; player anonymisation | Same-item lock conflict, credential retention; data deleted versus kept | (coordinator) | FR-5.3–5.7, FR-30.2–30.5 | SUPPORTED (anonymise not built) |
+| `accountmerge` | Player merge; player anonymisation | Same-item lock conflict, credential retention; data deleted versus kept | (coordinator) | FR-5.3–5.7, FR-30.2–30.5 | SUPPORTED |
 | `roster` | Guild ranks and raid groups | Configurable rows only | guild ranks, raid groups | FR-8.1 | SUPPORTED |
 | `lootcatalog` | Embedded catalog, startup mirror, boss order | Mode normalisation, catalog pair validity, full boss order | catalog mirror, initialisation reports, boss order | FR-8.2–8.3, FR-25 | SUPPORTED |
 | `raidseries` | Series configuration, recurrence calendar, planning | Local-week anchoring, DST errors, 520-week guard | raid series | FR-9 | SUPPORTED |

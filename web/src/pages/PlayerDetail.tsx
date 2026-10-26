@@ -100,6 +100,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
   const [mergePlayers, setMergePlayers] = useState<Player[]>([])
   const [mergeSourceID, setMergeSourceID] = useState('')
   const [mergeReason, setMergeReason] = useState('')
+  const [anonymiseReason, setAnonymiseReason] = useState('')
   const [mergeCharacterTarget, setMergeCharacterTarget] = useState('')
   const [mergeCharacterSource, setMergeCharacterSource] = useState('')
   const [mergeCharacterReason, setMergeCharacterReason] = useState('')
@@ -432,6 +433,23 @@ function PlayerDetail({ playerID, initialView }: Props) {
         await load()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Konten zusammenführen fehlgeschlagen')
+      }
+    })
+  }
+
+  const anonymisePlayer = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isAdmin || !player) return
+    if (!window.confirm(`${player.name} wirklich anonymisieren? Login, Passwort, Sitzungen, MFA und Rising-Gods-Profildaten werden gelöscht. Das kann nicht rückgängig gemacht werden.`)) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post(`/api/v1/players/${playerID}/anonymise`, { reason: anonymiseReason.trim() })
+        if (!isActive()) return
+        setAnonymiseReason('')
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anonymisieren fehlgeschlagen')
       }
     })
   }
@@ -844,6 +862,14 @@ function PlayerDetail({ playerID, initialView }: Props) {
                </select></label>
                <label>Grund<input aria-label="Grund für Kontozusammenführung" value={mergeReason} onChange={(event) => setMergeReason(event.target.value)} required /></label>
                <button type="submit" disabled={pending || !mergeSourceID || !mergeReason.trim()}>Zusammenführen</button>
+             </form>
+           </section>}
+           {isAdmin && !isOwnProfile && <section className="subcard">
+             <h3>Spieler anonymisieren</h3>
+             <p className="muted">Für Löschanfragen nach der Datenschutzerklärung. Login, Passwort, Sitzungen, MFA, Push-Abos und Rising-Gods-Profildaten werden gelöscht; der Spielername wird durch den Namen des ältesten Main-Charakters ersetzt. Raid-Historie, Loot, EP und Charakternamen bleiben erhalten, dieser Schritt ist also eine Pseudonymisierung und macht die Daten nicht anonym.</p>
+             <form className="inline-form" onSubmit={anonymisePlayer}>
+               <label>Grund (optional)<input aria-label="Grund für Anonymisierung" value={anonymiseReason} onChange={(event) => setAnonymiseReason(event.target.value)} /></label>
+               <button type="submit" disabled={pending}>Spieler anonymisieren</button>
              </form>
            </section>}
            {isOwnProfile && <section className="subcard">

@@ -1,8 +1,15 @@
-export const appVersion = '1.0.56'
+export const appVersion = '1.0.58'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Spieler anonymisieren',
+    changes: [
+      'Admins können einen Spieler auf dessen Löschanfrage anonymisieren: Login, Passwort, Sitzungen, MFA, Push-Abos und Rising-Gods-Profildaten werden gelöscht, der Name wird durch den des ältesten Main-Charakters ersetzt. Raid-Historie, Loot und EP bleiben erhalten; im Audit-Protokoll erscheint der alte Name nicht mehr.',
+    ],
+  },
+  {
+    version: '1.0.56',
     title: 'Lesbarere kleine Schrift',
     changes: [
       'Kleine Texte wie Abzeichen, Beschriftungen und Tabellenhinweise sind jetzt mindestens 12 Pixel groß und damit besser lesbar.',

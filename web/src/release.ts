@@ -1,8 +1,15 @@
-export const appVersion = '1.0.59'
+export const appVersion = '1.0.60'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Umfrage-Optionen in richtiger Reihenfolge',
+    changes: [
+      'In der Umfrageliste stehen die Antwortoptionen wieder in der eingestellten Reihenfolge, auch nachdem eine Umfrage bearbeitet und Optionen umsortiert wurden.',
+    ],
+  },
+  {
+    version: '1.0.59',
     title: 'EP-Korrekturen enden bei null',
     changes: [
       'Eine Korrektur an einem abgeschlossenen Raid zieht nie mehr EP ab, als der Spieler hat. Der Kontostand bleibt bei 0 und die fehlenden Punkte werden auch später nicht abgezogen.',

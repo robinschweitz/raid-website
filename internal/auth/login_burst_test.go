@@ -36,11 +36,23 @@ func parallelLogins(t *testing.T, svc *Service, count int, username func(int) st
 	return checked, limited
 }
 
+// waitForArgonSlots lets every login in a burst wait for a hashing slot, so the
+// limit tests below do not depend on how fast the machine hashes: a slow build
+// host (2 CPUs, other test packages running) otherwise hits argonSlotWait and
+// answers ErrPasswordHashBusy. The wait is restored when the test ends.
+func waitForArgonSlots(t *testing.T) {
+	t.Helper()
+	originalWait := argonSlotWait
+	argonSlotWait = 5 * time.Minute
+	t.Cleanup(func() { argonSlotWait = originalWait })
+}
+
 // Parallel wrong passwords for one account from one address reach the
 // password check at most loginFailureLimit times (SC-008): the attempt is
 // counted before the request waits for a hashing slot.
 func TestLoginLimitHoldsForParallelAttempts(t *testing.T) {
 	_, svc := loginLimitService(t)
+	waitForArgonSlots(t)
 	checked, limited := parallelLogins(t, svc, 12, func(int) string { return "owner" })
 	if checked != loginFailureLimit || limited != 12-loginFailureLimit {
 		t.Fatalf("checked %d, limited %d; want %d checked and the rest limited", checked, limited, loginFailureLimit)
@@ -50,6 +62,7 @@ func TestLoginLimitHoldsForParallelAttempts(t *testing.T) {
 // The per-address limit (SC-043) also holds for a parallel burst over many usernames.
 func TestAddressLimitHoldsForParallelAttempts(t *testing.T) {
 	_, svc := loginLimitService(t)
+	waitForArgonSlots(t)
 	const burst = addressFailureLimit + 6
 	checked, limited := parallelLogins(t, svc, burst, func(i int) string { return fmt.Sprintf("guess-%02d", i) })
 	if checked != addressFailureLimit || limited != burst-addressFailureLimit {

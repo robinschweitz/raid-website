@@ -1,8 +1,15 @@
-export const appVersion = '1.0.54'
+export const appVersion = '1.0.56'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Lesbarere kleine Schrift',
+    changes: [
+      'Kleine Texte wie Abzeichen, Beschriftungen und Tabellenhinweise sind jetzt mindestens 12 Pixel groß und damit besser lesbar.',
+    ],
+  },
+  {
+    version: '1.0.54',
     title: 'Bosskills im Raid und in der Übersicht',
     changes: [
       'Im Reiter „Loot“ eines Raids stehen jetzt die Bosskills mit Schwierigkeit. Die Raidleitung kann Kills eintragen, die Schwierigkeit ändern und Kills entfernen. Ohne Kills steht dort, dass keine erfasst sind.',

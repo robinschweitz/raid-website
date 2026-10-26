@@ -255,7 +255,7 @@ table.table.small {
   display: inline-block;
   padding: 0.1rem 0.5rem;
   border-radius: 3px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--muted);
@@ -516,7 +516,7 @@ label.inline-choice {
 .sidebar-caption, .eyebrow {
   text-transform: uppercase;
   letter-spacing: .14em;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
   color: #a3b8cc;
 }
@@ -559,7 +559,7 @@ label.inline-choice {
   display: block;
   margin-top: 2px;
   color: var(--muted);
-  font: 10px system-ui, sans-serif;
+  font: 12px system-ui, sans-serif;
   letter-spacing: .03em;
 }
 
@@ -597,7 +597,7 @@ main {
 
 .topbar-brand .muted {
   margin-left: 10px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .user > a {
@@ -640,7 +640,7 @@ main {
   justify-content: space-between;
   gap: 12px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 32px;
   padding: 18px 0 26px;
   border-top: 1px solid var(--border);
@@ -852,7 +852,7 @@ button, a, input, select, textarea {
   flex-direction: column;
   width: 68px;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -933,7 +933,7 @@ button, a, input, select, textarea {
 }
 
 .poll-preview .section-heading {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .positive {
@@ -1011,7 +1011,7 @@ button, a, input, select, textarea {
 .table th {
   color: #9fb6cb;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: .045em;
   text-transform: uppercase;
   background: rgba(19, 38, 59, 0.6);
@@ -1240,7 +1240,7 @@ input[type='checkbox'] {
 }
 
 .composition-role .role-label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .06em;
@@ -1294,7 +1294,7 @@ input[type='checkbox'] {
 }
 
 .attendance-ring .ring-text span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .06em;
@@ -1335,7 +1335,7 @@ input[type='checkbox'] {
 }
 
 .boss-progression .boss-label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .06em;
@@ -1362,7 +1362,7 @@ input[type='checkbox'] {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   border: 1px solid var(--border);
   background: var(--panel-2);
@@ -1502,7 +1502,7 @@ input[type='checkbox'] {
 }
 
 .notification-body time {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -1558,7 +1558,7 @@ input[type='checkbox'] {
 }
 
 .profile-panel .profile-stat span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .06em;
@@ -1570,7 +1570,7 @@ input[type='checkbox'] {
 }
 
 .profile-panel .profile-recent h4 {
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: .06em;
   color: var(--muted);
@@ -1594,7 +1594,7 @@ input[type='checkbox'] {
 }
 
 .chart-container .chart-title {
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: .06em;
   color: var(--muted);
@@ -1681,7 +1681,7 @@ input[type='checkbox'] {
   }
   .sidebar nav > .admin-nav {
     display: flex;
-    font-size: 11px;
+    font-size: 12px;
     padding: 8px;
   }
   .sidebar nav > .nav-link svg {
@@ -1721,7 +1721,7 @@ input[type='checkbox'] {
     gap: 4px;
     padding: 3px 12px;
     color: #a4b9ca;
-    font-size: 10px;
+    font-size: 12px;
   }
   .mobile-nav .active {
     color: #a4e7ff;

@@ -77,7 +77,7 @@ No numeric risk scores; the **Impact** line says in words what an attacker gains
 - **Impact:** someone whose new character carries the name of an old imported character gets that
   player's history and EP. The Admin issues the code and can see the linked player afterwards
   (FR-4.9).
-- **Status:** CONFIRMED. **Response:** Mitigate (OD-016: Admin confirms). **Rules:** FR-4.5, SC-049.
+- **Status:** CONFIRMED; fixed in #77 (the Admin's choice is stored with the code, redeem never matches by name). **Response:** Mitigate (OD-016: Admin confirms). **Rules:** FR-4.5, SC-049.
 
 **CT-006 — The last Admin can be demoted**
 - **Category:** Denial of service (administration). **Component:** `auth.SetCredentials`.

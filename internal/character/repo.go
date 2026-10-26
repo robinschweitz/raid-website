@@ -53,6 +53,13 @@ func (r *Repo) FindByName(ctx context.Context, name string) (*Character, error) 
 	return c, nil
 }
 
+// ListByName returns every character with exactly this name, oldest first.
+func (r *Repo) ListByName(ctx context.Context, name string) ([]Character, error) {
+	var rows []Character
+	err := r.db.NewSelect().Model(&rows).Where("name = ?", name).Order("id ASC").Scan(ctx)
+	return rows, err
+}
+
 func (r *Repo) FindByExternalProfile(ctx context.Context, source, profileID string) (*Character, error) {
 	c := new(Character)
 	err := r.db.NewSelect().Model(c).Where("external_source = ? AND external_profile_id = ?", source, profileID).Order("id ASC").Limit(1).Scan(ctx)

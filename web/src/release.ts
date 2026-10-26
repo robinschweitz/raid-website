@@ -1,8 +1,16 @@
-export const appVersion = '1.0.54'
+export const appVersion = '1.0.55'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Namensübereinstimmung bei der Registrierung',
+    changes: [
+      'Besitzt ein Spieler ohne Login schon einen Charakter mit dem angefragten Namen, zeigt die Registrierungsanfrage diesen Spieler an. Der Admin wählt „Diesem Spieler zuordnen“ oder „Neuer Spieler“, bevor der Code entsteht.',
+      'Beim Einlösen wird nur noch die gespeicherte Wahl befolgt. Ein gleicher Name allein verknüpft kein Konto mehr.',
+    ],
+  },
+  {
+    version: '1.0.54',
     title: 'Bosskills im Raid und in der Übersicht',
     changes: [
       'Im Reiter „Loot“ eines Raids stehen jetzt die Bosskills mit Schwierigkeit. Die Raidleitung kann Kills eintragen, die Schwierigkeit ändern und Kills entfernen. Ohne Kills steht dort, dass keine erfasst sind.',

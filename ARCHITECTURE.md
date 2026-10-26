@@ -109,7 +109,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   boss come from `lootcatalog` drops for the raid's instance and size (FR-29.5, FR-29.6,
   FR-29.9, FR-29.14) (Owner 2026-10-22, AQ-5). Endpoints: `GET /api/v1/raids/{id}/kills`
   (signed-in), `POST /api/v1/raids/{id}/kills`, `PATCH /api/v1/raids/{id}/kills/{killID}`,
-  `POST /api/v1/raids/{id}/kills/{killID}/remove` (RAIDASSISTENT and higher). Not built:
+  `POST /api/v1/raids/{id}/kills/{killID}/remove` (RAIDASSISTENT and higher). The raid page lists and manages the kills (`RaidKills`), and the dashboard and `BossProgression` mark recorded kills only (FR-29.4). Not built:
   `loot` reading the kill for the award difficulty, and the manual loot path and the
   `addonsync` import creating a missing kill and the loot in one transaction (FR-29.7,
   FR-29.8).

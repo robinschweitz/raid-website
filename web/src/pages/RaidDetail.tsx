@@ -15,6 +15,7 @@ import { RaidQuickAdd } from '../components/RaidQuickAdd'
 import { AddonInviteExport } from '../components/AddonInviteExport'
 import { AddonLootImport } from '../components/AddonLootImport'
 import { UnclaimedLoot } from '../components/UnclaimedLoot'
+import { RaidKills } from '../components/RaidKills'
 import { AddonRosterImport } from '../components/AddonRosterImport'
 import { RaidRecruitment } from './Recruitment'
 import { ShadowmourneRaidCard } from '../components/ShadowmourneRaidCard'
@@ -1028,6 +1029,7 @@ function RaidDetail({ raidID, initialView }: Props) {
           </div>
         )}
         </RaidLootList>
+        <RaidKills raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} bosses={catalogBosses} catalog={catalog} raidSize={raid.raid_size ?? null} />
         <UnclaimedLoot raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} bosses={catalogBosses} version={unclaimedVersion} />
         {canManage && isActiveRaid && associated && <AddonLootImport raidID={raidID} onImported={async () => { await load(); setUnclaimedVersion((value) => value + 1) }} />}
       </section>

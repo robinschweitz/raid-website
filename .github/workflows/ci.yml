@@ -62,6 +62,12 @@ jobs:
             printf 'Run gofmt -w cmd internal. Unformatted files:\n%s\n' "$unformatted"
             exit 1
           fi
+      # go.mod and go.sum must already be tidy (DR-11): a change here means a
+      # dependency was added or dropped without the tidy result being committed.
+      - name: Check go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
       - name: Vet Go
         run: go vet ./...
       - name: Install golangci-lint

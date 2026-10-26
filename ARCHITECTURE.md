@@ -290,7 +290,8 @@ sequenceDiagram
 - **DR-10** The web client talks to the server only through `web/src/api.ts` and only to
   same-origin `/api/v1`.
 - **DR-11** A new Go or npm dependency needs owner approval. `go.mod` stays tidy
-  (`go mod tidy`), so direct dependencies are not marked `// indirect` (Owner 2026-10-22, AQ-8).
+  (`go mod tidy`), so direct dependencies are not marked `// indirect`; CI runs
+  `go mod tidy` and fails on any diff (Owner 2026-10-22, AQ-8; CI check built with REQ-ARCH-012).
 - **DR-12** Code that nothing imports or calls is deleted, not kept switched off; Git history keeps
   it. Not yet followed by `internal/registration/rising_gods_warm.go` and `internal/logger`
   (Owner 2026-10-22, AQ-4 and AQ-8).

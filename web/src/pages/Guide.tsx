@@ -397,6 +397,7 @@ export function GuidePage() {
       <p>Unter <strong>Spieler</strong> auf den Namen klicken, Reiter <strong>Konto</strong>. Dort Rolle wählen (z. B. <code>MEMBER</code>), bei Bedarf ein neues Passwort setzen, <strong>Speichern</strong>.</p>
       <p><strong>Beispiel:</strong> Ein älteres Konto ist noch <code>GUEST</code>. Du stellst <code>MEMBER</code> ein und speicherst. Ab sofort kann er sich für Raids anmelden.</p>
       <Shot name="52-spieler-konto-admin" caption="Spielerkonto als Admin" />
+      <p>Für Auskunftsanfragen über den Datenschutzkontakt öffnest du im Konto-Tab <strong>Persönliche Daten exportieren</strong> und wählst <strong>Daten als JSON herunterladen</strong>. Der Export enthält die gespeicherte Spielhistorie ohne Passwörter, MFA-Geheimnisse oder Sitzungsschlüssel; der Zugriff wird protokolliert.</p>
       <p>Hat jemand zwei Accounts, nutze <strong>Konto zusammenführen</strong> mit einem Grund. Unter <strong>Spieler</strong> → <strong>Neuer Spieler</strong> legst du jemanden ohne Login an.</p>
       <h3>Raidserien</h3>
       <p>Eine Raidserie ist ein fester Raid wie <em>ICC25 Donnerstag</em>: Wochentag, Uhrzeit, Rhythmus, Namensvorlage (<code>{'ICC25-{number}'}</code>), Raidleitung, Instanz und Größe. Dort stellst du auch ein, wie viele Wochen automatisch im Voraus geplant werden.</p>

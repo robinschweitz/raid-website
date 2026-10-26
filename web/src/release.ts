@@ -1,8 +1,13 @@
-export const appVersion = '1.0.60'
+export const appVersion = '1.0.63'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Persönliche Daten als JSON exportieren',
+    changes: ['Admins können Auskunftsanfragen im Konto-Tab eines Spielers mit einem protokollierten JSON-Export beantworten. Passwörter, MFA-Geheimnisse und Sitzungsschlüssel werden nicht exportiert.'],
+  },
+  {
+    version: '1.0.60',
     title: 'Umfrage-Optionen in richtiger Reihenfolge',
     changes: [
       'In der Umfrageliste stehen die Antwortoptionen wieder in der eingestellten Reihenfolge, auch nachdem eine Umfrage bearbeitet und Optionen umsortiert wurden.',

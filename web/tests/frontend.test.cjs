@@ -4178,3 +4178,20 @@ test('the own profile offers no anonymise action', async () => {
   await flush(view)
   assert.equal(button(view, 'Spieler anonymisieren'), undefined)
 })
+
+test('only Admins can start the personal-data download (REQ-PRIVACY-012)', async () => {
+  const s = setup()
+  const downloads = []
+  s.api.downloadJSON = async (...args) => downloads.push(args)
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(s, 2)
+  await flush(view)
+  button(view, 'Daten als JSON herunterladen').props.onClick()
+  await flush(view)
+  assert.deepEqual(downloads, [['/api/v1/players/2/export', 'spieler-2.json']])
+  const member = setup({ id: 2, role: 'MEMBER' })
+  const own = member.mount(member.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(member, 2)
+  await flush(own)
+  assert.equal(button(own, 'Daten als JSON herunterladen'), undefined)
+})

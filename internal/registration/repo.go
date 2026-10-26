@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"raid-website/internal/audit"
+	"raid-website/internal/player"
 	"strings"
 	"time"
 
@@ -111,4 +113,27 @@ func (r *Repo) ListCodesByRequest(ctx context.Context, requestID int64) ([]Code,
 	var rows []Code
 	err := r.db.NewSelect().Model(&rows).Where("request_id = ?", requestID).Order("created_at DESC", "id DESC").Scan(ctx)
 	return rows, err
+}
+
+func (r *Repo) inResetTransaction(ctx context.Context, fn func(*Repo) error) error {
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.ExecContext(ctx, "UPDATE players SET id = id WHERE id = -1"); err != nil {
+			return err
+		}
+		return fn(NewRepo(tx))
+	})
+}
+func (r *Repo) resetPlayer(ctx context.Context, id int64) (*player.Player, error) {
+	return player.NewRepo(r.db).Get(ctx, id)
+}
+func (r *Repo) revokeResetCodes(ctx context.Context, playerID int64, now time.Time) error {
+	_, err := r.db.NewUpdate().Model((*ResetCode)(nil)).Set("revoked_at = ?", now).Where("player_id = ? AND used_at IS NULL AND revoked_at IS NULL", playerID).Exec(ctx)
+	return err
+}
+func (r *Repo) createResetCode(ctx context.Context, row *ResetCode) error {
+	_, err := r.db.NewInsert().Model(row).Exec(ctx)
+	return err
+}
+func (r *Repo) auditReset(ctx context.Context, actorID, playerID int64, action string, details map[string]any, reason string) error {
+	return audit.NewRepo(r.db).Record(ctx, actorID, "player", playerID, action, nil, details, reason)
 }

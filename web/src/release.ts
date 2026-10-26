@@ -1,8 +1,13 @@
-export const appVersion = '1.0.60'
+export const appVersion = '1.0.64'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Passwort-Reset mit einmaligem Code',
+    changes: ['Admins erstellen im Konto-Tab einen 72 Stunden gültigen Reset-Code und senden ihn ingame. Fremde Passwörter werden nicht mehr direkt gesetzt.'],
+  },
+  {
+    version: '1.0.60',
     title: 'Umfrage-Optionen in richtiger Reihenfolge',
     changes: [
       'In der Umfrageliste stehen die Antwortoptionen wieder in der eingestellten Reihenfolge, auch nachdem eine Umfrage bearbeitet und Optionen umsortiert wurden.',

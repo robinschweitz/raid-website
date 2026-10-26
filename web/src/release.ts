@@ -1,8 +1,13 @@
-export const appVersion = '1.0.60'
+export const appVersion = '1.0.62'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Begrenzte Charaktersuche für Besucher',
+    changes: ['Ohne Anmeldung sind zehn neue Charaktersuchen und Registrierungsanfragen pro zehn Minuten möglich. Gespeicherte Suchergebnisse und angemeldete Mitglieder bleiben erreichbar.'],
+  },
+  {
+    version: '1.0.60',
     title: 'Umfrage-Optionen in richtiger Reihenfolge',
     changes: [
       'In der Umfrageliste stehen die Antwortoptionen wieder in der eingestellten Reihenfolge, auch nachdem eine Umfrage bearbeitet und Optionen umsortiert wurden.',

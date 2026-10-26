@@ -43,6 +43,7 @@ var (
 )
 
 type Service struct {
+	visitors   visitorLimiter
 	db         *bun.DB
 	repo       *Repo
 	players    *player.Repo

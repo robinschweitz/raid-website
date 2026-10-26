@@ -4135,6 +4135,24 @@ test('the class icons are bundled with the site', () => {
   }
 })
 
+test('the EP-floor warning names the player and the points not taken and asks before saving', () => {
+  const { EpShortfallWarning } = setup().load('components/EpShortfallWarning.tsx')
+  let confirmed = 0
+  let cancelled = 0
+  const view = setup().mount(EpShortfallWarning, {
+    shortfalls: [{ player_id: 3, player_name: 'Sternfall', balance: 5, points_taken: 5, points_not_taken: 5 }],
+    pending: false,
+    onConfirm: () => { confirmed++ },
+    onCancel: () => { cancelled++ },
+  })
+  assert.match(text(view.tree), /Sternfall\s*: Es werden nur\s+5\s+EP abgezogen,\s+5\s+EP werden nicht abgezogen/)
+  const buttons = nodes(view.tree, (n) => n.type === 'button')
+  buttons.find((b) => /Trotzdem speichern/.test(text(b))).props.onClick()
+  buttons.find((b) => /Abbrechen/.test(text(b))).props.onClick()
+  assert.equal(confirmed, 1)
+  assert.equal(cancelled, 1)
+})
+
 test('an Admin confirms before anonymising another player and a declined confirmation sends nothing (FR-30.2)', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })

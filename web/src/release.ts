@@ -1,8 +1,16 @@
-export const appVersion = '1.0.58'
+export const appVersion = '1.0.59'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'EP-Korrekturen enden bei null',
+    changes: [
+      'Eine Korrektur an einem abgeschlossenen Raid zieht nie mehr EP ab, als der Spieler hat. Der Kontostand bleibt bei 0 und die fehlenden Punkte werden auch später nicht abgezogen.',
+      'Vor dem Speichern warnt die Seite mit dem Spieler und den Punkten, die nicht abgezogen werden. Das Audit-Log hält diese Zahl fest.',
+    ],
+  },
+  {
+    version: '1.0.58',
     title: 'Spieler anonymisieren',
     changes: [
       'Admins können einen Spieler auf dessen Löschanfrage anonymisieren: Login, Passwort, Sitzungen, MFA, Push-Abos und Rising-Gods-Profildaten werden gelöscht, der Name wird durch den des ältesten Main-Charakters ersetzt. Raid-Historie, Loot und EP bleiben erhalten; im Audit-Protokoll erscheint der alte Name nicht mehr.',

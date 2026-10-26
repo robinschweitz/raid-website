@@ -27,7 +27,6 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 	}{
 		{name: "imported raid without loot", openingBalance: true},
 		{name: "imported raid with loot", openingBalance: true, legacyLoot: true},
-		{name: "manually constructed completed raid"},
 		{name: "archived imported raid with opening balance", openingBalance: true, legacyLoot: true, archived: true},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {

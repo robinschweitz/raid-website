@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -25,7 +26,33 @@ var (
 	ErrInvalid   = errors.New("invalid correction")
 	ErrConflict  = errors.New("attendance already exists")
 	ErrHasLoot   = errors.New("character still holds loot in this raid")
+	// ErrEPShortfall means a correction would take more EP than a player has.
+	// The write is rolled back until staff confirm (FR-16.8).
+	ErrEPShortfall = errors.New("correction would take more EP than the player has")
 )
+
+// Shortfall names a player whose EP deduction the zero floor limits (FR-16.6).
+type Shortfall struct {
+	PlayerID   int64  `json:"player_id"`
+	PlayerName string `json:"player_name"`
+	Balance    int    `json:"balance"`
+	Taken      int    `json:"points_taken"`
+	NotTaken   int    `json:"points_not_taken"`
+}
+
+// ShortfallError carries the limited deductions of a refused correction.
+type ShortfallError struct{ Shortfalls []Shortfall }
+
+func (e *ShortfallError) Error() string        { return ErrEPShortfall.Error() }
+func (e *ShortfallError) Is(target error) bool { return target == ErrEPShortfall }
+
+type confirmKey struct{}
+
+// WithEPShortfallConfirmed marks a request whose staff saw the FR-16.8 warning
+// and chose to save the limited correction anyway.
+func WithEPShortfallConfirmed(ctx context.Context) context.Context {
+	return context.WithValue(ctx, confirmKey{}, true)
+}
 
 // Service applies history changes with audit and append-only compensation.
 type Service struct {
@@ -523,15 +550,50 @@ func (s *Service) reconcilePoints(ctx context.Context, r *Repo, raidID, actor in
 			after[playerID] = 0
 		}
 	}
+	playerIDs := make([]int64, 0, len(after))
+	for playerID := range after {
+		playerIDs = append(playerIDs, playerID)
+	}
+	sort.Slice(playerIDs, func(i, j int) bool { return playerIDs[i] < playerIDs[j] })
+	confirmed, _ := ctx.Value(confirmKey{}).(bool)
+	var shortfalls []Shortfall
 	// Apply only the eligibility change, never backfill historical raid awards.
-	for playerID, eligibility := range after {
-		amount := eligibility - before[playerID]
+	for _, playerID := range playerIDs {
+		amount := after[playerID] - before[playerID]
 		if amount == 0 {
 			continue
 		}
-		if err := r.points.InsertTransaction(ctx, &enhancepoints.Transaction{PlayerID: playerID, RaidID: &raidID, Amount: amount, Type: "correction_no_mainspec_loot", Reason: strings.TrimSpace(reason), RefType: "raid", RefID: strconv.FormatInt(raidID, 10), ActorID: actor, CreatedAt: time.Now().UTC()}); err != nil {
-			return err
+		var notTaken int
+		if amount < 0 {
+			// A deduction never takes a balance below 0 and the rest is not taken later (FR-16.6).
+			balance, err := r.points.Balance(ctx, playerID)
+			if err != nil {
+				return err
+			}
+			if available := max(balance, 0); -amount > available {
+				notTaken = -amount - available
+				amount = -available
+				p, err := r.players.Get(ctx, playerID)
+				if err != nil {
+					return referenceError(err)
+				}
+				shortfalls = append(shortfalls, Shortfall{PlayerID: playerID, PlayerName: p.Name, Balance: balance, Taken: available, NotTaken: notTaken})
+			}
 		}
+		if amount != 0 {
+			if err := r.points.InsertTransaction(ctx, &enhancepoints.Transaction{PlayerID: playerID, RaidID: &raidID, Amount: amount, Type: "correction_no_mainspec_loot", Reason: strings.TrimSpace(reason), RefType: "raid", RefID: strconv.FormatInt(raidID, 10), ActorID: actor, CreatedAt: time.Now().UTC()}); err != nil {
+				return err
+			}
+		}
+		if notTaken > 0 {
+			// The audit entry keeps the number of points not taken (FR-16.8).
+			if err := s.log(ctx, r, "ep_correction", playerID, actor, reason, nil, map[string]int64{"raid_id": raidID, "points_not_taken": int64(notTaken)}); err != nil {
+				return err
+			}
+		}
+	}
+	if len(shortfalls) > 0 && !confirmed {
+		return &ShortfallError{Shortfalls: shortfalls}
 	}
 	return nil
 }

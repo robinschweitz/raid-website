@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -14,33 +15,35 @@ import (
 )
 
 type createAttendanceRequest struct {
-	CharacterName *string `json:"character_name"`
-	Class         *string `json:"class"`
-	Spec          *string `json:"spec"`
-	PlayerID      int64   `json:"player_id"`
-	CharacterID   int64   `json:"character_id"`
-	Role          string  `json:"role"`
-	IsSubstitute  bool    `json:"is_substitute"`
-	IsBench       bool    `json:"is_bench"`
-	LateJoin      bool    `json:"late_join"`
-	EarlyLeave    bool    `json:"early_leave"`
-	Notes         string  `json:"notes"`
-	Reason        string  `json:"reason"`
+	CharacterName      *string `json:"character_name"`
+	Class              *string `json:"class"`
+	Spec               *string `json:"spec"`
+	PlayerID           int64   `json:"player_id"`
+	CharacterID        int64   `json:"character_id"`
+	Role               string  `json:"role"`
+	IsSubstitute       bool    `json:"is_substitute"`
+	IsBench            bool    `json:"is_bench"`
+	LateJoin           bool    `json:"late_join"`
+	EarlyLeave         bool    `json:"early_leave"`
+	Notes              string  `json:"notes"`
+	Reason             string  `json:"reason"`
+	ConfirmEPShortfall bool    `json:"confirm_ep_shortfall"`
 }
 
 type correctAttendanceRequest struct {
-	CharacterName *string `json:"character_name"`
-	Class         *string `json:"class"`
-	Spec          *string `json:"spec"`
-	PlayerID      *int64  `json:"player_id"`
-	CharacterID   *int64  `json:"character_id"`
-	Role          *string `json:"role"`
-	IsSubstitute  *bool   `json:"is_substitute"`
-	IsBench       *bool   `json:"is_bench"`
-	LateJoin      *bool   `json:"late_join"`
-	EarlyLeave    *bool   `json:"early_leave"`
-	Notes         *string `json:"notes"`
-	Reason        string  `json:"reason"`
+	CharacterName      *string `json:"character_name"`
+	Class              *string `json:"class"`
+	Spec               *string `json:"spec"`
+	PlayerID           *int64  `json:"player_id"`
+	CharacterID        *int64  `json:"character_id"`
+	Role               *string `json:"role"`
+	IsSubstitute       *bool   `json:"is_substitute"`
+	IsBench            *bool   `json:"is_bench"`
+	LateJoin           *bool   `json:"late_join"`
+	EarlyLeave         *bool   `json:"early_leave"`
+	Notes              *string `json:"notes"`
+	Reason             string  `json:"reason"`
+	ConfirmEPShortfall bool    `json:"confirm_ep_shortfall"`
 }
 
 func (a *API) correctAttendance(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +63,7 @@ func (a *API) correctAttendance(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	row, err := a.Corrections.CorrectAttendance(r.Context(), raidID, id, actor, req.Reason, func(row *attendance.Attendance) {
+	row, err := a.Corrections.CorrectAttendance(epConfirm(r, req.ConfirmEPShortfall), raidID, id, actor, req.Reason, func(row *attendance.Attendance) {
 		if req.PlayerID != nil {
 			row.PlayerID = *req.PlayerID
 		}
@@ -173,7 +176,7 @@ func (a *API) createAttendance(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:    now,
 	}
 	before := a.rosterSnapshot(r.Context(), raidID)
-	if err := a.Corrections.SaveAttendance(r.Context(), row, actor, req.Reason, raidcorrection.SnapshotPatch{CharacterName: req.CharacterName, Class: req.Class, Spec: req.Spec}); err != nil {
+	if err := a.Corrections.SaveAttendance(epConfirm(r, req.ConfirmEPShortfall), row, actor, req.Reason, raidcorrection.SnapshotPatch{CharacterName: req.CharacterName, Class: req.Class, Spec: req.Spec}); err != nil {
 		writeCorrectionError(w, err)
 		return
 	}
@@ -181,7 +184,23 @@ func (a *API) createAttendance(w http.ResponseWriter, r *http.Request) {
 	a.notifyNewRosterPlayers(w, r, raidID, actor, before)
 }
 
+// epConfirm carries the staff's answer to the EP-floor warning (FR-16.8).
+func epConfirm(r *http.Request, confirmed bool) context.Context {
+	if confirmed {
+		return raidcorrection.WithEPShortfallConfirmed(r.Context())
+	}
+	return r.Context()
+}
+
 func writeCorrectionError(w http.ResponseWriter, err error) {
+	var shortfall *raidcorrection.ShortfallError
+	if errors.As(err, &shortfall) {
+		WriteJSON(w, http.StatusConflict, map[string]any{
+			"error": ErrorBody{Code: "ep_shortfall", Message: "Die Korrektur würde mehr EP abziehen, als der Spieler hat"},
+			"data":  map[string]any{"shortfalls": nonNil(shortfall.Shortfalls)},
+		})
+		return
+	}
 	switch {
 	case errors.Is(err, loot.ErrCatalogContextRequired):
 		WriteError(w, http.StatusConflict, "catalog_context_required", "Raidinstanz und Raidgroesse muessen vor der Lootauswahl konfiguriert werden")

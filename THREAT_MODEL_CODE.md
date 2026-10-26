@@ -103,7 +103,7 @@ No numeric risk scores; the **Impact** line says in words what an attacker gains
 - **Evidence:** the WebAuthn library reports a clone warning when the authenticator's signature
   counter goes backwards; the code stores the new counter but never checks the warning.
 - **Impact:** a copied authenticator keeps working unnoticed (rare for hardware keys).
-- **Status:** CONFIRMED. **Response:** Mitigate. **Rules:** SC-048 (new).
+- **Status:** FIXED (issue #70). **Response:** Mitigate. **Rules:** SC-048.
 
 **CT-009 — MFA codes can be guessed without limit** — `VerifyMFAChallenge` had no failure counter.
 - **Status:** FIXED (PR #121, issue #62). **Response:** Mitigate. **Rules:** SC-011.
@@ -395,7 +395,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-005 | CONFIRMED | Mitigate | App | SC-049, FR-4.5 | T-043 |
 | CT-006 | CONFIRMED | Mitigate | App | SC-047 | T-044 |
 | CT-007 | CONFIRMED | Mitigate | App | SC-023 | — |
-| CT-008 | CONFIRMED | Mitigate | App | SC-048 | T-045 |
+| CT-008 | FIXED | Mitigate | App | SC-048 | T-045 |
 | CT-009 | FIXED | Mitigate | App | SC-011 | T-005 |
 | CT-010 | FIXED | Mitigate | App | SC-012 | T-006 |
 | CT-011 | CONFIRMED | Mitigate | App | SC-014 | T-011 |

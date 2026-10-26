@@ -103,7 +103,7 @@ func (r *Repo) DeleteByHash(ctx context.Context, tokenHash string) error {
 }
 
 func (r *Repo) DeleteExpired(ctx context.Context, before time.Time) error {
-	_, err := r.db.NewDelete().Model((*Session)(nil)).Where("expires_at < ?", before).Exec(ctx)
+	_, err := r.db.NewDelete().Model((*Session)(nil)).Where("expires_at <= ?", before).Exec(ctx)
 	return err
 }
 
@@ -331,4 +331,24 @@ func (r *Repo) FindWebAuthnSession(ctx context.Context, sessionHash, purpose str
 func (r *Repo) MarkWebAuthnSessionUsed(ctx context.Context, id int64, at time.Time) error {
 	_, err := r.db.NewUpdate().Model((*WebAuthnSession)(nil)).Set("used_at = ?", at).Where("id = ?", id).Where("used_at IS NULL").Exec(ctx)
 	return err
+}
+
+// PruneSecurityRecords deletes data after its authentication purpose ends (SC-038).
+// The transaction preserves current rate-limit attempts if any cleanup fails.
+func (r *Repo) PruneSecurityRecords(ctx context.Context, now time.Time) error {
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.NewDelete().Model((*LoginAttempt)(nil)).Where("created_at < ?", now.Add(-loginFailureWindow)).Exec(ctx); err != nil {
+			return fmt.Errorf("prune login attempts: %w", err)
+		}
+		if err := r.WithTx(tx).DeleteExpired(ctx, now); err != nil {
+			return fmt.Errorf("prune sessions: %w", err)
+		}
+		if _, err := tx.NewDelete().Model((*MFAChallenge)(nil)).Where("expires_at <= ? OR used_at IS NOT NULL", now).Exec(ctx); err != nil {
+			return fmt.Errorf("prune MFA challenges: %w", err)
+		}
+		if _, err := tx.NewDelete().Model((*WebAuthnSession)(nil)).Where("expires_at <= ? OR used_at IS NOT NULL", now).Exec(ctx); err != nil {
+			return fmt.Errorf("prune WebAuthn sessions: %w", err)
+		}
+		return nil
+	})
 }

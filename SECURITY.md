@@ -323,8 +323,8 @@ chapter level only; requirement IDs are not cited until each is verified against
 **SC-038 - Short-lived security records are deleted**
 - **Status:** ACTIVE
 - **Rule:** Login attempts, failed or successful, MUST be deleted once they are older than the longest login-limit window that uses them (SC-008, SC-043); a successful login MUST NOT be kept as an activity history. Expired sessions and expired or used MFA challenges MUST be deleted. Deletion runs during normal requests or at startup, not as a background job.
-- **Enforcement:** `auth` repository (`DeleteExpired` exists but is never called).
-- **Evidence:** FR-30.6, ARCHITECTURE "No background jobs". Code: **not compliant** — nothing is ever pruned, and every successful login is stored with its address (`THREAT_MODEL_CODE.md` CT-016, CT-029). Threats: T-022.
+- **Enforcement:** `auth.Repo.PruneSecurityRecords`, called at startup and before login.
+- **Evidence:** FR-30.6, ARCHITECTURE "No background jobs". Code: compliant since #74: startup and login delete attempts older than 15 minutes, expired sessions, and used or expired MFA and WebAuthn challenges in one transaction. Cleanup failures are logged and do not change the login result. Threats: T-022.
 - **Verification:** After the window, no login attempt, expired session, or old challenge row remains.
 
 **SC-039 - Protected main branch and CI gates**

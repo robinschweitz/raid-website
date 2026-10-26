@@ -1,8 +1,16 @@
-export const appVersion = '1.0.51'
+export const appVersion = '1.0.52'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Bosskills im Raid und in der Übersicht',
+    changes: [
+      'Im Reiter „Loot“ eines Raids stehen jetzt die Bosskills mit Schwierigkeit. Die Raidleitung kann Kills eintragen, die Schwierigkeit ändern und Kills entfernen. Ohne Kills steht dort, dass keine erfasst sind.',
+      'Auf der Übersicht sind getötete Bosse des nächsten Raids hervorgehoben. Angezeigt werden nur eingetragene Kills.',
+    ],
+  },
+  {
+    version: '1.0.51',
     title: 'Sicherere Anmeldung und Benachrichtigungen',
     changes: [
       'Die Sperre nach zu vielen falschen Passwörtern greift jetzt auch, wenn viele Anmeldeversuche gleichzeitig kommen.',

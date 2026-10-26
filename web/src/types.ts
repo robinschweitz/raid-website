@@ -277,6 +277,9 @@ export interface CatalogItem {
   dps?: number;
 }
 export type CatalogMode = 'NORMAL' | 'HEROIC' | 'HARDMODE'
+
+// A recorded boss kill of a raid (FR-29).
+export interface BossKill { id: number; raid_id: number; catalog_boss_id: string; boss: string; difficulty: CatalogMode }
 export const catalogModeLabels: Record<CatalogMode, string> = { NORMAL: 'Normal', HEROIC: 'Heroisch', HARDMODE: 'Hardmode' }
 export interface CatalogItemDrop extends CatalogItem {
   boss_id: string

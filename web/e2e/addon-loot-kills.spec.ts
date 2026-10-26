@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { admin, apiAs, createMember, signIn } from './fixtures'
 
-test('addon loot asks for a boss difficulty and records loot and kill together', async ({ page, request }) => {
-  const member = { username: 'addon-kill-member', password: 'addon-kill-password', name: 'Addon Kill', character: 'Importmage', characterClass: 'Magier', mainSpec: 'Feuer', secondSpec: 'Frost' }
+test('addon loot asks for a boss difficulty and records loot and kill together', async ({ page, request }, testInfo) => {
+  const member = { username: `addon-kill-member-${testInfo.retry}`, password: 'addon-kill-password', name: 'Addon Kill', character: 'Importmage', characterClass: 'Magier', mainSpec: 'Feuer', secondSpec: 'Frost' }
   const { playerID, characterID } = await createMember(request, member)
   const api = await apiAs(request, admin)
   const actor = (await (await request.get('/api/v1/auth/me')).json()).data
@@ -13,7 +13,7 @@ test('addon loot asks for a boss difficulty and records loot and kill together',
   expect(drop).toBeTruthy()
   await signIn(page, admin)
   await page.goto(`/#/raids/${raid.id}`)
-  await page.getByRole('button', { name: 'Loot', exact: true }).click()
+  await page.getByRole('button', { name: /^Loot \(\d+\)$/ }).click()
   const panel = page.getByRole('region', { name: 'Loot aus Addon importieren' })
   await panel.getByLabel('Loot-Export').fill(`RS1|LOOT|${raid.id}|Recorder|1\n1|2|36612|${drop.item_id}|Importmage|given`)
   await panel.getByRole('button', { name: 'Vorschau', exact: true }).click()

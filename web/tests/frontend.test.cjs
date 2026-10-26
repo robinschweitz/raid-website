@@ -3886,7 +3886,7 @@ const pushCheckInHarness = () => {
   const subscription = { endpoint: 'https://fcm.googleapis.com/x', drops: 0, unsubscribe: () => { subscription.drops++; return Promise.resolve(true) } }
   return subscription
 }
-const immediateQueue = (step) => step()
+const immediateQueue = (step) => step(new AbortController().signal)
 const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 test('the push check-in keeps only a subscription the server confirms and fails closed (FR-32.3, ADR 103)', async () => {
@@ -3937,6 +3937,42 @@ test('a push step that never finishes ends at the deadline and still drops the s
   // The real queue does not let one stalled step hold the next one forever.
   void runExclusive(() => new Promise(() => {}), 20)
   assert.equal(await runExclusive(async () => 'next', 20), 'next')
+})
+
+test('a timed-out check-in leaves a subscription alone that a newer change created (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const previous = { ...pushCheckInHarness(), endpoint: 'https://fcm.googleapis.com/previous' }
+  const newer = { ...pushCheckInHarness(), endpoint: 'https://fcm.googleapis.com/newer' }
+  let held = previous
+  newer.unsubscribe = () => { newer.drops++; return Promise.resolve(true) }
+  const outcome = await checkInWithDeadline({
+    queue: immediateQueue,
+    getSubscription: () => Promise.resolve(held),
+    // While the server does not answer, the player turns push on again and the browser gets a new subscription.
+    ask: () => { held = newer; return new Promise(() => {}) },
+    deadlineMs: 20,
+  })
+  assert.equal(outcome, 'timeout')
+  await settle(5)
+  assert.equal(newer.drops, 0, 'the newer subscription was dropped by the old check-in')
+})
+
+test('a push change that starts after the wait limit cancels the stalled one (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { runExclusive } = s.load('pushNotifications.ts')
+  let stalledSignal
+  const stalled = runExclusive((signal) => { stalledSignal = signal; return settle(60).then(() => signal.aborted) }, 20)
+  const newer = await runExclusive(async (signal) => signal.aborted, 20)
+  assert.equal(newer, false, 'the newer change runs normally')
+  assert.equal(await stalled, true, 'the stalled change sees it was cancelled')
+  assert.equal(stalledSignal.aborted, true)
+  // A read-only step waits the same way but cancels nothing.
+  let readSignal
+  const slow = runExclusive((signal) => { readSignal = signal; return settle(60) }, 20)
+  await runExclusive(async () => undefined, 20, false)
+  await slow
+  assert.equal(readSignal.aborted, false)
 })
 
 test('a late check-in answer after the deadline changes nothing (ADR 103)', async () => {

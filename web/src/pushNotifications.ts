@@ -48,26 +48,39 @@ export async function currentPushSubscription(): Promise<PushSubscription | null
 }
 
 // Push changes run one after another, so a status read, an enable, a disable
-// and the logout clean-up can never interleave and act on a stale browser
-// subscription (ADR 103). A failed step does not block the next one, and no
-// step waits longer than waitMs for the one before it, so one stalled browser
-// call cannot hold every later push change.
+// and the logout clean-up act on the browser subscription in the order they
+// were asked for (ADR 103). A failed step does not block the next one. No step
+// waits longer than waitMs for the one before it, so one stalled browser call
+// cannot hold every later push change; a change that starts this way cancels
+// the stalled one through its signal, and a cancelled step makes no further
+// change, so a late step can never undo a newer one. Read-only steps
+// (supersedes = false) wait the same way but cancel nothing.
 const queueWaitMs = 10000
 let pushQueue: Promise<unknown> = Promise.resolve()
+let runningStep: AbortController | null = null
 
-function settledOrAfter(previous: Promise<unknown>, ms: number): Promise<void> {
+// settledOrAfter resolves true when previous settled, false when ms passed first.
+function settledOrAfter(previous: Promise<unknown>, ms: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms)
-    const done = () => { clearTimeout(timer); resolve() }
+    const timer = setTimeout(() => resolve(false), ms)
+    const done = () => { clearTimeout(timer); resolve(true) }
     previous.then(done, done)
   })
 }
 
-export function runExclusive<T>(step: () => Promise<T>, waitMs = queueWaitMs): Promise<T> {
-  const result = settledOrAfter(pushQueue, waitMs).then(step)
+export function runExclusive<T>(step: (signal: AbortSignal) => Promise<T>, waitMs = queueWaitMs, supersedes = true): Promise<T> {
+  const controller = new AbortController()
+  const result = settledOrAfter(pushQueue, waitMs).then((settled) => {
+    if (!settled && supersedes) runningStep?.abort()
+    runningStep = controller
+    return step(controller.signal)
+  })
   pushQueue = result.catch(() => undefined)
   return result
 }
+
+// supersededError is thrown by a step that a newer push change cancelled.
+const supersededError = () => new Error('superseded')
 
 // Whether this browser gets messages for the signed-in player. The opt-in
 // belongs to a player on a device (FR-32.3, ADR 103): the browser checks in with
@@ -75,12 +88,12 @@ export function runExclusive<T>(step: () => Promise<T>, waitMs = queueWaitMs): P
 // when it belongs to someone else. The browser's own subscription is not
 // enough; the server decides.
 export function pushActiveOnThisDevice(): Promise<boolean> {
-  return runExclusive(async () => {
+  return runExclusive(async (signal) => {
     const subscription = await currentPushSubscription()
     if (!subscription) return false
-    const status = await api.post<{ active: boolean }>('/api/v1/push/subscriptions/sync', { endpoint: subscription.endpoint })
+    const status = await api.post<{ active: boolean }>('/api/v1/push/subscriptions/sync', { endpoint: subscription.endpoint }, { signal })
     return status.active
-  })
+  }, queueWaitMs, false)
 }
 
 // The whole push check-in of a sign-in, queue wait included, ends after this.
@@ -91,7 +104,7 @@ type BrowserSubscription = { endpoint: string; unsubscribe: () => Promise<boolea
 export type CheckInOutcome = 'none' | 'active' | 'dropped' | 'timeout'
 
 export type CheckInDeps = {
-  queue: <T>(step: () => Promise<T>) => Promise<T>
+  queue: <T>(step: (signal: AbortSignal) => Promise<T>) => Promise<T>
   getSubscription: () => Promise<BrowserSubscription | null>
   ask: (endpoint: string, signal: AbortSignal) => Promise<boolean>
   deadlineMs: number
@@ -106,36 +119,48 @@ function dropInBackground(subscription: BrowserSubscription): void {
 
 // checkInWithDeadline keeps this browser's subscription only when the server
 // confirms it belongs to the signed-in player, within one deadline that covers
-// the queue wait, the server request, and the decision. Anything else drops
-// it: another player's or an unknown subscription, a failed check-in, and a
-// check-in that missed the deadline. At the deadline the request is aborted
-// and a late answer changes nothing, so the outcome stays "dropped" (fail
-// closed, FR-32.3, ADR 103). Signing in never depends on it.
+// reading the subscription, the queue wait, the server request, and the
+// decision. Anything else drops it: another player's or an unknown
+// subscription, a failed check-in, and a check-in that missed the deadline. At
+// the deadline the request is aborted and a late answer changes nothing (fail
+// closed, FR-32.3, ADR 103). The check-in only ever drops the subscription it
+// examined: if the browser holds another one by then, a newer change made it
+// and it is left alone. Signing in never depends on it.
 export async function checkInWithDeadline(deps: CheckInDeps): Promise<CheckInOutcome> {
   const controller = new AbortController()
+  let examined: BrowserSubscription | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
   const deadline = new Promise<CheckInOutcome>((resolve) => { timer = setTimeout(() => resolve('timeout'), deps.deadlineMs) })
-  const work = deps.queue(async (): Promise<CheckInOutcome> => {
-    if (controller.signal.aborted) return 'timeout'
-    const subscription = await deps.getSubscription()
-    if (!subscription) return 'none'
-    let active = false
-    try {
-      active = await deps.ask(subscription.endpoint, controller.signal)
-    } catch {
-      active = false
-    }
-    // Past the deadline the decision is already made; a late answer changes nothing.
-    if (controller.signal.aborted) return 'timeout'
-    if (active) return 'active'
-    dropInBackground(subscription)
-    return 'dropped'
-  }).catch((): CheckInOutcome => 'dropped')
+  const stillHeld = async (subscription: BrowserSubscription): Promise<boolean> => {
+    const current = await deps.getSubscription()
+    return current !== null && current.endpoint === subscription.endpoint
+  }
+  const work = (async (): Promise<CheckInOutcome> => {
+    const found = await deps.getSubscription()
+    if (!found) return 'none'
+    examined = found
+    return deps.queue(async (queueSignal): Promise<CheckInOutcome> => {
+      if (controller.signal.aborted || queueSignal.aborted) return 'timeout'
+      if (!(await stillHeld(found))) return 'none'
+      let active = false
+      try {
+        active = await deps.ask(found.endpoint, controller.signal)
+      } catch {
+        active = false
+      }
+      // Past the deadline the decision is already made; a late answer changes nothing.
+      if (controller.signal.aborted || queueSignal.aborted) return 'timeout'
+      if (active) return 'active'
+      dropInBackground(found)
+      return 'dropped'
+    })
+  })().catch((): CheckInOutcome => 'dropped')
   const outcome = await Promise.race([work, deadline])
   clearTimeout(timer)
   if (outcome === 'timeout') {
     controller.abort()
-    void deps.getSubscription().then((subscription) => { if (subscription) dropInBackground(subscription) }).catch(() => undefined)
+    const target = examined as BrowserSubscription | null
+    if (target) void stillHeld(target).then((held) => { if (held) dropInBackground(target) }).catch(() => undefined)
   }
   return outcome
 }
@@ -162,14 +187,20 @@ export async function enablePush(config: PushConfig): Promise<void> {
   // Asked first and outside the queue, so the prompt still belongs to the click.
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') throw new Error(permission === 'denied' ? 'denied' : 'dismissed')
-  await runExclusive(async () => {
+  await runExclusive(async (signal) => {
     const registration = await navigator.serviceWorker.ready
     let subscription = await registration.pushManager.getSubscription()
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64URLToBytes(config.public_key) })
     }
+    // A newer change (a disable, a sign-in) cancelled this one while the
+    // browser was slow: do not register, and remove what was just created.
+    if (signal.aborted) {
+      await subscription.unsubscribe().catch(() => false)
+      throw supersededError()
+    }
     try {
-      await api.post('/api/v1/push/subscriptions', subscriptionBody(subscription.toJSON()))
+      await api.post('/api/v1/push/subscriptions', subscriptionBody(subscription.toJSON()), { signal })
     } catch (err) {
       // A browser subscription the server does not know would never get a message.
       await subscription.unsubscribe().catch(() => false)
@@ -179,13 +210,14 @@ export async function enablePush(config: PushConfig): Promise<void> {
 }
 
 export function disablePush(): Promise<void> {
-  return runExclusive(async () => {
+  return runExclusive(async (signal) => {
     const subscription = await currentPushSubscription()
-    if (!subscription) return
+    if (!subscription || signal.aborted) return
     try {
-      await api.del('/api/v1/push/subscriptions', { endpoint: subscription.endpoint })
+      await api.del('/api/v1/push/subscriptions', { endpoint: subscription.endpoint }, { signal })
     } finally {
-      await subscription.unsubscribe().catch(() => false)
+      // A newer change took over while this one stalled; it decides now.
+      if (!signal.aborted) await subscription.unsubscribe().catch(() => false)
     }
   })
 }

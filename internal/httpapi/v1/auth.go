@@ -297,7 +297,7 @@ func (a *API) beginWebAuthnRegistration(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, http.StatusUnauthorized, "invalid_credentials", "current password is invalid")
 		return
 	}
-	rpID, origin, ok := webAuthnRelyingParty(a.PublicOrigin, r, a.TrustProxyHeaders)
+	rpID, origin, ok := webAuthnRelyingParty(a.PublicOrigin, r)
 	if !ok {
 		WriteError(w, http.StatusInternalServerError, "webauthn_origin_invalid", "WebAuthn origin is not configured")
 		return
@@ -321,7 +321,7 @@ func (a *API) finishWebAuthnRegistration(w http.ResponseWriter, r *http.Request)
 		BadRequest(w, "malformed json body")
 		return
 	}
-	rpID, origin, ok := webAuthnRelyingParty(a.PublicOrigin, r, a.TrustProxyHeaders)
+	rpID, origin, ok := webAuthnRelyingParty(a.PublicOrigin, r)
 	if !ok {
 		WriteError(w, http.StatusInternalServerError, "webauthn_origin_invalid", "WebAuthn origin is not configured")
 		return
@@ -379,7 +379,7 @@ func (a *API) beginWebAuthnMFA(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	rpID, origin, ok := webAuthnRelyingParty(a.PublicOrigin, r, a.TrustProxyHeaders)
+	rpID, origin, ok := webAuthnRelyingParty(a.PublicOrigin, r)
 	if !ok {
 		WriteError(w, http.StatusInternalServerError, "webauthn_origin_invalid", "WebAuthn origin is not configured")
 		return
@@ -402,7 +402,7 @@ func (a *API) finishWebAuthnMFA(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	rpID, origin, ok := webAuthnRelyingParty(a.PublicOrigin, r, a.TrustProxyHeaders)
+	rpID, origin, ok := webAuthnRelyingParty(a.PublicOrigin, r)
 	if !ok {
 		WriteError(w, http.StatusInternalServerError, "webauthn_origin_invalid", "WebAuthn origin is not configured")
 		return

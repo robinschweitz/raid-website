@@ -3473,6 +3473,18 @@ test('completed raids do not offer removing participants', async () => {
   assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Aus dem Raid entfernen').length, 0)
 })
 
+test('the recruitment editor waits for the saved template, so a late load cannot overwrite edits', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const { RaidRecruitment } = s.load('pages/Recruitment.tsx')
+  const view = s.mount(RaidRecruitment, { raidID: 8, seriesID: 3, attendance: [] })
+  assert.match(text(view.tree), /Vorlage wird geladen/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Setup leeren').length, 0, 'no editing before the template arrived')
+  const setupGrid = Array.from({ length: 5 }, () => ['Maintank', 'Offtank', 'Leer', 'Irgendein MDD', 'Irgendein RDD'])
+  resolveIf(s, '/api/v1/raids/8/recruitment-template', { text: 'Gespeichert', setup: setupGrid, updated_by: 1, updated_at: '2030-01-01T10:00:00Z' })
+  await flush(view)
+  assert.equal(button(view, 'Setup leeren').props.disabled, undefined)
+})
+
 test('recruitment template is loaded from the server, saved explicitly and the refresh only reloads the roster', async () => {
   const s = setup({ id: 1, role: 'RAIDASSISTENT' })
   const { RaidRecruitment } = s.load('pages/Recruitment.tsx')

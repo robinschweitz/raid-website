@@ -223,6 +223,31 @@ before applying it. APT fetches and installs updates daily, but does not reboot
 the host immediately. The separate reboot timer restarts only when required at
 03:00 Europe/Berlin.
 
+## Security events in the journal
+
+The application writes one JSON line per security event to stderr, which
+systemd stores in the journal (SC-041, OD-013). Events: `login_failed`,
+`login_blocked`, `mfa_failed`, `mfa_challenge_invalid`, `csrf_rejected`,
+`password_changed`, `account_changed` (Admin change of a login, password or
+role), `mfa_enabled`, and `mfa_disabled`. Each line has `time`, `event`,
+`client_address`, `request_id`, and a `player_id` or normalised `username`;
+it never holds a password, code, or token. List them with:
+
+```sh
+journalctl -u raid-website.service --since "7 days ago" --no-pager | grep '"msg":"security_event"'
+```
+
+The journal must keep them 30 days. Install the retention setting once and
+restart journald:
+
+```sh
+install -d /etc/systemd/journald.conf.d
+printf '[Journal]
+MaxRetentionSec=30day
+' > /etc/systemd/journald.conf.d/raid-website.conf
+systemctl restart systemd-journald
+```
+
 ## Incident plan and secret rotation
 
 Use this plan when you suspect a compromise: unknown logins or role changes in
@@ -241,8 +266,8 @@ and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
    ```
 
    The Admin audit log in the app shows data changes. The journal keeps
-   security events for 30 days (SC-041, not built yet: until then it holds only
-   request logs).
+   security events for 30 days (SC-041); see "Security events in the journal"
+   below.
 
 2. **Contain: pause automatic deploys.** Stop the hourly update so a changed
    `main` is not installed while you work:

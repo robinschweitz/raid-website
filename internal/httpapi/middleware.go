@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -54,21 +55,24 @@ func securityHeaders(enableHSTS bool) func(http.Handler) http.Handler {
 	}
 }
 
-func csrfProtection(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+func csrfProtection(trustProxyHeaders bool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+				next.ServeHTTP(w, r)
+				return
+			}
+			// The token is required whether or not the request has a session cookie,
+			// Origin, or Sec-Fetch-Site: absent browser metadata must never skip it (SC-019).
+			cookie, err := r.Cookie(csrfCookieName)
+			if err != nil || cookie.Value == "" || r.Header.Get("X-CSRF-Token") == "" || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(r.Header.Get("X-CSRF-Token"))) != 1 {
+				v1.LogSecurityEvent(w, r, trustProxyHeaders, "csrf_rejected", slog.String("method", r.Method), slog.String("path", r.URL.Path))
+				v1.WriteError(w, http.StatusForbidden, "csrf_required", "CSRF token required")
+				return
+			}
 			next.ServeHTTP(w, r)
-			return
-		}
-		// The token is required whether or not the request has a session cookie,
-		// Origin, or Sec-Fetch-Site: absent browser metadata must never skip it (SC-019).
-		cookie, err := r.Cookie(csrfCookieName)
-		if err != nil || cookie.Value == "" || r.Header.Get("X-CSRF-Token") == "" || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(r.Header.Get("X-CSRF-Token"))) != 1 {
-			v1.WriteError(w, http.StatusForbidden, "csrf_required", "CSRF token required")
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+		})
+	}
 }
 
 // authenticate resolves the session cookie (if any) into the current player and

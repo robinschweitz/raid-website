@@ -345,7 +345,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** The server MUST write one structured journal line for each failed login, login or lookup rate-limit rejection, wrong MFA code, invalidated MFA challenge, CSRF rejection, password change or reset, Admin change of a player's credentials or role, and MFA enable or disable. Each line MUST contain time, event name, player ID or normalised username, client address (SC-006), and request ID, and MUST NOT contain passwords, codes, or tokens (SC-030). The journal MUST keep these lines for 30 days.
 - **Enforcement:** `auth`, `csrfProtection`, rate limiters; journald retention in `deploy/`.
-- **Evidence:** FR-26.4 (logins stay out of the audit log), OD-013 (owner, 2026-10-23). Code: **not compliant** — `internal/auth` logs nothing. Threats: T-021.
+- **Evidence:** FR-26.4 (logins stay out of the audit log), OD-013 (owner, 2026-10-23). Code: partly compliant since #73 — `internal/httpapi/v1/securityevents.go` writes one slog JSON line to stderr (journal) for `login_failed`, `login_blocked`, `mfa_failed`, `mfa_challenge_invalid`, `csrf_rejected`, `password_changed`, `account_changed`, `mfa_enabled`, and `mfa_disabled`, with client address and request ID; retention is in `deploy/README.md`; test `TestReqAuth024_SecurityEventsWithoutSecrets`. Still missing: the lookup rate-limit rejection (SC-028 not built) and password reset events (SC-042 not built). A wrong MFA code names no player, because the challenge identifies none at the handler. Threats: T-021.
 - **Verification:** Five wrong logins produce five journal lines without the password; journald keeps them 30 days.
 
 **SC-042 - Password reset with an in-game code**

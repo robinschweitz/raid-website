@@ -1,8 +1,16 @@
-export const appVersion = '1.0.56'
+export const appVersion = '1.0.57'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'EP-Korrekturen enden bei null',
+    changes: [
+      'Eine Korrektur an einem abgeschlossenen Raid zieht nie mehr EP ab, als der Spieler hat. Der Kontostand bleibt bei 0 und die fehlenden Punkte werden auch später nicht abgezogen.',
+      'Vor dem Speichern warnt die Seite mit dem Spieler und den Punkten, die nicht abgezogen werden. Das Audit-Log hält diese Zahl fest.',
+    ],
+  },
+  {
+    version: '1.0.56',
     title: 'Lesbarere kleine Schrift',
     changes: [
       'Kleine Texte wie Abzeichen, Beschriftungen und Tabellenhinweise sind jetzt mindestens 12 Pixel groß und damit besser lesbar.',

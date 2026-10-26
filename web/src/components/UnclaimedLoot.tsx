@@ -27,9 +27,11 @@ interface Props {
   needsReason: boolean
   bosses: CatalogBoss[]
   version: number
+  mode?: 'all' | 'form' | 'list'
+  onChanged?: () => void
 }
 
-export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }: Props) {
+export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version, mode = 'all', onChanged }: Props) {
   const { pending, submit, isActive } = useSubmission()
   const [entries, setEntries] = useState<UnclaimedEntry[]>([])
   const [error, setError] = useState('')
@@ -61,6 +63,7 @@ export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }
         setNotes('')
         setReason('')
         await load()
+        onChanged?.()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Konnte nicht gespeichert werden.')
       }
@@ -73,18 +76,20 @@ export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }
       await api.post(`/api/v1/unclaimed-loot/${entry.id}/remove`, { reason })
       setReason('')
       await load()
+      onChanged?.()
     } catch (err) {
       if (isActive()) setError(err instanceof ApiError ? err.message : 'Konnte nicht entfernt werden.')
     }
   })
 
-  if (!canWrite && entries.length === 0) return null
-  return <section className="subcard unclaimed-loot" aria-label="Beute ohne Empfänger">
-    <h3>Beute ohne Empfänger</h3>
-    <p className="muted">Entzaubert, für die Gildenbank oder von niemandem gewollt. Zählt für keinen Spieler und kostet keine EP.</p>
+  if (mode === 'form' && !canWrite) return null
+  if (mode !== 'form' && !canWrite && entries.length === 0) return null
+  return <section className={mode === 'form' ? 'unclaimed-loot' : 'unclaimed-loot loot-unclaimed-list'} aria-label="Beute ohne Empfänger">
+    {mode !== 'form' && <h3>Beute ohne Empfänger</h3>}
+    {mode !== 'list' && <p className="muted">Entzaubert, für die Gildenbank oder von niemandem gewollt. Zählt für keinen Spieler und kostet keine EP.</p>}
     {error && <ErrorMessage>{error}</ErrorMessage>}
     {canWrite && needsReason && <label className="unclaimed-reason">Grund (Pflicht im archivierten Raid)<input value={reason} onChange={(e) => setReason(e.target.value)} /></label>}
-    {entries.length === 0 ? <p className="muted">Noch nichts eingetragen.</p>
+    {mode !== 'form' && (entries.length === 0 ? <p className="muted">Noch nichts eingetragen.</p>
       : <div className="table-scroll"><table className="table small">
         <thead><tr><th>Item</th><th>Boss</th><th>Verbleib</th><th>Bei</th><th>Notizen</th>{canWrite && <th></th>}</tr></thead>
         <tbody>{entries.map((entry) => <tr key={entry.id}>
@@ -95,8 +100,9 @@ export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }
           <td>{entry.notes}{entry.source === 'addon' && <span className="muted"> (Addon)</span>}</td>
           {canWrite && <td><button type="button" disabled={pending || (needsReason && !reason.trim())} onClick={() => void remove(entry)}>Entfernen</button></td>}
         </tr>)}</tbody>
-      </table></div>}
-    {canWrite && <details className="editor-disclosure"><summary>Beute ohne Empfänger eintragen</summary>
+      </table></div>)}
+    {canWrite && mode !== 'list' && <div className={mode === 'form' ? '' : 'editor-disclosure'}>
+      {mode !== 'form' && <h4>Beute ohne Empfänger eintragen</h4>}
       <form className="unclaimed-form" onSubmit={add}>
         <label>Boss<select value={bossID} onChange={(e) => setBossID(e.target.value)}>
           <option value="">Ohne Boss</option>
@@ -110,6 +116,6 @@ export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }
         <label>Notizen<input value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
         <div className="actions"><button type="submit" disabled={pending || !itemName.trim() || (needsReason && !reason.trim())}>Eintragen</button></div>
       </form>
-    </details>}
+    </div>}
   </section>
 }

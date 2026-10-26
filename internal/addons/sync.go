@@ -15,7 +15,8 @@ type SyncResult struct {
 }
 
 // Sync copies every bundled addon from a wow-addons checkout (source/<Name>/)
-// into the bundle directory: the .toc and the files it lists, nothing else.
+// into the bundle directory: the .toc, the files it lists and, if present, its
+// LICENSE (ADR 105), nothing else.
 // Files of the old version that the new .toc no longer lists are removed, so
 // the bundle always matches its .toc. The source is checked completely before
 // anything is written.
@@ -37,6 +38,9 @@ func Sync(source, bundle string) ([]SyncResult, error) {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		files := append([]string{tocName}, toc.Files...)
+		if _, err := os.Stat(filepath.Join(source, name, LicenseFile)); err == nil {
+			files = append(files, LicenseFile)
+		}
 		for _, file := range files {
 			if _, err := os.Stat(filepath.Join(source, name, filepath.FromSlash(file))); err != nil {
 				return nil, fmt.Errorf("%w: %s lists %s, which is missing in %s", ErrInvalidBundle, name, file, source)

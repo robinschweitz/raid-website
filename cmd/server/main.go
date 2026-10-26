@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"raid-website/internal/auth"
 	"raid-website/internal/config"
 	"raid-website/internal/db"
 	"raid-website/internal/httpapi"
@@ -74,7 +75,12 @@ func run() (err error) {
 		log.Printf("web push off: VAPID_PRIVATE_KEY is not set")
 	}
 	risingGods := registration.RisingGodsClient{ProxyURL: cfg.RisingGodsProxyURL, ProxyToken: cfg.RisingGodsProxyToken}
+	totpEncryption, err := auth.NewTOTPEncryption(cfg.TOTPEncryptionKey)
+	if err != nil {
+		return err
+	}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
+		TOTPEncryption:    totpEncryption,
 		CookieSecure:      cfg.CookieSecure,
 		TrustProxyHeaders: cfg.TrustProxyHeaders,
 		PublicOrigin:      cfg.PublicOrigin,

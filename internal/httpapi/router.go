@@ -39,6 +39,7 @@ import (
 
 // Options controls optional runtime behaviour of the HTTP layer.
 type Options struct {
+	TOTPEncryption    *auth.TOTPEncryption
 	CookieSecure      bool
 	TrustProxyHeaders bool
 	PublicOrigin      string
@@ -76,7 +77,14 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	polls := poll.NewRepo(db)
 	audits := audit.NewRepo(db)
 
-	authSvc := auth.NewService(players, auth.NewRepo(db))
+	authRepo := auth.NewRepo(db)
+	if opts.TOTPEncryption != nil {
+		authRepo = authRepo.WithTOTPEncryption(opts.TOTPEncryption)
+		if err := authRepo.MigrateTOTPSecrets(context.Background()); err != nil {
+			return nil, err
+		}
+	}
+	authSvc := auth.NewService(players, authRepo)
 	registrationFeed := opts.RegistrationFeed
 	if registrationFeed == nil {
 		registrationFeed = registration.RisingGodsClient{}

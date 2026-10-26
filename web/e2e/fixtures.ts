@@ -162,7 +162,7 @@ export function berlinDate(days: number) {
 
 
 // Account setup follows the same reset-code path an Admin and member use.
-async function provisionAccount(request: APIRequestContext, api: Awaited<ReturnType<typeof apiAs>>, playerID: number, username: string, password: string, role: string) {
+export async function provisionAccount(request: APIRequestContext, api: Awaited<ReturnType<typeof apiAs>>, playerID: number, username: string, password: string, role: string) {
   await api.put(`/api/v1/players/${playerID}/account`, { username, role })
   const generated = await api.post(`/api/v1/players/${playerID}/reset-code`, {})
   const csrf = (await (await request.get('/api/v1/auth/csrf')).json()).data.token as string

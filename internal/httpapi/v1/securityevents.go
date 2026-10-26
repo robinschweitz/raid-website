@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"raid-website/internal/auth"
 )
 
 // securityLog writes one JSON line per security event to stderr, which systemd
@@ -33,6 +35,14 @@ func LogSecurityEvent(w http.ResponseWriter, r *http.Request, trustProxyHeaders 
 
 func (a *API) securityEvent(w http.ResponseWriter, r *http.Request, event string, attrs ...slog.Attr) {
 	LogSecurityEvent(w, r, a.TrustProxyHeaders, event, attrs...)
+}
+
+// playerAttrs names the player of a failed MFA step when the challenge knew one.
+func playerAttrs(err error) []slog.Attr {
+	if id, ok := auth.PlayerIDFromError(err); ok {
+		return []slog.Attr{slog.Int64("player_id", id)}
+	}
+	return nil
 }
 
 func normalisedUsername(username string) string {

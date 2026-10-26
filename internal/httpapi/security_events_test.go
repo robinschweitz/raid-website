@@ -129,3 +129,52 @@ func TestReqAuth024_SecurityEventsWithoutSecrets(t *testing.T) {
 		}
 	}
 }
+
+// TestReqAuth024_WrongMFACodeNamesThePlayer checks that a wrong code and an
+// invalidated challenge carry the player ID of the challenge, and that the
+// code itself never reaches the journal (SC-041, SC-030).
+func TestReqAuth024_WrongMFACodeNamesThePlayer(t *testing.T) {
+	buf := captureSecurityLog(t)
+	srv, bdb := setupServer(t)
+	client := srv.Client()
+	adminID := seedAccount(t, bdb, "admin", "admin-password-1", validation.RoleAdmin)
+
+	resp := postJSON(t, client, srv.URL+"/api/v1/auth/login", map[string]any{"username": "admin", "password": "admin-password-1"})
+	var started struct {
+		Data struct {
+			Challenge string `json:"challenge"`
+		} `json:"data"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&started)
+	resp.Body.Close()
+	if started.Data.Challenge == "" {
+		t.Fatal("login did not start an MFA challenge")
+	}
+
+	const wrongCode = "135790"
+	for i := 0; i < 5; i++ {
+		verified := postJSON(t, client, srv.URL+"/api/v1/auth/mfa/verify", map[string]any{"challenge": started.Data.Challenge, "code": wrongCode})
+		verified.Body.Close()
+	}
+	// The challenge is gone now: no player is known for it.
+	gone := postJSON(t, client, srv.URL+"/api/v1/auth/mfa/verify", map[string]any{"challenge": started.Data.Challenge, "code": wrongCode})
+	gone.Body.Close()
+
+	events := buf.events(t)
+	want := []string{"mfa_failed", "mfa_failed", "mfa_failed", "mfa_failed", "mfa_challenge_invalid", "mfa_challenge_invalid"}
+	if got := eventNames(events); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("events = %v, want %v", got, want)
+	}
+	for i, e := range events[:5] {
+		if e["player_id"] != float64(adminID) {
+			t.Fatalf("event %d (%v) has player_id %v, want %d", i, e["event"], e["player_id"], adminID)
+		}
+	}
+	if _, has := events[5]["player_id"]; has {
+		t.Fatalf("an unknown challenge must log no player: %v", events[5])
+	}
+	raw, _ := json.Marshal(events)
+	if strings.Contains(string(raw), wrongCode) || strings.Contains(string(raw), started.Data.Challenge) {
+		t.Fatal("journal lines contain the MFA code or the challenge")
+	}
+}

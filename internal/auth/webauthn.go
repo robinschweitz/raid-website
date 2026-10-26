@@ -146,7 +146,7 @@ func (s *Service) FinishWebAuthnMFA(ctx context.Context, webAuthnSessionToken st
 		return "", nil, err
 	}
 	if stored.MFAChallengeID == nil {
-		return "", nil, ErrInvalidMFA
+		return "", nil, withPlayer(stored.PlayerID, ErrInvalidMFA)
 	}
 	user, err := s.webAuthnUser(ctx, stored.PlayerID)
 	if err != nil {
@@ -158,7 +158,7 @@ func (s *Service) FinishWebAuthnMFA(ctx context.Context, webAuthnSessionToken st
 	}
 	credential, err := w.FinishLogin(user, *session, requestWithBody(response))
 	if err != nil {
-		return "", nil, fmt.Errorf("finish webauthn login: %w", err)
+		return "", nil, withPlayer(stored.PlayerID, fmt.Errorf("finish webauthn login: %w", err))
 	}
 	if err := s.updateWebAuthnCredential(ctx, stored.PlayerID, credential, now); err != nil {
 		return "", nil, err

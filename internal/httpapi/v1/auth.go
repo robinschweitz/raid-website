@@ -171,12 +171,12 @@ func (a *API) verifyMFA(w http.ResponseWriter, r *http.Request) {
 	token, p, err := a.Auth.VerifyMFAChallenge(r.Context(), req.Challenge, req.Code)
 	if err != nil {
 		if errors.Is(err, auth.ErrMFAChallengeInvalid) {
-			a.securityEvent(w, r, "mfa_challenge_invalid")
+			a.securityEvent(w, r, "mfa_challenge_invalid", playerAttrs(err)...)
 			WriteError(w, http.StatusUnauthorized, "mfa_challenge_invalid", "MFA challenge is no longer valid; log in again")
 			return
 		}
 		if errors.Is(err, auth.ErrInvalidMFA) {
-			a.securityEvent(w, r, "mfa_failed", slog.String("method", "code"))
+			a.securityEvent(w, r, "mfa_failed", append(playerAttrs(err), slog.String("method", "code"))...)
 			WriteError(w, http.StatusUnauthorized, "invalid_mfa_code", "invalid MFA code")
 			return
 		}
@@ -410,9 +410,12 @@ func (a *API) finishWebAuthnMFA(w http.ResponseWriter, r *http.Request) {
 	token, p, err := a.Auth.FinishWebAuthnMFA(r.Context(), req.Session, req.Response, rpID, origin)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidMFA) {
-			a.securityEvent(w, r, "mfa_failed", slog.String("method", "webauthn"))
+			a.securityEvent(w, r, "mfa_failed", append(playerAttrs(err), slog.String("method", "webauthn"))...)
 			WriteError(w, http.StatusUnauthorized, "invalid_mfa_code", "invalid MFA challenge")
 			return
+		}
+		if _, known := auth.PlayerIDFromError(err); known {
+			a.securityEvent(w, r, "mfa_failed", append(playerAttrs(err), slog.String("method", "webauthn"))...)
 		}
 		WriteError(w, http.StatusUnprocessableEntity, "webauthn_invalid", "security key login failed")
 		return

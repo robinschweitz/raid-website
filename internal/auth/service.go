@@ -699,7 +699,7 @@ func (s *Service) VerifyMFAChallenge(ctx context.Context, challenge, code string
 	}
 	// A challenge whose deletion failed after the last wrong code stays closed.
 	if c.FailedAttempts >= mfaFailureLimit {
-		return "", nil, ErrMFAChallengeInvalid
+		return "", nil, withPlayer(c.PlayerID, ErrMFAChallengeInvalid)
 	}
 	p, err := s.players.Get(ctx, c.PlayerID)
 	if err != nil {
@@ -723,7 +723,7 @@ func (s *Service) VerifyMFAChallenge(ctx context.Context, challenge, code string
 			return "", nil, err
 		}
 		if !used {
-			return "", nil, s.recordWrongMFACode(ctx, c.ID)
+			return "", nil, withPlayer(p.ID, s.recordWrongMFACode(ctx, c.ID))
 		}
 	}
 	if err := s.sessions.MarkMFAChallengeUsed(ctx, c.ID, now); err != nil {

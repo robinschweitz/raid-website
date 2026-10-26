@@ -183,29 +183,52 @@ export async function checkInPush(): Promise<void> {
   }).catch(() => undefined)
 }
 
+type EnableSubscription = BrowserSubscription & { toJSON: () => PushSubscriptionJSON }
+
+export type EnableDeps<S extends EnableSubscription> = {
+  getSubscription: () => Promise<S | null>
+  subscribe: () => Promise<S>
+  register: (subscription: S, signal: AbortSignal) => Promise<void>
+}
+
+// enableSubscription is the queued part of turning push on. It checks for
+// cancellation after every browser call: a cancelled step creates nothing,
+// registers nothing, and removes only a subscription it created itself; a
+// subscription that existed before belongs to whoever made it and stays
+// (ADR 103).
+export async function enableSubscription<S extends EnableSubscription>(deps: EnableDeps<S>, signal: AbortSignal): Promise<void> {
+  const existing = await deps.getSubscription()
+  if (signal.aborted) throw supersededError()
+  const created = existing === null
+  const subscription = existing ?? await deps.subscribe()
+  if (signal.aborted) {
+    if (created) await subscription.unsubscribe().catch(() => false)
+    throw supersededError()
+  }
+  try {
+    await deps.register(subscription, signal)
+  } catch (err) {
+    // A subscription the server does not know would never get a message; one
+    // that existed before stays for its owner, and a cancelled step leaves it to the newer one.
+    if (created || !signal.aborted) await subscription.unsubscribe().catch(() => false)
+    throw err
+  }
+}
+
 export async function enablePush(config: PushConfig): Promise<void> {
   // Asked first and outside the queue, so the prompt still belongs to the click.
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') throw new Error(permission === 'denied' ? 'denied' : 'dismissed')
   await runExclusive(async (signal) => {
     const registration = await navigator.serviceWorker.ready
-    let subscription = await registration.pushManager.getSubscription()
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64URLToBytes(config.public_key) })
-    }
-    // A newer change (a disable, a sign-in) cancelled this one while the
-    // browser was slow: do not register, and remove what was just created.
-    if (signal.aborted) {
-      await subscription.unsubscribe().catch(() => false)
-      throw supersededError()
-    }
-    try {
-      await api.post('/api/v1/push/subscriptions', subscriptionBody(subscription.toJSON()), { signal })
-    } catch (err) {
-      // A browser subscription the server does not know would never get a message.
-      await subscription.unsubscribe().catch(() => false)
-      throw err
-    }
+    if (signal.aborted) throw supersededError()
+    await enableSubscription({
+      getSubscription: () => registration.pushManager.getSubscription(),
+      subscribe: () => registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64URLToBytes(config.public_key) }),
+      register: async (subscription, requestSignal) => {
+        await api.post('/api/v1/push/subscriptions', subscriptionBody(subscription.toJSON()), { signal: requestSignal })
+      },
+    }, signal)
   })
 }
 

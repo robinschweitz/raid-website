@@ -3975,6 +3975,68 @@ test('a push change that starts after the wait limit cancels the stalled one (AD
   assert.equal(readSignal.aborted, false)
 })
 
+test('a cancelled enable keeps a subscription that existed before and removes only one it created (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { enableSubscription } = s.load('pushNotifications.ts')
+  const browserSub = (endpoint) => {
+    const sub = { endpoint, drops: 0, unsubscribe: () => { sub.drops++; return Promise.resolve(true) }, toJSON: () => ({ endpoint, keys: { p256dh: 'p', auth: 'a' } }) }
+    return sub
+  }
+
+  // An existing subscription, a stalled enable, and a newer change that cancels it.
+  const existing = browserSub('https://fcm.googleapis.com/existing')
+  let controller = new AbortController()
+  let registered = 0
+  const stalledExisting = enableSubscription({
+    getSubscription: () => settle(30).then(() => existing),
+    subscribe: () => Promise.reject(new Error('must not subscribe')),
+    register: () => { registered++; return Promise.resolve() },
+  }, controller.signal)
+  controller.abort()
+  await assert.rejects(stalledExisting, /superseded/)
+  assert.equal(existing.drops, 0, 'the existing subscription was removed by the cancelled enable')
+  assert.equal(registered, 0)
+
+  // Cancelled while the browser created a new subscription: that one is removed again.
+  const fresh = browserSub('https://fcm.googleapis.com/fresh')
+  controller = new AbortController()
+  const stalledCreate = enableSubscription({
+    getSubscription: () => Promise.resolve(null),
+    subscribe: () => settle(30).then(() => fresh),
+    register: () => { registered++; return Promise.resolve() },
+  }, controller.signal)
+  await settle(5)
+  controller.abort()
+  await assert.rejects(stalledCreate, /superseded/)
+  assert.equal(fresh.drops, 1)
+  assert.equal(registered, 0)
+
+  // Cancelled before anything happened: nothing is created.
+  controller = new AbortController()
+  controller.abort()
+  let subscribed = 0
+  await assert.rejects(enableSubscription({ getSubscription: () => Promise.resolve(null), subscribe: () => { subscribed++; return Promise.resolve(fresh) }, register: () => Promise.resolve() }, controller.signal), /superseded/)
+  assert.equal(subscribed, 0)
+
+  // Cancelled while the server request runs: an existing subscription still stays.
+  const kept = browserSub('https://fcm.googleapis.com/kept')
+  controller = new AbortController()
+  const cancelledRegister = enableSubscription({
+    getSubscription: () => Promise.resolve(kept),
+    subscribe: () => Promise.reject(new Error('must not subscribe')),
+    register: (_sub, signal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))),
+  }, controller.signal)
+  await settle(5)
+  controller.abort()
+  await assert.rejects(cancelledRegister, /aborted/)
+  assert.equal(kept.drops, 0)
+
+  // Not cancelled: a failed registration removes the subscription the server does not know.
+  const unknown = browserSub('https://fcm.googleapis.com/unknown')
+  await assert.rejects(enableSubscription({ getSubscription: () => Promise.resolve(unknown), subscribe: () => Promise.reject(new Error('no')), register: () => Promise.reject(new Error('server')) }, new AbortController().signal), /server/)
+  assert.equal(unknown.drops, 1)
+})
+
 test('a late check-in answer after the deadline changes nothing (ADR 103)', async () => {
   const s = setup({ id: 1, role: 'MEMBER' })
   const { checkInWithDeadline } = s.load('pushNotifications.ts')

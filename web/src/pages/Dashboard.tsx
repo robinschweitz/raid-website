@@ -152,7 +152,7 @@ export function DashboardPage() {
             <div className="attendance-detail-row"><span className="muted">Aufgestellt</span><strong>{confirmedCount} / {requiredPlayers || "–"}</strong></div>
             <div className="attendance-detail-row"><span className="muted">Ersatzbank</span><strong>{attendance.filter((a) => a.is_bench).length}</strong></div>
             <div className="attendance-detail-row"><span className="muted">Freie Plätze</span><strong>{requiredPlayers ? openSlots : "–"}</strong></div>
-            {overCapacity > 0 && <div className="attendance-detail-row"><span className="muted">Überbelegung</span><strong>+{overCapacity}</strong></div>
+            {overCapacity > 0 && <div className="attendance-detail-row"><span className="muted">Überbelegung</span><strong>+{overCapacity}</strong></div>}
           </div>
         </div> : <p className="muted">Keine Daten verf&uuml;gbar.</p>}
       </section>

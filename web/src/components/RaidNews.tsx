@@ -55,7 +55,7 @@ export function RaidNews({ player }: { player: Player | null }) {
     {error && <ErrorMessage>{error}</ErrorMessage>}
     {items.length === 0 && <p className="muted">Keine Raid-News vorhanden.</p>}
     {items.map((item) => <article key={item.id} style={{ marginBottom: '1rem', overflowWrap: 'anywhere' }}>
-      <h3>{item.important ? '📣 ' : ''}{item.title}</h3>
+      <h3>{item.important ? '' : ''}{item.title}</h3>
       <p style={{ whiteSpace: 'pre-wrap' }}>{item.body}</p>
       <small className="muted">{new Date(item.created_at).toLocaleDateString('de-DE')}</small>
     </article>)}

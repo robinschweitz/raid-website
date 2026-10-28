@@ -64,7 +64,7 @@ export function RaidNews({ player }: { player: Player | null }) {
       <form onSubmit={save} className="raid-news-form">
         <label className="raid-news-title">Titel<input maxLength={120} required value={draft.title} onChange={(e) => setDraft((old) => ({ ...old, title: e.target.value }))} /></label>
         <label className="raid-news-body">Nachricht<textarea maxLength={4000} required rows={4} value={draft.body} onChange={(e) => setDraft((old) => ({ ...old, body: e.target.value }))} /></label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '0.5rem', marginTop: '0.5rem', textAlign: 'center' }}>
           <label className="raid-news-check"><input type="checkbox" checked={draft.important} onChange={(e) => setDraft((old) => ({ ...old, important: e.target.checked }))} /> Wichtig</label>
           <label className="raid-news-check"><input type="checkbox" checked={draft.published} onChange={(e) => setDraft((old) => ({ ...old, published: e.target.checked }))} /> Veröffentlicht</label>
           <div className="raid-news-actions" style={{ marginLeft: 'auto' }}>

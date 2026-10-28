@@ -339,7 +339,8 @@ export function GuidePage() {
       <h3>Loot eintragen</h3>
       <p>Beim Addon-Import wählst du einmal je Boss ohne Kill die Schwierigkeit. Alle ausgewählten Zeilen und neuen Kills werden gemeinsam gespeichert; bei einem Fehler wird nichts davon übernommen.</p>
       <p>Für einen Boss ohne Kill wird der Kill mit der gewählten Schwierigkeit zusammen mit der Beute gespeichert. Bei einer widersprüchlichen Schwierigkeit wird nichts gespeichert; lade dann den Raid neu.</p>
-      <p>Gewürfelt wird im Spiel. Hier wird nur eingetragen, wer was bekommen hat: Reiter <strong>Loot</strong>, <strong>Loot erfassen</strong>, Boss und Modus wählen, Item suchen, Empfänger und Vergabeart wählen.</p>
+      <p>Gewürfelt wird im Spiel. Hier wird nur eingetragen, wer was bekommen hat: Reiter <strong>Loot</strong>, <strong>Loot erfassen</strong>, bei <strong>Art der Erfassung</strong> <em>An Spieler vergeben</em> lassen, Boss und Modus wählen, Item suchen, Empfänger und Vergabeart wählen.</p>
+
       <div className="table-scroll">
         <table className="table">
           <thead><tr><th>Vergabeart</th><th>Bedeutung</th><th>+10 EP beim Archivieren?</th></tr></thead>
@@ -356,7 +357,7 @@ export function GuidePage() {
       <h3>Bosskills</h3>
       <p>Im Reiter <strong>Loot</strong> steht über der Beute ohne Empfänger der Kasten <strong>Bosskills</strong> mit jedem getöteten Boss und seiner Schwierigkeit. Alle Angemeldeten sehen ihn. Wurde nichts erfasst, steht dort, dass keine Kills erfasst sind. Die Raidleitung öffnet <strong>Kill eintragen</strong>, wählt Boss und Schwierigkeit, ändert die Schwierigkeit in der Liste oder entfernt einen Kill; solange es für den Boss noch Beute gibt, geht das nicht. Im archivierten Raid ist ein Grund nötig. Auf der Übersicht sind die getöteten Bosse des nächsten Raids hervorgehoben.</p>
       <h3>Beute ohne Empfänger</h3>
-      <p>Items, die entzaubert wurden, in die Gildenbank gehen oder die niemand wollte, gehören keinem Spieler. Sie stehen im Reiter <strong>Loot</strong> unter <strong>Beute ohne Empfänger</strong>: aufklappen, Boss (optional), Item, Verbleib und bei wem es liegt eintragen. Sie zählen für niemanden und kosten keine EP. Der Addon-Import übernimmt Zeilen, die RaidLedger als <em>DE</em> oder <em>BANK</em> vergeben hat, automatisch dorthin.</p>
+      <p>Items, die entzaubert wurden, in die Gildenbank gehen oder die niemand wollte, gehören keinem Spieler. Die Raidleitung trägt sie im Reiter <strong>Loot</strong> unter <strong>Loot erfassen</strong> ein: bei <strong>Art der Erfassung</strong> <em>Entzaubert / Gildenbank / Niemand wollte es</em> wählen, dann Boss (optional), Item, Verbleib und bei wem es liegt. Alle sehen sie danach in der Liste <strong>Beute ohne Empfänger</strong>. Sie zählen für niemanden und kosten keine EP. Der Addon-Import übernimmt Zeilen, die RaidLedger als <em>DE</em> oder <em>BANK</em> vergeben hat, automatisch dorthin.</p>
       <h3>Archivieren nach dem Raid</h3>
       <p>Archivieren beendet den Raid endgültig. Teilnehmer ohne Main-Spec-Loot bekommen +10 EP, ungenutzte Locks verfallen, und der nächste Serientermin entsteht.</p>
       <ol>

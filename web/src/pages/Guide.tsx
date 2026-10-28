@@ -104,9 +104,9 @@ export function GuidePage() {
           <thead><tr><th>Rolle</th><th>Wer ist das?</th><th>Was kann ich?</th></tr></thead>
           <tbody>
             <tr><td><strong>Besucher</strong></td><td>Nicht eingeloggt</td><td>Nächsten Raid, Raidhistorie, aktive Umfrage und diese Anleitung ansehen</td></tr>
-            <tr><td><strong>Gast</strong> <code>GUEST</code></td><td>Frisch registriert</td><td>Alles ansehen, auch die Schattengram-Reihenfolge. Anmelden geht erst, wenn ein Admin dich zum Mitglied macht.</td></tr>
+            <tr><td><strong>Gast</strong> <code>GUEST</code></td><td>Ältere Konten und Spieler ohne Login aus dem Raid</td><td>Alles ansehen, auch die Schattengram-Reihenfolge. Anmelden geht erst, wenn ein Admin dich zum Mitglied macht.</td></tr>
             <tr><td><strong>Mitglied</strong> <code>MEMBER</code></td><td>Normale Raider</td><td>Für Raids anmelden, absagen oder „unsicher“ melden, Wunschliste, Item-Locks, abstimmen</td></tr>
-            <tr><td><strong>Raidassistent</strong> <code>RAIDASSISTENT</code></td><td>Helfer der Raidleitung</td><td>Dazu: Raids anlegen und vorausplanen, Anmeldungen übernehmen, Aufstellung, Gesuchtext, Loot, archivieren, Umfragen erstellen, Schattengram-Liste pflegen und pro Raid einteilen</td></tr>
+            <tr><td><strong>Raidassistent</strong> <code>RAIDASSISTENT</code></td><td>Helfer der Raidleitung</td><td>Dazu: Raids anlegen und vorausplanen, Anmeldungen übernehmen, Aufstellung, Gesuchtext, Loot, archivieren, Umfragen erstellen und bearbeiten, Schattengram-Liste pflegen und pro Raid einteilen</td></tr>
             <tr><td><strong>Raidleitung</strong> <code>RAIDLEADER</code></td><td>Leitet die Raids</td><td>Alles vom Raidassistenten</td></tr>
             <tr><td><strong>Admin</strong> <code>ADMIN</code></td><td>Gildenverwaltung</td><td>Dazu: Spieler und Rollen, Registrierungscodes, Raidserien, Gildenkonfiguration, Audit-Protokoll</td></tr>
           </tbody>
@@ -133,7 +133,7 @@ export function GuidePage() {
         <li>Klicke auf <strong>Registrieren</strong>.</li>
       </ol>
       <Shot name="03-registrieren" caption="Registrieren mit Code, Benutzername und Passwort" />
-      <Tip><strong>Wichtig:</strong> Nach der Registrierung bist du zuerst <strong>Gast</strong>. Sag einem Admin Bescheid, damit er dich zum <strong>Mitglied</strong> macht. Erst dann kannst du dich für Raids anmelden und eine Wunschliste anlegen.</Tip>
+      <Tip><strong>Wichtig:</strong> Nach der Registrierung bist du <strong>Mitglied</strong> und kannst dich für Raids anmelden und eine Wunschliste anlegen. Das gilt auch, wenn dein Charakter schon aus dem Raid bekannt war und du diesen Spieler übernimmst.</Tip>
       <h3>Schritt 3: Einloggen</h3>
       <p>Ab jetzt gehst du immer über <strong>Anmelden</strong>: Benutzername und Passwort eingeben, fertig.</p>
       <Shot name="01-login" caption="Die Login-Seite" />
@@ -150,7 +150,7 @@ export function GuidePage() {
             <tr><td><strong>Raids</strong></td><td>Alle geplanten und vergangenen Raids. Hier öffnest du einen Raid im Detail.</td></tr>
             <tr><td><strong>Aktueller Raid</strong></td><td>Direkt zum Raid von heute Abend: der neueste Raid, der schon begonnen hat (sonst der nächste). Auf dem Handy heißt er <strong>Aktuell</strong>.</td></tr>
             <tr><td><strong>Spieler</strong></td><td>Alle Spieler. Über deinen Namen (auch oben rechts) kommst du zu deinem Profil.</td></tr>
-            <tr><td><strong>Statistiken</strong></td><td>Auswertungen über Raids und Loot</td></tr>
+            <tr><td><strong>Statistiken</strong></td><td>Auswertungen über Raids und Loot (ohne Anmeldung sichtbar, ohne Items und Enhance Points)</td></tr>
             <tr><td><strong>Umfragen</strong></td><td>Abstimmen, z. B. über einen neuen Raidtag</td></tr>
             <tr><td><strong>Beute</strong></td><td>Item-Katalog. Hier fügst du Items zur Wunschliste hinzu.</td></tr>
             <tr><td><strong>Schattengram</strong></td><td>Wer an Schattengram arbeitet, bei welchem Schritt, in welcher Reihenfolge, und wer schon fertig ist.</td></tr>
@@ -173,7 +173,7 @@ export function GuidePage() {
           <tbody>
             <tr><td><span className="badge warn">Noch nicht angemeldet</span></td><td>Du hast noch nichts gesagt.</td></tr>
             <tr><td><span className="badge">Angemeldet</span></td><td>Die Raidleitung weiß, dass du willst, hat dich aber noch nicht eingeplant.</td></tr>
-            <tr><td><span className="badge ok">Bestätigt</span></td><td>Du bist in der Aufstellung.</td></tr>
+            <tr><td><span className="badge ok">Bestätigt</span></td><td>Du bist in der Aufstellung, auch wenn die Raidleitung dich selbst eingetragen hat.</td></tr>
             <tr><td><span className="badge warn">Unsicher</span></td><td>Du weißt noch nicht sicher, ob du kommst.</td></tr>
             <tr><td><span className="badge bad">Abgesagt</span></td><td>Du kannst nicht.</td></tr>
           </tbody>
@@ -256,9 +256,11 @@ export function GuidePage() {
       <Shot name="20-item-locks" caption="Item-Locks: aktiver Lock und Formular" />
       <h3>Konto</h3>
       <p>Im Reiter <strong>Konto</strong> änderst du dein Passwort. Freiwillig kannst du eine Authenticator-App oder einen Sicherheitsschlüssel als zweiten Faktor einrichten. Warum sich das lohnt, steht unter <Link to="/kontosicherheit">Kontosicherheit</Link>.</p>
+      <p>Ebenfalls freiwillig: Unter <strong>Benachrichtigungen</strong> schaltest du für dein Gerät Meldungen bei neuen Umfragen, neuen Raids und deinem Platz in einer Aufstellung ein. Der Browser fragt erst nach, wenn du auf den Knopf drückst. Auf iPhone und iPad geht das nur mit RAID auf dem Home-Bildschirm (ab iOS 16.4). Die Meldungen bleiben auf diesem Gerät eingeschaltet, auch wenn du dich später neu anmeldest. Sie enden, wenn du dich abmeldest, wenn sich jemand anderes auf dem Gerät anmeldet und, nach einer Passwortänderung, auf deinen anderen Geräten.</p>
       <Shot name="21-konto" caption="Konto: Passwort und Zwei-Faktor" />
       <h3>Umfragen</h3>
       <p>Unter <Link to="/polls">Umfragen</Link> Antwort wählen und <strong>Abstimmen</strong> klicken.</p>
+      <p>Die Raidleitung kann eine Umfrage mit <strong>Bearbeiten</strong> nachträglich ändern: Titel, Beschreibung, Ende, Antworten, und eine geschlossene Umfrage wieder öffnen. Eine umbenannte Antwort behält ihre Stimmen; eine Antwort, für die schon jemand gestimmt hat, lässt sich nicht entfernen.</p>
       <Shot name="22-umfragen" caption="Eine Umfrage" />
     </Section>
 
@@ -299,13 +301,14 @@ export function GuidePage() {
       <h3>Anmeldungen steuern</h3>
       <ul>
         <li><strong>Anmeldungen schließen</strong> beendet die Anmeldung früher (und kann sie wieder öffnen).</li>
-        <li><strong>Absagen &amp; Unsicher</strong> zeigt, wer nicht kann oder unsicher ist. <strong>Sicher dabei</strong> bzw. <strong>Absage zurücknehmen</strong> setzt jemanden wieder auf dabei.</li>
+        <li>Die <strong>Anmeldeliste</strong> steht ganz oben, deine eigene Anmeldung ist darunter unter <em>Eigene Anmeldung</em> eingeklappt. Oben zählt sie, wie viele ausstehend, in der Aufstellung, unsicher und abgesagt sind.</li>
+        <li>Wer unsicher ist oder abgesagt hat, steht unten in der Liste. <strong>Sicher dabei</strong> bzw. <strong>Absage zurücknehmen</strong> setzt jemanden wieder auf dabei.</li>
         <li>Unter <em>Spieler markieren</em> trägst du selbst jemanden als abgesagt oder unsicher ein, z. B. nach einer Discord-Nachricht.</li>
       </ul>
       <Shot name="32-raid-anmeldungen-leitung" caption="Anmeldungen aus Sicht der Raidleitung" />
       <h3>In die Aufstellung übernehmen</h3>
-      <p>Unter <strong>Charakteroptionen nach Spieler</strong> steht jeder Angemeldete mit allen angebotenen Charakteren. Bei <em>Ausstehend</em> klickst du <strong>In Aufstellung übernehmen</strong>. Mit <strong>Auf diesen Charakter wechseln</strong> tauschst du den Charakter. Pro Spieler kommt nur ein Charakter in den Raid.</p>
-      <Shot name="33-anmeldungen-uebernehmen" caption="Charakteroptionen nach Spieler" />
+      <p>In der <strong>Anmeldeliste</strong> steht jeder Spieler in einer Zeile, offene Anmeldungen zuerst. Jeder Charakter zeigt Klassensymbol, Klasse und Spec. Bei <em>Ausstehend</em> klickst du <strong>In Aufstellung übernehmen</strong>. Mit <strong>Auf diesen Charakter wechseln</strong> tauschst du den Charakter. Pro Spieler kommt nur ein Charakter in den Raid.</p>
+      <Shot name="33-anmeldungen-uebernehmen" caption="Anmeldeliste nach Status" />
       <h3>Die Aufstellung</h3>
       <p>Der Reiter <strong>Aufstellung</strong> sortiert nach Tanks, Heilung, Nahkampf und Fernkampf, dazu die Ersatzbank. Mit <strong>Teilnahme hinzufügen</strong> trägst du jemanden ohne Anmeldung ein. Mit dem <strong>Stift</strong> änderst du Charakter und Spec oder nimmst jemanden mit <strong>Entfernen</strong> heraus.</p>
       <Shot name="34-aufstellung" caption="Raidaufstellung nach Rollen" />
@@ -334,7 +337,7 @@ export function GuidePage() {
 
     <Section id="loot" audience="raidleitung" title="Loot eintragen und archivieren">
       <h3>Loot eintragen</h3>
-      <p>Gewürfelt wird im Spiel. Hier wird nur eingetragen, wer was bekommen hat: Reiter <strong>Loot</strong>, <strong>Loot erfassen</strong>, Boss und Modus wählen, Item suchen, Empfänger und Vergabeart wählen.</p>
+      <p>Gewürfelt wird im Spiel. Hier wird nur eingetragen, wer was bekommen hat: Reiter <strong>Loot</strong>, <strong>Loot erfassen</strong>, bei <strong>Art der Erfassung</strong> <em>An Spieler vergeben</em> lassen, Boss und Modus wählen, Item suchen, Empfänger und Vergabeart wählen.</p>
       <div className="table-scroll">
         <table className="table">
           <thead><tr><th>Vergabeart</th><th>Bedeutung</th><th>+10 EP beim Archivieren?</th></tr></thead>
@@ -348,8 +351,10 @@ export function GuidePage() {
       </div>
       <Shot name="37-loot" caption="Loot erfassen" />
       <p><strong>Schneller mit dem Addon:</strong> In RaidLedger auf <strong>EXPORT</strong> klicken, den Text unter <em>Loot aus Addon importieren</em> einfügen, <strong>Vorschau</strong>, jede Zeile prüfen und übernehmen. Download und alle Funktionen stehen unter <Link to="/addons/raidledger">Addons → RaidLedger</Link>.</p>
+      <h3>Bosskills</h3>
+      <p>Im Reiter <strong>Loot</strong> steht über der Beute ohne Empfänger der Kasten <strong>Bosskills</strong> mit jedem getöteten Boss und seiner Schwierigkeit. Alle Angemeldeten sehen ihn. Wurde nichts erfasst, steht dort, dass keine Kills erfasst sind. Die Raidleitung öffnet <strong>Kill eintragen</strong>, wählt Boss und Schwierigkeit, ändert die Schwierigkeit in der Liste oder entfernt einen Kill; solange es für den Boss noch Beute gibt, geht das nicht. Im archivierten Raid ist ein Grund nötig. Auf der Übersicht sind die getöteten Bosse des nächsten Raids hervorgehoben.</p>
       <h3>Beute ohne Empfänger</h3>
-      <p>Items, die entzaubert wurden, in die Gildenbank gehen oder die niemand wollte, gehören keinem Spieler. Sie stehen im Reiter <strong>Loot</strong> unter <strong>Beute ohne Empfänger</strong>: aufklappen, Boss (optional), Item, Verbleib und bei wem es liegt eintragen. Sie zählen für niemanden und kosten keine EP. Der Addon-Import übernimmt Zeilen, die RaidLedger als <em>DE</em> oder <em>BANK</em> vergeben hat, automatisch dorthin.</p>
+      <p>Items, die entzaubert wurden, in die Gildenbank gehen oder die niemand wollte, gehören keinem Spieler. Die Raidleitung trägt sie im Reiter <strong>Loot</strong> unter <strong>Loot erfassen</strong> ein: bei <strong>Art der Erfassung</strong> <em>Entzaubert / Gildenbank / Niemand wollte es</em> wählen, dann Boss (optional), Item, Verbleib und bei wem es liegt. Alle sehen sie danach in der Liste <strong>Beute ohne Empfänger</strong>. Sie zählen für niemanden und kosten keine EP. Der Addon-Import übernimmt Zeilen, die RaidLedger als <em>DE</em> oder <em>BANK</em> vergeben hat, automatisch dorthin.</p>
       <h3>Archivieren nach dem Raid</h3>
       <p>Archivieren beendet den Raid endgültig. Teilnehmer ohne Main-Spec-Loot bekommen +10 EP, ungenutzte Locks verfallen, und der nächste Serientermin entsteht.</p>
       <ol>
@@ -368,13 +373,14 @@ export function GuidePage() {
       <h3>Neue Leute freischalten</h3>
       <ol>
         <li>Die Person fordert auf der Login-Seite einen Code an.</li>
-        <li>Unter <strong>Registrierung</strong> erscheint die Anfrage. Erstelle einen Code. Er wird nur einmal angezeigt.</li>
+        <li>Unter <strong>Registrierung</strong> erscheint die Anfrage. Besitzt ein Spieler ohne Login schon einen Charakter mit diesem Namen, zeigt die Anfrage ihn an. Wähle dann <strong>Diesem Spieler zuordnen</strong> oder <strong>Neuer Spieler</strong>. Erst danach entsteht der Code. Er wird nur einmal angezeigt.</li>
         <li>Schick den Code ingame an genau diesen Charakter und markiere ihn als gesendet.</li>
-        <li>Die Person registriert sich. Gibt es den Charakter schon (z. B. aus der alten Liste), bekommt <strong>der Spieler, dem der Charakter gehört</strong>, den Login. Sonst entsteht ein neuer Spieler als <strong>Gast</strong>.</li>
-        <li>Mach die Person zum <strong>Mitglied</strong>, falls sie es noch nicht ist (nächster Schritt).</li>
+        <li>Die Person registriert sich. Der Login geht an den Spieler, den du beim Erstellen des Codes gewählt hast (oder dem das Rising-Gods-Profil schon gehört), sonst entsteht ein neuer Spieler. Allein wegen eines gleichen Namens wird nie zugeordnet. In beiden Fällen ist die Person danach <strong>Mitglied</strong> (eine höhere Rolle bleibt).</li>
+        <li>Ist die Person noch <strong>Gast</strong> (z. B. ein älteres Konto), mach sie zum <strong>Mitglied</strong> (nächster Schritt).</li>
       </ol>
       <p>Im Reiter <strong>Verlauf</strong> zeigt die Spalte <strong>Verknüpfter Spieler</strong>, für welchen Spieler ein Code eingelöst wurde, mit Login-Namen und Datum.</p>
       <p><strong>Beispiel:</strong> Die Anfrage für den Charakter <em>Mirabelle</em> ist eingelöst und mit dem Spieler <em>Mira</em> (Login <code>@mira</code>) verknüpft.</p>
+      <p>Ein alter Registrierungscode ist nicht wiederherstellbar. Unter „Details“ prüfst du Status und Gültigkeit. Stelle bei Verlust einen neuen Code aus, kopiere ihn zur Weitergabe und widerrufe den alten Code.</p>
       <Shot name="53-registrierung" caption="Verlauf: welcher Code welchem Spieler zugeordnet wurde" />
       <h3>Wer hat schon ein Konto?</h3>
       <p>Unter <strong>Spieler</strong> sehen Admins zu jedem Spieler seine <strong>Charaktere</strong>, das <strong>Konto</strong> und die <strong>Rolle</strong>. Oben steht, wie viele Spieler schon ein Konto haben. Wurde ein Charakter versehentlich dem falschen Spieler zugeordnet, öffne beim bisherigen Spieler den Reiter „Charaktere“, klicke beim Charakter auf <strong>Verschieben</strong> und wähle den richtigen Spieler. Die Raid-Aufstellungen zeigen danach den richtigen Spieler; Loot und EP bleiben unverändert.</p>
@@ -390,7 +396,7 @@ export function GuidePage() {
       <Shot name="51b-spieler-ohne-konto" caption="Nur Spieler ohne Konto" />
       <h3>Rolle ändern, Passwort zurücksetzen</h3>
       <p>Unter <strong>Spieler</strong> auf den Namen klicken, Reiter <strong>Konto</strong>. Dort Rolle wählen (z. B. <code>MEMBER</code>), bei Bedarf ein neues Passwort setzen, <strong>Speichern</strong>.</p>
-      <p><strong>Beispiel:</strong> Ein frisch registrierter Spieler ist <code>GUEST</code>. Du stellst <code>MEMBER</code> ein und speicherst. Ab sofort kann er sich für Raids anmelden.</p>
+      <p><strong>Beispiel:</strong> Ein älteres Konto ist noch <code>GUEST</code>. Du stellst <code>MEMBER</code> ein und speicherst. Ab sofort kann er sich für Raids anmelden.</p>
       <Shot name="52-spieler-konto-admin" caption="Spielerkonto als Admin" />
       <p>Hat jemand zwei Accounts, nutze <strong>Konto zusammenführen</strong> mit einem Grund. Unter <strong>Spieler</strong> → <strong>Neuer Spieler</strong> legst du jemanden ohne Login an.</p>
       <h3>Raidserien</h3>

@@ -28,6 +28,8 @@ import { AccountSecurityPage } from './pages/AccountSecurity'
 import { MFAReminderBanner } from './components/MFAReminderBanner'
 import { CurrentRaidPage } from './pages/CurrentRaid'
 import { appVersion } from './release'
+import { ErrorMessage } from './components/ErrorMessage'
+import { PWAInstall } from './components/PWAInstall'
 
 // After signing in from the login link the address is still /login.
 function RedirectHome() {
@@ -130,8 +132,9 @@ function Layout() {
           <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button></> : <Link to="/login">Anmelden</Link>}</div>
       </header>
       {path !== '/kontosicherheit' && <MFAReminderBanner isSignedIn={player !== null} adminID={player?.role === 'ADMIN' ? player.id : undefined} path={path} />}
+      <PWAInstall />
       <main id="main-content" className={path === '/' ? undefined : 'secondary-page'} tabIndex={-1}>
-        {error && <p className="error" role="alert">{error}</p>}
+        {error && <ErrorMessage>{error}</ErrorMessage>}
         <Routes />
       </main>
       </div>
@@ -165,15 +168,15 @@ function Gate() {
     return (
       <div className="login-wrap">
         <div className="card login-card">
-          <p className="error" role="alert">{error}</p>
+          <ErrorMessage>{error}</ErrorMessage>
           <button onClick={() => void refresh()}>Erneut versuchen</button>
         </div>
       </div>
     )
   }
   // The guide, the addons pages and the account-security page must be readable before an
-  // account exists (ADR 083, ADR 085, ADR 092).
-  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/')) {
+  // account exists (ADR 083, ADR 085, ADR 092); so must the statistics (FR-1.4).
+  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/') && path !== '/statistics') {
     return <LoginPage />
   }
   return <Layout />

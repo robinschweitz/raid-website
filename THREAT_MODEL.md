@@ -105,8 +105,8 @@ threats that cross each boundary.
 
 **T-003 — Login CPU exhaustion**
 - **Category:** Denial of service. **Actor:** visitor. **Asset:** A-7.
-- **Scenario:** Every login runs bcrypt (SC-005), and SC-009 adds a dummy bcrypt for unknown
-  names. The spec limits failures per username and address, not per address across usernames, so
+- **Scenario:** Every login runs Argon2id (SC-005, 64 MiB, at most two at once), and SC-009 adds a
+  dummy hash for unknown names. The spec limits failures per username and address, not per address across usernames, so
   one client rotating usernames can keep the CPU busy.
 - **Status:** COVERED — SC-043 (30 failed attempts per address in 15 minutes; rotating usernames are failures).
 
@@ -233,8 +233,9 @@ threats that cross each boundary.
 **T-011 — A database or backup copy leaks secrets and personal data**
 - **Category:** Information disclosure. **Actor:** whoever obtains a database file or snapshot.
 - **Spec basis:** SC-014 (TOTP secrets encrypted), SC-035 (service isolation); SC-034 (encrypted
-  off-server copy) is `BLOCKED` on OD-007. Host snapshots are not specified as encrypted.
-- **Status:** PARTLY COVERED — OD-007.
+  off-server copy, ADR 099). Host snapshots are not specified as encrypted, and the off-server
+  passphrase is also on the host, which the owner accepted on 2026-10-24.
+- **Status:** PARTLY COVERED — host snapshots unencrypted (accepted).
 
 **T-021 — Security events leave no trace**
 - **Category:** Repudiation. **Asset:** A-1.
@@ -314,9 +315,9 @@ threats that cross each boundary.
 
 **T-030 — Loss of the host loses all data**
 - **Category:** Denial of service (availability of A-2, A-3).
-- **Spec basis:** NFR-2.2 (snapshots on the host); NFR-2.3 and SC-034 (off-server copy) are
-  `DEFERRED` / `BLOCKED` on OQ-14 / OD-007.
-- **Status:** PARTLY COVERED — OD-007.
+- **Spec basis:** NFR-2.2 (snapshots on the host); NFR-2.3, NFR-2.5, and SC-034 (daily encrypted
+  copy to a Storage Box in another data centre, monthly restore test, ADR 099).
+- **Status:** COVERED.
 
 ### Organisation (OCTAVE)
 
@@ -406,7 +407,7 @@ through the backlog.
 ## Conflicts and evidence gaps
 
 - **Gap:** host snapshots are not specified as encrypted at rest (T-011).
-- **Gap:** the hosting provider's snapshot policy is not specified (OD-007).
+- **Gap:** closed 2026-10-24: Storage Box snapshots daily, 10 kept (ADR 099).
 
 ## DFD elements
 
@@ -414,7 +415,7 @@ through the backlog.
 | --- | --- |
 | External entities | Visitor and member browsers; foreign websites; players with addon text; Rising-Gods; Cloudflare Worker; GitHub (repository, CI) |
 | Processes | nginx; Go application (middleware, handlers, domain services); build user; root publisher; backup and verify jobs; Worker |
-| Data stores | SQLite database; host snapshots; off-server copy (planned); environment files; GitHub and Cloudflare secrets; browser cookies and `localStorage` |
+| Data stores | SQLite database; host snapshots; encrypted off-server copies on the Storage Box; environment files; GitHub and Cloudflare secrets; browser cookies and `localStorage` |
 | Flows | The five flows in "Main data flows", plus deploy (GitHub → build → publish) and backup (database → snapshot → off-server) |
 | Boundaries | TB-1 to TB-7 |
 
@@ -483,7 +484,7 @@ flowchart TD
   O --> D1["Hold connections open — T-017, covered"]
   O --> D2["Burn CPU with logins — T-003, blocked by SC-043"]
   O --> D3["Get the guild blocked by Rising-Gods — T-016, T-035, covered"]
-  O --> D4["Destroy the host without an off-server copy — T-030, OD-007"]
+  O --> D4["Destroy the host without an off-server copy — T-030, covered by SC-034"]
   O --> D5["Deploy a broken build — T-012, blocked by SC-039"]
 ```
 
@@ -548,7 +549,7 @@ unintended result. Findings are T-031 to T-036:
   sandboxed services (SC-035), verified snapshots (NFR-2.1, NFR-2.2), ADRs and the audit log.
 - **Strategy:** the owner closed the deployment-path gap (SC-039), Admin accounts (SC-040, SC-043),
   and recovery (SC-042, SC-044) on 2026-10-23; continuity rests on one person (T-040, accepted) and
-  the off-server copy is still deferred (OD-007).
+  the off-server copy is in place since 2026-10-24 (SC-034, ADR 099).
 
 ## Brainstorming
 
@@ -562,7 +563,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | --- | --- |
 | Does the DFD match the system? | It matches `ARCHITECTURE.md`, the system as specified. |
 | Are all threats identified? | All cheat-sheet techniques were applied to every spec file. |
-| Does every threat have an agreed response? | Yes — `Response` column; every gap was decided on 2026-10-23, only OD-007 stays deferred. |
+| Does every threat have an agreed response? | Yes — `Response` column; every gap was decided on 2026-10-23, OD-007 on 2026-10-24. |
 | Are mitigations testable and measurable? | Yes — every `SC-*` rule has a **Verification** field. |
 | Is the model kept up to date? | `AGENTS.md` names this file as the owner of threats; spec changes add or update `T-*` entries. |
 
@@ -582,7 +583,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-008 | COVERED | Mitigate | App | SC-007 |
 | T-009 | COVERED | Mitigate | App | SC-016, SC-022, SC-024 |
 | T-010 | COVERED | Mitigate | App | SC-017, SC-018 |
-| T-011 | PARTLY COVERED | Mitigate | App + Ops | SC-014, SC-034, SC-035, OD-007 |
+| T-011 | PARTLY COVERED | Mitigate | App + Ops | SC-014, SC-034, SC-035 |
 | T-012 | COVERED | Mitigate | Ops | SC-036, SC-039, OD-011 |
 | T-013 | COVERED | Mitigate | Ops | SC-037 |
 | T-014 | COVERED | Mitigate | Ops | SC-036 |
@@ -601,7 +602,7 @@ reuses that vocabulary ("wristband" sessions, "secret handshake" CSRF, "spare ke
 | T-027 | COVERED | Mitigate | App | SC-020, SC-021, SC-024 |
 | T-028 | COVERED | Mitigate | Ops | SC-036, SC-039, OD-011 |
 | T-029 | COVERED | Mitigate | Ops | SC-025, SC-035, SC-037 |
-| T-030 | PARTLY COVERED | Transfer or Mitigate | Ops | SC-034, OD-007 |
+| T-030 | COVERED | Transfer or Mitigate | Ops | SC-034 |
 | T-031 | ACCEPTED | Accept | App | FR-17.2, FR-17.3 |
 | T-032 | COVERED | Mitigate | App | FR-10.9, FR-13.6, FR-14.6, FR-20.7 |
 | T-033 | COVERED | Mitigate | App | FR-12.2, FR-12.9 |
@@ -680,7 +681,7 @@ sequenceDiagram
   B->>N: POST /login + X-CSRF-Token
   N->>S: X-Real-IP = client (SC-006)
   S->>S: limits per username + address (SC-008) and per address (SC-043)
-  S->>S: bcrypt or dummy bcrypt, same error (SC-005, SC-009)
+  S->>S: Argon2id (legacy bcrypt) or dummy hash, same error (SC-005, SC-009)
   S-->>B: MFA challenge, 5 min, single use (SC-010)
   B->>S: code (at most 5 wrong: SC-011; each code once: SC-012)
   S-->>B: session cookie HttpOnly, 30 days, 7 days idle (SC-016, SC-018)

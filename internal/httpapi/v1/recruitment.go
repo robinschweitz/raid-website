@@ -11,6 +11,8 @@ func writeRecruitmentError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, recruitment.ErrNotFound):
 		WriteError(w, http.StatusNotFound, "not_found", "Raid nicht gefunden.")
+	case errors.Is(err, recruitment.ErrInvalidSlot):
+		WriteError(w, http.StatusUnprocessableEntity, "invalid_slot", "Ein Platz der Soll-Besetzung ist kein bekannter Spec und kein „Irgendein …“-Platzhalter.")
 	case errors.Is(err, recruitment.ErrInvalid):
 		WriteError(w, http.StatusBadRequest, "invalid_template", "Text (höchstens 2000 Zeichen) und eine Soll-Besetzung aus 5 Gruppen mit je 5 Plätzen sind erforderlich.")
 	default:

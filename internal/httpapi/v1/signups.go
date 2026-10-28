@@ -123,11 +123,13 @@ func (a *API) acceptSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor, _ := ActorID(r)
+	before := a.rosterSnapshot(r.Context(), id)
 	if err := a.Signups.Accept(r.Context(), id, signupID, actor, req.ReplaceAttendanceID, req.ExpectedCharacterID); err != nil {
 		writeSignupError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+	a.notifyNewRosterPlayers(w, r, id, actor, before)
 }
 
 func (a *API) declineAbsence(w http.ResponseWriter, r *http.Request) {

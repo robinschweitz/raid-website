@@ -69,13 +69,14 @@ implemented yet when it differs from the code.
 - **FR-4.2** The system MUST reject a registration or claim request with HTTP 409 `registration_request_exists` when a request for the same profile is PENDING, APPROVED, or CONSUMED. A REJECTED request MUST NOT block a new request. (ADR 055)
 - **FR-4.3** An ADMIN MUST be able to list requests, reject a request, create a single-use code for a request, mark a code as sent, and revoke an unused code. (ADR 040)
 - **FR-4.4** A registration code MUST expire after its lifetime (SC-013). (ADR 040)
-- **FR-4.5** The Admin registration UI MUST show existing registration code metadata (status, validity) and explain that previously generated plaintext codes cannot be recovered because only hashes are stored. Admins MUST be able to issue a replacement code and revoke an obsolete code using existing authorized actions. (ADR 095; Owner 2026-10-23)
-- **FR-4.5** Redeeming a new-account code MUST create a MEMBER account, create or link the character, start a session, and consume the code. A login is attached to an existing player who has none when that player owns the requested Rising-Gods profile or, as a fallback, a character with the same name; the name fallback applies only when the ADMIN confirmed that player while creating the code (FR-4.3, SC-049). (ADR 040, 084; Owner 2026-10-22, OQ-3; Owner 2026-10-23, OD-016)
+- **FR-4.5** Redeeming a new-account code MUST create a MEMBER account, create or link the character, start a session, and consume the code. A login is attached to an existing player who has none when that player owns the requested Rising-Gods profile or, as a fallback, a character with the same name; the name fallback applies only when the ADMIN confirmed that player while creating the code (FR-4.3, SC-049). A GUEST player who gets a login this way MUST become MEMBER; a higher role stays. (ADR 040, 084, 103; Owner 2026-10-22, OQ-3; Owner 2026-10-23, OD-016; Owner 2026-10-25)
 - **FR-4.6** A logged-in user MUST be able to request a claim for a Rising-Gods character. Redeeming a claim code MUST link or move the character to the user. (ADR 040)
 - **FR-4.7** A claim MUST NOT change existing raid roster snapshots. (ADR 040)
 - **FR-4.8** The first Rising-Gods talent build MUST become the main spec. The second build MUST become the second spec when it exists. (ADR 040)
 - **FR-4.9** The admin request list MUST show the linked player, login, and date after a code is redeemed. (ADR 084)
-- **FR-4.10** The system MUST NOT change the role of existing GUEST accounts automatically. An ADMIN promotes them (FR-1.9). (Owner 2026-10-22, OQ-3)
+- **FR-4.10** The system MUST NOT change the role of existing GUEST accounts (players who already have a login) automatically. An ADMIN promotes them (FR-1.9). A player without a login who gets one from a registration code follows FR-4.5. (Owner 2026-10-22, OQ-3; Owner 2026-10-25, ADR 103)
+
+- **FR-4.11** The Admin registration UI MUST show existing code status and validity, explain why plaintext is not recoverable, and offer replacement issuance and revocation using the existing authorized actions. (ADR 095; Owner 2026-10-23)
 
 ### 5. Players and accounts
 
@@ -157,7 +158,7 @@ implemented yet when it differs from the code.
 
 - **FR-11.1** "Aktueller Raid" MUST open the most recently started raid that is still PLANNED or OPEN and not archived; otherwise it MUST open the soonest future PLANNED or OPEN raid that is not archived. Completed, cancelled and archived raids MUST NOT be selected. A raid with no real or scheduled start MUST NOT be selected. If none qualifies, the answer MUST be HTTP 404 `no_current_raid`. (ADR 088 amended by ADR 094; Owner 2026-10-23)
 - **FR-11.2** The dashboard MUST show an active raid with a start time in the past as "Läuft" until staff archives it. This MUST NOT be a stored status. (ADR 034)
-- **FR-11.3** For MEMBER and higher, the overview MUST show the next four raids that have not started, with the user's status and actions to sign up with the main character, to decline, and to take back a decline. (ADR 081)
+- **FR-11.3** For MEMBER and higher, the overview MUST show the next four raids that have not started, with the user's status and actions to sign up with the main character, to decline, and to take back a decline. A roster row of one of the user's characters MUST show the status as accepted with that character, also when the user never signed up (staff added it directly). (ADR 081, ADR 097)
 - **FR-11.4** The dashboard MUST show the encounters of the configured instance; kill progress follows FR-29.4. (ADR 030; Owner 2026-10-22, OQ-7)
 - **FR-11.5** The UI MUST NOT show invented data: progression, RSVP rates, notifications, or performance numbers. (ADR 026)
 
@@ -176,6 +177,7 @@ implemented yet when it differs from the code.
 - **FR-12.11** An absence MUST NOT change the roster, signups, or bench. (ADR 069)
 - **FR-12.12** A TENTATIVE absence MUST NOT change the EP rule. (ADR 082)
 - **FR-12.13** For members, a planned or open raid page MUST open on "Anmeldungen". For staff, it MUST open on "Aufstellung". (ADR 081)
+- **FR-12.14** The "Anmeldungen" tab MUST list one row per player who signed up, stands in the roster, or has an absence, ordered pending, in the roster, tentative, declined, then by name, with counts per state. Each character MUST show class emblem, class, and spec; roster rows without a signup MUST appear as added by staff. For staff the list MUST come first and their own signup MUST be folded below it. (ADR 097)
 
 ### 13. Raid roster
 
@@ -290,7 +292,7 @@ implemented yet when it differs from the code.
 - **FR-23.1** Staff MUST be able to read and save a recruitment template for a planned or open raid: one per series, else one per raid. (ADR 068)
 - **FR-23.2** The template text MUST have at most 2000 characters and a 5×5 target setup. (ADR 068)
 - **FR-23.3** The text MUST support `{{SETUP}}`, `{{SETUP_KURZ}}`, `{{TANK_SPECS}}`, `{{HEAL_SPECS}}`, `{{MDD_SPECS}}`, and `{{RDD_SPECS}}`, computed from the saved roster. (ADR 080)
-- **FR-23.4** The server MUST reject a target-setup slot value that is not a known class-and-spec value or "Irgendein" placeholder. (Owner 2026-10-22, OQ-4)
+- **FR-23.4** The server MUST reject a target-setup slot value that the setup editor does not offer: the class-and-spec values, `Maintank`, `Offtank`, `Leer`, and the four Irgendein placeholders `Irgendein Tank`, `Irgendein Heiler`, `Irgendein MDD`, `Irgendein RDD`. A bare `Irgendein` is rejected. (Owner 2026-10-22, OQ-4; Owner 2026-10-25)
 
 ### 24. Polls
 
@@ -299,7 +301,8 @@ implemented yet when it differs from the code.
 - **FR-24.3** A MEMBER or higher MUST have one vote per poll and MAY change it while the poll is open. (code; Owner 2026-10-22, review)
 - **FR-24.4** A vote on a closed poll or after its closing time MUST give HTTP 409 `poll_closed`. (code)
 - **FR-24.5** A CHOICE vote MUST reference only configured options. Duplicate or too many selections MUST be rejected. (ADR 039)
-- **FR-24.6** A poll write without a session MUST give HTTP 401 `login_required`, like every other protected endpoint. (Owner 2026-10-22, OQ-10)
+- **FR-24.6** A poll write without a session MUST give HTTP 401 `unauthenticated`, like every other protected endpoint. (Owner 2026-10-22, OQ-10; amended by ADR 095)
+- **FR-24.7** Staff MUST be able to edit an existing poll: title, description, closing time, status OPEN or CLOSED (so a closed poll can be reopened), and for CHOICE polls the options (rename, add, remove, reorder). Poll type and multiple selection MUST NOT change. Renaming an option MUST keep its votes under the new label. Removing an option that has votes MUST be rejected with HTTP 409 `poll_option_has_votes` and change nothing. An OPEN poll MUST NOT get a closing time in the past. The edit MUST be audited with before and after. (Owner 2026-10-24, ADR 096)
 
 ### 25. Loot catalog
 
@@ -331,6 +334,7 @@ implemented yet when it differs from the code.
 - **FR-28.2** The navigation MUST show the application version. A changelog page MUST list user-facing changes in German. (ADR 056)
 - **FR-28.3** All user-facing text MUST be German. (owner brief)
 - **FR-28.4** The UI MUST show times in the user's local timezone. (ADR 003)
+- **FR-28.5** Users MAY install the website as a PWA where the browser supports it; using it MUST NOT require installation. The site MUST offer the browser's install prompt where one exists and the manual steps on iPhone and iPad, MUST show no hint when nothing can be offered or the site already runs installed, and the hint MAY be hidden for the browser session. Installation MUST NOT store pages or API responses on the device (SC-052). (Owner 2026-10-24, #159, ADR 101)
 
 ### 29. Boss kills
 
@@ -352,20 +356,30 @@ implemented yet when it differs from the code.
 ### 30. Privacy
 
 - **FR-30.1** The system MUST provide a German privacy page (Datenschutzerklärung) that is readable without login. It MUST name the owner as the responsible person with a contact address (where the values come from: SC-033). (Owner 2026-10-22, OQ-9 and OQ-12)
-- **FR-30.2** An ADMIN MUST be able to anonymise a player. Anonymisation MUST delete the login, password, sessions, MFA data, and Rising-Gods profile data, and MUST replace the player name with the name of the player's main character. With several main characters, the oldest main MUST be used; with none, the oldest character; with no character, "Ehemaliges Mitglied #<player ID>". (Owner 2026-10-22, OQ-9, OQ-12 and OQ-13)
+- **FR-30.2** An ADMIN MUST be able to anonymise a player. Anonymisation MUST delete the login, password, sessions, MFA data, push subscriptions (FR-32), and Rising-Gods profile data, and MUST replace the player name with the name of the player's main character. With several main characters, the oldest main MUST be used; with none, the oldest character; with no character, "Ehemaliges Mitglied #<player ID>". (Owner 2026-10-22, OQ-9, OQ-12 and OQ-13)
 - **FR-30.3** Anonymisation MUST keep raid rosters, loot, EP transactions, and character names in raid history. (Owner 2026-10-22, OQ-9)
 - **FR-30.4** Audit entries MUST stay without a time limit. They MUST NOT show the name of an anonymised player. Rationale for the privacy page: a traceable, contestable loot and EP record is a legitimate interest of the guild (GDPR Art. 6(1)(f)); only ADMINs can read the audit log (FR-1.8); on erasure requests audit entries are kept but the name is hidden (FR-30.2). A legal review stays recommended (THREAT_MODEL T-039). (Owner 2026-10-22, OQ-9 and OQ-12)
 - **FR-30.5** A person MUST ask for anonymisation through the contact on the privacy page. Only an ADMIN MUST be able to do it. Members MUST NOT get a self-service delete. (Owner 2026-10-22, OQ-12)
 - **FR-30.6** Login attempts (failed and successful), expired sessions, and expired MFA challenges MUST be deleted once no rule needs them (SC-038). From a Rising-Gods profile only character name, class, specs, and gear score MUST be stored; the raw response MUST NOT be kept (SC-050). (THREAT_MODEL T-022, T-047; Owner 2026-10-23, OD-017)
 - **FR-30.7** On a person's request through the privacy contact, an ADMIN MUST be able to download one machine-readable file with all data stored about that player: account (without secrets), characters, signups, absences, roster rows, loot, EP transactions, item locks, wishlist, votes, and audit entries about them. Members get no self-service export. (Owner 2026-10-23, OQ-15)
 - **FR-30.8** "Anonymisation" in FR-30.2 is pseudonymisation in GDPR terms: character names stay in raid history (FR-30.3) and are public in game, so a former member can still be recognised by people who know their characters. The privacy page MUST describe it this way and MUST NOT promise that the data becomes anonymous. (THREAT_MODEL T-048)
+- **FR-30.9** The privacy page MUST name the push subscription data (FR-32): the endpoint and keys that a player's browser creates, stored only after opt-in and deleted on opt-out, logout, or when the push service reports it gone; and that the browser vendor's push service (Google, Mozilla, Apple, or Microsoft) delivers the encrypted message and sees when it is sent. (Owner 2026-10-24, ADR 102)
 
 ### 31. History and bulk changes
 
 - **FR-31.1** Records that affect history MUST be archived (`archived_at`, `removed_at`, `withdrawn_at`), not deleted. (ADR 007)
-- **FR-31.2** The only hard deletes MUST be: the merge source (FR-5.5, FR-6.10), a roster row of a planned or open raid (FR-13.7), a revoked absence (FR-12.9), a removed wishlist item (FR-19.1), the account data that anonymisation deletes (FR-30.2), and the MFA data that a password reset removes (FR-5.8). Each MUST write an audit entry with the removed data, without secrets (FR-26.3). (ADR 056, 069, 076; Owner 2026-10-22, OQ-9)
+- **FR-31.2** The only hard deletes MUST be: the merge source (FR-5.5, FR-6.10), a roster row of a planned or open raid (FR-13.7), a revoked absence (FR-12.9), a removed wishlist item (FR-19.1), the account data that anonymisation deletes (FR-30.2), the MFA data that a password reset removes (FR-5.8), and a push subscription (FR-32.3). Each MUST write an audit entry with the removed data, without secrets (FR-26.3); a push subscription that the push service reports as gone, or that stayed unclaimed for 30 days (FR-32.3), is removed by the system without an audit entry. (ADR 056, 069, 076; Owner 2026-10-22, OQ-9)
 - **FR-31.3** A bulk write MUST report what it created, skipped, and rejected, and MUST NOT overwrite existing records. (ADR 008)
 - **FR-31.4** The system MUST NOT have a Google Sheets integration. Data imported from the old sheet stays authoritative. A future historical import MUST be a one-time offline operation with a database backup, a dry run, and a report, not a web feature. (ADR 066)
+
+### 32. Push notifications
+
+- **FR-32.1** A MEMBER or higher MAY turn push notifications on for the current device in the own account tab, and MUST be able to turn them off again. The browser's permission prompt MUST appear only after the player's click, never on page load. A signed-in player of any role MUST be able to remove the own subscription. Visitors without a session get HTTP 401, a GUEST who subscribes gets HTTP 403. Subscribe and unsubscribe MUST be audited (FR-26.1). (Owner 2026-10-24, ADR 102)
+- **FR-32.2** A push MUST be sent for these events only: a poll is created (FR-24.1) — to all subscribed players; one or more raids are created (FR-10.1, FR-9.6, FR-9.7, FR-10.8) — to all subscribed players, one message per write; a character of a player gets a new roster row in a planned or open, unarchived raid (FR-12.5, FR-13.1, FR-13.5, FR-20.5) — to that player only. The player who made the change MUST NOT get a message about it. Recipients MUST be active players with a login and at least the MEMBER role when the message is sent. (Owner 2026-10-24, ADR 102)
+- **FR-32.3** A subscription MUST be deleted when the player turns notifications off, when the player logs out on that device, when the push service answers 404 or 410, and with the source of an account merge (FR-5.4). A subscription MUST belong to the player on the device that turned it on: it MUST stay when the same player signs in again on that device (for example after the session expired), and it MUST NEVER pass to or be delivered for another player. When another player signs in on that device, the server MUST delete the previous player's subscription as part of that sign-in. Signing out on the device MUST delete the player's subscription there; an own password change MUST delete it on the player's other devices (FR-2.13); an Admin change of password, login name, or role MUST delete it on all devices (FR-2.14). After every sign-in, and before it shows the player as signed in, the web client MUST check its subscription in with the server; when the server does not confirm the subscription for this player, or the check-in fails or takes longer than 5 seconds, the client MUST drop the subscription in the browser (fail closed). Signing in MUST NOT depend on push. A subscription without a device (from before ADR 103) MUST get no messages until its own player's browser claims it, and MUST be deleted after 30 days unclaimed. The account tab MUST show the state the server reports. One browser MUST have at most one subscription; subscribing it for another account MUST move it there. A player MUST have at most 10 subscriptions; a new one replaces the oldest. (Owner 2026-10-24, ADR 102; Owner 2026-10-25, ADR 103)
+- **FR-32.4** Push MUST be sent after the triggering write has committed and its answer has been sent, within the same request (no background job). A failed or slow delivery MUST be logged and MUST NOT fail or undo the write. (Owner 2026-10-24, ADR 102)
+- **FR-32.5** A notification MUST show only a fixed German text for its kind ("Es gibt eine neue Umfrage.", "Es wurde ein neuer Raid geplant.", "Du stehst in einer Raid-Aufstellung.") and MUST open the matching page when clicked. It MUST NOT contain a poll title, raid name, time, or any player or character name. (Owner 2026-10-24, ADR 102)
+- **FR-32.6** Without a configured VAPID key, push MUST be off: the account tab MUST show no opt-in and a subscription request MUST be rejected with HTTP 409 `push_disabled`. The account tab MUST say that iPhone and iPad deliver push only to the installed web app (iOS 16.4 or newer). (Owner 2026-10-24, ADR 102)
 
 ## Non-Functional Requirements
 
@@ -374,8 +388,8 @@ implemented yet when it differs from the code.
 - **NFR-1.3** Production network exposure: SC-025. (ADR 070)
 - **NFR-2.1** The system MUST take a verified database snapshot before each deployment. (ADR 071, 072)
 - **NFR-2.2** The system MUST keep 48 hourly, 32 daily, 13 weekly, and 25 monthly database snapshots. A weekly job MUST verify the newest snapshot. (ADR 070)
-- **NFR-2.3** An encrypted copy of the newest verified snapshot MUST leave the server every day for storage that the owner controls. The maximum data loss is therefore one day. The storage and the key holder are DEFERRED (OQ-14); encryption and key rules: SC-034. (ADR 070; Owner 2026-10-22, OQ-8)
-- **NFR-2.5** A restore from the off-server copy MUST be tested every month. (Owner 2026-10-22, OQ-8)
+- **NFR-2.3** An encrypted copy of the newest verified snapshot MUST leave the server every day for storage that the owner controls: a Hetzner Storage Box in another data centre. The server MUST only add copies there and MUST NOT overwrite or delete one. The maximum data loss is therefore one day. Encryption and key rules: SC-034. (ADR 070, ADR 099; Owner 2026-10-22, OQ-8; Owner 2026-10-24, OQ-14)
+- **NFR-2.5** A restore from the off-server copy MUST be tested every month: download, decrypt, check, and start the server on it. (Owner 2026-10-22, OQ-8; ADR 099)
 - **NFR-3.1** The system MUST cache Rising-Gods name searches for 12 hours and MAY serve them stale for up to 7 days while it refreshes. The cache MUST hold at most 2000 searches. (ADR 044)
 - **NFR-3.2** Parallel identical Rising-Gods lookups MUST share one upstream request. (ADR 044)
 - **NFR-3.3** A Rising-Gods list result that reached the upstream cap (300 rows) MUST NOT be treated as complete or reused to answer a more specific query. (ADR 044)
@@ -385,11 +399,11 @@ implemented yet when it differs from the code.
 
 ## Open Questions
 
-The owner's question and review passes on 2026-10-22 and 2026-10-23 resolved OQ-1 to OQ-13 and OQ-15. Their answers are in
+The owner's question and review passes on 2026-10-22, 2026-10-23, and 2026-10-24 resolved OQ-1 to OQ-15. Their answers are in
 the requirements marked "Owner 2026-10-22". NFR-2.4 (delete the pre-migration-066 backup) is
 done and was removed. IDs are not reused.
 
-- **OQ-14** DEFERRED until 2026-11-30 (OD-020). Off-server backup (NFR-2.3): Which storage, and who holds the encryption key? Blocks only NFR-2.3.
+None open.
 
 ### Resolved (2026-10-22)
 
@@ -402,9 +416,10 @@ done and was removed. IDs are not reused.
 - **OQ-7** Difficulty is tracked per boss through a kill log → FR-29.
 - **OQ-8** Daily encrypted off-server copy, monthly restore test → NFR-2.3, NFR-2.5.
 - **OQ-9** GDPR applies: privacy page and Admin anonymisation → FR-30.
-- **OQ-10** Poll writes without a session answer `login_required` → FR-24.6.
+- **OQ-10** Poll writes without a session answer `unauthenticated` (superseded: first answered `login_required`, see ADR 095) → FR-24.6.
 - **OQ-11** Kill log details → FR-29.5–29.11.
 - **OQ-12** Privacy details → FR-30.1–30.5.
 - **OQ-13** Anonymised name: oldest main, else oldest character → FR-30.2.
 - **OQ-15** Access to one's own data: on request, Admin download → FR-30.7 (2026-10-23).
+- **OQ-14** Off-server backup: Hetzner Storage Box, passphrase on the server and with the owner, add-only uploads → NFR-2.3, ADR 099 (2026-10-24).
 - Owner review: EP stops at zero with a warning → FR-16.6, FR-16.8; visitor search limit → FR-7.6; pre-066 backup deleted (former NFR-2.4).

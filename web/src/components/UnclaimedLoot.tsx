@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
 import type { CatalogBoss } from '../types'
+import { ErrorMessage } from './ErrorMessage'
 
 // Loot that went to nobody (ADR 089): disenchanted, for the guild bank, or
 // nobody wanted it. It counts for no player and costs no EP.
@@ -20,17 +21,17 @@ interface UnclaimedEntry {
 
 const outcomeLabels: Record<Outcome, string> = { DISENCHANTED: 'Entzaubert', BANK: 'Gildenbank', NOBODY: 'Wollte niemand' }
 
-interface Props {
+interface FormProps {
   raidID: number
-  canWrite: boolean
   needsReason: boolean
   bosses: CatalogBoss[]
-  version: number
+  onAdded: () => void
 }
 
-export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }: Props) {
+// UnclaimedLootForm records one item that went to nobody. It sits inside the
+// raid's loot entry, next to the form for player awards.
+export function UnclaimedLootForm({ raidID, needsReason, bosses, onAdded }: FormProps) {
   const { pending, submit, isActive } = useSubmission()
-  const [entries, setEntries] = useState<UnclaimedEntry[]>([])
   const [error, setError] = useState('')
   const [bossID, setBossID] = useState('')
   const [itemName, setItemName] = useState('')
@@ -38,16 +39,6 @@ export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }
   const [holder, setHolder] = useState('')
   const [notes, setNotes] = useState('')
   const [reason, setReason] = useState('')
-
-  const load = async () => {
-    const rows = await api.get<UnclaimedEntry[]>(`/api/v1/raids/${raidID}/unclaimed-loot`)
-    if (isActive()) setEntries(rows)
-  }
-
-  useEffect(() => {
-    void load().catch(() => { if (isActive()) setError('Beute ohne Empfänger konnte nicht geladen werden.') })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raidID, version])
 
   const add = (event: FormEvent) => {
     event.preventDefault()
@@ -59,12 +50,57 @@ export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }
         setHolder('')
         setNotes('')
         setReason('')
-        await load()
+        onAdded()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Konnte nicht gespeichert werden.')
       }
     })
   }
+
+  return <div className="unclaimed-loot">
+    <p className="muted">Entzaubert, für die Gildenbank oder von niemandem gewollt. Zählt für keinen Spieler und kostet keine EP.</p>
+    {error && <ErrorMessage>{error}</ErrorMessage>}
+    <form className="unclaimed-form" onSubmit={add}>
+      <label>Boss<select value={bossID} onChange={(e) => setBossID(e.target.value)}>
+        <option value="">Ohne Boss</option>
+        {bosses.map((boss) => <option key={boss.id} value={boss.id}>{boss.name}</option>)}
+      </select></label>
+      <label>Item<input value={itemName} required placeholder="Name des Gegenstands" onChange={(e) => setItemName(e.target.value)} /></label>
+      <label>Verbleib<select value={outcome} onChange={(e) => setOutcome(e.target.value as Outcome)}>
+        {Object.entries(outcomeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select></label>
+      <label>Bei<input value={holder} placeholder="Wer hat es (optional)" onChange={(e) => setHolder(e.target.value)} /></label>
+      <label>Notizen<input value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
+      {needsReason && <label>Grund (Pflicht im archivierten Raid)<input value={reason} onChange={(e) => setReason(e.target.value)} /></label>}
+      <div className="actions"><button type="submit" disabled={pending || !itemName.trim() || (needsReason && !reason.trim())}>Eintragen</button></div>
+    </form>
+  </div>
+}
+
+interface ListProps {
+  raidID: number
+  canWrite: boolean
+  needsReason: boolean
+  version: number
+}
+
+// UnclaimedLootList shows the raid's items that went to nobody. Staff can
+// remove an entry; the version prop reloads the list after an add or import.
+export function UnclaimedLootList({ raidID, canWrite, needsReason, version }: ListProps) {
+  const { pending, submit, isActive } = useSubmission()
+  const [entries, setEntries] = useState<UnclaimedEntry[]>([])
+  const [error, setError] = useState('')
+  const [reason, setReason] = useState('')
+
+  const load = async () => {
+    const rows = await api.get<UnclaimedEntry[]>(`/api/v1/raids/${raidID}/unclaimed-loot`)
+    if (isActive()) setEntries(rows)
+  }
+
+  useEffect(() => {
+    void load().catch(() => { if (isActive()) setError('Beute ohne Empfänger konnte nicht geladen werden.') })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raidID, version])
 
   const remove = (entry: UnclaimedEntry) => submit(async () => {
     setError('')
@@ -78,13 +114,12 @@ export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }
   })
 
   if (!canWrite && entries.length === 0) return null
-  return <section className="subcard unclaimed-loot" aria-label="Beute ohne Empfänger">
+  return <section className="unclaimed-loot loot-unclaimed-list" aria-label="Beute ohne Empfänger">
     <h3>Beute ohne Empfänger</h3>
-    <p className="muted">Entzaubert, für die Gildenbank oder von niemandem gewollt. Zählt für keinen Spieler und kostet keine EP.</p>
-    {error && <p className="error" role="alert">{error}</p>}
-    {canWrite && needsReason && <label className="unclaimed-reason">Grund (Pflicht im archivierten Raid)<input value={reason} onChange={(e) => setReason(e.target.value)} /></label>}
-    {entries.length === 0 ? <p className="muted">Noch nichts eingetragen.</p>
-      : <div className="table-scroll"><table className="table small">
+    {error && <ErrorMessage>{error}</ErrorMessage>}
+    {entries.length === 0 ? <p className="muted">Noch nichts eingetragen. Neue Einträge über „Loot erfassen“ mit „Entzaubert / Gildenbank / Niemand wollte es“.</p> : <>
+      {canWrite && needsReason && <label className="unclaimed-reason">Grund zum Entfernen (Pflicht im archivierten Raid)<input value={reason} onChange={(e) => setReason(e.target.value)} /></label>}
+      <div className="table-scroll"><table className="table small">
         <thead><tr><th>Item</th><th>Boss</th><th>Verbleib</th><th>Bei</th><th>Notizen</th>{canWrite && <th></th>}</tr></thead>
         <tbody>{entries.map((entry) => <tr key={entry.id}>
           <td><strong>{entry.item_name}</strong></td>
@@ -94,21 +129,7 @@ export function UnclaimedLoot({ raidID, canWrite, needsReason, bosses, version }
           <td>{entry.notes}{entry.source === 'addon' && <span className="muted"> (Addon)</span>}</td>
           {canWrite && <td><button type="button" disabled={pending || (needsReason && !reason.trim())} onClick={() => void remove(entry)}>Entfernen</button></td>}
         </tr>)}</tbody>
-      </table></div>}
-    {canWrite && <details className="editor-disclosure"><summary>Beute ohne Empfänger eintragen</summary>
-      <form className="unclaimed-form" onSubmit={add}>
-        <label>Boss<select value={bossID} onChange={(e) => setBossID(e.target.value)}>
-          <option value="">Ohne Boss</option>
-          {bosses.map((boss) => <option key={boss.id} value={boss.id}>{boss.name}</option>)}
-        </select></label>
-        <label>Item<input value={itemName} required placeholder="Name des Gegenstands" onChange={(e) => setItemName(e.target.value)} /></label>
-        <label>Verbleib<select value={outcome} onChange={(e) => setOutcome(e.target.value as Outcome)}>
-          {Object.entries(outcomeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select></label>
-        <label>Bei<input value={holder} placeholder="Wer hat es (optional)" onChange={(e) => setHolder(e.target.value)} /></label>
-        <label>Notizen<input value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
-        <div className="actions"><button type="submit" disabled={pending || !itemName.trim() || (needsReason && !reason.trim())}>Eintragen</button></div>
-      </form>
-    </details>}
+      </table></div>
+    </>}
   </section>
 }

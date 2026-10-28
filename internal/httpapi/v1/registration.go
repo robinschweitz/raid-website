@@ -2,6 +2,7 @@ package v1
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -19,11 +20,21 @@ type redeemRequest struct {
 	Password string `json:"password"`
 }
 
+// createCodeRequest is the optional body of code creation: the Admin's decision
+// about a player that matches the requested character name (SC-049).
+type createCodeRequest struct {
+	MatchChoice   string `json:"match_choice"`
+	MatchPlayerID int64  `json:"match_player_id"`
+}
+
 type claimCodeRequest struct {
 	Code string `json:"code"`
 }
 
 func registrationError(w http.ResponseWriter, err error) {
+	if writePasswordBusy(w, err) {
+		return
+	}
 	switch {
 	case errors.Is(err, registration.ErrInvalidCode):
 		WriteError(w, http.StatusBadRequest, "registration_code_invalid", "Code ungültig oder abgelaufen.")
@@ -35,6 +46,10 @@ func registrationError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusConflict, "profile_already_linked", "Dieser Rising-Gods-Charakter ist bereits verknüpft.")
 	case errors.Is(err, registration.ErrRequestExists):
 		WriteError(w, http.StatusConflict, "registration_request_exists", "Für diesen Rising-Gods-Charakter besteht bereits eine offene Anfrage oder ein Konto.")
+	case errors.Is(err, registration.ErrMatchChoiceRequired):
+		WriteError(w, http.StatusUnprocessableEntity, "match_choice_required", "Ein Spieler ohne Login besitzt einen Charakter mit diesem Namen. Bitte „diesem Spieler zuordnen“ oder „neuer Spieler“ wählen.")
+	case errors.Is(err, registration.ErrMatchChoiceInvalid):
+		WriteError(w, http.StatusUnprocessableEntity, "match_choice_invalid", "Die Auswahl passt nicht zu dieser Anfrage.")
 	case errors.Is(err, registration.ErrRequestNotFound), errors.Is(err, registration.ErrCodeNotFound):
 		WriteError(w, http.StatusNotFound, "not_found", "Eintrag nicht gefunden.")
 	case errors.Is(err, registration.ErrExternalUnavailable):
@@ -43,6 +58,8 @@ func registrationError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusBadRequest, "registration_invalid", "Bitte einen aktiven Rising-Gods-Charakter auswählen.")
 	case errors.Is(err, auth.ErrWeakPassword):
 		WriteError(w, http.StatusUnprocessableEntity, "password_too_short", "Das Passwort muss mindestens 12 Zeichen lang sein.")
+	case errors.Is(err, auth.ErrPasswordTooLong):
+		WriteError(w, http.StatusUnprocessableEntity, "password_too_long", passwordTooLongMessage)
 	default:
 		WriteError(w, http.StatusInternalServerError, "internal", "Registrierung konnte nicht verarbeitet werden.")
 	}
@@ -137,7 +154,12 @@ func (a *API) createRegistrationCode(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "invalid request id")
 		return
 	}
-	code, err := a.Registration.CreateCode(r.Context(), actor, id)
+	var body createCodeRequest
+	if err := DecodeJSON(r, &body); err != nil && !errors.Is(err, io.EOF) {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	code, err := a.Registration.CreateCode(r.Context(), actor, id, registration.MatchChoiceInput{Choice: body.MatchChoice, PlayerID: body.MatchPlayerID})
 	if err != nil {
 		registrationError(w, err)
 		return
@@ -215,7 +237,9 @@ func (a *API) registerWithCode(w http.ResponseWriter, r *http.Request) {
 		registrationError(w, err)
 		return
 	}
-	a.setSessionCookie(w, token, sessionMaxAgeSeconds)
+	if !a.startSession(w, r, token, p.ID) {
+		return
+	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(p, p)})
 }
 

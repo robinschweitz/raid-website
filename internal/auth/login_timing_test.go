@@ -3,29 +3,31 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
-// recordPasswordChecks replaces the login bcrypt comparison with a wrapper
+// recordPasswordChecks replaces the login password comparison with a wrapper
 // that records the hash of every comparison.
 func recordPasswordChecks(t *testing.T) *[]string {
 	t.Helper()
 	var hashes []string
 	original := comparePassword
-	comparePassword = func(hash, password []byte) error {
+	comparePassword = func(ctx context.Context, hash, password []byte) error {
 		hashes = append(hashes, string(hash))
-		return bcrypt.CompareHashAndPassword(hash, password)
+		return verifyStoredPassword(ctx, string(hash), string(password))
 	}
 	t.Cleanup(func() { comparePassword = original })
 	return &hashes
 }
 
-func TestDummyPasswordHashUsesDefaultCost(t *testing.T) {
-	cost, err := bcrypt.Cost([]byte(dummyPasswordHash))
-	if err != nil || cost != bcrypt.DefaultCost {
-		t.Fatalf("dummy hash cost = %d, %v; want %d", cost, err, bcrypt.DefaultCost)
+// The dummy hash must cost exactly what a real hash costs (SC-009).
+func TestDummyPasswordHashUsesCurrentParameters(t *testing.T) {
+	if !strings.HasPrefix(dummyPasswordHash, argonPrefix) {
+		t.Fatalf("dummy hash %q does not use the current Argon2id parameters %q", dummyPasswordHash, argonPrefix)
+	}
+	if err := verifyStoredPassword(context.Background(), dummyPasswordHash, "any password"); !errors.Is(err, errPasswordMismatch) {
+		t.Fatalf("dummy hash check = %v, want a plain mismatch", err)
 	}
 }
 

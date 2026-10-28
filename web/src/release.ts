@@ -1,12 +1,203 @@
-export const appVersion = '1.0.34'
+export const appVersion = '1.0.63'
 
 export const changelog = [
+  { version: appVersion, title: 'Registrierungscodes nachreichen', changes: ['Admins können verlorene Codes anhand ihres Verlaufs ersetzen und alte Codes widerrufen. Der Code selbst wird nur einmal angezeigt.'] },
   {
-    version: appVersion,
-    title: 'Registrierungscodes einfacher nachreichen',
+    version: '1.0.62',
+    title: 'RaidWishlist 2.3.0',
     changes: [
-      'Admins sehen im Registrierungsbereich, wie sie bereits erstellte, aber nicht weitergegebene Codes ersetzen können. Neue Codes lassen sich direkt kopieren; alte Codes können widerrufen werden.',
-      'Aus Sicherheitsgründen sind ältere Codes selbst nicht wiederherstellbar: Gespeichert wird nur der Hash.',
+      'Neue RaidWishlist-Version zum Herunterladen unter „Addons“. Mit BEARBEITEN (oder /wish edit) änderst du deine Wunschliste direkt im Spiel: Der Raidkatalog findet epische und legendäre Beute aus allen WotLK-Raids nach deutschem oder englischem Namen, mit Filtern für Raid und Qualität.',
+      'Unter EINSTELLUNGEN trägst du deinen EP-Stand für Enhanced ein, ohne die Liste neu zu importieren.',
+      'Neue Chat-Würfel-Erinnerung für Raids ohne RaidLedger (Standard: aus): Schreibt der Plündermeister ein Item von deiner Liste mit „roll“ oder „würfel“ in den Chat, öffnet sich die Würfel-Abfrage.',
+    ],
+  },
+  {
+    version: '1.0.61',
+    title: 'Beute ohne Empfänger direkt beim Loot erfassen',
+    changes: [
+      'Unter „Loot erfassen“ wählt die Raidleitung jetzt zuerst die Art: an einen Spieler vergeben oder entzaubert, für die Gildenbank oder von niemandem gewollt. Der eigene Kasten zum Eintragen unter „Beute ohne Empfänger“ entfällt; die Liste bleibt dort.',
+    ],
+  },
+  {
+    version: '1.0.60',
+    title: 'Umfrage-Optionen in richtiger Reihenfolge',
+    changes: [
+      'In der Umfrageliste stehen die Antwortoptionen wieder in der eingestellten Reihenfolge, auch nachdem eine Umfrage bearbeitet und Optionen umsortiert wurden.',
+    ],
+  },
+  {
+    version: '1.0.59',
+    title: 'EP-Korrekturen enden bei null',
+    changes: [
+      'Eine Korrektur an einem abgeschlossenen Raid zieht nie mehr EP ab, als der Spieler hat. Der Kontostand bleibt bei 0 und die fehlenden Punkte werden auch später nicht abgezogen.',
+      'Vor dem Speichern warnt die Seite mit dem Spieler und den Punkten, die nicht abgezogen werden. Das Audit-Log hält diese Zahl fest.',
+    ],
+  },
+  {
+    version: '1.0.58',
+    title: 'Spieler anonymisieren',
+    changes: [
+      'Admins können einen Spieler auf dessen Löschanfrage anonymisieren: Login, Passwort, Sitzungen, MFA, Push-Abos und Rising-Gods-Profildaten werden gelöscht, der Name wird durch den des ältesten Main-Charakters ersetzt. Raid-Historie, Loot und EP bleiben erhalten; im Audit-Protokoll erscheint der alte Name nicht mehr.',
+    ],
+  },
+  {
+    version: '1.0.56',
+    title: 'Lesbarere kleine Schrift',
+    changes: [
+      'Kleine Texte wie Abzeichen, Beschriftungen und Tabellenhinweise sind jetzt mindestens 12 Pixel groß und damit besser lesbar.',
+    ],
+  },
+  {
+    version: '1.0.55',
+    title: 'Namensübereinstimmung bei der Registrierung',
+    changes: [
+      'Besitzt ein Spieler ohne Login schon einen Charakter mit dem angefragten Namen, zeigt die Registrierungsanfrage diesen Spieler an. Der Admin wählt „Diesem Spieler zuordnen“ oder „Neuer Spieler“, bevor der Code entsteht.',
+      'Beim Einlösen wird nur noch die gespeicherte Wahl befolgt. Ein gleicher Name allein verknüpft kein Konto mehr.',
+    ],
+  },
+  {
+    version: '1.0.54',
+    title: 'Bosskills im Raid und in der Übersicht',
+    changes: [
+      'Im Reiter „Loot“ eines Raids stehen jetzt die Bosskills mit Schwierigkeit. Die Raidleitung kann Kills eintragen, die Schwierigkeit ändern und Kills entfernen. Ohne Kills steht dort, dass keine erfasst sind.',
+      'Auf der Übersicht sind getötete Bosse des nächsten Raids hervorgehoben. Angezeigt werden nur eingetragene Kills.',
+    ],
+  },
+  {
+    version: '1.0.53',
+    title: 'Klassen-Symbole von der eigenen Seite',
+    changes: [
+      'Die Klassen-Symbole der Charaktere werden jetzt von dieser Seite geladen und nicht mehr von wow.zamimg.com. Dadurch erfährt kein fremder Server mehr, wer die Seite besucht. Nur die Item-Symbole im Loot-Katalog kommen weiter von dort.',
+    ],
+  },
+  {
+    version: '1.0.51',
+    title: 'Sicherere Anmeldung und Benachrichtigungen',
+    changes: [
+      'Die Sperre nach zu vielen falschen Passwörtern greift jetzt auch, wenn viele Anmeldeversuche gleichzeitig kommen.',
+      'Ist der Server gerade ausgelastet, meldet die Anmeldung das nach wenigen Sekunden, statt lange zu warten. Einfach kurz danach noch einmal versuchen.',
+      'Benachrichtigungen bleiben auf deinem Gerät eingeschaltet, auch wenn du dich dort später neu anmeldest. Meldet sich jemand anderes auf dem Gerät an oder meldest du dich ab, enden sie dort. Nach einer Passwortänderung enden sie auf deinen anderen Geräten.',
+      'Wer sich mit einem Code registriert und dabei einen schon vorhandenen Spieler übernimmt, ist jetzt auch Mitglied und kann sich sofort für Raids anmelden.',
+      'Admins ohne zweiten Faktor sehen Logins und Rollen anderer Spieler erst, wenn sie die Zwei-Faktor-Anmeldung eingerichtet haben.',
+    ],
+  },
+  {
+    version: '1.0.50',
+    title: 'Aufgeräumte Statistik-Seite',
+    changes: [
+      'Auf der Statistik-Seite zeigen „Historische Rollen“ und „Loot-Verteilung“ jetzt Diagramme wie die Kacheln darüber. Dadurch sind alle Kacheln einer Zeile gleich hoch und es gibt keine leere Fläche mehr.',
+      'Ein Charakter mit der Klasse „Hexenmeister“ wird jetzt als Hexer erkannt und kann wie andere Hexer angemeldet und aufgestellt werden.',
+    ],
+  },
+  {
+    version: '1.0.49',
+    title: 'Statistiken ohne Anmeldung',
+    changes: [
+      'Die Statistik-Seite kann jetzt auch ohne Anmeldung geöffnet werden. Sie zeigt nur Zahlen, keine Items und keine Enhance Points. Der Bereich „Loot-Verteilung“ zeigt jetzt die Verteilung nach Klasse.',
+    ],
+  },
+  {
+    version: '1.0.48',
+    title: 'Der letzte Admin bleibt Admin',
+    changes: [
+      'Der einzige aktive Admin kann sich nicht mehr selbst die Admin-Rolle nehmen oder mit einem anderen Spieler zusammengeführt werden. Die Seite zeigt dann einen Hinweis, dass mindestens ein aktiver Admin bleiben muss.',
+    ],
+  },
+  {
+    version: '1.0.47',
+    title: 'Neue Konten sind Mitglieder',
+    changes: [
+      'Wer sich mit einem Registrierungscode neu anmeldet, ist sofort Mitglied und kann sich für Raids anmelden. Bestehende Gast-Konten bleiben unverändert; ein Admin stuft sie hoch.',
+    ],
+  },
+  {
+    version: '1.0.46',
+    title: 'Klarere Rahmen für Eingabefelder und Schaltflächen',
+    changes: [
+      'Eingabefelder, Auswahlfelder, Textfelder und Schaltflächen haben jetzt einen deutlicher sichtbaren Rahmen. So sind sie auch für Menschen mit eingeschränktem Sehvermögen besser zu erkennen.',
+    ],
+  },
+  {
+    version: '1.0.45',
+    title: 'Benachrichtigungen aufs Handy',
+    changes: [
+      'Im Reiter Konto kannst du freiwillig Benachrichtigungen einschalten. Dein Gerät meldet sich dann bei einer neuen Umfrage, einem neuen Raid und wenn du in eine Raid-Aufstellung kommst. Die Meldung nennt keine Inhalte. Auf iPhone und iPad klappt das nur, wenn RAID auf dem Home-Bildschirm liegt (ab iOS 16.4).',
+    ],
+  },
+  {
+    version: '1.0.44',
+    title: 'Längere Passwörter und sicherere Speicherung',
+    changes: [
+      'Passwörter dürfen jetzt bis zu 1024 Bytes lang sein. Sie werden mit Argon2id gespeichert. Bestehende Passwörter gelten weiter und werden bei der nächsten Anmeldung automatisch umgestellt; niemand wird dabei abgemeldet.',
+    ],
+  },
+  {
+    version: '1.0.43',
+    title: 'RAID zum Startbildschirm hinzufügen',
+    changes: [
+      'Auf unterstützten Smartphones kannst du RAID freiwillig zum Startbildschirm hinzufügen. Auf iPhones gibt es eine kurze Anleitung. Es werden dabei keine privaten Seiten offline gespeichert.',
+    ],
+  },
+  {
+    version: '1.0.41',
+    title: 'Passwörter höchstens 72 Bytes',
+    changes: [
+      'Passwörter, die länger als 72 Bytes sind, werden abgelehnt statt gekürzt. Umlaute und Sonderzeichen zählen mehrfach. Das gilt bei Registrierung, Passwortänderung und Kontodaten durch Admins.',
+    ],
+  },
+  {
+    version: '1.0.40',
+    title: 'Schutz vor fremden Anfragen',
+    changes: [
+      'Jede Änderung (auch Anmeldung und Registrierung) wird nur noch mit gültigem Sicherheits-Token angenommen. Im normalen Gebrauch merkst du davon nichts.',
+    ],
+  },
+  {
+    version: '1.0.39',
+    title: 'Loot zurückziehen ohne Begründung im offenen Raid',
+    changes: [
+      'Loot lässt sich in offenen und geplanten Raids ohne Begründung zurückziehen. Im archivierten Raid bleibt die Begründung Pflicht.',
+    ],
+  },
+  {
+    version: '1.0.38',
+    title: 'Absage gibt Item-Sperren frei',
+    changes: [
+      'Wird ein Raid abgesagt, laufen seine noch nicht eingelösten Item-Sperren jetzt ab. Dabei gehen keine Enhance Points verloren. Sperren früher abgesagter Raids bleiben unverändert.',
+    ],
+  },
+  {
+    version: '1.0.37',
+    title: 'Übersichtlichere Anmeldungen und Umfragen bearbeiten',
+    changes: [
+      'Die Anmeldeliste eines Raids zeigt jeden Spieler in einer Zeile, offene Anmeldungen zuerst, mit Klassensymbol, Klasse und Spec. Oben steht, wie viele ausstehend, eingetragen, unsicher und abgesagt sind.',
+      'Die Raidleitung sieht die Anmeldeliste ganz oben; die eigene Anmeldung ist darunter eingeklappt.',
+      'Trägt die Raidleitung deinen Charakter direkt in die Aufstellung ein, zeigt „Meine nächsten Raids“ dich jetzt als bestätigt.',
+      'Die Raidleitung kann Umfragen nachträglich bearbeiten: Titel, Beschreibung, Ende, Antwortoptionen, und geschlossene Umfragen wieder öffnen. Umbenannte Optionen behalten ihre Stimmen.',
+    ],
+  },
+  {
+    version: '1.0.36',
+    title: 'RaidWishlist 2.1.0',
+    changes: [
+      'Neue RaidWishlist-Version zum Herunterladen unter „Addons“. Das Fenster lässt sich an der Ecke unten rechts größer ziehen, die Listen zeigen dann mehr Zeilen. Mit – und + unten im Fenster (oder /wish scale) wird es kleiner oder größer, von 60 bis 150 %. /wish reset stellt Größe und Position zurück.',
+      'Ein Item, das du im letzten Raid bekommen hast, verhindert im nächsten Raid nicht mehr den Würfel-Hinweis.',
+      'Items, die dein Spiel noch nie gesehen hat, zeigen kurz „[Gegenstand 12345]“ und dann ihren Namen statt „item:12345“.',
+    ],
+  },
+  {
+    version: '1.0.35',
+    title: 'Andere Geräte nach Passwortänderung abgemeldet',
+    changes: [
+      'Ändert jemand sein Passwort, werden alle anderen Geräte abgemeldet; das aktuelle Gerät bleibt angemeldet.',
+      'Ändert ein Admin Passwort, Benutzernamen oder Rolle eines Spielers, wird dieser Spieler überall abgemeldet.',
+    ],
+  },
+  {
+    version: '1.0.34',
+    title: 'Fehlermeldungen werden vorgelesen',
+    changes: [
+      'Alle Fehlermeldungen nutzen jetzt dieselbe Darstellung und werden von Screenreadern angesagt.',
     ],
   },
   {

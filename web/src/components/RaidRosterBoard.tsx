@@ -4,6 +4,7 @@ import { ClassEmblem } from './ClassEmblem'
 import type { Attendance } from '../types'
 import type { ReactNode } from 'react'
 import { Link } from '../router'
+import { ErrorMessage } from './ErrorMessage'
 
 interface Props {
   attendance: Attendance[]
@@ -41,9 +42,9 @@ export function RaidRosterBoard({ attendance, playerName, canWrite, pending, onE
         {tentative?.get(row.player_id) && <p className="setup-note">Unsicher: {tentative.get(row.player_id)}</p>}
         {onBench && absences?.has(row.player_id) && !row.is_bench && <button type="button" className="setup-bench-action" disabled={pending} onClick={() => onBench(row)}>Auf die Bank setzen</button>}
         {row.notes && <p className="setup-note">{row.notes}</p>}
-        {canWrite && (!row.character_name?.trim() || !row.class?.trim() || !row.spec?.trim()) && <small className="error">Teilnahme #{row.id}: {[
+        {canWrite && (!row.character_name?.trim() || !row.class?.trim() || !row.spec?.trim()) && <ErrorMessage>Teilnahme #{row.id}: {[
           !row.character_name?.trim() && 'Charaktername', !row.class?.trim() && 'Klasse', !row.spec?.trim() && 'tatsächlicher Spec',
-        ].filter(Boolean).join(', ')} fehlt.</small>}
+        ].filter(Boolean).join(', ')} fehlt.</ErrorMessage>}
         {canWrite && <button type="button" className="setup-edit" title="Teilnahme korrigieren" disabled={pending} onClick={() => onEdit(row)}>
           <span className="visually-hidden">Teilnahme korrigieren</span>
         </button>}

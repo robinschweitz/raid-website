@@ -14,8 +14,8 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -37,7 +37,10 @@ jobs:
         run: npm test
       - name: Lint DESIGN.md
         run: npx --yes @google/design.md@0.4.0 lint DESIGN.md
-      - uses: actions/setup-go@v5
+      # The root-run host scripts are reviewed like code (SC-037).
+      - name: Check host scripts
+        run: shellcheck -s sh deploy/bin/*
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: 1.26.x
           cache: true
@@ -59,6 +62,12 @@ jobs:
             printf 'Run gofmt -w cmd internal. Unformatted files:\n%s\n' "$unformatted"
             exit 1
           fi
+      # go.mod and go.sum must already be tidy (DR-11): a change here means a
+      # dependency was added or dropped without the tidy result being committed.
+      - name: Check go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
       - name: Vet Go
         run: go vet ./...
       - name: Install golangci-lint
@@ -77,15 +86,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
       # No Go cache here: this job only builds the server, and restoring the ~400 MB
       # cache counts against the account's Actions cache download limit.
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: 1.26.x
           cache: false
@@ -104,7 +113,7 @@ jobs:
         run: npm run e2e
       - name: Upload report and screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: e2e-report
           path: |

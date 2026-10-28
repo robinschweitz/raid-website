@@ -3,6 +3,17 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { atLeast, type Poll, type Player, type PollType, type Vote } from '../types'
 import { useSubmission } from '../useSubmission'
+import { ErrorMessage } from '../components/ErrorMessage'
+import { PollEditor, type PollEditBody } from '../components/PollEditor'
+
+function pollEditError(err: unknown): string {
+  if (!(err instanceof ApiError)) return 'Speichern fehlgeschlagen'
+  if (err.code === 'poll_option_has_votes') return 'Eine Antwort, für die schon abgestimmt wurde, kann nicht entfernt werden. Benenne sie stattdessen um.'
+  if (err.message.includes('closes_at')) return 'Eine offene Umfrage braucht ein Ende in der Zukunft oder gar keins.'
+  if (err.message.includes('two options')) return 'Eine Auswahl-Umfrage braucht mindestens zwei Antworten.'
+  if (err.message.includes('duplicate option')) return 'Jede Antwort darf nur einmal vorkommen.'
+  return err.message
+}
 
 export function PollsPage() {
   const { pending, submit, isActive } = useSubmission()
@@ -18,6 +29,7 @@ export function PollsPage() {
   const [optionsText, setOptionsText] = useState('')
   const [choice, setChoice] = useState<Record<number, string>>({})
   const [selectedChoices, setSelectedChoices] = useState<Record<number, string[]>>({})
+  const [editingID, setEditingID] = useState<number | null>(null)
 
   const canManage = me ? atLeast(me.role, 'RAIDASSISTENT') : false
   const canVote = me ? atLeast(me.role, 'MEMBER') : false
@@ -102,10 +114,26 @@ export function PollsPage() {
     })
   }
 
+  const editPoll = async (poll: Poll, body: PollEditBody) => {
+    if (!canManage) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.put<Poll>(`/api/v1/polls/${poll.id}`, body)
+        if (!isActive()) return
+        setEditingID(null)
+        setVotes((prev) => { const next = { ...prev }; delete next[poll.id]; return next })
+        load()
+      } catch (err) {
+        if (isActive()) setError(pollEditError(err))
+      }
+    })
+  }
+
   return (
     <div>
       <div className="page-heading"><div><p className="eyebrow">Gemeinsam entscheiden</p><h1>Umfragen</h1></div></div>
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
       {canManage && (
@@ -146,8 +174,9 @@ export function PollsPage() {
       <div className="poll-directory">{polls.map((p) => (
         <section className="card" key={p.id}>
           <h2>
-            {p.title} <span className="badge">{p.status}</span>
+            {p.title} <span className={p.status === 'OPEN' ? 'badge ok' : 'badge'}>{p.status === 'OPEN' ? 'Offen' : 'Geschlossen'}</span>
           </h2>
+          {editingID === p.id ? <PollEditor poll={p} pending={pending} onSave={(body) => { void editPoll(p, body) }} onCancel={() => setEditingID(null)} /> : <>
           {p.description && <p className="muted">{p.description}</p>}
           {p.poll_type === 'CHOICE' && <p className="muted">{p.allow_multiple ? 'Mehrfachauswahl möglich' : 'Eine Auswahl möglich'}</p>}
           <div className="actions">
@@ -181,7 +210,10 @@ export function PollsPage() {
             )}
             <button onClick={() => loadVotes(p.id)}>Stimmen</button>
             {canManage && p.status === 'OPEN' && <button disabled={pending} onClick={() => closePoll(p)}>Schließen</button>}
+            {canManage && <button disabled={pending} onClick={() => setEditingID(p.id)}>Bearbeiten</button>}
           </div>
+          {p.closes_at && <p className="muted">Ende: {new Date(p.closes_at).toLocaleString('de-DE')}</p>}
+          </>}
           {votes[p.id] && (
             <ul className="plain-list">
               {votes[p.id].map((v) => (

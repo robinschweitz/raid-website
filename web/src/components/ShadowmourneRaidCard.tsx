@@ -5,6 +5,7 @@ import { Link } from '../router'
 import { shadowmourneRaidTasks, shadowmourneStageLabels, shadowmourneTaskHints } from '../shadowmourne'
 import { atLeast, type ShadowmourneRaidCharacter, type ShadowmourneRaidPlan, type ShadowmourneRaidTaskName } from '../types'
 import { useSubmission } from '../useSubmission'
+import { ErrorMessage } from './ErrorMessage'
 
 interface Props {
   raidID: number
@@ -51,7 +52,7 @@ export function ShadowmourneRaidCard({ raidID, rosterKey }: Props) {
   return <section className="subcard shadowmourne-raid" aria-label="Schattengram im Raid">
     <div className="section-heading"><h2>Schattengram im Raid</h2><Link to="/schattengram">Zur Liste</Link></div>
     <p className="muted">Diese Schritte kann pro Raid nur eine Person machen. Vorschlag: der höchste Listenplatz in der Aufstellung, der gerade bei diesem Schritt ist. Die Raidleitung kann auch Krieger, Paladine und Todesritter aus der Aufstellung wählen, die nicht auf der Liste stehen.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     <div className="shadowmourne-task-grid">
       {shadowmourneRaidTasks.map((name) => {
         const task = plan.tasks.find((item) => item.task === name)

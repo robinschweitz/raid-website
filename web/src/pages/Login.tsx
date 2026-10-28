@@ -6,6 +6,7 @@ import { GuildCrest } from '../components/GuildCrest'
 import { Link } from '../router'
 import type { ExternalCharacter, Player, RegistrationRequest } from '../types'
 import { browserSupportsWebAuthn } from '../webauthn'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 export function LoginPage() {
   const { login, verifyMFA, verifySecurityKey, refresh } = useAuth()
@@ -169,7 +170,7 @@ export function LoginPage() {
         {mode === 'login' && mfaChallenge && <div className="login-section">
           {mfaFactors.webauthn && mfaMethod === 'webauthn' && <div className="login-section">
             <p className="muted">Melde dich mit deinem Sicherheitsschlüssel an.</p>
-            {!webAuthnSupported && <p className="error">Dieser Browser unterstützt WebAuthn nicht. Verwende einen kompatiblen Browser oder ein Gerät mit Sicherheitsschlüssel-Unterstützung.</p>}
+            {!webAuthnSupported && <ErrorMessage>Dieser Browser unterstützt WebAuthn nicht. Verwende einen kompatiblen Browser oder ein Gerät mit Sicherheitsschlüssel-Unterstützung.</ErrorMessage>}
             <button type="button" disabled={busy || !hasUsableWebAuthn} onClick={() => void onSecurityKeySubmit()}>{busy ? 'Prüfe…' : 'Mit YubiKey anmelden'}</button>
             {hasCodeMFA && <button type="button" className="ghost" disabled={busy} onClick={() => setMfaMethod('code')}>Stattdessen Code verwenden</button>}
           </div>}
@@ -182,7 +183,7 @@ export function LoginPage() {
             <button className="primary-action" type="submit" disabled={busy || !mfaCode.trim()}>{busy ? 'Prüfe…' : 'Anmelden'}</button>
             {hasUsableWebAuthn && <button type="button" className="ghost" disabled={busy} onClick={() => setMfaMethod('webauthn')}>Mit YubiKey anmelden</button>}
           </form>}
-          {!mfaFactors.webauthn && !hasCodeMFA && <p className="error">Für dieses Konto ist MFA aktiv, aber es ist kein verwendbarer Faktor verfügbar.</p>}
+          {!mfaFactors.webauthn && !hasCodeMFA && <ErrorMessage>Für dieses Konto ist MFA aktiv, aber es ist kein verwendbarer Faktor verfügbar.</ErrorMessage>}
           <button type="button" className="ghost" disabled={busy} onClick={resetMFA}>Zurück</button>
         </div>}
         {mode === 'request' && <div className="login-section">
@@ -204,10 +205,11 @@ export function LoginPage() {
           <p className="muted">Code erhalten? Lege damit dein Konto an.</p>
           <label>Code<input value={code} onChange={(e) => setCode(e.target.value)} required /></label>
           <label>Benutzername<input value={regUser} onChange={(e) => setRegUser(e.target.value)} autoComplete="username" required /></label>
-          <label>Passwort<input type="password" value={regPass} onChange={(e) => setRegPass(e.target.value)} autoComplete="new-password" required /></label>
+          <label>Passwort<input type="password" value={regPass} onChange={(e) => setRegPass(e.target.value)} autoComplete="new-password" required aria-describedby="reg-pass-hint" />
+            <span id="reg-pass-hint" className="muted">Mindestens 12 Zeichen, höchstens 1024 Bytes. Umlaute und Sonderzeichen zählen mehrfach.</span></label>
           <button className="primary-action" type="submit" disabled={busy || !code.trim() || !regUser.trim() || !regPass.trim()}>Registrieren</button>
         </form>}
-        {error && <p className="error">{error}</p>}
+        {error && <ErrorMessage>{error}</ErrorMessage>}
         {requestStatus && <p className="muted" role="status">{requestStatus}</p>}
         <p className="login-help">Neu hier? <Link to="/anleitung">Anleitung mit Bildern lesen</Link></p>
       </section>

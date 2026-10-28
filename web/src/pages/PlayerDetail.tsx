@@ -21,6 +21,8 @@ import { canonicalClass, useCharacterOptions } from '../characterOptions'
 import { SpecSelect } from '../components/SpecSelect'
 import { browserSupportsWebAuthn, createWebAuthnCredential, type WebAuthnBeginResponse } from '../webauthn'
 import { announceMFAChange, type MFAStatus } from '../accountSecurity'
+import { ErrorMessage } from '../components/ErrorMessage'
+import { PushNotificationSettings } from '../components/PushNotificationSettings'
 
 const CLASSES = [
   'Todesritter',
@@ -98,6 +100,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
   const [mergePlayers, setMergePlayers] = useState<Player[]>([])
   const [mergeSourceID, setMergeSourceID] = useState('')
   const [mergeReason, setMergeReason] = useState('')
+  const [anonymiseReason, setAnonymiseReason] = useState('')
   const [mergeCharacterTarget, setMergeCharacterTarget] = useState('')
   const [mergeCharacterSource, setMergeCharacterSource] = useState('')
   const [mergeCharacterReason, setMergeCharacterReason] = useState('')
@@ -434,6 +437,23 @@ function PlayerDetail({ playerID, initialView }: Props) {
     })
   }
 
+  const anonymisePlayer = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isAdmin || !player) return
+    if (!window.confirm(`${player.name} wirklich anonymisieren? Login, Passwort, Sitzungen, MFA und Rising-Gods-Profildaten werden gelöscht. Das kann nicht rückgängig gemacht werden.`)) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post(`/api/v1/players/${playerID}/anonymise`, { reason: anonymiseReason.trim() })
+        if (!isActive()) return
+        setAnonymiseReason('')
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anonymisieren fehlgeschlagen')
+      }
+    })
+  }
+
   const mergeCharacter = async (event: FormEvent) => {
     event.preventDefault()
     if (!isAdmin || !mergeCharacterTarget || !mergeCharacterSource || mergeCharacterTarget === mergeCharacterSource || !mergeCharacterReason.trim()) return
@@ -584,7 +604,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
         <p>
           <Link to="/players">← Spieler</Link>
         </p>
-        {error ? <p className="error">{error}</p> : <p className="muted">Lade…</p>}
+        {error ? <ErrorMessage>{error}</ErrorMessage> : <p className="muted">Lade…</p>}
       </div>
     )
   }
@@ -601,7 +621,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
           {player.guild_rank_id != null && <p className="muted">Gildenrang: {ranks.find((r) => r.id === player.guild_rank_id)?.name ?? (rankError || (rankLoading ? 'Wird geladen…' : 'Nicht verfügbar'))}</p>}
         </div>
       </header>
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
 
       <nav className="workspace-tabs" aria-label="Profilbereiche">
@@ -648,7 +668,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
 
         {isAdmin && (
           <details className="editor-disclosure"><summary>Charakter hinzufügen</summary>
-          {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
+          {optionsError && <ErrorMessage>{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></ErrorMessage>}
           <form className="inline-form" onSubmit={createCharacter}>
             <label>Rising-Gods-Charakter<input value={charQuery} onChange={(e) => setCharQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
             <button type="button" disabled={pending || charQuery.trim().length < 3} onClick={() => void searchNewCharacters()}>{charSearching ? 'Suche…' : 'Suchen'}</button>
@@ -723,7 +743,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
                   <label className="check"><input type="checkbox" disabled={pending} checked={characterDraft.active} onChange={(e) => changeCharacter({ active: e.target.checked })} />Aktiv</label>
                   <button type="submit" disabled={pending || !characterDraft.name.trim()}>Charakter speichern</button>
                   <button type="button" disabled={pending} onClick={() => editCharacter(null)}>Bearbeitung abbrechen</button>
-                  {error && <p className="error" role="alert">{error}</p>}
+                  {error && <ErrorMessage>{error}</ErrorMessage>}
                 </form></td> : transferCharacter?.id === c.id ? <td colSpan={7}><form className="inline-form in-place-editor" onSubmit={transferCharacterOwner}>
                   <p className="muted"><strong>{c.name}</strong> gehört danach zum ausgewählten Spieler. Raid-Aufstellungen werden zugeordnet; Loot und EP bleiben unverändert.</p>
                   <label>Neuer Spieler<select autoFocus required disabled={pending} value={transferPlayerID} onChange={(e) => setTransferPlayerID(e.target.value)}>
@@ -732,7 +752,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
                   </select></label>
                   <button type="submit" disabled={pending || !transferPlayerID}>Charakter verschieben</button>
                   <button type="button" disabled={pending} onClick={() => setTransferCharacter(null)}>Abbrechen</button>
-                  {error && <p className="error" role="alert">{error}</p>}
+                  {error && <ErrorMessage>{error}</ErrorMessage>}
                 </form></td> : <>
                 <td><Link className="character-name" to={`/characters/${c.id}`}>{c.name}</Link></td>
                 <td>{c.class}</td>
@@ -844,15 +864,24 @@ function PlayerDetail({ playerID, initialView }: Props) {
                <button type="submit" disabled={pending || !mergeSourceID || !mergeReason.trim()}>Zusammenführen</button>
              </form>
            </section>}
+           {isAdmin && !isOwnProfile && <section className="subcard">
+             <h3>Spieler anonymisieren</h3>
+             <p className="muted">Für Löschanfragen nach der Datenschutzerklärung. Login, Passwort, Sitzungen, MFA, Push-Abos und Rising-Gods-Profildaten werden gelöscht; der Spielername wird durch den Namen des ältesten Main-Charakters ersetzt. Raid-Historie, Loot, EP und Charakternamen bleiben erhalten, dieser Schritt ist also eine Pseudonymisierung und macht die Daten nicht anonym.</p>
+             <form className="inline-form" onSubmit={anonymisePlayer}>
+               <label>Grund (optional)<input aria-label="Grund für Anonymisierung" value={anonymiseReason} onChange={(event) => setAnonymiseReason(event.target.value)} /></label>
+               <button type="submit" disabled={pending}>Spieler anonymisieren</button>
+             </form>
+           </section>}
            {isOwnProfile && <section className="subcard">
             <h3>Passwort ändern</h3>
             <form className="inline-form" onSubmit={changeOwnPassword}>
               <input type="password" aria-label="Aktuelles Passwort" placeholder="Aktuelles Passwort" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" />
-              <input type="password" aria-label="Neues Passwort" placeholder="Neues Passwort (mind. 12 Zeichen)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
+              <input type="password" aria-label="Neues Passwort" placeholder="Neues Passwort (mind. 12 Zeichen, höchstens 1024 Bytes)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
               <button type="submit" disabled={pending || !currentPassword.trim() || !newPassword.trim()}>Passwort ändern</button>
             </form>
             {passwordStatus && <p className="muted" role="status">{passwordStatus}</p>}
           </section>}
+          {isOwnMember && <PushNotificationSettings />}
           {isOwnProfile && <section className="subcard">
             <h3>Multi-Faktor-Authentifizierung</h3>
             <p className="muted">Optional: Richte einen Authenticator-Code oder YubiKey ein. Du wirst beim Start einer Änderung nach deinem aktuellen Passwort gefragt. <Link to="/kontosicherheit">Warum das wichtig ist</Link></p>

@@ -49,7 +49,7 @@ func TestSecurityHeadersAllowWowIconImages(t *testing.T) {
 
 	csp := w.Header().Get("Content-Security-Policy")
 	if !strings.Contains(csp, "img-src 'self' data: https://wow.zamimg.com") {
-		t.Fatalf("Content-Security-Policy = %q; want wow icon image host allowed", csp)
+		t.Fatalf("Content-Security-Policy = %q; want item icon host allowed", csp)
 	}
 }
 

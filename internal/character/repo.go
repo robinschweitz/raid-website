@@ -2,6 +2,7 @@ package character
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -50,6 +51,13 @@ func (r *Repo) FindByName(ctx context.Context, name string) (*Character, error) 
 		return nil, err
 	}
 	return c, nil
+}
+
+// ListByName returns every character with exactly this name, oldest first.
+func (r *Repo) ListByName(ctx context.Context, name string) ([]Character, error) {
+	var rows []Character
+	err := r.db.NewSelect().Model(&rows).Where("name = ?", name).Order("id ASC").Scan(ctx)
+	return rows, err
 }
 
 func (r *Repo) FindByExternalProfile(ctx context.Context, source, profileID string) (*Character, error) {
@@ -110,4 +118,71 @@ func (r *Repo) ListNameHistory(ctx context.Context, characterID int64) ([]NameHi
 		return nil, err
 	}
 	return hs, nil
+}
+
+func (r *Repo) runInTx(ctx context.Context, fn func(context.Context, bun.Tx) error) error {
+	return r.db.RunInTx(ctx, nil, fn)
+}
+
+// AcquireWriteLock takes SQLite's writer lock at the start of a transaction by
+// running a write that changes no row.
+func (r *Repo) AcquireWriteLock(ctx context.Context) error {
+	_, err := r.db.ExecContext(ctx, "UPDATE players SET id = id WHERE id = -1")
+	return err
+}
+
+// CountMergeConflicts counts the raids and wishlist items on which both
+// characters have a record.
+func (r *Repo) CountMergeConflicts(ctx context.Context, sourceID, targetID int64) (int, error) {
+	queries := []string{
+		"SELECT COUNT(*) FROM raid_attendance s JOIN raid_attendance t ON s.raid_id=t.raid_id WHERE s.character_id=? AND t.character_id=?",
+		"SELECT COUNT(*) FROM raid_signups s JOIN raid_signups t ON s.raid_id=t.raid_id WHERE s.character_id=? AND t.character_id=?",
+		"SELECT COUNT(*) FROM character_wishlist s JOIN character_wishlist t ON s.item_id=t.item_id WHERE s.character_id=? AND t.character_id=?",
+	}
+	total := 0
+	for _, query := range queries {
+		var n int
+		if err := r.db.QueryRowContext(ctx, query, sourceID, targetID).Scan(&n); err != nil {
+			return 0, fmt.Errorf("check merge conflicts: %w", err)
+		}
+		total += n
+	}
+	return total, nil
+}
+
+// MoveReferences points every record of the source character at the target and
+// refreshes the owner and name snapshots stored beside them.
+func (r *Repo) MoveReferences(ctx context.Context, sourceID int64, target *Character, now time.Time) error {
+	statements := []struct {
+		query string
+		args  []any
+	}{
+		{"UPDATE character_name_history SET character_id=? WHERE character_id=?", []any{target.ID, sourceID}},
+		{"UPDATE raid_attendance SET player_id=?, character_id=?, character_name=?, updated_at=? WHERE character_id=?", []any{target.PlayerID, target.ID, target.Name, now, sourceID}},
+		{"UPDATE loot_awards SET awarded_to_player_id=?, awarded_to_character_id=?, awarded_to_character_name=?, updated_at=? WHERE awarded_to_character_id=?", []any{target.PlayerID, target.ID, target.Name, now, sourceID}},
+		{"UPDATE raid_signups SET player_id=?, character_id=?, updated_at=? WHERE character_id=?", []any{target.PlayerID, target.ID, now, sourceID}},
+		{"UPDATE character_wishlist SET character_id=?, player_id=?, updated_at=? WHERE character_id=?", []any{target.ID, target.PlayerID, now, sourceID}},
+	}
+	for _, statement := range statements {
+		if _, err := r.db.ExecContext(ctx, statement.query, statement.args...); err != nil {
+			return fmt.Errorf("move character references: %w", err)
+		}
+	}
+	return nil
+}
+
+// InsertMergeAlias stores the merged character's old name.
+func (r *Repo) InsertMergeAlias(ctx context.Context, sourceName string, targetID, sourceID int64, createdAt time.Time) error {
+	if _, err := r.db.ExecContext(ctx, "INSERT INTO character_merge_aliases (source_name, target_character_id, source_character_id, created_at) VALUES (?, ?, ?, ?)", sourceName, targetID, sourceID, createdAt); err != nil {
+		return fmt.Errorf("store character alias: %w", err)
+	}
+	return nil
+}
+
+// Delete removes a character row.
+func (r *Repo) Delete(ctx context.Context, id int64) error {
+	if _, err := r.db.ExecContext(ctx, "DELETE FROM characters WHERE id=?", id); err != nil {
+		return fmt.Errorf("delete source character: %w", err)
+	}
+	return nil
 }

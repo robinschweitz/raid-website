@@ -244,6 +244,18 @@ func login(t *testing.T, client *http.Client, srv *httptest.Server, username, pa
 	return ""
 }
 
+// testCSRFToken is the fixed double-submit token that test requests send.
+const testCSRFToken = "test-csrf-token"
+
+// addCSRF adds the CSRF cookie and header that every state-changing request needs (SC-019).
+func addCSRF(req *http.Request) {
+	if req.Method == http.MethodGet || req.Method == http.MethodHead || req.Method == http.MethodOptions {
+		return
+	}
+	req.Header.Set("X-CSRF-Token", testCSRFToken)
+	req.AddCookie(&http.Cookie{Name: "raid_csrf", Value: testCSRFToken})
+}
+
 func postJSON(t *testing.T, client *http.Client, url string, payload any) *http.Response {
 	t.Helper()
 	body, _ := json.Marshal(payload)
@@ -252,6 +264,7 @@ func postJSON(t *testing.T, client *http.Client, url string, payload any) *http.
 		t.Fatalf("new request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	addCSRF(req)
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("POST %s: %v", url, err)
@@ -281,6 +294,7 @@ func do(t *testing.T, client *http.Client, method, url, token string, body any) 
 	if token != "" {
 		req.Header.Set("Cookie", auth.CookieName+"="+token)
 	}
+	addCSRF(req)
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, url, err)
@@ -802,6 +816,7 @@ func TestListEndpointsReturnEmptyArrays(t *testing.T) {
 		fmt.Sprintf("/api/v1/players/%d/loot", adminID),
 		fmt.Sprintf("/api/v1/raids/%d/attendance", raidID),
 		fmt.Sprintf("/api/v1/raids/%d/loot", raidID),
+		fmt.Sprintf("/api/v1/raids/%d/kills", raidID),
 	} {
 		assertEmptyArray(path)
 	}

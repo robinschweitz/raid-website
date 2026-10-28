@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useSubmission } from '../useSubmission'
 import { api, ApiError } from '../api'
+import { EpShortfallWarning, type EpShortfall } from '../components/EpShortfallWarning'
 import { useAuth } from '../auth'
 import { Link } from '../router'
 import { RaidLootList } from '../components/RaidLootList'
@@ -14,10 +15,12 @@ import { SpecSelect } from '../components/SpecSelect'
 import { RaidQuickAdd } from '../components/RaidQuickAdd'
 import { AddonInviteExport } from '../components/AddonInviteExport'
 import { AddonLootImport } from '../components/AddonLootImport'
-import { UnclaimedLoot } from '../components/UnclaimedLoot'
+import { UnclaimedLootForm, UnclaimedLootList } from '../components/UnclaimedLoot'
+import { RaidKills } from '../components/RaidKills'
 import { AddonRosterImport } from '../components/AddonRosterImport'
 import { RaidRecruitment } from './Recruitment'
 import { ShadowmourneRaidCard } from '../components/ShadowmourneRaidCard'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 interface Props {
   raidID: number
@@ -51,6 +54,12 @@ function localStart(timestamp: string | null | undefined): string {
   if (!timestamp) return ''
   const date = new Date(timestamp)
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
+function epShortfalls(err: unknown): EpShortfall[] | null {
+  if (!(err instanceof ApiError) || err.code !== 'ep_shortfall') return null
+  const data = err.data as { shortfalls?: EpShortfall[] } | undefined
+  return data?.shortfalls?.length ? data.shortfalls : null
 }
 
 function raidError(err: unknown, fallback: string): string {
@@ -116,6 +125,7 @@ function RaidDetail({ raidID, initialView }: Props) {
   const [loot, setLoot] = useState<RecordedLoot[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [error, setError] = useState('')
+  const [epWarning, setEpWarning] = useState<{ shortfalls: EpShortfall[]; retry: () => void } | null>(null)
   const [message, setMessage] = useState('')
   const [series, setSeries] = useState<RaidSeries[]>([])
   const [raidName, setRaidName] = useState('')
@@ -162,6 +172,7 @@ function RaidDetail({ raidID, initialView }: Props) {
   const [associationSize, setAssociationSize] = useState('')
   const [catalogBoss, setCatalogBoss] = useState('')
   const [unclaimedVersion, setUnclaimedVersion] = useState(0)
+  const [lootEntryKind, setLootEntryKind] = useState<'award' | 'unclaimed'>('award')
   const [catalogItem, setCatalogItem] = useState('')
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogDifficulty, setCatalogDifficulty] = useState('')
@@ -386,7 +397,9 @@ function RaidDetail({ raidID, initialView }: Props) {
         setMessage(`${row.character_name?.trim() || 'Teilnahme'} sitzt jetzt auf der Ersatzbank.`)
         await load()
       } catch (err) {
-        if (isActive()) setError(raidError(err, 'Teilnahme fehlgeschlagen'))
+        const shortfalls = epShortfalls(err)
+        if (shortfalls && isActive()) setEpWarning({ shortfalls, retry: () => void addAttendance(null, true) })
+        else if (isActive()) setError(raidError(err, 'Teilnahme fehlgeschlagen'))
       }
     })
   }
@@ -490,8 +503,8 @@ function RaidDetail({ raidID, initialView }: Props) {
     })
   })
 
-  const addAttendance = async (event: FormEvent) => {
-    event.preventDefault()
+  const addAttendance = async (event: FormEvent | null, confirmShortfall = false) => {
+    event?.preventDefault()
     if (!canWrite || renderedCharacterVersion !== characterVersion.current
       || !hasAttCharacter) return
     if (attNeedsReason && !attReason.trim()) {
@@ -513,6 +526,7 @@ function RaidDetail({ raidID, initialView }: Props) {
     await submit(async () => {
       setError('')
       setMessage('')
+      setEpWarning(null)
       try {
         const body = {
           player_id: Number(attPlayer),
@@ -521,6 +535,7 @@ function RaidDetail({ raidID, initialView }: Props) {
           ...attDetails,
           ...snapshotChanges,
           ...(attNeedsReason ? { reason: attReason.trim() } : {}),
+          ...(confirmShortfall ? { confirm_ep_shortfall: true } : {}),
         }
         if (attEditing) {
           await api.patch<Attendance>(`/api/v1/raids/${raidID}/attendance/${attEditing.id}`, body)
@@ -546,8 +561,8 @@ function RaidDetail({ raidID, initialView }: Props) {
     })
   }
 
-  const addLoot = async (event: FormEvent) => {
-    event.preventDefault()
+  const addLoot = async (event: FormEvent | null, confirmShortfall = false) => {
+    event?.preventDefault()
     if (!canWrite || renderedLootVersion !== lootFormVersion.current || catalogContext !== persistedCatalogContext.current) return
     if (lootNeedsReason && !lootReason.trim()) {
       setError('Für eine Änderung im Archiv ist eine nichtleere Begründung erforderlich.')
@@ -564,6 +579,7 @@ function RaidDetail({ raidID, initialView }: Props) {
     await submit(async () => {
       setError('')
       setMessage('')
+      setEpWarning(null)
       try {
         const body = {
           ...(!lootEditing || lootItemID !== lootEditing.item_id ? { item_id: lootItemID } : {}),
@@ -577,13 +593,13 @@ function RaidDetail({ raidID, initialView }: Props) {
           ...(lootNeedsReason ? { reason: lootReason.trim() } : {}),
         }
         if (lootEditing) {
-          await api.patch<LootAward>(`/api/v1/raids/${raidID}/loot/${lootEditing.id}`, body)
+          await api.patch<LootAward>(`/api/v1/raids/${raidID}/loot/${lootEditing.id}`, { ...body, ...(confirmShortfall ? { confirm_ep_shortfall: true } : {}) })
         } else {
            const payload = JSON.stringify({ flow: 'catalog-new', body })
           if (lootRequest.current?.payload !== payload) {
             lootRequest.current = { payload, id: crypto.randomUUID() }
           }
-          await api.post<RecordedLoot>(`/api/v1/raids/${raidID}/loot`, { ...body, request_id: lootRequest.current.id })
+          await api.post<RecordedLoot>(`/api/v1/raids/${raidID}/loot`, { ...body, request_id: lootRequest.current.id, ...(confirmShortfall ? { confirm_ep_shortfall: true } : {}) })
         }
         if (!isActive()) return
         ++lootFormVersion.current
@@ -613,7 +629,9 @@ function RaidDetail({ raidID, initialView }: Props) {
         setMessage(lootEditing ? 'Loot-Korrektur gespeichert.' : 'Loot vergeben.')
         await load()
       } catch (err) {
-        if (isActive()) setError(raidError(err, 'Loot fehlgeschlagen'))
+        const shortfalls = epShortfalls(err)
+        if (shortfalls && isActive()) setEpWarning({ shortfalls, retry: () => void addLoot(null, true) })
+        else if (isActive()) setError(raidError(err, 'Loot fehlgeschlagen'))
       }
     })
   }
@@ -739,22 +757,26 @@ function RaidDetail({ raidID, initialView }: Props) {
     })
   }
 
-	const withdrawLoot = async () => {
+	const withdrawLoot = async (confirmShortfall = false) => {
 		if (!lootEditing || !canWrite || (lootNeedsReason && !lootReason.trim())) return
-		if (!window.confirm(`Loot „${lootEditing.item_name}“ wirklich zurückziehen?`)) return
+		if (!confirmShortfall && !window.confirm(`Loot „${lootEditing.item_name}“ wirklich zurückziehen?`)) return
 		await submit(async () => {
 			setError('')
 			setMessage('')
+			setEpWarning(null)
 			try {
 				await api.post<LootAward>(`/api/v1/raids/${raidID}/loot/${lootEditing.id}/withdraw`, {
 					...(lootNeedsReason ? { reason: lootReason.trim() } : {}),
+					...(confirmShortfall ? { confirm_ep_shortfall: true } : {}),
 				})
 				if (!isActive()) return
 				editLoot(null)
 				setMessage('Loot zurückgezogen.')
 				await load()
 			} catch (err) {
-				if (isActive()) setError(raidError(err, 'Loot konnte nicht zurückgezogen werden.'))
+				const shortfalls = epShortfalls(err)
+				if (shortfalls && isActive()) setEpWarning({ shortfalls, retry: () => void withdrawLoot(true) })
+				else if (isActive()) setError(raidError(err, 'Loot konnte nicht zurückgezogen werden.'))
 			}
 		})
 	}
@@ -765,7 +787,7 @@ function RaidDetail({ raidID, initialView }: Props) {
         <p>
           <Link to="/raids">← Raids</Link>
         </p>
-        {error ? <p className="error">{error}</p> : <p className="muted">Lade…</p>}
+        {error ? <ErrorMessage>{error}</ErrorMessage> : <p className="muted">Lade…</p>}
       </div>
     )
   }
@@ -788,7 +810,8 @@ function RaidDetail({ raidID, initialView }: Props) {
         {raid.notes && <p className="setup-note">{raid.notes}</p>}
         {raid.archived_at && <p className="muted">Archivierte Historie: Änderungen an Roster und Loot erfordern eine Begründung.</p>}
       </RaidBanner>
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+      {epWarning && <EpShortfallWarning shortfalls={epWarning.shortfalls} pending={pending} onConfirm={epWarning.retry} onCancel={() => setEpWarning(null)} />}
       {message && <p className="success-message" role="status"><span>{message}</span><button type="button" aria-label="Meldung schließen" onClick={() => setMessage('')}>Schließen</button></p>}
       {pending && <p className="muted" role="status">Wird gespeichert…</p>}
       <nav className="workspace-tabs" aria-label="Raidbereiche">
@@ -902,7 +925,7 @@ function RaidDetail({ raidID, initialView }: Props) {
         <RaidRosterBoard onBench={canWrite && isActiveRaid ? benchAttendance : undefined} absences={absenceReasons} tentative={tentativeReasons} attendance={visibleAttendance} filtered={rosterFiltered} playerName={playerName} canWrite={canWrite} pending={pending} onEdit={editAttendance} editingID={attEditing?.id} isAddOpen={quickAdd && quickAddName !== ''}>
         {canWrite && (
           <div>
-            {optionsError && <p className="error">{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></p>}
+            {optionsError && <ErrorMessage>{optionsError} <button type="button" onClick={reloadOptions}>Erneut laden</button></ErrorMessage>}
             {!attEditing && !quickAdd && <button type="button" disabled={pending} onClick={() => { setQuickAddName(''); setQuickAdd(true) }}>Neuen Charakter anlegen</button>}
             {quickAdd ? <RaidQuickAdd key={quickAddName} initialQuery={quickAddName} raidID={raidID} players={players} options={classSpecs} needsReason={attNeedsReason} pending={pending} submit={submit} isActive={isActive} onCancel={() => setQuickAdd(false)} onAdded={async () => { setQuickAdd(false); await load() }} /> :
             <form className="inline-form" onSubmit={addAttendance}>
@@ -938,7 +961,7 @@ function RaidDetail({ raidID, initialView }: Props) {
                 }} /> {label}
               </label>)}</fieldset>
               {attNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Teilnahme-Begründung" value={attReason} onChange={(e) => setAttReason(e.target.value)} required /></label>}
-              {attEditing && error && <p className="error" role="alert">{error}</p>}
+              {attEditing && error && <ErrorMessage>{error}</ErrorMessage>}
               {!pending && (!hasAttCharacter ? <p className="field-hint">Zuerst einen Charakter wählen.</p> : attNeedsReason && !attReason.trim() ? <p className="field-hint">Begründung eintragen.</p> : null)}
               <button className="primary-action" type="submit" disabled={pending || !hasAttCharacter || (attNeedsReason && !attReason.trim())}>{attEditing ? 'Teilnahme-Korrektur speichern' : 'Hinzufügen'}</button>
               {attEditing && <button type="button" disabled={pending} onClick={() => editAttendance(null)}>Bearbeitung abbrechen</button>}
@@ -962,6 +985,11 @@ function RaidDetail({ raidID, initialView }: Props) {
           <div>
             {catalogStatus && <p className="muted" role="status">{catalogStatus}</p>}
             <p className="muted">{associated ? 'Boss und Item müssen zur gespeicherten Raidinstanz und Raidgröße passen. Vorhandene historische Einträge bleiben erhalten.' : 'Vor neuer Loot-Erfassung bitte Raidinstanz und Raidgröße oben wählen und speichern. Historische Einträge können mit unveränderter Identität und unverändertem Empfänger korrigiert werden.'}</p>
+            {!lootEditing && <label>Art der Erfassung<select value={lootEntryKind} onChange={(e) => setLootEntryKind(e.target.value as 'award' | 'unclaimed')}>
+              <option value="award">An Spieler vergeben</option>
+              <option value="unclaimed">Entzaubert / Gildenbank / Niemand wollte es</option>
+            </select></label>}
+            {!lootEditing && lootEntryKind === 'unclaimed' ? <UnclaimedLootForm raidID={raidID} needsReason={lootNeedsReason} bosses={catalogBosses} onAdded={() => setUnclaimedVersion((value) => value + 1)} /> : <>
             {attendance.length === 0 && <p className="muted">Keine Empfänger verfügbar: zuerst Charaktere in den Raidroster aufnehmen.</p>}
             <form className="inline-form" onSubmit={addLoot}>
               {associated ? <>
@@ -1018,16 +1046,18 @@ function RaidDetail({ raidID, initialView }: Props) {
               {lootEditing && <p className="muted">Unveränderter Enhanced-Gewinner behält seine historischen Kosten. Ein Methoden- oder Empfängerwechsel wird vom Server samt EP, abgeleiteter Token-Sicht und Audit atomar ausgeglichen.</p>}
               <label>Notizen<input disabled={pending} placeholder="Loot-Notizen" value={lootNotes} onChange={(e) => changeLoot(() => setLootNotes(e.target.value))} /></label>
               {lootNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Loot-Begründung" value={lootReason} onChange={(e) => changeLoot(() => setLootReason(e.target.value))} required /></label>}
-              {lootEditing && error && <p className="error" role="alert">{error}</p>}
+              {lootEditing && error && <ErrorMessage>{error}</ErrorMessage>}
                 {lootBlockedHint && <p className="field-hint loot-submit-hint">{lootBlockedHint}</p>}
                 <button className="primary-action" type="submit" disabled={pending || !lootItem.trim() || !hasLootRecipient || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : 'Vergeben'}</button>
-				{lootEditing && <button type="button" disabled={pending || (lootNeedsReason && !lootReason.trim())} onClick={() => void withdrawLoot()}>Loot zurückziehen</button>}
+				{lootEditing && <button type="button" disabled={pending || (lootNeedsReason && !lootReason.trim())} onClick={() => void withdrawLoot(false)}>Loot zurückziehen</button>}
                {lootEditing && <button type="button" disabled={pending} onClick={() => editLoot(null)}>Bearbeitung abbrechen</button>}
             </form>
+            </>}
           </div>
         )}
         </RaidLootList>
-        <UnclaimedLoot raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} bosses={catalogBosses} version={unclaimedVersion} />
+        <RaidKills raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} bosses={catalogBosses} catalog={catalog} raidSize={raid.raid_size ?? null} />
+        <UnclaimedLootList raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} version={unclaimedVersion} />
         {canManage && isActiveRaid && associated && <AddonLootImport raidID={raidID} onImported={async () => { await load(); setUnclaimedVersion((value) => value + 1) }} />}
       </section>
     </div>

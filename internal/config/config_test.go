@@ -20,6 +20,7 @@ func TestProductionCredentials(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("ENV", "production")
+			t.Setenv("PUBLIC_ORIGIN", "https://example.org")
 			t.Setenv("ADMIN_USERNAME", tc.username)
 			t.Setenv("ADMIN_PASSWORD", tc.password)
 			t.Setenv("COOKIE_SECURE", "false")
@@ -65,6 +66,7 @@ func TestProductionListenAddress(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("ENV", "production")
+			t.Setenv("PUBLIC_ORIGIN", "https://example.org")
 			t.Setenv("ADMIN_USERNAME", "owner")
 			t.Setenv("ADMIN_PASSWORD", "unique-password")
 			t.Setenv("LISTEN_ADDR", tc.listenAddr)
@@ -99,5 +101,72 @@ func TestRisingGodsProxyConfiguration(t *testing.T) {
 				t.Fatalf("unexpected normalized proxy URL %q", cfg.RisingGodsProxyURL)
 			}
 		})
+	}
+}
+
+// TestVAPIDConfiguration: Web Push is off without a key; key and subject come
+// together (FR-32, SC-054). The key itself is parsed by cmd/server.
+func TestVAPIDConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		name, key, subject string
+		valid              bool
+	}{
+		{"disabled", "", "", true},
+		{"missing subject", "key", "", false},
+		{"missing key", "", "mailto:raid@example.org", false},
+		{"enabled", "key", "mailto:raid@example.org", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("VAPID_PRIVATE_KEY", tc.key)
+			t.Setenv("VAPID_SUBJECT", tc.subject)
+			cfg, err := Load()
+			if (err == nil) != tc.valid {
+				t.Fatalf("Load error = %v, want valid %v", err, tc.valid)
+			}
+			if tc.valid && cfg.VAPIDPrivateKey != tc.key {
+				t.Fatalf("VAPIDPrivateKey = %q", cfg.VAPIDPrivateKey)
+			}
+		})
+	}
+}
+
+func TestProductionPublicOrigin(t *testing.T) {
+	for _, tc := range []struct {
+		name, origin string
+		valid        bool
+	}{
+		{"missing", "", false},
+		{"plain http", "http://example.org", false},
+		{"no scheme", "example.org", false},
+		{"with path", "https://example.org/app", false},
+		{"with user info", "https://user@example.org", false},
+		{"https origin", "https://example.org", true},
+		{"https origin with port", "https://example.org:8443", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("ENV", "production")
+			t.Setenv("ADMIN_USERNAME", "owner")
+			t.Setenv("ADMIN_PASSWORD", "unique-password")
+			t.Setenv("PUBLIC_ORIGIN", tc.origin)
+			if _, err := Load(); (err == nil) != tc.valid {
+				t.Fatalf("Load error = %v, want valid %v", err, tc.valid)
+			}
+		})
+	}
+}
+
+func TestDevelopmentPublicOrigin(t *testing.T) {
+	t.Setenv("ENV", "development")
+	t.Setenv("PUBLIC_ORIGIN", "")
+	if _, err := Load(); err != nil {
+		t.Fatalf("development without PUBLIC_ORIGIN: %v", err)
+	}
+	t.Setenv("PUBLIC_ORIGIN", "http://localhost:5173")
+	if _, err := Load(); err != nil {
+		t.Fatalf("development with a localhost origin: %v", err)
+	}
+	t.Setenv("PUBLIC_ORIGIN", "ftp://localhost")
+	if _, err := Load(); err == nil {
+		t.Fatal("a non-http origin must fail")
 	}
 }

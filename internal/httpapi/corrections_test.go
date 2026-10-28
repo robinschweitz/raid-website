@@ -381,7 +381,7 @@ func TestLegacyOrdinaryLootLockResolutionAndCorrectionDoesNotRevive(t *testing.T
 	}
 	f.legacyCompleted()
 	f.archiveHistory()
-	f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", awardID), map[string]any{"awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar, "reason": "explicit recipient correction"}, http.StatusOK)
+	f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", awardID), map[string]any{"awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar, "reason": "explicit recipient correction", "confirm_ep_shortfall": true}, http.StatusOK)
 	stored, err := enhancepoints.NewRepo(f.db).GetLock(context.Background(), lock.ID)
 	if err != nil {
 		t.Fatal(err)

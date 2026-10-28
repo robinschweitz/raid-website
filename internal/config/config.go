@@ -20,6 +20,9 @@ type Config struct {
 	AdminPassword        string
 	RisingGodsProxyURL   string
 	RisingGodsProxyToken string
+	// VAPIDPrivateKey and VAPIDSubject switch Web Push on (FR-32, SC-054).
+	VAPIDPrivateKey string
+	VAPIDSubject    string
 }
 
 func Load() (*Config, error) {
@@ -45,6 +48,11 @@ func Load() (*Config, error) {
 		AdminPassword:        getEnv("ADMIN_PASSWORD", "development-password"),
 		RisingGodsProxyURL:   strings.TrimRight(strings.TrimSpace(getEnv("RISING_GODS_PROXY_URL", "")), "/"),
 		RisingGodsProxyToken: strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
+		VAPIDPrivateKey:      strings.TrimSpace(getEnv("VAPID_PRIVATE_KEY", "")),
+		VAPIDSubject:         strings.TrimSpace(getEnv("VAPID_SUBJECT", "")),
+	}
+	if (c.VAPIDPrivateKey == "") != (c.VAPIDSubject == "") {
+		return nil, errors.New("VAPID_PRIVATE_KEY and VAPID_SUBJECT must be set together")
 	}
 	if (c.RisingGodsProxyURL == "") != (c.RisingGodsProxyToken == "") {
 		return nil, errors.New("RISING_GODS_PROXY_URL and RISING_GODS_PROXY_TOKEN must be set together")
@@ -53,6 +61,11 @@ func Load() (*Config, error) {
 		u, err := url.Parse(c.RisingGodsProxyURL)
 		if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" {
 			return nil, errors.New("RISING_GODS_PROXY_URL must be an https origin without a path")
+		}
+	}
+	if c.PublicOrigin != "" || env == "production" {
+		if err := validatePublicOrigin(c.PublicOrigin, env == "production"); err != nil {
+			return nil, err
 		}
 	}
 	if env == "production" {
@@ -71,6 +84,23 @@ func Load() (*Config, error) {
 		}
 	}
 	return c, nil
+}
+
+// validatePublicOrigin checks PUBLIC_ORIGIN, the only source of the WebAuthn
+// relying party (SC-007). Production needs an HTTPS origin without a path.
+func validatePublicOrigin(origin string, isProduction bool) error {
+	if origin == "" {
+		return errors.New("production requires PUBLIC_ORIGIN, the HTTPS origin of the site")
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" || u.Hostname() == "" || u.User != nil ||
+		(u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
+		return errors.New("PUBLIC_ORIGIN must be an origin such as https://example.org")
+	}
+	if u.Scheme != "https" && (isProduction || u.Scheme != "http") {
+		return errors.New("PUBLIC_ORIGIN must use https in production")
+	}
+	return nil
 }
 
 func getEnv(k, def string) string {

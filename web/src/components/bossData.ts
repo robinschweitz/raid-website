@@ -1,8 +1,9 @@
 // Encounter artwork uses Blizzard achievement icons, served by Wowhead.
 // Multi-NPC encounters count once; optional bosses are included.
-export interface BossEncounter { name: string; icon: string }
+// id is the catalog boss ID, which recorded kills refer to; only catalog instances have one.
+export interface BossEncounter { name: string; icon: string; id?: string }
 
-const encounter = (name: string, icon: string): BossEncounter => ({ name, icon })
+const encounter = (name: string, icon: string, id?: string): BossEncounter => ({ name, icon, id })
 
 export const INSTANCE_BOSSES: Record<string, BossEncounter[]> = {
   '533': [
@@ -45,18 +46,18 @@ export const INSTANCE_BOSSES: Record<string, BossEncounter[]> = {
     encounter('Toravon', 'toravon'),
   ],
   '631': [
-    encounter('Lord Mark’gar', 'lordmarrowgar'),
-    encounter('Lady Todeswisper', 'ladydeathwhisper'),
-    encounter('Luftschiffkampf', 'gunshipbattle'),
-    encounter('Todesbringer Saurfang', 'saurfang'),
-    encounter('Fauldarm', 'festergut'),
-    encounter('Modermiene', 'rotface'),
-    encounter('Professor Seuchenmord', 'profputricide'),
-    encounter('Rat der Blutprinzen', 'bloodprincecouncil'),
-    encounter('Blutkönigin Lana’thel', 'bloodqueenlanathel'),
-    encounter('Valithria Traumwandler', 'valithriadreamwalker'),
-    encounter('Sindragosa', 'sindragosa'),
-    encounter('Der Lichkönig', 'lichking'),
+    encounter('Lord Mark’gar', 'lordmarrowgar', 'ICCLordMarrowgar'),
+    encounter('Lady Todeswisper', 'ladydeathwhisper', 'ICCLadyDeathwhisper'),
+    encounter('Luftschiffkampf', 'gunshipbattle', 'ICCGunshipBattle'),
+    encounter('Todesbringer Saurfang', 'saurfang', 'ICCSaurfang'),
+    encounter('Fauldarm', 'festergut', 'ICCFestergut'),
+    encounter('Modermiene', 'rotface', 'ICCRotface'),
+    encounter('Professor Seuchenmord', 'profputricide', 'ICCPutricide'),
+    encounter('Rat der Blutprinzen', 'bloodprincecouncil', 'ICCCouncil'),
+    encounter('Blutkönigin Lana’thel', 'bloodqueenlanathel', 'ICCLanathel'),
+    encounter('Valithria Traumwandler', 'valithriadreamwalker', 'ICCValithria'),
+    encounter('Sindragosa', 'sindragosa', 'ICCSindragosa'),
+    encounter('Der Lichkönig', 'lichking', 'ICCLichKing'),
   ],
   '649': [
     encounter('Bestien von Nordend', 'gormoktheimpaler'),

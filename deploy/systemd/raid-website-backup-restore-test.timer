@@ -1,0 +1,11 @@
+[Unit]
+Description=Monthly restore test of the off-server Raid Website copy
+
+[Timer]
+OnCalendar=*-*-01 05:00:00 UTC
+Persistent=true
+RandomizedDelaySec=1h
+Unit=raid-website-backup-restore-test.service
+
+[Install]
+WantedBy=timers.target

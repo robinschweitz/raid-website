@@ -4,6 +4,7 @@ import { useAuth } from '../auth'
 import { Link } from '../router'
 import { atLeast, type GeneratedRegistrationCode, type RegistrationCode, type RegistrationRequest } from '../types'
 import { useSubmission } from '../useSubmission'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 const pageSize = 20
 
@@ -49,11 +50,13 @@ export function RegistrationRequestsPage() {
     setCodes({})
   }
 
-  const createCode = async (request: RegistrationRequest) => {
+  const createCode = async (request: RegistrationRequest, choice?: 'ATTACH' | 'NEW') => {
     await submit(async () => {
       setError('')
       try {
-        const result = await api.post<GeneratedRegistrationCode>(`/api/v1/registration-requests/${request.id}/code`)
+        // SC-049: with a name match the Admin's choice decides what the code does.
+        const body = choice && request.name_match ? { match_choice: choice, match_player_id: choice === 'ATTACH' ? request.name_match.player_id : 0 } : undefined
+        const result = await api.post<GeneratedRegistrationCode>(`/api/v1/registration-requests/${request.id}/code`, body)
         if (!isActive()) return
         setGenerated((values) => ({ ...values, [request.id]: { code: result.code, codeId: result.code_record.id, characterName: request.character_name } }))
         setCodes((values) => ({ ...values, [request.id]: [result.code_record, ...(values[request.id] ?? [])] }))
@@ -157,7 +160,7 @@ export function RegistrationRequestsPage() {
     <p><Link to="/roster">← Gildenkonfiguration</Link></p>
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Registrierungsanfragen</h1></div></div>
     <p className="muted">Bereits erstellte Codes können nicht erneut angezeigt werden, weil nur ihr sicherer Hash gespeichert wird. Hat ein anderer Admin einen Code nicht weitergegeben, öffne „Details“: Du kannst einen neuen Code ausstellen und den alten widerrufen. Der neue Code wird einmalig angezeigt und kann direkt kopiert werden.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {addonCodes && <section className="card">
       <h2>Addon-Export</h2>
       <p className="muted">Neue offene, noch nicht gesendete Codes dieser Sitzung im Format <code>Name:Code</code>.</p>
@@ -183,15 +186,24 @@ export function RegistrationRequestsPage() {
           <td>{linkedPlayerCell(request)}</td>
           <td><button type="button" className="registration-details" aria-expanded={openRequestID === request.id} onClick={() => toggleDetails(request)}>{openRequestID === request.id ? 'Schließen' : 'Details'}</button></td>
           <td className="actions">
-            <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void createCode(request)}>{request.status === 'APPROVED' ? 'Neuen Code ausstellen' : 'Code erstellen'}</button>
+            <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED' || !!request.name_match} title={request.name_match ? 'Bitte zuerst unten wählen, ob der Spieler zugeordnet wird.' : undefined} onClick={() => void createCode(request)}>{request.status === 'APPROVED' ? 'Neuen Code ausstellen' : 'Code erstellen'}</button>
             <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void reject(request)}>Ablehnen</button>
           </td>
         </tr>
+        {request.name_match && (request.status === 'PENDING' || request.status === 'APPROVED') && <tr className="registration-match-row"><td colSpan={6}>
+          <div className="registration-match" role="group" aria-label={`Namensübereinstimmung für ${request.character_name}`}>
+            <p><strong>Namensübereinstimmung:</strong> Der Spieler <Link to={`/players/${request.name_match.player_id}`}>{request.name_match.player_name}</Link> hat noch kein Login und besitzt bereits einen Charakter „{request.character_name}“. Soll das neue Konto diesem Spieler zugeordnet werden?</p>
+            <div className="actions">
+              <button disabled={pending} onClick={() => void createCode(request, 'ATTACH')}>Diesem Spieler zuordnen</button>
+              <button disabled={pending} onClick={() => void createCode(request, 'NEW')}>Neuer Spieler</button>
+            </div>
+          </div>
+        </td></tr>}
         {openRequestID === request.id && <tr className="registration-details-row"><td colSpan={6}>
           <div className="registration-details-content">
             <p><a href={request.external_profile_url} target="_blank" rel="noreferrer">Rising-Gods-Profil öffnen</a></p>
-            {generated[request.id] && <p role="status"><strong>Neuer Code: <code>{generated[request.id].code}</code></strong> <button type="button" onClick={() => void navigator.clipboard.writeText(generated[request.id].code)}>Code kopieren</button></p>}
-            {codes[request.id] ? <div className="registration-codes"><strong>Code-Verlauf (für alle Admins sichtbar)</strong><p className="muted">Hier stehen Status und Gültigkeit. Der Code selbst ist nach dem Erstellen nicht mehr abrufbar. Für einen verlorenen Code oben „Neuen Code ausstellen“ verwenden und den bisherigen unten widerrufen.</p>{codes[request.id].length === 0 ? <p className="muted">Noch keine Codes erstellt.</p> : codes[request.id].map((code) => <div key={code.id}><span>#{code.id} · gültig bis {new Date(code.expires_at).toLocaleDateString('de-DE')} · {code.used_at ? `verwendet${code.used_by_username ? ` von @${code.used_by_username}` : ''}` : code.revoked_at ? 'widerrufen' : code.sent_at ? 'gesendet' : 'offen'}</span>{!code.used_at && !code.revoked_at && !code.sent_at && <button disabled={pending} onClick={() => void markSent(code)}>Als gesendet markieren</button>}{!code.used_at && !code.revoked_at && <button disabled={pending} onClick={() => void revoke(code)}>Widerrufen</button>}</div>)}</div> : <p className="muted">Codes werden geladen…</p>}
+            {generated[request.id] && <p role="status"><strong>Neuer Code: {generated[request.id].code}</strong></p>}
+            {codes[request.id] ? <div className="registration-codes"><strong>Codes</strong>{codes[request.id].length === 0 ? <p className="muted">Noch keine Codes erstellt.</p> : codes[request.id].map((code) => <div key={code.id}><span>#{code.id} · gültig bis {new Date(code.expires_at).toLocaleDateString('de-DE')} · {code.used_at ? `verwendet${code.used_by_username ? ` von @${code.used_by_username}` : ''}` : code.revoked_at ? 'widerrufen' : code.sent_at ? 'gesendet' : 'offen'}</span>{!code.used_at && !code.revoked_at && !code.sent_at && <button disabled={pending} onClick={() => void markSent(code)}>Als gesendet markieren</button>}{!code.used_at && !code.revoked_at && <button disabled={pending} onClick={() => void revoke(code)}>Widerrufen</button>}</div>)}</div> : <p className="muted">Codes werden geladen…</p>}
           </div>
         </td></tr>}
       </Fragment>)}</tbody>

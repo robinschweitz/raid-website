@@ -324,7 +324,7 @@ One dark theme only (`color-scheme: dark`); there is no light mode.
 - **Caption:** sidebar captions and eyebrows are 12px, weight 650, uppercase, letter spacing
   0.14em.
 - **Minimum size:** no text is smaller than 12px, including badges, captions and table notes
-  (Owner 2026-10-22, DQ-3). The code still has 10–11.5px text.
+  (Owner 2026-10-22, DQ-3).
 - **Figures:** big numbers (`stat`) are 2rem bold in `primary`.
 - No web fonts are loaded; the page uses only fonts on the device.
 
@@ -390,8 +390,8 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
   Save and Cancel, never in a detached editor (ADR 032).
 - **Table:** full width, rule under each row, left-aligned; `small` variant for dense lists.
 - **Class emblem:** the ten Blizzard class icons, stored in the repository and served by the
-  site itself; no class image is loaded from another server (Owner 2026-10-22, DQ-2). Unknown classes show
-  the neutral fallback. The code still hotlinks `wow.zamimg.com`.
+  site itself from `web/public/class-icons/`; no class image is loaded from another server
+  (Owner 2026-10-22, DQ-2, ADR 104). Unknown classes show the neutral fallback.
 - **Character chip:** name in class colour plus class emblem, owner and spec as muted
   text; `#ID` only when two names would look the same (ADR 069).
 - **Empty state:** short muted sentence; for roles that can act, it names the action to take
@@ -403,6 +403,17 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
 - **Copy box:** for addon exports, numbered steps and one "Export kopieren" button; if the
   clipboard is blocked, the text is shown selected for manual copying (ADR 081).
 
+- **Install hint:** one thin line under the top bar in the `info` colour, styled like the
+  account-security reminder: phone icon, a bold sentence, muted detail, the browser's
+  "Installieren" button where offered, and a quiet close button (FR-28.5, ADR 101). App icons
+  are PNGs of the crest on `background` (`web/public/app-icon-*.png`, `apple-touch-icon.png`).
+- **Push opt-in:** a subcard "Benachrichtigungen" in the own account tab, above the MFA card,
+  for MEMBER and higher: one muted sentence on what is sent and that it names no content, the
+  device's state ("aktiv"/"aus"), and one ordinary button "Benachrichtigungen aktivieren" or
+  "… abschalten". On iPhone/iPad outside the installed app it shows only the install note; a
+  blocked permission is explained, not hidden. It is not shown when the server has no VAPID
+  key (FR-32, ADR 102). Notifications themselves use the title "RAID", the 192px app icon,
+  and a fixed German sentence (FR-32.5).
 - **New screens:** the boss kill list and difficulty prompt (FR-29), the privacy page and the
   anonymise action (FR-30), the EP-floor warning (FR-16.8), the forced Admin MFA setup (FR-3.10), and the password reset
   with a code (FR-5.8) are designed in their own
@@ -414,7 +425,8 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
 - Do show only stored data; show an explicit loading, empty or error state instead of a guess.
 - Do keep one primary action per panel and keep destructive actions visually quiet.
 - Do keep the crest, class colours and frost accents original; reuse existing tokens.
-- Do serve every image from the site itself; don't load images from other servers.
+- Do serve every image from the site itself; don't load images from other servers. The only
+  exception is the Wowhead item icons of the loot catalog on `wow.zamimg.com` (ADR 104).
 - Don't reproduce a screenshot or game art as the page background or as UI chrome.
 - Don't add fake progression, RSVP percentages, notifications or performance statistics.
 - Don't add a CSS framework, component library, icon font or web font without owner approval.
@@ -427,9 +439,10 @@ Target: WCAG 2.2 level AA.
 - **Contrast (checked 2026-10-22 against `surface-card`, `surface-raised` and `surface-sidebar`):**
   all text tokens pass 4.5:1 (lowest: `class-deathknight` 5.8:1, `class-shaman` 6.6:1,
   `on-surface-muted` 6.8:1). The focus ring passes 3:1 (11.0:1). Form-control edges in
-  `outline-control` pass 3:1 (4.0:1 against `surface-raised`, 4.6:1 against `surface-card`); the
-  current code still uses `outline` there (1.4:1 to 1.6:1). ASSUMPTION: the translucent cards stay at or
-  darker than `surface-card` over every part of the background photo.
+  `outline-control` pass 3:1 (4.0:1 against `surface-raised`, 4.6:1 against `surface-card`).
+  Every control edge uses `outline-control`; the former `outline` edge was 1.4:1 to 1.6:1.
+  ASSUMPTION: the translucent cards stay at or darker than `surface-card` over every part of the
+  background photo.
 - **Focus:** every focusable element shows a 2px `primary` outline with 3px offset
   (`:focus-visible`). A skip link moves to the main content.
 - **Targets:** buttons and inputs are at least 36px high (WCAG 2.5.8 needs 24px).
@@ -437,8 +450,7 @@ Target: WCAG 2.2 level AA.
   scrolling.
 - **Language:** `<html lang="de">`.
 - **Status changes:** success messages use `role="status"`; every error message uses the shared
-  error component with `role="alert"` (Owner 2026-10-22, DQ-5). Today 18 of 55 error elements are not
-  announced.
+  error component with `role="alert"` (Owner 2026-10-22, DQ-5; `web/src/components/ErrorMessage.tsx`).
 - **Decorative images:** class emblems and boss portraits next to a visible name use empty
   `alt` and `aria-hidden`; the guide and addon screenshots have German alt text.
 
@@ -458,8 +470,9 @@ Target: WCAG 2.2 level AA.
   (FR-3.7, FR-3.8).
 - **External links:** Rising-Gods profiles, Wowhead items and full-size screenshots open in a new
   tab with `rel="noreferrer"`.
-- **External assets:** every image comes from the site itself (Owner 2026-10-22, DQ-2); the
-  content security policy that enforces it is SC-024.
+- **External assets:** class icons, boss portraits and all other images come from the site
+  itself (Owner 2026-10-22, DQ-2). Item icons in the loot catalog stay on `wow.zamimg.com`
+  (Owner 2026-10-26, ADR 104); the content security policy is SC-024.
 - **Visible role gating:** controls a role cannot use are hidden or explained; the server check
   is SC-001.
 
@@ -469,7 +482,7 @@ None open. The owner resolved DQ-1 to DQ-5 on 2026-10-22; the answers are in the
 "Owner 2026-10-22". IDs are not reused.
 
 - **DQ-1** Control borders use `outline-control` `#5989a3`.
-- **DQ-2** Class icons are served from the site; CSP drops `wow.zamimg.com`.
+- **DQ-2** Class icons are served from the site. Amended 2026-10-26 (ADR 104): `wow.zamimg.com` stays in the CSP for item icons only.
 - **DQ-3** No text below 12px.
 - **DQ-4** New screens are designed in their implementation issues.
 - **DQ-5** One shared error component with `role="alert"`.

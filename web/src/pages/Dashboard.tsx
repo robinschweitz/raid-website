@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
-import type { Attendance, Character, Player, PointsResponse, Poll, Raid, Vote } from '../types'
+import type { Attendance, BossKill, Character, Player, PointsResponse, Poll, Raid, Vote } from '../types'
 import { RaidBanner } from '../components/RaidBanner'
 // import { EnhancePointsCard } from '../components/EnhancePointsCard'
 import { AttendanceRing } from '../components/AttendanceRing'
@@ -12,7 +12,7 @@ import { GuildNotifications } from '../components/GuildNotifications'
 import { PlayerProfilePanel } from '../components/PlayerProfilePanel'
 import { MyRaidsPanel } from '../components/MyRaidsPanel'
 import { atLeast } from '../types'
-// import { StatisticsCharts } from '../components/StatisticsCharts'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 
 export function DashboardPage() {
@@ -23,6 +23,7 @@ export function DashboardPage() {
   const [votes, setVotes] = useState<Record<number, Vote[]>>({})
   const [points, setPoints] = useState<PointsResponse | null>(null)
   const [attendance, setAttendance] = useState<Attendance[] | null>(null)
+  const [kills, setKills] = useState<BossKill[] | null>(null)
   const [characters, setCharacters] = useState<Character[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -73,6 +74,17 @@ export function DashboardPage() {
     return () => { active = false }
   }, [nextRaid])
 
+  // Kills are readable only when signed in; without them the progress shows no status.
+  const nextRaidID = nextRaid?.id
+  useEffect(() => {
+    let active = true
+    setKills(null)
+    if (player && nextRaidID !== undefined) api.get<BossKill[]>(`/api/v1/raids/${nextRaidID}/kills`)
+      .then((rows) => { if (active) setKills(rows) })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [player, nextRaidID])
+
   useEffect(() => {
     let active = true
     if (!player) return
@@ -93,7 +105,7 @@ export function DashboardPage() {
       </div>
       <Link to="/raids">Alle Raids ansehen &rarr;</Link>
     </div>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
 
     {player && atLeast(player.role, 'MEMBER') && !loading && <MyRaidsPanel playerID={player.id} raids={raids} characters={characters} />}
 
@@ -108,7 +120,7 @@ export function DashboardPage() {
           </div>
           <h2>{nextRaid.name}</h2>
           <p className="muted">Raidleitung: {players.find((p) => p.id === nextRaid.raid_leader_id)?.name ?? `Spieler #${nextRaid.raid_leader_id}`}</p>
-          {attendanceError ? <p className="error" role="alert">{attendanceError}</p> : attendance ? <>
+          {attendanceError ? <ErrorMessage>{attendanceError}</ErrorMessage> : attendance ? <>
             <div className="composition" aria-label="Gespeicherte Raidaufstellung">
               <span><strong>{attendance.length}</strong> Aufgestellt</span>
               <span><strong>{attendance.filter((a) => a.role === 'TANK').length}</strong> Tanks</span>
@@ -116,7 +128,7 @@ export function DashboardPage() {
               <span><strong>{attendance.filter((a) => a.role === 'DD').length}</strong> DD</span>
             </div>
           </> : <p className="muted" role="status">Aufstellung wird geladen&hellip;</p>}
-          <BossProgression catalogInstanceId={nextRaid.catalog_instance_id} />
+          <BossProgression catalogInstanceId={nextRaid.catalog_instance_id} kills={kills} />
           <Link className="button-link primary" to={`/raids/${nextRaid.id}`}>Raid &ouml;ffnen &rarr;</Link>
         </> : <><h2>{error ? 'Raidplanung nicht verfügbar' : 'Kein zukünftiger Raid geplant'}</h2><p className="muted">{error ? 'Bitte lade die Seite erneut.' : 'Hier erscheint der nächste gespeicherte Termin.'}</p><Link className="button-link" to="/raids">Zur Raidplanung &rarr;</Link></>}
       </div>
@@ -142,7 +154,7 @@ export function DashboardPage() {
 
       <section className="card widget-poll">
         <div className="section-heading"><h2>Aktive Umfrage</h2><Link to="/polls">Alle &rarr;</Link></div>
-        {votesError && <p className="error" role="alert">{votesError}</p>}
+        {votesError && <ErrorMessage>{votesError}</ErrorMessage>}
         {polls.map((p) => {
           const pollVotes = votes[p.id]
           const choiceCounts: Record<string, number> = {}
@@ -185,16 +197,11 @@ export function DashboardPage() {
         </table></div>
       </section>
 
-      {/* <section className="card widget-stats">
-        <div className="section-heading"><h2>Statistiken</h2><span className="eyebrow">Saison</span></div>
-        <StatisticsCharts raids={raids} />
-      </section> */}
-
       {player && <section className="card widget-profile">
         <div className="section-heading"><h2>Mein Profil</h2></div>
         {player && <PlayerProfilePanel player={player} characters={characters} points={points} />}
         {player && atLeast(player.role, 'MEMBER') && <p className="profile-link"><Link to="/wishlist">Meine Wunschliste &amp; Addon-Export &rarr;</Link></p>}
-        {pointsError && <p className="error" role="alert">{pointsError}</p>}
+        {pointsError && <ErrorMessage>{pointsError}</ErrorMessage>}
       </section>}
 
       <section className="card widget-agenda">
@@ -210,7 +217,7 @@ export function DashboardPage() {
 
     {/* <div className="dashboard-columns">
       <div className="dashboard-points">
-        {pointsError && <p className="error" role="alert">{pointsError}</p>}
+        {pointsError && <ErrorMessage>{pointsError}</ErrorMessage>}
         <EnhancePointsCard points={points} />
         {player && <p className="profile-link"><Link to={`/players/${player.id}`}>Mein Profil &amp; EP-Historie &rarr;</Link></p>}
       </div>
@@ -225,7 +232,7 @@ export function DashboardPage() {
       </section>
       <section className="card dashboard-polls">
         <div className="section-heading"><h2>Offene Umfragen</h2><Link to="/polls">Alle &rarr;</Link></div>
-        {votesError && <p className="error" role="alert">{votesError}</p>}
+        {votesError && <ErrorMessage>{votesError}</ErrorMessage>}
         {polls.map((p) => <div className="poll-preview" key={p.id}>
           <h3>{p.title}</h3>
           {p.description && <p className="muted">{p.description}</p>}

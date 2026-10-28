@@ -1,10 +1,37 @@
-export const appVersion = '1.0.63'
+export const appVersion = '1.0.70'
 
 export const changelog = [
   {
     version: appVersion,
     title: 'Verständliche Fehlermeldungen ohne interne Details',
     changes: ['Fehler beim Kontospeichern und bei Korrekturen zeigen feste deutsche Meldungen. Interne Datenbankfehler bleiben im Serverprotokoll.'],
+  },
+  {
+    version: '1.0.69',
+    title: 'Reset-Code einlösen',
+    changes: ['Über „Passwort vergessen?“ lässt sich ein einmaliger Reset-Code einlösen. Alle bisherigen Sitzungen und zweiten Faktoren werden dabei entfernt.'],
+  },
+  {
+    version: '1.0.68',
+    title: 'Passwort-Reset mit einmaligem Code',
+    changes: ['Admins erstellen im Konto-Tab einen 72 Stunden gültigen Reset-Code und senden ihn ingame. Fremde Passwörter werden nicht mehr direkt gesetzt.'],
+  },
+  {
+    version: '1.0.67',
+    title: 'Persönliche Daten als JSON exportieren',
+    changes: ['Admins können Auskunftsanfragen im Konto-Tab eines Spielers mit einem protokollierten JSON-Export beantworten. Passwörter, MFA-Geheimnisse und Sitzungsschlüssel werden nicht exportiert.'],
+  },
+  {
+    version: '1.0.66',
+    title: 'Begrenzte Charaktersuche für Besucher',
+    changes: ['Ohne Anmeldung sind zehn neue Charaktersuchen und Registrierungsanfragen pro zehn Minuten möglich. Gespeicherte Suchergebnisse und angemeldete Mitglieder bleiben erreichbar.'],
+  },
+  { version: '1.0.65', title: 'Registrierungscodes nachreichen', changes: ['Admins können verlorene Codes anhand ihres Verlaufs ersetzen und alte Codes widerrufen. Der Code selbst wird nur einmal angezeigt.'] },
+  { version: '1.0.64', title: 'Datenschutzerklärung', changes: ['Die öffentliche Datenschutzseite nennt Kontakt, gespeicherte Daten, Aufbewahrung und Auskunftsrechte.'] },
+  {
+    version: '1.0.63',
+    title: 'Sitzungen enden nach sieben Tagen ohne Nutzung',
+    changes: ['Nach sieben Tagen ohne Nutzung ist eine neue Anmeldung nötig. Aktive Sitzungen enden weiterhin spätestens nach 30 Tagen.'],
   },
   {
     version: '1.0.62',

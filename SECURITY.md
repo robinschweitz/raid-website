@@ -144,7 +144,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Startup migration:** At startup, before the server accepts requests, every value that is plaintext or uses a key other than the current one MUST be re-encrypted with the current key, all in one database transaction. If any row fails, the transaction MUST roll back and the server MUST exit with an error that names the count of failed rows but no secret. The migration MUST be safe to run again: it touches only rows not yet under the current key. After it, the server MUST check that no such row remains and MUST refuse to start otherwise.
 - **Key rotation:** `TOTP_ENCRYPTION_KEY` is the current key; `TOTP_ENCRYPTION_KEYS_PREVIOUS` MAY hold earlier keys, comma-separated. Decryption picks the key by `<key-id>`. A stored value whose key is in neither variable MUST stop startup. To rotate, the operator sets the new key, moves the old one to the previous list, and restarts; the migration re-encrypts every row; the old key MAY be removed after the next successful start. Old database snapshots still need the old key, so it MUST be kept with the backup key material until the last snapshot that uses it has expired (NFR-2.2, SC-034).
 - **Enforcement:** `auth` MFA settings repository; `internal/config`.
-- **Evidence:** V11, V14, OD-003 (owner, 2026-10-22). Code: **not compliant** — stored as plaintext. Threats: T-011.
+- **Evidence:** V11, V14, OD-003 (owner, 2026-10-22). Code: encryption and transactional plaintext migration built in #64. The server requires a base64-encoded 32-byte environment key whenever stored TOTP exists; new setups cannot store plaintext without a key. Previous-key rotation is built in #65: startup accepts configured previous keys and re-encrypts every old-key value under the current key in the same migration transaction. Unknown keys stop startup. Threats: T-011.
 - **Verification:** The `totp_secret` column holds no base32 secret; a login with a valid code still works; startup without the key fails while a TOTP setup exists; a migration that fails on one row leaves every row unchanged and the server stopped, and a second start completes it; after a rotation every row carries the new key ID and logins still work; a value copied to another player's row fails to decrypt.
 
 **SC-015 - Re-authentication for security changes**
@@ -174,7 +174,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** A session MUST end 30 days after login at the latest, and MUST end earlier when it has not been used for 7 days. Each authenticated request resets the idle clock; the last-use time MUST be written at most once per hour, so that ordinary reads do not write to the database.
 - **Enforcement:** `auth` session validation; a last-used timestamp on `sessions`.
-- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (owner, 2026-10-22). Code: 30-day maximum compliant; idle timeout **not built**; `last_seen_at` is written on every request (`THREAT_MODEL_CODE.md` CT-028). Threats: T-010.
+- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (owner, 2026-10-22). Code: compliant since #67: authentication rejects seven-day idle sessions and the fixed 30-day expiry; a conditional update writes `last_seen_at` at most hourly, including concurrent requests. Touch failures are logged without failing the read. Threats: T-010.
 - **Verification:** A session unused for 7 days and 1 minute returns 401; a session used daily stays valid until day 30.
 
 **SC-019 - CSRF protection**
@@ -250,7 +250,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** For the requests that FR-7.6 limits, one client address (SC-006) MUST NOT start more than 10 in 10 minutes. Answers served from the cache MUST NOT count. Further requests get HTTP 429 with a stable code. The counter is in memory (DR-9).
 - **Enforcement:** `GET /api/v1/external/rising-gods/characters`, `POST /api/v1/auth/registration-requests`; counter in `registration` or the HTTP layer.
-- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: none. Threats: T-016, T-035.
+- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: compliant since #79: the registration service shares a mutex-protected in-memory ten-request budget across visitor searches and registration requests; cached answers bypass it, authenticated callers are exempt, and expired address counters are removed. Threats: T-016, T-035.
 - **Verification:** The eleventh uncached visitor search within 10 minutes returns 429 without an upstream request; a logged-in user is not limited.
 
 **SC-029 - Worker access**
@@ -323,8 +323,8 @@ chapter level only; requirement IDs are not cited until each is verified against
 **SC-038 - Short-lived security records are deleted**
 - **Status:** ACTIVE
 - **Rule:** Login attempts, failed or successful, MUST be deleted once they are older than the longest login-limit window that uses them (SC-008, SC-043); a successful login MUST NOT be kept as an activity history. Expired sessions and expired or used MFA challenges MUST be deleted. Deletion runs during normal requests or at startup, not as a background job.
-- **Enforcement:** `auth` repository (`DeleteExpired` exists but is never called).
-- **Evidence:** FR-30.6, ARCHITECTURE "No background jobs". Code: **not compliant** — nothing is ever pruned, and every successful login is stored with its address (`THREAT_MODEL_CODE.md` CT-016, CT-029). Threats: T-022.
+- **Enforcement:** `auth.Repo.PruneSecurityRecords`, called at startup and before login.
+- **Evidence:** FR-30.6, ARCHITECTURE "No background jobs". Code: compliant since #74: startup and login delete attempts older than 15 minutes, expired sessions, and used or expired MFA and WebAuthn challenges in one transaction. Cleanup failures are logged and do not change the login result. Threats: T-022.
 - **Verification:** After the window, no login attempt, expired session, or old challenge row remains.
 
 **SC-039 - Protected main branch and CI gates**
@@ -352,7 +352,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** A password reset MUST use a single-use reset code that an Admin creates for a player and sends in game to that player's main character, with the same randomness, hashing, and revocation as registration codes (SC-013) and a lifetime of 72 hours. Redeeming it MUST set a new password (SC-005), MUST remove the player's TOTP settings, recovery codes, and security keys, and MUST end all sessions of the player (SC-017), in one audited transaction. An Admin MUST NOT set another player's password directly for a reset. Creating a reset code MUST revoke any earlier unused reset code of the same player. Failed redemptions of reset and registration codes MUST count against the per-address limit of SC-043. Creating and redeeming a reset code MUST be logged as security events (SC-041). The in-game message is the only notification channel; a player who did not ask for the reset notices because their old password stops working (accepted: the site stores no e-mail). A reset of an ADMIN is followed by SC-040.
 - **Enforcement:** reset-code workflow in `registration`, on the registration-code infrastructure (owner 2026-10-23, backlog #48); `auth`.
-- **Evidence:** FR-5.8, OD-014, OD-018 (owner, 2026-10-23). Code: **not compliant** — not built; Admins set passwords directly. Threats: T-026.
+- **Evidence:** FR-5.8, OD-014, OD-018 (owner, 2026-10-23). Code: Admin code creation, 72-hour expiry, hash-only storage, replacement revocation and the prohibition on directly setting another player's password are built in #81. Redemption is built in #82: one transaction changes the password, consumes the code, removes MFA and all sessions, revokes push delivery and records counts without secrets. Reset and registration redemptions share the per-address failed-attempt budget. The operator command is tracked in #83. Threats: T-026.
 - **Verification:** A redeemed code works once; afterwards old sessions return 401, MFA is off, and the new password logs in; a second code revokes the first; the 31st failed redemption from one address in 15 minutes is rejected; a code older than 72 hours is rejected.
 
 **SC-043 - Login limit per client address**
@@ -408,14 +408,14 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** From a Rising-Gods profile the system MUST store only character name, class, specs, and gear score. The raw response MUST NOT be stored; existing raw copies on registration requests and characters MUST be removed by a migration.
 - **Enforcement:** `registration` and `characters` repositories; a database migration that drops or empties `raw_profile_json` and `external_profile_json`.
-- **Evidence:** FR-30.6, OD-017 (owner, 2026-10-23); `THREAT_MODEL_CODE.md` CT-030: the full response is stored and never read. Code: **not compliant**. Threats: T-047.
+- **Evidence:** FR-30.6, OD-017 (owner, 2026-10-23); `THREAT_MODEL_CODE.md` CT-030. Code: compliant since #78: repositories discard raw profiles and unused demographic fields; migration 083 clears existing copies. Profile identifiers and URLs remain for linking. Threats: T-047.
 - **Verification:** After registration and after the migration, no row holds a raw profile; the four fields are still shown.
 
 **SC-051 - Server-side reset code for a locked-out Admin**
 - **Status:** ACTIVE
 - **Rule:** A command `cmd/reset-code`, run on the server as the application user, MUST create a reset code (SC-042) for a named player and print it once. It MUST open the database directly, MUST NOT be reachable over HTTP, MUST write an audit entry with the actor "server operator", and MUST be logged as a security event (SC-041). It MUST NOT set a password or remove MFA itself; that happens only when the code is redeemed.
 - **Enforcement:** `cmd/reset-code` (new) using the `registration` reset-code service.
-- **Evidence:** FR-3.11, OD-019 (owner, 2026-10-23). Code: **not built**. Threats: T-049.
+- **Evidence:** FR-3.11, OD-019 (owner, 2026-10-23). Code: built in #83: `cmd/reset-code` uses the shared reset service, audits as "server operator", logs a security event without the code and prints it once. Threats: T-049.
 - **Verification:** Running the command for the only Admin prints a code that works once within 72 hours; the audit log shows the operator entry; no HTTP route reaches the command.
 
 **SC-052 - Service worker without cache; push shows fixed texts only**

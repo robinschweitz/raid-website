@@ -28,10 +28,9 @@ func TestReqArch013_AC01(t *testing.T) {
 func TestReqArch013_AC02(t *testing.T) {
 	srv, db := setupServer(t)
 	client := srv.Client()
-	seedAccount(t, db, "admin-113b", "admin-113-password", validation.RoleAdmin)
-	id := seedAccount(t, db, "member-113b", "member-113-password", validation.RoleMember)
+	id := seedAccount(t, db, "admin-113b", "admin-113-password", validation.RoleAdmin)
 	token := login(t, client, srv, "admin-113b", "admin-113-password")
-	status, body := do(t, client, http.MethodPut, fmt.Sprintf("%s/api/v1/players/%d/account", srv.URL, id), token, map[string]any{"username": "member-113b", "password": "short", "role": "MEMBER"})
+	status, body := do(t, client, http.MethodPut, fmt.Sprintf("%s/api/v1/players/%d/account", srv.URL, id), token, map[string]any{"username": "admin-113b", "password": "short", "role": "ADMIN"})
 	if status != http.StatusUnprocessableEntity || !strings.Contains(string(body), `"code":"password_too_short"`) {
 		t.Fatalf("known error = %d %s", status, body)
 	}

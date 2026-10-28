@@ -47,9 +47,9 @@ export function PrivacyPage() {
         <li><strong>Charaktere:</strong> Name, Klasse, Skillungen und Gearscore, geladen aus dem öffentlichen Rising-Gods-Profil. Die rohe Antwort des Profils wird nicht gespeichert.</li>
         <li><strong>Raidbetrieb:</strong> Anmeldungen, Absagen, Aufstellungen, Beute, Enhance Points, Itemsperren, Wunschlisten und Umfragestimmen.</li>
         <li><strong>Änderungsprotokoll:</strong> Wer wann welche Daten geändert hat (siehe unten).</li>
-        <li><strong>Technisch nötig:</strong> Ein Sitzungs-Cookie nach der Anmeldung und ein Schutz-Cookie gegen gefälschte Anfragen. Es gibt keine Werbung, keine Analyse und keine Einbindung fremder Server. Anmeldeversuche und abgelaufene Sitzungen werden gelöscht, sobald sie nicht mehr gebraucht werden.</li>
+        <li><strong>Technisch nötig:</strong> Ein Sitzungs-Cookie nach der Anmeldung und ein Schutz-Cookie gegen gefälschte Anfragen. Es gibt keine Werbung und keine Analyse. Item-Symbole im Beutekatalog werden von wow.zamimg.com geladen; dabei wird deine IP-Adresse an diesen Anbieter übertragen. Andere Bilder kommen von dieser Seite. Anmeldeversuche und abgelaufene Sitzungen werden gelöscht, sobald sie nicht mehr gebraucht werden.</li>
       </ul>
-      <p>Ohne Anmeldung sichtbar sind nur der Raidkalender, die Spielerliste mit Gildenrang, die Statistiken (Zählungen, keine Items und keine Enhance Points) und die Hilfeseiten.</p>
+      <p>Ohne Anmeldung sichtbar sind der Raidkalender, die Spielerliste mit Gildenrang, Umfragen, Raidaufstellungen, die Statistiken (Zählungen, keine Items und keine Enhance Points) und die Hilfeseiten.</p>
     </section>
 
     <section className="card guide-section" aria-labelledby="grundlage-title">

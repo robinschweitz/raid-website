@@ -78,6 +78,9 @@ func TestMiddlewareAuthenticationFailures(t *testing.T) {
 			case "inactive":
 				statement = "UPDATE players SET active = 0"
 			case "touch failure":
+				if _, err := bdb.DB.ExecContext(ctx, "UPDATE sessions SET last_seen_at = ?", time.Now().UTC().Add(-2*time.Hour)); err != nil {
+					t.Fatal(err)
+				}
 				statement = "CREATE TRIGGER reject_touch BEFORE UPDATE ON sessions BEGIN SELECT RAISE(ABORT, 'injected failure'); END"
 			case "closed database":
 				if err := bdb.Close(); err != nil {
@@ -93,7 +96,7 @@ func TestMiddlewareAuthenticationFailures(t *testing.T) {
 			h := authenticate(svc)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				called = true
 				_, hasActor := v1.CurrentPlayer(r)
-				if hasActor != (scenario == "valid") {
+				if hasActor != (scenario == "valid" || scenario == "touch failure") {
 					t.Fatalf("actor present = %v for %s", hasActor, scenario)
 				}
 				w.WriteHeader(http.StatusNoContent)
@@ -104,7 +107,7 @@ func TestMiddlewareAuthenticationFailures(t *testing.T) {
 			}
 			w := httptest.NewRecorder()
 			h.ServeHTTP(w, r)
-			isFailure := scenario == "closed database" || scenario == "touch failure"
+			isFailure := scenario == "closed database"
 			if isFailure {
 				if called {
 					t.Fatal("downstream handler called despite authentication failure")

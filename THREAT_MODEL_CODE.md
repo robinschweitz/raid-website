@@ -147,8 +147,7 @@ CONFIRMED. **Rules:** SC-028.
 
 ### Data, logging, and privacy
 
-**CT-016 — Security records never deleted** — `auth.Repo.DeleteExpired` is never called; login
-attempts, sessions, and MFA challenges accumulate. **Status:** CONFIRMED. **Rules:** SC-038.
+**CT-016 — Security records never deleted** — fixed by #74: startup and login prune expired authentication data in one transaction. **Status:** MITIGATED. **Rules:** SC-038.
 
 **CT-020 — Class icons hotlinked** — `ClassEmblem.tsx` loads from `wow.zamimg.com`. **Status:**
 CONFIRMED. **Rules:** SC-024.
@@ -187,7 +186,7 @@ then fails and the error surfaces through CT-007. **Status:** CONFIRMED. **Rules
   `:319`) with username and client address, and nothing is ever deleted (CT-016). Over time the
   table becomes a log of when and from where each member logged in.
 - **Impact:** a database copy reveals members' login times and IP addresses for the whole history.
-- **Status:** CONFIRMED. **Response:** Eliminate. **Rules:** SC-038 (only the limit window is kept).
+- **Status:** MITIGATED (#74): startup and login keep only the 15-minute limit window. **Response:** Eliminate. **Rules:** SC-038.
 
 **CT-030 — Raw Rising-Gods profiles kept forever (LINDDUN Data disclosure, Non-compliance)**
 - **Category:** Information disclosure (privacy: data minimisation). **Component:**
@@ -403,7 +402,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-013 | CONFIRMED | Mitigate | App | SC-019 | T-007 |
 | CT-014 | CONFIRMED | Mitigate | App | SC-026 | T-017 |
 | CT-015 | CONFIRMED | Mitigate | App | SC-028 | T-016, T-035 |
-| CT-016 | CONFIRMED | Eliminate | App | SC-038 | T-022 |
+| CT-016 | MITIGATED | Eliminate | App | SC-038 | T-022 |
 | CT-017 | FIXED | Mitigate | Ops | SC-037 | T-013 |
 | CT-018 | FIXED | Mitigate | Ops | SC-039 | T-012 |
 | CT-019 | CONFIRMED | Mitigate | Ops | SC-036 | T-014 |
@@ -416,7 +415,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-026 | FIXED | Mitigate | App | SC-043 | T-003 |
 | CT-027 | FIXED | Mitigate | App | SC-006 | T-001 |
 | CT-028 | MITIGATED | Mitigate | App | SC-018 | T-010 |
-| CT-029 | CONFIRMED | Eliminate | App | SC-038 | T-022 |
+| CT-029 | MITIGATED | Eliminate | App | SC-038 | T-022 |
 | CT-030 | CONFIRMED | Eliminate | App | SC-050, FR-30.6 | T-047 |
 
 CT-002 found nothing and has no row.

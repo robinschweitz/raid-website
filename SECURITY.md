@@ -408,7 +408,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** From a Rising-Gods profile the system MUST store only character name, class, specs, and gear score. The raw response MUST NOT be stored; existing raw copies on registration requests and characters MUST be removed by a migration.
 - **Enforcement:** `registration` and `characters` repositories; a database migration that drops or empties `raw_profile_json` and `external_profile_json`.
-- **Evidence:** FR-30.6, OD-017 (owner, 2026-10-23); `THREAT_MODEL_CODE.md` CT-030: the full response is stored and never read. Code: **not compliant**. Threats: T-047.
+- **Evidence:** FR-30.6, OD-017 (owner, 2026-10-23); `THREAT_MODEL_CODE.md` CT-030. Code: compliant since #78: repositories discard raw profiles and unused demographic fields; migration 083 clears existing copies. Profile identifiers and URLs remain for linking. Threats: T-047.
 - **Verification:** After registration and after the migration, no row holds a raw profile; the four fields are still shown.
 
 **SC-051 - Server-side reset code for a locked-out Admin**

@@ -174,7 +174,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** A session MUST end 30 days after login at the latest, and MUST end earlier when it has not been used for 7 days. Each authenticated request resets the idle clock; the last-use time MUST be written at most once per hour, so that ordinary reads do not write to the database.
 - **Enforcement:** `auth` session validation; a last-used timestamp on `sessions`.
-- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (owner, 2026-10-22). Code: 30-day maximum compliant; idle timeout **not built**; `last_seen_at` is written on every request (`THREAT_MODEL_CODE.md` CT-028). Threats: T-010.
+- **Evidence:** FR-2.4, FR-2.12, V7, OD-008 (owner, 2026-10-22). Code: compliant since #67: authentication rejects seven-day idle sessions and the fixed 30-day expiry; a conditional update writes `last_seen_at` at most hourly, including concurrent requests. Touch failures are logged without failing the read. Threats: T-010.
 - **Verification:** A session unused for 7 days and 1 minute returns 401; a session used daily stays valid until day 30.
 
 **SC-019 - CSRF protection**
@@ -323,8 +323,8 @@ chapter level only; requirement IDs are not cited until each is verified against
 **SC-038 - Short-lived security records are deleted**
 - **Status:** ACTIVE
 - **Rule:** Login attempts, failed or successful, MUST be deleted once they are older than the longest login-limit window that uses them (SC-008, SC-043); a successful login MUST NOT be kept as an activity history. Expired sessions and expired or used MFA challenges MUST be deleted. Deletion runs during normal requests or at startup, not as a background job.
-- **Enforcement:** `auth` repository (`DeleteExpired` exists but is never called).
-- **Evidence:** FR-30.6, ARCHITECTURE "No background jobs". Code: **not compliant** — nothing is ever pruned, and every successful login is stored with its address (`THREAT_MODEL_CODE.md` CT-016, CT-029). Threats: T-022.
+- **Enforcement:** `auth.Repo.PruneSecurityRecords`, called at startup and before login.
+- **Evidence:** FR-30.6, ARCHITECTURE "No background jobs". Code: compliant since #74: startup and login delete attempts older than 15 minutes, expired sessions, and used or expired MFA and WebAuthn challenges in one transaction. Cleanup failures are logged and do not change the login result. Threats: T-022.
 - **Verification:** After the window, no login attempt, expired session, or old challenge row remains.
 
 **SC-039 - Protected main branch and CI gates**
@@ -408,7 +408,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** From a Rising-Gods profile the system MUST store only character name, class, specs, and gear score. The raw response MUST NOT be stored; existing raw copies on registration requests and characters MUST be removed by a migration.
 - **Enforcement:** `registration` and `characters` repositories; a database migration that drops or empties `raw_profile_json` and `external_profile_json`.
-- **Evidence:** FR-30.6, OD-017 (owner, 2026-10-23); `THREAT_MODEL_CODE.md` CT-030: the full response is stored and never read. Code: **not compliant**. Threats: T-047.
+- **Evidence:** FR-30.6, OD-017 (owner, 2026-10-23); `THREAT_MODEL_CODE.md` CT-030. Code: compliant since #78: repositories discard raw profiles and unused demographic fields; migration 083 clears existing copies. Profile identifiers and URLs remain for linking. Threats: T-047.
 - **Verification:** After registration and after the migration, no row holds a raw profile; the four fields are still shown.
 
 **SC-051 - Server-side reset code for a locked-out Admin**

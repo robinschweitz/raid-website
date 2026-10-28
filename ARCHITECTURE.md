@@ -319,3 +319,9 @@ None open. The owner resolved AQ-1 to AQ-8 on 2026-10-22; the answers are in the
 - **AQ-6** Anonymise in `accountmerge`; privacy contact from configuration.
 - **AQ-7** Visitor search counter in memory.
 - **AQ-8** `go mod tidy`, delete `internal/logger` (DR-11, DR-12).
+
+
+### Raid-News (#202)
+- `raid_news` stores publication status and text; `raid_news_acknowledgements` stores per-player confirmation.
+- v1 endpoints read published posts and require raid-assistant role for management; signed-in actors acknowledge published important posts.
+- Dashboard loads news independently of raid data.

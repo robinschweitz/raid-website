@@ -3726,26 +3726,63 @@ test('the account-security deep link opens the profile account tab (ADR 092)', a
   assert.equal(nodes(plain.tree, (n) => n.type === 'section' && n.props.id === 'profile-account')[0].props.hidden, true)
 })
 
-test('loot that went to nobody: listed for everyone, staff record more (ADR 089)', async () => {
+test('loot that went to nobody: listed for everyone, staff remove entries (ADR 089)', async () => {
   const s = setup()
-  const bosses = [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }]
-  const view = s.mount(s.load('components/UnclaimedLoot.tsx').UnclaimedLoot, { raidID: 1, canWrite: true, needsReason: false, bosses, version: 0 })
+  const { UnclaimedLootList } = s.load('components/UnclaimedLoot.tsx')
+  const view = s.mount(UnclaimedLootList, { raidID: 1, canWrite: true, needsReason: false, version: 0 })
   assert.equal(resolveIf(s, '/api/v1/raids/1/unclaimed-loot', [{ id: 1, boss: 'Saurfang', item_id: '50667', item_name: 'Gürtelbund des gerechten Zorns', outcome: 'DISENCHANTED', holder_name: 'Shanna', notes: '', source: 'addon' }]), true)
   await flush(view)
   assert.match(text(view.tree), /Gürtelbund des gerechten Zorns/)
   assert.match(text(view.tree), /Entzaubert/)
   assert.match(text(view.tree), /\(Addon\)/)
-  input(view, 'Name des Gegenstands').props.onChange(change('Bryntroll'))
-  view.render()
-  nodes(view.tree, (n) => n.type === 'form')[0].props.onSubmit({ preventDefault() {} })
-  assert.equal(writes(s)[0].url, '/api/v1/raids/1/unclaimed-loot')
-  assert.deepEqual(writes(s)[0].body, { catalog_boss_id: '', item_name: 'Bryntroll', outcome: 'NOBODY', holder_name: '', notes: '', reason: '' })
+  assert.equal(nodes(view.tree, (n) => n.type === 'form').length, 0)
+  button(view, 'Entfernen').props.onClick()
+  assert.equal(writes(s)[0].url, '/api/v1/unclaimed-loot/1/remove')
 
   const reader = setup({ id: 2, role: 'MEMBER' })
-  const empty = reader.mount(reader.load('components/UnclaimedLoot.tsx').UnclaimedLoot, { raidID: 1, canWrite: false, needsReason: false, bosses: [], version: 0 })
+  const empty = reader.mount(reader.load('components/UnclaimedLoot.tsx').UnclaimedLootList, { raidID: 1, canWrite: false, needsReason: false, version: 0 })
   assert.equal(resolveIf(reader, '/api/v1/raids/1/unclaimed-loot', []), true)
   await flush(empty)
   assert.doesNotMatch(text(empty.tree) || '', /Beute ohne Empfänger/)
+})
+
+test('the unclaimed-loot form records an item without loading the list and reports the add', async () => {
+  const s = setup()
+  let added = 0
+  const bosses = [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }]
+  const view = s.mount(s.load('components/UnclaimedLoot.tsx').UnclaimedLootForm, { raidID: 1, needsReason: true, bosses, onAdded: () => { added++ } })
+  assert.equal(s.requests.filter((r) => r.method === 'get').length, 0)
+  input(view, 'Name des Gegenstands').props.onChange(change('Bryntroll'))
+  view.render()
+  const submit = () => nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit')[0]
+  assert.equal(submit().props.disabled, true)
+  const reasonField = nodes(view.tree, (n) => n.type === 'label' && text(n).startsWith('Grund'))[0]
+  nodes(reasonField, (n) => n.type === 'input')[0].props.onChange(change('Nachgetragen'))
+  view.render()
+  assert.equal(submit().props.disabled, false)
+  nodes(view.tree, (n) => n.type === 'form')[0].props.onSubmit({ preventDefault() {} })
+  assert.equal(writes(s)[0].url, '/api/v1/raids/1/unclaimed-loot')
+  assert.deepEqual(writes(s)[0].body, { catalog_boss_id: '', item_name: 'Bryntroll', outcome: 'NOBODY', holder_name: '', notes: '', reason: 'Nachgetragen' })
+  writes(s)[0].resolve({ id: 7 })
+  await flush(view)
+  assert.equal(added, 1)
+})
+
+test('loot entry switches between a player award and loot that went to nobody', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+  await flush(view)
+  const kind = () => nodes(nodes(view.tree, (n) => n.type === 'label' && text(n).startsWith('Art der Erfassung'))[0], (n) => n.type === 'select')[0]
+  const unclaimedForm = () => nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'UnclaimedLootForm')[0]
+  assert.equal(kind().props.value, 'award')
+  assert.ok(select(view, 'Loot-Boss'))
+  assert.equal(unclaimedForm(), undefined)
+  kind().props.onChange(change('unclaimed'))
+  view.render()
+  assert.equal(select(view, 'Loot-Boss'), undefined)
+  assert.equal(unclaimedForm().props.raidID, 1)
+  assert.ok(nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'UnclaimedLootList')[0])
 })
 
 test('staff see the signup list with class emblems first and their own signup folded away', async () => {

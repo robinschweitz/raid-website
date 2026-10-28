@@ -1,8 +1,9 @@
-export const appVersion = '1.0.63'
+export const appVersion = '1.0.64'
 
 export const changelog = [
+  { version: appVersion, title: 'Raid-News auf der Übersicht', changes: ['Die Raidleitung kann Mitteilungen veröffentlichen. Wichtige Meldungen erscheinen beim Öffnen der Übersicht und lassen sich einmalig bestätigen. Alle veröffentlichten Raid-News bleiben auf der Startseite lesbar.'] },
   {
-    version: appVersion,
+    version: '1.0.63',
     title: 'Sitzungen enden nach sieben Tagen ohne Nutzung',
     changes: ['Nach sieben Tagen ohne Nutzung ist eine neue Anmeldung nötig. Aktive Sitzungen enden weiterhin spätestens nach 30 Tagen.'],
   },

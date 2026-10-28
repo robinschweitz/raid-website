@@ -15,7 +15,7 @@ import { SpecSelect } from '../components/SpecSelect'
 import { RaidQuickAdd } from '../components/RaidQuickAdd'
 import { AddonInviteExport } from '../components/AddonInviteExport'
 import { AddonLootImport } from '../components/AddonLootImport'
-import { UnclaimedLootForm, UnclaimedLootList } from '../components/UnclaimedLoot'
+import { UnclaimedLootList } from '../components/UnclaimedLoot'
 import { RaidKills } from '../components/RaidKills'
 import { AddonRosterImport } from '../components/AddonRosterImport'
 import { RaidRecruitment } from './Recruitment'
@@ -172,7 +172,8 @@ function RaidDetail({ raidID, initialView }: Props) {
   const [associationSize, setAssociationSize] = useState('')
   const [catalogBoss, setCatalogBoss] = useState('')
   const [unclaimedVersion, setUnclaimedVersion] = useState(0)
-  const [lootEntryKind, setLootEntryKind] = useState<'award' | 'unclaimed'>('award')
+  const [lootOutcome, setLootOutcome] = useState<'' | 'DISENCHANTED' | 'BANK' | 'NOBODY'>('')
+  const [lootHolder, setLootHolder] = useState('')
   const [catalogItem, setCatalogItem] = useState('')
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogDifficulty, setCatalogDifficulty] = useState('')
@@ -296,6 +297,8 @@ function RaidDetail({ raidID, initialView }: Props) {
     setLootPlayer('')
     setLootCharacter('')
     setLootRecipientSearch('')
+    setLootOutcome('')
+    setLootHolder('')
     setLootMethod('MAIN')
     setLootNotes('')
     setLootReason('')
@@ -318,9 +321,10 @@ function RaidDetail({ raidID, initialView }: Props) {
   const recipientCore = (a: Attendance) => `${a.character_name?.trim() || 'Name historisch nicht gespeichert'} · ${a.role} · ${playerName(a.player_id)}`
   const recipientLabel = (a: Attendance) => raidRecipients.filter((other) => recipientCore(other) === recipientCore(a)).length > 1 ? `${recipientCore(a)} · #${a.character_id}` : recipientCore(a)
   const selectedRecipient = raidRecipients.find((a) => String(a.character_id) === lootCharacter && String(a.player_id) === lootPlayer)
-  const recipientText = selectedRecipient ? recipientLabel(selectedRecipient) : lootRecipientSearch
+  const specialRecipients = { DISENCHANTED: 'Entzaubern', BANK: 'Gildenbank', NOBODY: 'Wollte niemand' } as const
+  const recipientText = !lootEditing && lootOutcome ? specialRecipients[lootOutcome] : selectedRecipient ? recipientLabel(selectedRecipient) : lootRecipientSearch
   const visibleRecipients = raidRecipients.filter((a) => a === selectedRecipient || recipientCore(a).toLowerCase().includes(lootRecipientSearch.trim().toLowerCase()))
-  const lootBlockedHint = lootEditing || pending ? '' : !lootItem.trim() || !hasCatalogIdentity ? 'Zuerst ein Item wählen.' : !hasLootRecipient ? 'Empfänger-Charakter wählen.' : ''
+  const lootBlockedHint = lootEditing || pending ? '' : !lootItem.trim() || !hasCatalogIdentity ? 'Zuerst ein Item wählen.' : !lootOutcome && !hasLootRecipient ? 'Empfänger oder Verbleib wählen.' : ''
   // The character ID is only shown when two characters would otherwise look identical.
   const characterCore = (character: Character) => `${character.name} · ${character.class} · ${playerName(character.player_id)}`
   const characterKey = (character: Character) => `${characterCore(character)}${character.active ? '' : ' (inaktiv)'}`
@@ -469,6 +473,8 @@ function RaidDetail({ raidID, initialView }: Props) {
     setLootPlayer(row ? String(row.awarded_to_player_id) : '')
     setLootCharacter(row?.awarded_to_character_id ? String(row.awarded_to_character_id) : '')
     setLootRecipientSearch('')
+    setLootOutcome('')
+    setLootHolder('')
     setLootMethod(row ? awardMethod(row) : 'MAIN')
     setLootNotes(row?.notes ?? '')
     setLootReason('')
@@ -572,7 +578,7 @@ function RaidDetail({ raidID, initialView }: Props) {
       setError('Bitte Boss und Item passend zur gespeicherten Raidinstanz wählen. Historische Identitäten können bei unverändertem Empfänger erhalten bleiben.')
       return
     }
-    if (!lootItem.trim() || !hasLootRecipient || !Object.keys(awardLabels).includes(lootMethod)) {
+    if (!lootItem.trim() || (!lootOutcome && (!hasLootRecipient || !Object.keys(awardLabels).includes(lootMethod)))) {
       setError('Bitte ein Item und einen Empfänger-Charakter aus diesem Raid wählen.')
       return
     }
@@ -581,6 +587,20 @@ function RaidDetail({ raidID, initialView }: Props) {
       setMessage('')
       setEpWarning(null)
       try {
+        if (!lootEditing && lootOutcome) {
+          await api.post(`/api/v1/raids/${raidID}/unclaimed-loot`, {
+            catalog_boss_id: catalogBoss, item_id: lootItemID, item_name: lootItem,
+            outcome: lootOutcome, holder_name: lootHolder, notes: lootNotes, reason: lootReason.trim(),
+          })
+          if (!isActive()) return
+          ++lootFormVersion.current
+          setUnclaimedVersion((value) => value + 1)
+          setCatalogItem(''); setCatalogSearch(''); setLootItem(''); setLootItemID('')
+          setLootOutcome(''); setLootHolder(''); setLootRecipientSearch('')
+          setLootNotes(''); setLootReason('')
+          setMessage('Loot-Verbleib gespeichert.')
+          return
+        }
         const body = {
           ...(!lootEditing || lootItemID !== lootEditing.item_id ? { item_id: lootItemID } : {}),
           ...(catalogBoss && (!lootEditing || catalogBoss !== (lootEditing.catalog_boss_id ?? '')) ? { catalog_boss_id: catalogBoss } : {}),
@@ -622,7 +642,8 @@ function RaidDetail({ raidID, initialView }: Props) {
         setLootEditing(null)
         setLootCharacter('')
         setLootRecipientSearch('')
-    setLootRecipientSearch('')
+        setLootOutcome('')
+        setLootHolder('')
         setLootMethod('MAIN')
         setLootNotes('')
         setLootReason('')
@@ -985,12 +1006,7 @@ function RaidDetail({ raidID, initialView }: Props) {
           <div>
             {catalogStatus && <p className="muted" role="status">{catalogStatus}</p>}
             <p className="muted">{associated ? 'Boss und Item müssen zur gespeicherten Raidinstanz und Raidgröße passen. Vorhandene historische Einträge bleiben erhalten.' : 'Vor neuer Loot-Erfassung bitte Raidinstanz und Raidgröße oben wählen und speichern. Historische Einträge können mit unveränderter Identität und unverändertem Empfänger korrigiert werden.'}</p>
-            {!lootEditing && <label>Art der Erfassung<select value={lootEntryKind} onChange={(e) => setLootEntryKind(e.target.value as 'award' | 'unclaimed')}>
-              <option value="award">An Spieler vergeben</option>
-              <option value="unclaimed">Entzaubert / Gildenbank / Niemand wollte es</option>
-            </select></label>}
-            {!lootEditing && lootEntryKind === 'unclaimed' ? <UnclaimedLootForm raidID={raidID} needsReason={lootNeedsReason} bosses={catalogBosses} onAdded={() => setUnclaimedVersion((value) => value + 1)} /> : <>
-            {attendance.length === 0 && <p className="muted">Keine Empfänger verfügbar: zuerst Charaktere in den Raidroster aufnehmen.</p>}
+            {attendance.length === 0 && lootEditing && <p className="muted">Keine Empfänger verfügbar: zuerst Charaktere in den Raidroster aufnehmen.</p>}
             <form className="inline-form" onSubmit={addLoot}>
               {associated ? <>
                 {lootEditing && <p>Gespeicherter Eintrag: {lootBoss || 'Kein Boss gewählt'} · {lootItem || 'Kein Drop gewählt'}{lootItemID ? ` (Item-ID ${lootItemID})` : ''}</p>}
@@ -1027,32 +1043,35 @@ function RaidDetail({ raidID, initialView }: Props) {
               </> : <>
               {lootEditing && <p>Gespeicherte Identität: {lootBoss || 'Boss historisch nicht gespeichert'} · {lootItem} · Item-ID {lootItemID || 'historisch nicht gespeichert'}</p>}
               </>}
-              <label className="picker-field">Empfänger-Charakter aus dem Raidroster<span className="picker-row"><input ref={lootRecipientInput} type="search" list="loot-recipient-options" aria-label="Loot-Empfänger" autoComplete="off" autoFocus={lootEditing != null} disabled={pending || (attendance.length === 0 && !lootEditing)} value={recipientText} placeholder={lootEditing && !lootEditing.awarded_to_character_id ? 'Historischen Empfänger unverändert lassen' : 'Name tippen oder wählen'} onChange={(e) => changeLoot(() => {
+              <label className="picker-field">Empfänger oder Verbleib<span className="picker-row"><input ref={lootRecipientInput} type="search" list="loot-recipient-options" aria-label="Loot-Empfänger" autoComplete="off" autoFocus={lootEditing != null} disabled={pending} value={recipientText} placeholder={lootEditing && !lootEditing.awarded_to_character_id ? 'Historischen Empfänger unverändert lassen' : 'Name tippen oder wählen'} onChange={(e) => changeLoot(() => {
                 const typed = e.target.value
                 const typedID = typed.trim()
+                const outcome = !lootEditing ? (Object.entries(specialRecipients).find(([, label]) => label === typed)?.[0] ?? '') : ''
+                setLootOutcome(outcome as typeof lootOutcome)
                 const selected = raidRecipients.find((a) => recipientLabel(a) === typed)
                   ?? (/^\d+$/.test(typedID) ? raidRecipients.find((a) => String(a.character_id) === typedID) : undefined)
                 setLootCharacter(selected ? String(selected.character_id) : '')
                 setLootPlayer(selected ? String(selected.player_id) : '')
-                setLootRecipientSearch(selected ? '' : typed)
+                setLootRecipientSearch(selected || outcome ? '' : typed)
               })} required={!lootEditing} />{selectedRecipient && <button type="button" aria-label="Ausgewählten Empfänger entfernen" disabled={pending} onClick={() => changeLoot(() => { setLootCharacter(''); setLootPlayer(''); setLootRecipientSearch('') })}>Entfernen</button>}</span></label>
               <datalist id="loot-recipient-options">
+                {!lootEditing && Object.entries(specialRecipients).map(([key, label]) => <option key={key} value={label} />)}
                 {visibleRecipients.map((a) => <option key={a.id} value={recipientLabel(a)} />)}
               </datalist>
-              <label>Vergabemethode<select aria-label="Loot-Vergabemethode" disabled={pending} value={lootMethod} onChange={(e) => changeLoot(() => setLootMethod(e.target.value as AwardMethod))}>
+              {(!lootOutcome || !!lootEditing) && <label>Vergabemethode<select aria-label="Loot-Vergabemethode" disabled={pending} value={lootMethod} onChange={(e) => changeLoot(() => setLootMethod(e.target.value as AwardMethod))}>
                 {Object.entries(awardLabels).map(([method, label]) => <option key={method} value={method}>{label}</option>)}
-              </select></label>
-              {lootMethod === 'ENHANCED' && <p className="muted">Betrag wird aus dem aktuellen EP-Stand ermittelt, maximal 50 EP; nur der Gewinner zahlt. Ein positiver EP-Stand ist erforderlich. Der Server prüft und bucht atomar beim Speichern.</p>}
+              </select></label>}
+              {!lootEditing && lootOutcome && <><p className="muted">Zählt für keinen Spieler und kostet keine EP.</p><label>Bei (optional)<input disabled={pending} value={lootHolder} placeholder="Wer hat das Item?" onChange={(e) => changeLoot(() => setLootHolder(e.target.value))} /></label></>}
+              {(!lootOutcome || !!lootEditing) && lootMethod === 'ENHANCED' && <p className="muted">Betrag wird aus dem aktuellen EP-Stand ermittelt, maximal 50 EP; nur der Gewinner zahlt. Ein positiver EP-Stand ist erforderlich. Der Server prüft und bucht atomar beim Speichern.</p>}
               {lootEditing && <p className="muted">Unveränderter Enhanced-Gewinner behält seine historischen Kosten. Ein Methoden- oder Empfängerwechsel wird vom Server samt EP, abgeleiteter Token-Sicht und Audit atomar ausgeglichen.</p>}
               <label>Notizen<input disabled={pending} placeholder="Loot-Notizen" value={lootNotes} onChange={(e) => changeLoot(() => setLootNotes(e.target.value))} /></label>
               {lootNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Loot-Begründung" value={lootReason} onChange={(e) => changeLoot(() => setLootReason(e.target.value))} required /></label>}
               {lootEditing && error && <ErrorMessage>{error}</ErrorMessage>}
                 {lootBlockedHint && <p className="field-hint loot-submit-hint">{lootBlockedHint}</p>}
-                <button className="primary-action" type="submit" disabled={pending || !lootItem.trim() || !hasLootRecipient || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : 'Vergeben'}</button>
+                <button className="primary-action" type="submit" disabled={pending || !lootItem.trim() || (!lootOutcome && !hasLootRecipient) || !hasCatalogIdentity || (lootNeedsReason && !lootReason.trim())}>{lootEditing ? 'Loot-Korrektur speichern' : lootOutcome ? 'Eintragen' : 'Vergeben'}</button>
 				{lootEditing && <button type="button" disabled={pending || (lootNeedsReason && !lootReason.trim())} onClick={() => void withdrawLoot(false)}>Loot zurückziehen</button>}
                {lootEditing && <button type="button" disabled={pending} onClick={() => editLoot(null)}>Bearbeitung abbrechen</button>}
             </form>
-            </>}
           </div>
         )}
         </RaidLootList>

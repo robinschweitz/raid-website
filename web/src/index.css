@@ -2010,10 +2010,8 @@ input[type='checkbox'] {
 .raid-news-management { margin-top: 1rem; }
 .raid-news-management > summary { cursor: pointer; color: var(--accent); font-weight: 600; }
 .raid-news-form {
-  display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 1rem;
-  max-width: 900px;
   margin-top: 1rem;
   padding: 1rem;
   border: 1px solid var(--border);

@@ -248,6 +248,11 @@ func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterI
 		}
 		before := mustJSON(c)
 		now := time.Now().UTC()
+		oldName := c.Name
+		if c.Name != profile.Name {
+			c.Name = profile.Name
+			c.NameChangedAt = &now
+		}
 		c.MainSpec = profile.MainSpec
 		c.SecondSpec = profile.SecondSpec
 		c.GearScore = profile.GearScore
@@ -256,6 +261,11 @@ func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterI
 		c.UpdatedAt = now
 		if err := chars.Update(ctx, c); err != nil {
 			return fmt.Errorf("update reloaded character: %w", err)
+		}
+		if c.Name != oldName {
+			if err := chars.InsertNameHistory(ctx, &character.NameHistory{CharacterID: c.ID, OldName: oldName, NewName: c.Name, ActorID: actorID, Reason: "Rising-Gods-Profil neu geladen", CreatedAt: now}); err != nil {
+				return fmt.Errorf("record Rising-Gods rename: %w", err)
+			}
 		}
 		if err := audit.NewRepo(tx).Insert(ctx, &audit.Log{ActorID: &actorID, EntityType: "character", EntityID: fmt.Sprint(c.ID), Action: "reload_rising_gods_profile", BeforeJSON: before, AfterJSON: mustJSON(c), Reason: "Rising-Gods-Profil neu geladen", CreatedAt: now}); err != nil {
 			return fmt.Errorf("audit profile reload: %w", err)

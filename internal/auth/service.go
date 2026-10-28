@@ -336,6 +336,9 @@ func (s *Service) LoginWithClient(ctx context.Context, username, password, clien
 func (s *Service) StartLogin(ctx context.Context, username, password, clientIP string) (*LoginStart, error) {
 	uname := strings.ToLower(strings.TrimSpace(username))
 	now := time.Now().UTC()
+	if err := s.sessions.PruneSecurityRecords(ctx, now); err != nil {
+		log.Printf("authentication cleanup: %v", err)
+	}
 	attempt, err := s.reserveLoginAttempt(ctx, uname, clientIP, now)
 	if err != nil {
 		return nil, err

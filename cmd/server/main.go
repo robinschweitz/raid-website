@@ -55,6 +55,9 @@ func run() (err error) {
 	if _, err := m.Migrate(ctx); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
+	if err := auth.NewRepo(bdb.DB).PruneSecurityRecords(ctx, time.Now().UTC()); err != nil {
+		log.Printf("authentication cleanup: %v", err)
+	}
 	if err := detectNamingPatterns(ctx, bdb.DB); err != nil {
 		return fmt.Errorf("naming pattern detection: %w", err)
 	}

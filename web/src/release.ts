@@ -1,7 +1,8 @@
-export const appVersion = '1.0.64'
+export const appVersion = '1.0.65'
 
 export const changelog = [
-  { version: appVersion, title: 'Raid-News auf der Übersicht', changes: ['Die Raidleitung kann Mitteilungen veröffentlichen. Wichtige Meldungen erscheinen beim Öffnen der Übersicht und lassen sich einmalig bestätigen. Alle veröffentlichten Raid-News bleiben auf der Startseite lesbar.'] },
+  { version: appVersion, title: 'Raid-News einfacher bearbeiten', changes: ['Der Editor für Raid-News hat jetzt geordnete Eingabefelder, gut erkennbare Optionen und eine eigene Speichern-Zeile. Auf dem Handy steht alles untereinander.'] },
+  { version: '1.0.64', title: 'Raid-News auf der Übersicht', changes: ['Die Raidleitung kann Mitteilungen veröffentlichen. Wichtige Meldungen erscheinen beim Öffnen der Übersicht und lassen sich einmalig bestätigen. Alle veröffentlichten Raid-News bleiben auf der Startseite lesbar.'] },
   {
     version: '1.0.63',
     title: 'Sitzungen enden nach sieben Tagen ohne Nutzung',

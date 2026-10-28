@@ -2005,3 +2005,54 @@ input[type='checkbox'] {
 .badge.unclaimed-disenchanted { color: #d6b4ff; border-color: #8c5bd1; }
 .badge.unclaimed-bank { color: #f2dc8c; border-color: #b39a3d; }
 .badge.unclaimed-nobody { color: #a9b6c2; border-color: #5d6b78; }
+
+/* Raid-News editor: keep the message fields together, with clear checkbox labels. */
+.raid-news-management { margin-top: 1rem; }
+.raid-news-management > summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.raid-news-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 1rem;
+  max-width: 900px;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--frost);
+}
+.raid-news-form > label:not(.raid-news-check) {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: .4rem;
+  min-width: 0;
+}
+.raid-news-form input:not([type="checkbox"]),
+.raid-news-form textarea { width: 100%; min-width: 0; }
+.raid-news-form textarea { resize: vertical; min-height: 120px; }
+.raid-news-form .raid-news-check {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: .55rem;
+  align-self: center;
+  cursor: pointer;
+}
+.raid-news-form .raid-news-check input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.raid-news-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: .65rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+@media (max-width: 680px) {
+  .raid-news-form { grid-template-columns: minmax(0, 1fr); padding: .8rem; }
+  .raid-news-actions { grid-column: 1; justify-content: stretch; }
+  .raid-news-actions button { width: 100%; }
+}

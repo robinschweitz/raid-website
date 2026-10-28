@@ -149,15 +149,15 @@ func (a *API) transferCharacter(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, character.ErrNotFound), errors.Is(err, character.ErrPlayerNotFound):
-			WriteError(w, http.StatusNotFound, "not_found", err.Error())
+			WriteError(w, http.StatusNotFound, "not_found", stableErrorMessage("not_found"))
 		case errors.Is(err, character.ErrInvalidActor):
 			WriteError(w, http.StatusUnauthorized, "invalid_actor", "actor does not exist")
 		case errors.Is(err, character.ErrForbidden):
 			WriteError(w, http.StatusForbidden, "forbidden", "character transfer requires admin")
 		case errors.Is(err, character.ErrSameOwner):
-			WriteError(w, http.StatusConflict, "already_owned", err.Error())
+			WriteError(w, http.StatusConflict, "already_owned", stableErrorMessage("already_owned"))
 		case errors.Is(err, character.ErrAttendanceConflict):
-			WriteError(w, http.StatusConflict, "transfer_conflict", err.Error())
+			WriteError(w, http.StatusConflict, "transfer_conflict", stableErrorMessage("transfer_conflict"))
 		default:
 			WriteError(w, http.StatusInternalServerError, "internal", "could not transfer character")
 		}

@@ -179,13 +179,13 @@ func (a *API) mergePlayer(w http.ResponseWriter, r *http.Request) {
 	if err := a.AccountMerge.Merge(r.Context(), targetID, req.SourcePlayerID, actor.ID, req.Reason); err != nil {
 		switch {
 		case errors.Is(err, accountmerge.ErrSamePlayer), errors.Is(err, accountmerge.ErrSourceRequired):
-			WriteError(w, http.StatusUnprocessableEntity, "invalid_merge", err.Error())
+			WriteError(w, http.StatusUnprocessableEntity, "invalid_merge", stableErrorMessage("invalid_merge"))
 		case errors.Is(err, accountmerge.ErrSourceInactive):
-			WriteError(w, http.StatusConflict, "source_inactive", err.Error())
+			WriteError(w, http.StatusConflict, "source_inactive", stableErrorMessage("source_inactive"))
 		case errors.Is(err, player.ErrLastAdmin):
 			WriteError(w, http.StatusConflict, "last_admin", lastAdminMessage)
 		case errors.Is(err, accountmerge.ErrLockConflict):
-			WriteError(w, http.StatusConflict, "lock_conflict", err.Error())
+			WriteError(w, http.StatusConflict, "lock_conflict", stableErrorMessage("lock_conflict"))
 		case isNotFound(err):
 			WriteError(w, http.StatusNotFound, "not_found", "player not found")
 		default:
@@ -230,4 +230,28 @@ func (a *API) anonymisePlayer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) exportPlayer(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r, "id")
+	if !ok {
+		WriteError(w, http.StatusNotFound, "not_found", "Spieler nicht gefunden.")
+		return
+	}
+	actor, _ := ActorID(r)
+	result, err := a.AccountMerge.Export(r.Context(), actor, id)
+	if err != nil {
+		switch {
+		case isNotFound(err):
+			WriteError(w, http.StatusNotFound, "not_found", "Spieler nicht gefunden.")
+		case errors.Is(err, accountmerge.ErrExportForbidden):
+			WriteError(w, http.StatusForbidden, "forbidden", "Nur Admins dürfen persönliche Daten exportieren.")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "Der Datenexport ist fehlgeschlagen.")
+		}
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Disposition", "attachment; filename=player-export.json")
+	WriteJSON(w, http.StatusOK, map[string]any{"data": result})
 }

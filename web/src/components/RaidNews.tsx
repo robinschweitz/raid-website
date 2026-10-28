@@ -67,9 +67,10 @@ export function RaidNews({ player }: { player: Player | null }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
           <label className="raid-news-check"><input type="checkbox" checked={draft.important} onChange={(e) => setDraft((old) => ({ ...old, important: e.target.checked }))} /> Wichtig (Popup)</label>
           <label className="raid-news-check"><input type="checkbox" checked={draft.published} onChange={(e) => setDraft((old) => ({ ...old, published: e.target.checked }))} /> Veröffentlicht</label>
-        </div>
-        <div className="raid-news-actions"><button disabled={busy} type="submit">{editing === null ? 'Veröffentlichen / speichern' : 'Änderungen speichern'}</button>
-        {editing !== null && <button type="button" onClick={() => { setEditing(null); setDraft(emptyDraft) }}>Abbrechen</button>}
+          <div className="raid-news-actions" style={{ marginLeft: 'auto' }}>
+            <button disabled={busy} type="submit">{editing === null ? 'Veröffentlichen / speichern' : 'Änderungen speichern'}</button>
+            {editing !== null && <button type="button" onClick={() => { setEditing(null); setDraft(emptyDraft) }}>Abbrechen</button>}
+          </div>
         </div>
       </form>
       {manage.map((item) => <div key={item.id} className="actions">

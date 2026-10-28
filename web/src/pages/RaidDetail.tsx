@@ -15,7 +15,7 @@ import { SpecSelect } from '../components/SpecSelect'
 import { RaidQuickAdd } from '../components/RaidQuickAdd'
 import { AddonInviteExport } from '../components/AddonInviteExport'
 import { AddonLootImport } from '../components/AddonLootImport'
-import { UnclaimedLoot } from '../components/UnclaimedLoot'
+import { UnclaimedLootForm, UnclaimedLootList } from '../components/UnclaimedLoot'
 import { RaidKills } from '../components/RaidKills'
 import { AddonRosterImport } from '../components/AddonRosterImport'
 import { RaidRecruitment } from './Recruitment'
@@ -172,6 +172,7 @@ function RaidDetail({ raidID, initialView }: Props) {
   const [associationSize, setAssociationSize] = useState('')
   const [catalogBoss, setCatalogBoss] = useState('')
   const [unclaimedVersion, setUnclaimedVersion] = useState(0)
+  const [lootEntryKind, setLootEntryKind] = useState<'award' | 'unclaimed'>('award')
   const [catalogItem, setCatalogItem] = useState('')
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogDifficulty, setCatalogDifficulty] = useState('')
@@ -984,6 +985,11 @@ function RaidDetail({ raidID, initialView }: Props) {
           <div>
             {catalogStatus && <p className="muted" role="status">{catalogStatus}</p>}
             <p className="muted">{associated ? 'Boss und Item müssen zur gespeicherten Raidinstanz und Raidgröße passen. Vorhandene historische Einträge bleiben erhalten.' : 'Vor neuer Loot-Erfassung bitte Raidinstanz und Raidgröße oben wählen und speichern. Historische Einträge können mit unveränderter Identität und unverändertem Empfänger korrigiert werden.'}</p>
+            {!lootEditing && <label>Art der Erfassung<select value={lootEntryKind} onChange={(e) => setLootEntryKind(e.target.value as 'award' | 'unclaimed')}>
+              <option value="award">An Spieler vergeben</option>
+              <option value="unclaimed">Entzaubert / Gildenbank / Niemand wollte es</option>
+            </select></label>}
+            {!lootEditing && lootEntryKind === 'unclaimed' ? <UnclaimedLootForm raidID={raidID} needsReason={lootNeedsReason} bosses={catalogBosses} onAdded={() => setUnclaimedVersion((value) => value + 1)} /> : <>
             {attendance.length === 0 && <p className="muted">Keine Empfänger verfügbar: zuerst Charaktere in den Raidroster aufnehmen.</p>}
             <form className="inline-form" onSubmit={addLoot}>
               {associated ? <>
@@ -1046,11 +1052,12 @@ function RaidDetail({ raidID, initialView }: Props) {
 				{lootEditing && <button type="button" disabled={pending || (lootNeedsReason && !lootReason.trim())} onClick={() => void withdrawLoot(false)}>Loot zurückziehen</button>}
                {lootEditing && <button type="button" disabled={pending} onClick={() => editLoot(null)}>Bearbeitung abbrechen</button>}
             </form>
+            </>}
           </div>
         )}
         </RaidLootList>
         <RaidKills raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} bosses={catalogBosses} catalog={catalog} raidSize={raid.raid_size ?? null} />
-        <UnclaimedLoot raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} bosses={catalogBosses} version={unclaimedVersion} />
+        <UnclaimedLootList raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} version={unclaimedVersion} />
         {canManage && isActiveRaid && associated && <AddonLootImport raidID={raidID} onImported={async () => { await load(); setUnclaimedVersion((value) => value + 1) }} />}
       </section>
     </div>

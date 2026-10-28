@@ -88,6 +88,7 @@ func (r *Repo) TouchSession(ctx context.Context, id int64, at time.Time) error {
 		Model((*Session)(nil)).
 		Set("last_seen_at = ?", at).
 		Where("id = ?", id).
+		Where("last_seen_at <= ?", at.Add(-sessionTouchInterval)).
 		Exec(ctx)
 	return err
 }

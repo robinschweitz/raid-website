@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext, type Page, type TestInfo } from '
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { admin, apiAs } from './fixtures'
+import { admin, apiAs, signIn } from './fixtures'
 
 // Screenshots for the user guide (Anleitung page). Runs only with DOCS_TOUR=1:
 //   DOCS_TOUR=1 npx playwright test e2e/zz-docs-tour.spec.ts
@@ -59,14 +59,7 @@ async function toWebP(page: Page, png: Buffer): Promise<Buffer> {
   return Buffer.from(dataURL.split(',')[1], 'base64')
 }
 
-async function signIn(page: Page, name: string, password: string) {
-  await page.goto('/#/login')
-  await page.getByLabel('Benutzername').fill(name)
-  await page.getByLabel('Passwort').fill(password)
-  await page.locator('form').getByRole('button', { name: 'Anmelden' }).click()
-  await expect(page.getByRole('button', { name: 'Abmelden' })).toBeVisible()
-}
-const signInAs = (page: Page, name: Person) => signIn(page, name.toLowerCase(), pw(name))
+const signInAs = (page: Page, name: Person) => signIn(page, { username: name.toLowerCase(), password: pw(name) })
 
 const thursday = (weeksFromNow: number) => {
   const d = new Date()
@@ -298,7 +291,7 @@ test('Raidleitung', async ({ page }, testInfo) => {
 })
 
 test('Admin', async ({ page }, testInfo) => {
-  await signIn(page, admin.username, admin.password)
+  await signIn(page, admin)
   await page.goto('/#/raid-series')
   await page.waitForTimeout(600)
   await shot(page, testInfo, '50-raidserien')

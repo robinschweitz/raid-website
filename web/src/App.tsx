@@ -22,6 +22,7 @@ import { RegistrationRequestsPage } from './pages/RegistrationRequests'
 import { ChangelogPage } from './pages/Changelog'
 import { AuditLogPage } from './pages/AuditLog'
 import { WishlistPage } from './pages/Wishlist'
+import { PrivacyPage } from './pages/Privacy'
 import { GuidePage } from './pages/Guide'
 import { ShadowmournePage } from './pages/Shadowmourne'
 import { AddonsPage } from './pages/Addons'
@@ -72,6 +73,7 @@ function Routes() {
   if (parts[0] === 'registration-requests') return <RegistrationRequestsPage />
   if (parts[0] === 'audit-log') return <AuditLogPage />
   if (parts[0] === 'changelog') return <ChangelogPage />
+  if (parts[0] === 'datenschutz') return <PrivacyPage />
   if (parts[0] === 'anleitung') return <GuidePage />
   if (parts[0] === 'schattengram') return <ShadowmournePage />
   if (parts[0] === 'addons') return <AddonsPage addonID={parts[1]} />
@@ -123,7 +125,7 @@ function Layout() {
           </>}
         </nav>
         <div className="sidebar-footer">
-          <Link to="/changelog">Version {appVersion}</Link>
+          <Link to="/datenschutz">Datenschutz</Link><br /><Link to="/changelog">Version {appVersion}</Link>
           <span>Änderungen ansehen</span>
         </div>
       </aside>
@@ -178,7 +180,7 @@ function Gate() {
   }
   // The guide, the addons pages and the account-security page must be readable before an
   // account exists (ADR 083, ADR 085, ADR 092); so must the statistics (FR-1.4).
-  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/') && path !== '/statistics' && path !== '/passwort-zuruecksetzen') {
+  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/') && path !== '/statistics' && path !== '/passwort-zuruecksetzen' && path !== '/datenschutz') {
     return <LoginPage />
   }
   return <Layout />

@@ -41,6 +41,9 @@ func registrationError(w http.ResponseWriter, err error) {
 	case errors.Is(err, auth.ErrLoginRateLimited):
 		w.Header().Set("Retry-After", "900")
 		WriteError(w, http.StatusTooManyRequests, "login_rate_limited", "Zu viele fehlgeschlagene Versuche. Bitte später erneut versuchen.")
+	case errors.Is(err, registration.ErrSearchLimit):
+		w.Header().Set("Retry-After", "600")
+		WriteError(w, http.StatusTooManyRequests, "search_limit", "Zu viele Anfragen. Bitte in zehn Minuten erneut versuchen.")
 	case errors.Is(err, registration.ErrInvalidCode):
 		WriteError(w, http.StatusBadRequest, "registration_code_invalid", "Code ungültig oder abgelaufen.")
 	case errors.Is(err, registration.ErrUsernameTaken):
@@ -76,7 +79,8 @@ func (a *API) searchRisingGodsCharacters(w http.ResponseWriter, r *http.Request)
 		BadRequest(w, "query must contain at least 3 characters")
 		return
 	}
-	rows, err := a.Registration.SearchCharacters(r.Context(), query)
+	_, authenticated := CurrentPlayer(r)
+	rows, err := a.Registration.SearchForVisitor(r.Context(), query, clientAddress(r, a.TrustProxyHeaders), authenticated)
 	if err != nil {
 		registrationError(w, err)
 		return
@@ -90,7 +94,8 @@ func (a *API) createRegistrationRequest(w http.ResponseWriter, r *http.Request) 
 		BadRequest(w, "malformed json body")
 		return
 	}
-	created, err := a.Registration.CreateRequest(r.Context(), nil, req.ProfileID)
+	_, authenticated := CurrentPlayer(r)
+	created, err := a.Registration.CreateVisitorRequest(r.Context(), req.ProfileID, clientAddress(r, a.TrustProxyHeaders), authenticated)
 	if err != nil {
 		registrationError(w, err)
 		return

@@ -4251,3 +4251,36 @@ test('reset password page submits once and clears the secret after success (REQ-
   assert.match(text(view.tree), /Dein Passwort wurde geändert/)
   assert.equal(nodes(view.tree, (n) => n.type === 'input').length, 0)
 })
+
+test('only Admins can start the personal-data download (REQ-PRIVACY-012)', async () => {
+  const s = setup()
+  const downloads = []
+  s.api.downloadJSON = async (...args) => downloads.push(args)
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(s, 2)
+  await flush(view)
+  button(view, 'Daten als JSON herunterladen').props.onClick()
+  await flush(view)
+  assert.deepEqual(downloads, [['/api/v1/players/2/export', 'spieler-2.json']])
+  const member = setup({ id: 2, role: 'MEMBER' })
+  const own = member.mount(member.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(member, 2)
+  await flush(own)
+  assert.equal(button(own, 'Daten als JSON herunterladen'), undefined)
+})
+
+test('visitor search limit is shown in German on registration (REQ-ACCOUNT-014)', async () => {
+  const s = setup(null)
+  const { ApiError } = s.load('api.ts')
+  const view = s.mount(s.load('pages/Login.tsx').LoginPage)
+  button(view, 'Code anfordern').props.onClick()
+  view.render()
+  input(view, 'Mindestens 3 Zeichen').props.onChange(change('Mage'))
+  view.render()
+  const pending = button(view, 'Suchen').props.onClick()
+  const request = s.requests.find((r) => r.url.includes('/external/rising-gods/characters'))
+  request.reject(new ApiError(429, 'search_limit', 'Zu viele Anfragen. Bitte in zehn Minuten erneut versuchen.'))
+  await pending
+  await flush(view)
+  assert.match(text(view.tree), /Zu viele Anfragen.*zehn Minuten/)
+})

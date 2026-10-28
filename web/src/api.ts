@@ -70,6 +70,18 @@ async function request<T>(method: string, path: string, body?: unknown, envelope
 }
 
 export const api = {
+  downloadJSON: async (path: string, filename: string) => {
+    const data = await request<unknown>('GET', path)
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } finally { URL.revokeObjectURL(url) }
+  },
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, false, options),
   postEnvelope: <T>(path: string, body?: unknown) => request<T>('POST', path, body, true),

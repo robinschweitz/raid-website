@@ -9,6 +9,7 @@ import { AttendanceRing } from '../components/AttendanceRing'
 import { BossProgression } from '../components/BossProgression'
 import { RaidCompositionCard } from '../components/RaidCompositionCard'
 import { GuildNotifications } from '../components/GuildNotifications'
+import { RaidNews } from '../components/RaidNews'
 import { PlayerProfilePanel } from '../components/PlayerProfilePanel'
 import { MyRaidsPanel } from '../components/MyRaidsPanel'
 import { atLeast } from '../types'
@@ -106,6 +107,7 @@ export function DashboardPage() {
       <Link to="/raids">Alle Raids ansehen &rarr;</Link>
     </div>
     {error && <ErrorMessage>{error}</ErrorMessage>}
+    <RaidNews player={player} />
 
     {player && atLeast(player.role, 'MEMBER') && !loading && <MyRaidsPanel playerID={player.id} raids={raids} characters={characters} />}
 

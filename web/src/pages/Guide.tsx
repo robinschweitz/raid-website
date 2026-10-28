@@ -354,6 +354,7 @@ export function GuidePage() {
       </div>
       <Shot name="37-loot" caption="Loot erfassen" />
       <p><strong>Schneller mit dem Addon:</strong> In RaidLedger auf <strong>EXPORT</strong> klicken, den Text unter <em>Loot aus Addon importieren</em> einfügen, <strong>Vorschau</strong>, jede Zeile prüfen und übernehmen. Download und alle Funktionen stehen unter <Link to="/addons/raidledger">Addons → RaidLedger</Link>.</p>
+      <Shot name="37b-addon-loot" caption="Addon-Loot: Schwierigkeit einmal pro Boss wählen und gemeinsam übernehmen" />
       <h3>Bosskills</h3>
       <p>Im Reiter <strong>Loot</strong> steht über der Beute ohne Empfänger der Kasten <strong>Bosskills</strong> mit jedem getöteten Boss und seiner Schwierigkeit. Alle Angemeldeten sehen ihn. Wurde nichts erfasst, steht dort, dass keine Kills erfasst sind. Die Raidleitung öffnet <strong>Kill eintragen</strong>, wählt Boss und Schwierigkeit, ändert die Schwierigkeit in der Liste oder entfernt einen Kill; solange es für den Boss noch Beute gibt, geht das nicht. Im archivierten Raid ist ein Grund nötig. Auf der Übersicht sind die getöteten Bosse des nächsten Raids hervorgehoben.</p>
       <h3>Beute ohne Empfänger</h3>

@@ -231,3 +231,27 @@ func (a *API) anonymisePlayer(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (a *API) exportPlayer(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r, "id")
+	if !ok {
+		WriteError(w, http.StatusNotFound, "not_found", "Spieler nicht gefunden.")
+		return
+	}
+	actor, _ := ActorID(r)
+	result, err := a.AccountMerge.Export(r.Context(), actor, id)
+	if err != nil {
+		switch {
+		case isNotFound(err):
+			WriteError(w, http.StatusNotFound, "not_found", "Spieler nicht gefunden.")
+		case errors.Is(err, accountmerge.ErrExportForbidden):
+			WriteError(w, http.StatusForbidden, "forbidden", "Nur Admins dürfen persönliche Daten exportieren.")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "Der Datenexport ist fehlgeschlagen.")
+		}
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Disposition", "attachment; filename=player-export.json")
+	WriteJSON(w, http.StatusOK, map[string]any{"data": result})
+}

@@ -1,9 +1,9 @@
 import { expect, type APIRequestContext, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { DatabaseSync } from 'node:sqlite'
-import { createHmac } from 'node:crypto'
+import { createHmac, createCipheriv, createHash, randomBytes } from 'node:crypto'
+import { e2eTOTPKey } from './totp-key'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
 
 export const admin = { username: 'e2e-admin', password: 'e2e-admin-password' }
 export const assistant = { username: 'e2e-raidassistent', password: 'raidassistent-password' }
@@ -41,9 +41,18 @@ export function totpCode(secret = adminTOTPSecret): string {
 function ensureAdminTOTP() {
   const db = new DatabaseSync(databasePath)
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '+00:00')
+  const player = db.prepare('SELECT id FROM players WHERE username = ?').get(admin.username) as { id: number } | undefined
+  if (!player) throw new Error('e2e Admin is missing')
+  const key = Buffer.from(e2eTOTPKey, 'base64')
+  const nonce = randomBytes(12)
+  const cipher = createCipheriv('aes-256-gcm', key, nonce)
+  cipher.setAAD(Buffer.from(String(player.id)))
+  const encrypted = Buffer.concat([cipher.update(adminTOTPSecret, 'utf8'), cipher.final()])
+  const keyID = createHash('sha256').update(key).digest('hex').slice(0, 8)
+  const stored = `v1:${keyID}:${Buffer.concat([nonce, encrypted, cipher.getAuthTag()]).toString('base64')}`
   db.prepare(`INSERT INTO player_mfa_settings (player_id, totp_secret, totp_enabled_at, created_at, updated_at)
-    SELECT id, ?, ?, ?, ? FROM players WHERE username = ?
-    ON CONFLICT(player_id) DO UPDATE SET totp_secret = excluded.totp_secret, totp_enabled_at = excluded.totp_enabled_at, totp_last_step = NULL`).run(adminTOTPSecret, now, now, now, admin.username)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(player_id) DO UPDATE SET totp_secret = excluded.totp_secret, totp_enabled_at = excluded.totp_enabled_at, totp_last_step = NULL`).run(player.id, stored, now, now, now)
   db.close()
 }
 
@@ -88,8 +97,7 @@ export async function seedGuild(request: APIRequestContext) {
   const people: Record<string, number> = {}
   for (const [user, role, name] of [[assistant, 'RAIDASSISTENT', 'Raidassistent'], [member, 'MEMBER', 'Mitglied']] as const) {
     const created = await api.post('/api/v1/players', { name })
-    await api.put(`/api/v1/players/${created.id}/account`, { username: user.username, role })
-    seedAccountPassword(created.id, user.password)
+    await provisionAccount(request, api, created.id, user.username, user.password, role)
     people[role] = created.id
   }
   const db = new DatabaseSync(databasePath)
@@ -105,8 +113,7 @@ export interface MemberSetup { username: string; password: string; name: string;
 export async function createMember(request: APIRequestContext, setup: MemberSetup) {
   const api = await apiAs(request, admin)
   const created = await api.post('/api/v1/players', { name: setup.name })
-  await api.put(`/api/v1/players/${created.id}/account`, { username: setup.username, role: 'MEMBER' })
-  seedAccountPassword(created.id, setup.password)
+  await provisionAccount(request, api, created.id, setup.username, setup.password, 'MEMBER')
   const db = new DatabaseSync(databasePath)
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '+00:00')
   const character = db.prepare('INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)').run(created.id, setup.character, setup.characterClass, setup.mainSpec, setup.secondSpec, now, now)
@@ -164,11 +171,11 @@ export function berlinDate(days: number) {
 }
 
 
-// Set up an initial fixture password directly, like the existing character
-// fixture. The HTTP account endpoint intentionally cannot reset other players.
-export function seedAccountPassword(playerID: number, password: string) {
-  const hash = execFileSync('go', ['run', path.join(import.meta.dirname, 'hash-password.go')], { cwd: path.join(import.meta.dirname, '../..'), input: password, encoding: 'utf8' }).trim()
-  const db = new DatabaseSync(databasePath)
-  db.prepare('UPDATE players SET password_hash = ? WHERE id = ?').run(hash, playerID)
-  db.close()
+// Account setup follows the same reset-code path an Admin and member use.
+export async function provisionAccount(request: APIRequestContext, api: Awaited<ReturnType<typeof apiAs>>, playerID: number, username: string, password: string, role: string) {
+  await api.put(`/api/v1/players/${playerID}/account`, { username, role })
+  const generated = await api.post(`/api/v1/players/${playerID}/reset-code`, {})
+  const csrf = (await (await request.get('/api/v1/auth/csrf')).json()).data.token as string
+  const response = await request.post('/api/v1/auth/reset-password', { data: { code: generated.code, password }, headers: { 'X-CSRF-Token': csrf } })
+  expect(response.status(), await response.text()).toBe(204)
 }

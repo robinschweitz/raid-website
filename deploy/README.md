@@ -65,6 +65,8 @@ without it, because the WebAuthn relying party comes only from it (SC-007). Also
 set `COOKIE_SECURE=true` and `TRUST_PROXY_HEADERS=true`. Configure nginx and request the certificate before
 starting the service.
 
+Set `PRIVACY_CONTACT_NAME` (responsible person) and `PRIVACY_CONTACT_ADDRESS` (contact address) in the protected environment file. Production refuses to start without both.
+
 Push notifications (FR-32) are optional and stay off until both
 `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` are set (SC-054). Create the key once on
 any machine with Go and add both lines to `/etc/raid-website.env`; the
@@ -385,3 +387,24 @@ Unknown/ambiguous names fail without a write; use the numeric ID when needed.
 The audit identifies the actor as `server operator`; the security event contains
 only the player ID. Redemption requires #82 and removes MFA and all sessions.
 The Admin must set up MFA again before using Admin functions (SC-040).
+
+### TOTP encryption (SC-014)
+
+Before deploying #64, stop the service and take the deployment snapshot (NFR-2.1).
+Set `TOTP_ENCRYPTION_KEY` in the protected environment file to the base64 encoding
+of 32 random bytes (generate with `openssl rand -base64 32`). Keep this key with
+the backup key material; never put it in the database, repository, or a ticket.
+Start the service and check its journal. Before accepting requests it encrypts
+all plaintext TOTP secrets atomically. On failure it reports only a count and
+refuses to start; correct the configuration or restore the snapshot and retry.
+A successful restart leaves existing authenticator apps and recovery codes usable.
+Without the key, a server with stored TOTP cannot start, and a fresh server cannot
+create TOTP secrets. This applies in development too. A repeat startup does not
+rewrite values already under this key. To rotate after #65, stop the service and take the deployment snapshot. Put the
+old base64 key in `TOTP_ENCRYPTION_KEYS_PREVIOUS` (comma-separated for several),
+set a newly generated `TOTP_ENCRYPTION_KEY`, then start the service. Startup
+re-encrypts all old-key rows atomically. Check startup succeeds and verify a TOTP
+login before removing the previous key from the environment and restarting.
+Keep every old key with the backup key material until the last snapshot using it
+expires: removing it from the live environment does not remove that obligation.
+An unknown key ID stops startup; restore the missing key rather than deleting data.

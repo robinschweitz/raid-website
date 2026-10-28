@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"raid-website/internal/audit"
+	"raid-website/internal/auth"
 	"raid-website/internal/player"
+	"raid-website/internal/push"
 	"strings"
 	"time"
 
@@ -22,6 +24,8 @@ func NewRepo(db bun.IDB) *Repo { return &Repo{db: db} }
 func (r *Repo) WithTx(tx bun.Tx) *Repo { return &Repo{db: tx} }
 
 func (r *Repo) CreateRequest(ctx context.Context, req *Request) error {
+	req.RawProfileJSON = ""
+	req.Level, req.Race, req.Faction = 0, "", ""
 	_, err := r.db.NewInsert().Model(req).Exec(ctx)
 	if err != nil && strings.Contains(err.Error(), "active_registration_request_exists") {
 		return ErrRequestExists
@@ -45,6 +49,8 @@ func (r *Repo) FindBlockingRequest(ctx context.Context, source, profileID string
 }
 
 func (r *Repo) UpdateRequest(ctx context.Context, req *Request) error {
+	req.RawProfileJSON = ""
+	req.Level, req.Race, req.Faction = 0, "", ""
 	_, err := r.db.NewUpdate().Model(req).WherePK().Exec(ctx)
 	return err
 }
@@ -148,4 +154,57 @@ func (r *Repo) operatorResetPlayer(ctx context.Context, name string) (*player.Pl
 		return nil, fmt.Errorf("player name is unknown or ambiguous; use --player-id")
 	}
 	return &rows[0], nil
+}
+
+func (r *Repo) reserveCodeAttempt(ctx context.Context, address string, now time.Time) (int64, error) {
+	return auth.NewRepo(r.db).ReserveLoginAttempt(ctx, "", address, now, now.Add(-15*time.Minute), 30, 30)
+}
+func (r *Repo) releaseCodeAttempt(ctx context.Context, id int64) error {
+	return auth.NewRepo(r.db).DeleteLoginAttempt(ctx, id)
+}
+func (r *Repo) validResetCode(ctx context.Context, hash string, now time.Time) (*ResetCode, error) {
+	row := new(ResetCode)
+	err := r.db.NewSelect().Model(row).Where("code_hash = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?", hash, now).Scan(ctx)
+	return row, err
+}
+func (r *Repo) consumeResetCode(ctx context.Context, id int64, now time.Time) error {
+	result, err := r.db.NewUpdate().Model((*ResetCode)(nil)).Set("used_at = ?", now).Where("id = ? AND used_at IS NULL AND revoked_at IS NULL", id).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return ErrResetCodeInvalid
+	}
+	return nil
+}
+func (r *Repo) applyPasswordReset(ctx context.Context, playerID int64, hash string, now time.Time) (map[string]int64, error) {
+	p, err := r.resetPlayer(ctx, playerID)
+	if err != nil {
+		return nil, err
+	}
+	p.PasswordHash = hash
+	p.UpdatedAt = now
+	if err := player.NewRepo(r.db).Update(ctx, p); err != nil {
+		return nil, err
+	}
+	removed := map[string]int64{}
+	for _, table := range []string{"sessions", "player_mfa_settings", "mfa_recovery_codes", "mfa_login_challenges", "webauthn_credentials", "webauthn_sessions"} {
+		result, err := r.db.NewDelete().Table(table).Where("player_id = ?", playerID).Exec(ctx)
+		if err != nil {
+			return nil, err
+		}
+		count, err := result.RowsAffected()
+		if err != nil {
+			return nil, err
+		}
+		removed[table] = count
+	}
+	if err := push.RevokeForPlayer(ctx, r.db, playerID, playerID, ""); err != nil {
+		return nil, err
+	}
+	return removed, nil
 }

@@ -78,22 +78,24 @@ func hideAnonymised(entries []Entry) {
 			e.ActorName = nil
 		}
 		if e.EntityType == "player" && anonymised[e.EntityID] {
-			e.BeforeJSON = stripPlayerIdentity(e.BeforeJSON)
-			e.AfterJSON = stripPlayerIdentity(e.AfterJSON)
+			e.BeforeJSON = HidePlayerIdentity(e.BeforeJSON)
+			e.AfterJSON = HidePlayerIdentity(e.AfterJSON)
 		}
 	}
 }
 
-func stripPlayerIdentity(snapshot string) string {
+// HidePlayerIdentity hides an erased player's name and login without changing history.
+// Both audit views and personal-data exports must apply this to player snapshots.
+func HidePlayerIdentity(snapshot string) string {
 	var fields map[string]any
 	if json.Unmarshal([]byte(snapshot), &fields) != nil || fields == nil {
-		return snapshot
+		return ""
 	}
 	delete(fields, "name")
 	delete(fields, "username")
 	out, err := json.Marshal(fields)
 	if err != nil {
-		return snapshot
+		return ""
 	}
 	return string(out)
 }

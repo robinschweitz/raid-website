@@ -7,11 +7,11 @@ import path from 'node:path'
 export async function guideSnapshot(page: Page, info: TestInfo, name: string) {
   await expect(page.locator('main')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Anmelden', exact: true })).toHaveCount(0)
-  await page.evaluate(() => document.fonts.ready)
-  const mask = page.locator('input[type="password"], input[aria-label="Benutzername"], input[aria-label="Reset-Code"], input[aria-label="Code"]')
+  await page.evaluate(async () => { await document.fonts.ready; (document.activeElement as HTMLElement | null)?.blur() })
+  const mask = page.locator(' .user a[href*="/players/"], input[type="password"], input[aria-label="Benutzername"], input[aria-label="Reset-Code"], input[aria-label="Code"]')
   const dir = path.join(import.meta.dirname, '..', 'e2e-screenshots', 'guide')
   mkdirSync(dir, { recursive: true })
-  const png = await page.screenshot({ mask: [mask], animations: 'disabled' })
+  const png = await page.screenshot({ mask: [mask], maskColor: '#16273b', animations: 'disabled' })
   const webp = await page.evaluate(async (source) => {
     const image = new Image()
     image.src = source

@@ -421,3 +421,8 @@ None open.
 - **OQ-15** Access to one's own data: on request, Admin download → FR-30.7 (2026-10-23).
 - **OQ-14** Off-server backup: Hetzner Storage Box, passphrase on the server and with the owner, add-only uploads → NFR-2.3, ADR 099 (2026-10-24).
 - Owner review: EP stops at zero with a warning → FR-16.6, FR-16.8; visitor search limit → FR-7.6; pre-066 backup deleted (former NFR-2.4).
+
+### Raid-News (Owner 2026-10-28; #202)
+- **FR-NEWS-1** Visitors and players MUST be able to read published raid news; drafts MUST NOT be exposed to non-staff.
+- **FR-NEWS-2** RAIDASSISTENT and higher MUST be able to create, edit, publish and unpublish raid news.
+- **FR-NEWS-3** Important news MUST display as a modal for signed-in players until individually acknowledged. Confirmed news MUST remain in the list.

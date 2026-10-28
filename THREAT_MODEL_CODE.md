@@ -179,7 +179,7 @@ then fails and the error surfaces through CT-007. **Status:** CONFIRMED. **Rules
   raid night multiplies the writes. SC-018 allows updating at most once per hour.
 - **Impact:** slower responses and lock contention under load; an attacker with a session can
   force a write per request.
-- **Status:** CONFIRMED. **Response:** Mitigate. **Rules:** SC-018.
+- **Status:** MITIGATED (#67). Authentication skips recent touches and the repository conditionally updates at most once per hour, including concurrent reads. **Rules:** SC-018.
 
 **CT-029 — Every login is kept as an activity record (LINDDUN Detecting, Linking)**
 - **Category:** Information disclosure (privacy). **Component:** `auth.recordLoginAttempt`.
@@ -415,7 +415,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-025 | CONFIRMED | Mitigate | App | SC-042 | T-026 |
 | CT-026 | FIXED | Mitigate | App | SC-043 | T-003 |
 | CT-027 | FIXED | Mitigate | App | SC-006 | T-001 |
-| CT-028 | CONFIRMED | Mitigate | App | SC-018 | T-010 |
+| CT-028 | MITIGATED | Mitigate | App | SC-018 | T-010 |
 | CT-029 | CONFIRMED | Eliminate | App | SC-038 | T-022 |
 | CT-030 | CONFIRMED | Eliminate | App | SC-050, FR-30.6 | T-047 |
 

@@ -36,7 +36,7 @@ type Request struct {
 	Level              int       `bun:"level,notnull" json:"level"`
 	Race               string    `bun:"race,notnull" json:"race"`
 	Faction            string    `bun:"faction,notnull" json:"faction"`
-	RawProfileJSON     string    `bun:"raw_profile_json,notnull" json:"raw_profile_json"`
+	RawProfileJSON     string    `bun:"raw_profile_json,notnull" json:"-"`
 	CreatedAt          time.Time `bun:"created_at,notnull" json:"created_at"`
 	UpdatedAt          time.Time `bun:"updated_at,notnull" json:"updated_at"`
 

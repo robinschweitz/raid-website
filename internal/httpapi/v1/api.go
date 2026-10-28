@@ -176,6 +176,11 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/raid-groups", RequireRole(validation.RoleAdmin, a.createRaidGroup))
 	mux.HandleFunc("PATCH /api/v1/raid-groups/{id}", RequireRole(validation.RoleAdmin, a.updateRaidGroup))
 
+	mux.HandleFunc("GET /api/v1/raid-news", a.listRaidNews)
+	mux.HandleFunc("GET /api/v1/raid-news/manage", RequireRole(validation.RoleRaidassistent, a.manageRaidNews))
+	mux.HandleFunc("POST /api/v1/raid-news", RequireRole(validation.RoleRaidassistent, a.createRaidNews))
+	mux.HandleFunc("PUT /api/v1/raid-news/{id}", RequireRole(validation.RoleRaidassistent, a.updateRaidNews))
+	mux.HandleFunc("POST /api/v1/raid-news/{id}/acknowledge", RequireAuth(a.acknowledgeRaidNews))
 	mux.HandleFunc("GET /api/v1/polls", a.listPolls)
 	mux.HandleFunc("POST /api/v1/polls", RequireRole(validation.RoleRaidassistent, a.createPoll))
 	mux.HandleFunc("GET /api/v1/polls/{id}", RequireAuth(a.getPoll))

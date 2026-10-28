@@ -3767,20 +3767,26 @@ test('the unclaimed-loot form records an item without loading the list and repor
   assert.equal(added, 1)
 })
 
-test('loot entry switches between a player award and loot that went to nobody', async () => {
+test('loot entry uses the same form for player awards and unclaimed outcomes', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
   await flush(view)
-  const kind = () => nodes(nodes(view.tree, (n) => n.type === 'label' && text(n).startsWith('Art der Erfassung'))[0], (n) => n.type === 'select')[0]
-  const unclaimedForm = () => nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'UnclaimedLootForm')[0]
-  assert.equal(kind().props.value, 'award')
+  const method = () => select(view, 'Loot-Vergabemethode')
+  const recipient = () => nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Loot-Empfänger')[0]
+  assert.equal(method().props.value, 'MAIN')
   assert.ok(select(view, 'Loot-Boss'))
-  assert.equal(unclaimedForm(), undefined)
-  kind().props.onChange(change('unclaimed'))
+  assert.equal(recipient().props.disabled, false)
+  for (const outcome of ['DISENCHANTED', 'BANK', 'NOBODY']) {
+    method().props.onChange(change(outcome))
+    view.render()
+    assert.equal(method().props.value, outcome)
+    assert.ok(select(view, 'Loot-Boss'), 'boss selector remains in the same form')
+    assert.equal(recipient().props.disabled, true, 'unclaimed loot requires no recipient')
+  }
+  method().props.onChange(change('MAIN'))
   view.render()
-  assert.equal(select(view, 'Loot-Boss'), undefined)
-  assert.equal(unclaimedForm().props.raidID, 1)
+  assert.equal(recipient().props.disabled, false)
   assert.ok(nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'UnclaimedLootList')[0])
 })
 

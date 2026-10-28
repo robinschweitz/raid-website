@@ -367,3 +367,18 @@ and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
    was rotated. Check the audit log for changes made during the incident and
    correct them as Admin. Re-enable `raid-website-update.timer`. Record any
    spec gap you found in `SECURITY.md` or `THREAT_MODEL.md`.
+
+### TOTP encryption (SC-014)
+
+Before deploying #64, stop the service and take the deployment snapshot (NFR-2.1).
+Set `TOTP_ENCRYPTION_KEY` in the protected environment file to the base64 encoding
+of 32 random bytes (generate with `openssl rand -base64 32`). Keep this key with
+the backup key material; never put it in the database, repository, or a ticket.
+Start the service and check its journal. Before accepting requests it encrypts
+all plaintext TOTP secrets atomically. On failure it reports only a count and
+refuses to start; correct the configuration or restore the snapshot and retry.
+A successful restart leaves existing authenticator apps and recovery codes usable.
+Without the key, a server with stored TOTP cannot start, and a fresh server cannot
+create TOTP secrets. This applies in development too. A repeat startup does not
+rewrite values already under this key. Previous-key rotation is tracked in #65;
+do not replace or discard the key until that support is deployed.

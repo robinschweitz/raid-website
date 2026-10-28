@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"net"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 )
 
 type Config struct {
+	TOTPEncryptionKey    []byte
 	Port                 string
 	ListenAddr           string
 	DatabaseURL          string
@@ -50,6 +52,13 @@ func Load() (*Config, error) {
 		RisingGodsProxyToken: strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
 		VAPIDPrivateKey:      strings.TrimSpace(getEnv("VAPID_PRIVATE_KEY", "")),
 		VAPIDSubject:         strings.TrimSpace(getEnv("VAPID_SUBJECT", "")),
+	}
+	if raw := strings.TrimSpace(os.Getenv("TOTP_ENCRYPTION_KEY")); raw != "" {
+		key, err := base64.StdEncoding.DecodeString(raw)
+		if err != nil || len(key) != 32 {
+			return nil, errors.New("TOTP_ENCRYPTION_KEY must be base64 encoding of 32 bytes")
+		}
+		c.TOTPEncryptionKey = key
 	}
 	if (c.VAPIDPrivateKey == "") != (c.VAPIDSubject == "") {
 		return nil, errors.New("VAPID_PRIVATE_KEY and VAPID_SUBJECT must be set together")

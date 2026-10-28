@@ -11,7 +11,7 @@ export async function guideSnapshot(page: Page, info: TestInfo, name: string) {
   const mask = page.locator('input[type="password"], input[aria-label="Benutzername"], input[aria-label="Reset-Code"], input[aria-label="Code"]')
   const dir = path.join(import.meta.dirname, '..', 'e2e-screenshots', 'guide')
   mkdirSync(dir, { recursive: true })
-  const png = await page.screenshot({ mask, animations: 'disabled' })
+  const png = await page.screenshot({ mask: [mask], animations: 'disabled' })
   const webp = await page.evaluate(async (source) => {
     const image = new Image()
     image.src = source

@@ -1,7 +1,13 @@
-export const appVersion = '1.0.63'
+export const appVersion = '1.0.65'
 
 export const changelog = [
   { version: appVersion, title: 'Registrierungscodes nachreichen', changes: ['Admins können verlorene Codes anhand ihres Verlaufs ersetzen und alte Codes widerrufen. Der Code selbst wird nur einmal angezeigt.'] },
+  { version: '1.0.64', title: 'Datenschutzerklärung', changes: ['Die öffentliche Datenschutzseite nennt Kontakt, gespeicherte Daten, Aufbewahrung und Auskunftsrechte.'] },
+  {
+    version: '1.0.63',
+    title: 'Sitzungen enden nach sieben Tagen ohne Nutzung',
+    changes: ['Nach sieben Tagen ohne Nutzung ist eine neue Anmeldung nötig. Aktive Sitzungen enden weiterhin spätestens nach 30 Tagen.'],
+  },
   {
     version: '1.0.62',
     title: 'RaidWishlist 2.3.0',

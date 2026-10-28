@@ -1,4 +1,4 @@
-# ADR 095: Admin recovery for undelivered registration codes
+# ADR 105: Admin recovery for undelivered registration codes
 
 Status: Accepted.
 

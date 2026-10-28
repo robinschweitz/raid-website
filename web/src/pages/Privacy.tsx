@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { Link } from '../router'
+import { ErrorMessage } from '../components/ErrorMessage'
 
 // The privacy page (FR-30.1, FR-30.4, FR-30.8). It is readable without a session;
 // the responsible person comes from configuration through a public endpoint (SC-033).
@@ -32,7 +33,7 @@ export function PrivacyPage() {
 
     <section className="card guide-section" aria-labelledby="verantwortlich-title">
       <h2 id="verantwortlich-title">Verantwortlich</h2>
-      {error && <p className="error" role="alert">{error}</p>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
       {!error && !contact && <p className="muted">Lade&hellip;</p>}
       {contact && (contact.name || contact.address
         ? <p>Verantwortlich im Sinne der DSGVO ist <strong>{contact.name}</strong>. Kontakt: <strong>{contact.address}</strong></p>

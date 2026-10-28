@@ -258,6 +258,9 @@ export function GuidePage() {
       <p>Im Reiter <strong>Konto</strong> änderst du dein Passwort. Freiwillig kannst du eine Authenticator-App oder einen Sicherheitsschlüssel als zweiten Faktor einrichten. Warum sich das lohnt, steht unter <Link to="/kontosicherheit">Kontosicherheit</Link>.</p>
       <p>Ebenfalls freiwillig: Unter <strong>Benachrichtigungen</strong> schaltest du für dein Gerät Meldungen bei neuen Umfragen, neuen Raids und deinem Platz in einer Aufstellung ein. Der Browser fragt erst nach, wenn du auf den Knopf drückst. Auf iPhone und iPad geht das nur mit RAID auf dem Home-Bildschirm (ab iOS 16.4). Die Meldungen bleiben auf diesem Gerät eingeschaltet, auch wenn du dich später neu anmeldest. Sie enden, wenn du dich abmeldest, wenn sich jemand anderes auf dem Gerät anmeldet und, nach einer Passwortänderung, auf deinen anderen Geräten.</p>
       <Shot name="21-konto" caption="Konto: Passwort und Zwei-Faktor" />
+      <h3>Passwort vergessen</h3>
+      <p>Bitte einen Admin ingame um einen Reset-Code für deinen Main-Charakter. Öffne <Link to="/passwort-zuruecksetzen">Passwort zurücksetzen</Link>, gib den Code und ein neues Passwort ein. Danach meldest du dich neu an und richtest deinen zweiten Faktor wieder ein.</p>
+      <Shot name="23-passwort-zuruecksetzen" caption="Einmaligen Reset-Code mit neuem Passwort einlösen" />
       <h3>Umfragen</h3>
       <p>Unter <Link to="/polls">Umfragen</Link> Antwort wählen und <strong>Abstimmen</strong> klicken.</p>
       <p>Die Raidleitung kann eine Umfrage mit <strong>Bearbeiten</strong> nachträglich ändern: Titel, Beschreibung, Ende, Antworten, und eine geschlossene Umfrage wieder öffnen. Eine umbenannte Antwort behält ihre Stimmen; eine Antwort, für die schon jemand gestimmt hat, lässt sich nicht entfernen.</p>

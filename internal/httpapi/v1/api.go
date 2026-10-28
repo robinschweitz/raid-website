@@ -17,6 +17,7 @@ import (
 	"raid-website/internal/loot"
 	"raid-website/internal/player"
 	"raid-website/internal/poll"
+	"raid-website/internal/push"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcompletion"
 	"raid-website/internal/raidcorrection"
@@ -55,6 +56,7 @@ type Deps struct {
 	Shadowmourne      *shadowmourne.Service
 	Registration      *registration.Service
 	AccountMerge      *accountmerge.Service
+	Push              *push.Service
 }
 
 // API holds the dependencies shared by the v1 HTTP handlers.
@@ -111,6 +113,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/players/{id}", RequireAuth(a.getPlayer))
 	mux.HandleFunc("PUT /api/v1/players/{id}/account", RequireRole(validation.RoleAdmin, a.setAccount))
 	mux.HandleFunc("POST /api/v1/players/{id}/merge", RequireRole(validation.RoleAdmin, a.mergePlayer))
+	mux.HandleFunc("POST /api/v1/players/{id}/anonymise", RequireRole(validation.RoleAdmin, a.anonymisePlayer))
 	mux.HandleFunc("GET /api/v1/players/{id}/characters", RequireAuth(a.listPlayerCharacters))
 	mux.HandleFunc("POST /api/v1/players/{id}/characters", RequireRole(validation.RoleAdmin, a.createCharacter))
 
@@ -178,7 +181,9 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/polls/{id}/vote", RequireRole(validation.RoleMember, a.votePoll))
 	mux.HandleFunc("GET /api/v1/polls/{id}/votes", RequireAuth(a.listPollVotes))
 	mux.HandleFunc("POST /api/v1/polls/{id}/close", RequireRole(validation.RoleRaidassistent, a.closePoll))
+	mux.HandleFunc("PUT /api/v1/polls/{id}", RequireRole(validation.RoleRaidassistent, a.editPoll))
 
+	a.registerPush(mux)
 	WishlistHandlers{Wishlist: wishlist.NewService(a.DB)}.Register(mux)
 
 }

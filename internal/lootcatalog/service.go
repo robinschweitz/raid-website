@@ -329,3 +329,41 @@ func (s *Service) ValidateDrop(ctx context.Context, instanceID string, raidSize 
 	}
 	return Boss{}, Item{}, ErrInvalid
 }
+
+// BossModes returns the gameplay modes that the bundled drops evidence for one
+// boss of an instance at one raid size, in the order NORMAL, HEROIC, HARDMODE.
+// A boss outside the instance is ErrInvalid.
+func (s *Service) BossModes(ctx context.Context, instanceID, bossID string, raidSize int) (Boss, []Mode, error) {
+	catalog, err := s.List(ctx)
+	if err != nil {
+		return Boss{}, nil, err
+	}
+	boss := Boss{}
+	for _, candidate := range catalog.Bosses {
+		if candidate.ID == bossID && candidate.InstanceID == instanceID {
+			boss = candidate
+			break
+		}
+	}
+	if boss.ID == "" {
+		return Boss{}, nil, ErrInvalid
+	}
+	found := map[Mode]bool{}
+	for _, drop := range catalog.Drops {
+		if drop.BossID != bossID || drop.RaidSize != raidSize {
+			continue
+		}
+		mode, _, err := sourceGameMode(drop)
+		if err != nil {
+			return Boss{}, nil, err
+		}
+		found[mode] = true
+	}
+	modes := []Mode{}
+	for _, mode := range []Mode{ModeNormal, ModeHeroic, ModeHardmode} {
+		if found[mode] {
+			modes = append(modes, mode)
+		}
+	}
+	return boss, modes, nil
+}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/uptrace/bun"
 
@@ -63,7 +65,7 @@ func (r *Repo) GetPoll(ctx context.Context, id int64) (*Poll, error) {
 
 func (r *Repo) ListOptions(ctx context.Context, pollID int64) ([]Option, error) {
 	var opts []Option
-	err := r.db.NewSelect().Model(&opts).Where("poll_id = ?", pollID).Order("sort_order ASC, id ASC").Scan(ctx)
+	err := r.db.NewSelect().Model(&opts).Where("poll_id = ?", pollID).Order("sort_order ASC", "id ASC").Scan(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +200,7 @@ func (r *Repo) FindVote(ctx context.Context, pollID, playerID int64) (*Vote, err
 
 func (r *Repo) ListVoteChoices(ctx context.Context, voteID int64) ([]string, error) {
 	var choices []VoteChoice
-	if err := r.db.NewSelect().Model(&choices).Where("vote_id = ?", voteID).Order("sort_order ASC, id ASC").Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(&choices).Where("vote_id = ?", voteID).Order("sort_order ASC", "id ASC").Scan(ctx); err != nil {
 		return nil, err
 	}
 	labels := make([]string, 0, len(choices))
@@ -219,7 +221,7 @@ func (r *Repo) loadOptions(ctx context.Context, polls []Poll) error {
 		byID[polls[i].ID] = &polls[i]
 	}
 	var opts []Option
-	if err := r.db.NewSelect().Model(&opts).Where("poll_id IN (?)", bun.List(ids)).Order("poll_id ASC, sort_order ASC, id ASC").Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(&opts).Where("poll_id IN (?)", bun.List(ids)).Order("poll_id ASC", "sort_order ASC", "id ASC").Scan(ctx); err != nil {
 		return err
 	}
 	for _, opt := range opts {
@@ -242,7 +244,7 @@ func (r *Repo) loadVoteChoices(ctx context.Context, votes []Vote) error {
 		byID[votes[i].ID] = &votes[i]
 	}
 	var choices []VoteChoice
-	if err := r.db.NewSelect().Model(&choices).Where("vote_id IN (?)", bun.List(ids)).Order("vote_id ASC, sort_order ASC, id ASC").Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(&choices).Where("vote_id IN (?)", bun.List(ids)).Order("vote_id ASC", "sort_order ASC", "id ASC").Scan(ctx); err != nil {
 		return err
 	}
 	for _, choice := range choices {
@@ -257,6 +259,78 @@ func (r *Repo) loadVoteChoices(ctx context.Context, votes []Vote) error {
 		}
 		if votes[i].Choices == nil {
 			votes[i].Choices = []string{}
+		}
+	}
+	return nil
+}
+
+// SaveEdit applies a planned poll edit in one transaction with its audit entry
+// (FR-24.7). A removed option that still has votes rejects the whole edit.
+// Renaming an option also renames it in the stored votes, so votes stay.
+func (r *Repo) SaveEdit(ctx context.Context, before Poll, plan *EditPlan, actorID int64) error {
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if len(plan.Removed) > 0 {
+			votes, err := tx.NewSelect().Model((*VoteChoice)(nil)).Where("option_id IN (?)", bun.List(plan.Removed)).Count(ctx)
+			if err != nil {
+				return err
+			}
+			if votes > 0 {
+				return ErrOptionHasVotes
+			}
+			if _, err := tx.NewDelete().Model((*Option)(nil)).Where("poll_id = ?", before.ID).Where("id IN (?)", bun.List(plan.Removed)).Exec(ctx); err != nil {
+				return err
+			}
+		}
+		// Labels are unique per poll, so swapping two labels needs a free
+		// placeholder for each changed option first.
+		for _, option := range plan.Changed {
+			if _, err := tx.NewUpdate().Model((*Option)(nil)).Set("label = ?", fmt.Sprintf("\u2060edit-%d", option.ID)).Where("id = ?", option.ID).Exec(ctx); err != nil {
+				return err
+			}
+		}
+		for _, option := range plan.Changed {
+			if _, err := tx.NewUpdate().Model((*Option)(nil)).Set("label = ?", option.Label).Set("sort_order = ?", option.SortOrder).Where("id = ?", option.ID).Exec(ctx); err != nil {
+				return err
+			}
+			if _, err := tx.NewUpdate().Model((*VoteChoice)(nil)).Set("label = ?", option.Label).Where("option_id = ?", option.ID).Exec(ctx); err != nil {
+				return err
+			}
+		}
+		if len(plan.Changed) > 0 {
+			if err := r.WithTx(tx).refreshVoteSummaries(ctx, before.ID); err != nil {
+				return err
+			}
+		}
+		for i := range plan.After.Options {
+			option := &plan.After.Options[i]
+			if option.ID != 0 {
+				continue
+			}
+			if _, err := tx.NewInsert().Model(option).Exec(ctx); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.NewUpdate().Model(&plan.After).Column("title", "description", "closes_at", "status", "updated_at").WherePK().Exec(ctx); err != nil {
+			return err
+		}
+		return audit.NewRepo(tx).Record(ctx, actorID, "poll", before.ID, "update", before, plan.After, "")
+	})
+}
+
+// refreshVoteSummaries rewrites the joined choice text of every vote of a
+// poll from its stored choices, after options were renamed.
+func (r *Repo) refreshVoteSummaries(ctx context.Context, pollID int64) error {
+	votes, err := r.ListVotes(ctx, pollID)
+	if err != nil {
+		return err
+	}
+	for _, vote := range votes {
+		summary := strings.Join(vote.Choices, ", ")
+		if summary == vote.Choice {
+			continue
+		}
+		if _, err := r.db.NewUpdate().Model((*Vote)(nil)).Set("choice = ?", summary).Where("id = ?", vote.ID).Exec(ctx); err != nil {
+			return err
 		}
 	}
 	return nil

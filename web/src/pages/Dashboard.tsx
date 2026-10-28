@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Link } from '../router'
-import type { Attendance, Character, Player, PointsResponse, Poll, Raid, Vote } from '../types'
+import type { Attendance, BossKill, Character, Player, PointsResponse, Poll, Raid, Vote } from '../types'
 import { RaidBanner } from '../components/RaidBanner'
 // import { EnhancePointsCard } from '../components/EnhancePointsCard'
 import { AttendanceRing } from '../components/AttendanceRing'
@@ -13,7 +13,6 @@ import { PlayerProfilePanel } from '../components/PlayerProfilePanel'
 import { MyRaidsPanel } from '../components/MyRaidsPanel'
 import { atLeast } from '../types'
 import { ErrorMessage } from '../components/ErrorMessage'
-// import { StatisticsCharts } from '../components/StatisticsCharts'
 
 
 export function DashboardPage() {
@@ -24,6 +23,7 @@ export function DashboardPage() {
   const [votes, setVotes] = useState<Record<number, Vote[]>>({})
   const [points, setPoints] = useState<PointsResponse | null>(null)
   const [attendance, setAttendance] = useState<Attendance[] | null>(null)
+  const [kills, setKills] = useState<BossKill[] | null>(null)
   const [characters, setCharacters] = useState<Character[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -74,6 +74,17 @@ export function DashboardPage() {
     return () => { active = false }
   }, [nextRaid])
 
+  // Kills are readable only when signed in; without them the progress shows no status.
+  const nextRaidID = nextRaid?.id
+  useEffect(() => {
+    let active = true
+    setKills(null)
+    if (player && nextRaidID !== undefined) api.get<BossKill[]>(`/api/v1/raids/${nextRaidID}/kills`)
+      .then((rows) => { if (active) setKills(rows) })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [player, nextRaidID])
+
   useEffect(() => {
     let active = true
     if (!player) return
@@ -117,7 +128,7 @@ export function DashboardPage() {
               <span><strong>{attendance.filter((a) => a.role === 'DD').length}</strong> DD</span>
             </div>
           </> : <p className="muted" role="status">Aufstellung wird geladen&hellip;</p>}
-          <BossProgression catalogInstanceId={nextRaid.catalog_instance_id} />
+          <BossProgression catalogInstanceId={nextRaid.catalog_instance_id} kills={kills} />
           <Link className="button-link primary" to={`/raids/${nextRaid.id}`}>Raid &ouml;ffnen &rarr;</Link>
         </> : <><h2>{error ? 'Raidplanung nicht verfügbar' : 'Kein zukünftiger Raid geplant'}</h2><p className="muted">{error ? 'Bitte lade die Seite erneut.' : 'Hier erscheint der nächste gespeicherte Termin.'}</p><Link className="button-link" to="/raids">Zur Raidplanung &rarr;</Link></>}
       </div>
@@ -185,11 +196,6 @@ export function DashboardPage() {
           </tbody>
         </table></div>
       </section>
-
-      {/* <section className="card widget-stats">
-        <div className="section-heading"><h2>Statistiken</h2><span className="eyebrow">Saison</span></div>
-        <StatisticsCharts raids={raids} />
-      </section> */}
 
       {player && <section className="card widget-profile">
         <div className="section-heading"><h2>Mein Profil</h2></div>

@@ -63,6 +63,9 @@ func visiblePlayerPtr(actor *player.Player, p *player.Player) playerResponse {
 	return visiblePlayer(actor, *p)
 }
 
+// lastAdminMessage is the 409 text when a change would remove the last Admin.
+const lastAdminMessage = "at least one active admin must remain"
+
 type createPlayerRequest struct {
 	Name        string `json:"name"`
 	GuildRankID *int64 `json:"guild_rank_id"`
@@ -128,8 +131,7 @@ func (a *API) createPlayer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not create player")
 		return
 	}
-	actor, _ := CurrentPlayer(r)
-	WriteJSON(w, http.StatusCreated, map[string]any{"data": visiblePlayerPtr(actor, p)})
+	WriteJSON(w, http.StatusCreated, map[string]any{"data": visiblePlayerPtr(accountViewer(r), p)})
 }
 
 func (a *API) getPlayer(w http.ResponseWriter, r *http.Request) {
@@ -147,8 +149,7 @@ func (a *API) getPlayer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not load player")
 		return
 	}
-	actor, _ := CurrentPlayer(r)
-	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(actor, p)})
+	WriteJSON(w, http.StatusOK, map[string]any{"data": visiblePlayerPtr(accountViewer(r), p)})
 }
 
 func (a *API) mergePlayer(w http.ResponseWriter, r *http.Request) {
@@ -181,12 +182,50 @@ func (a *API) mergePlayer(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusUnprocessableEntity, "invalid_merge", err.Error())
 		case errors.Is(err, accountmerge.ErrSourceInactive):
 			WriteError(w, http.StatusConflict, "source_inactive", err.Error())
+		case errors.Is(err, player.ErrLastAdmin):
+			WriteError(w, http.StatusConflict, "last_admin", lastAdminMessage)
 		case errors.Is(err, accountmerge.ErrLockConflict):
 			WriteError(w, http.StatusConflict, "lock_conflict", err.Error())
 		case isNotFound(err):
 			WriteError(w, http.StatusNotFound, "not_found", "player not found")
 		default:
 			WriteError(w, http.StatusInternalServerError, "internal", "could not merge accounts")
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type anonymisePlayerRequest struct {
+	Reason string `json:"reason"`
+}
+
+func (a *API) anonymisePlayer(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid player id")
+		return
+	}
+	var req anonymisePlayerRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	actor, ok := CurrentPlayer(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "authentication required")
+		return
+	}
+	if err := a.AccountMerge.Anonymise(r.Context(), id, actor.ID, req.Reason); err != nil {
+		switch {
+		case errors.Is(err, player.ErrLastAdmin):
+			WriteError(w, http.StatusConflict, "last_admin", lastAdminMessage)
+		case errors.Is(err, accountmerge.ErrAlreadyAnonymised):
+			WriteError(w, http.StatusConflict, "already_anonymised", "Dieser Spieler wurde bereits anonymisiert.")
+		case isNotFound(err):
+			WriteError(w, http.StatusNotFound, "not_found", "player not found")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "could not anonymise player")
 		}
 		return
 	}

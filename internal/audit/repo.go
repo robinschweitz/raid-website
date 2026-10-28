@@ -52,7 +52,50 @@ func (r *Repo) List(ctx context.Context) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	hideAnonymised(entries)
 	return entries, nil
+}
+
+// ActionPlayerAnonymise is the action of the entry that marks a player as anonymised.
+const ActionPlayerAnonymise = "player_anonymise"
+
+// hideAnonymised removes the name of anonymised players from the display (FR-30.4):
+// the actor name, and name and login in the snapshots of the player record itself.
+// The stored rows stay untouched.
+func hideAnonymised(entries []Entry) {
+	anonymised := map[string]bool{}
+	for _, e := range entries {
+		if e.EntityType == "player" && e.Action == ActionPlayerAnonymise {
+			anonymised[e.EntityID] = true
+		}
+	}
+	if len(anonymised) == 0 {
+		return
+	}
+	for i := range entries {
+		e := &entries[i]
+		if e.ActorID != nil && anonymised[strconv.FormatInt(*e.ActorID, 10)] {
+			e.ActorName = nil
+		}
+		if e.EntityType == "player" && anonymised[e.EntityID] {
+			e.BeforeJSON = stripPlayerIdentity(e.BeforeJSON)
+			e.AfterJSON = stripPlayerIdentity(e.AfterJSON)
+		}
+	}
+}
+
+func stripPlayerIdentity(snapshot string) string {
+	var fields map[string]any
+	if json.Unmarshal([]byte(snapshot), &fields) != nil || fields == nil {
+		return snapshot
+	}
+	delete(fields, "name")
+	delete(fields, "username")
+	out, err := json.Marshal(fields)
+	if err != nil {
+		return snapshot
+	}
+	return string(out)
 }
 
 // Record writes one append-only entry with JSON snapshots of the record before

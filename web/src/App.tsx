@@ -21,15 +21,16 @@ import { RegistrationRequestsPage } from './pages/RegistrationRequests'
 import { ChangelogPage } from './pages/Changelog'
 import { AuditLogPage } from './pages/AuditLog'
 import { WishlistPage } from './pages/Wishlist'
+import { PrivacyPage } from './pages/Privacy'
 import { GuidePage } from './pages/Guide'
 import { ShadowmournePage } from './pages/Shadowmourne'
 import { AddonsPage } from './pages/Addons'
 import { AccountSecurityPage } from './pages/AccountSecurity'
-import { PrivacyPage } from './pages/Privacy'
 import { MFAReminderBanner } from './components/MFAReminderBanner'
 import { CurrentRaidPage } from './pages/CurrentRaid'
 import { appVersion } from './release'
 import { ErrorMessage } from './components/ErrorMessage'
+import { PWAInstall } from './components/PWAInstall'
 
 // After signing in from the login link the address is still /login.
 function RedirectHome() {
@@ -71,11 +72,11 @@ function Routes() {
   if (parts[0] === 'registration-requests') return <RegistrationRequestsPage />
   if (parts[0] === 'audit-log') return <AuditLogPage />
   if (parts[0] === 'changelog') return <ChangelogPage />
+  if (parts[0] === 'datenschutz') return <PrivacyPage />
   if (parts[0] === 'anleitung') return <GuidePage />
   if (parts[0] === 'schattengram') return <ShadowmournePage />
   if (parts[0] === 'addons') return <AddonsPage addonID={parts[1]} />
   if (parts[0] === 'kontosicherheit') return <AccountSecurityPage />
-  if (parts[0] === 'datenschutz') return <PrivacyPage />
   return <p className="muted">Seite nicht gefunden.</p>
 }
 
@@ -122,9 +123,8 @@ function Layout() {
           </>}
         </nav>
         <div className="sidebar-footer">
-          <Link to="/changelog">Version {appVersion}</Link>
+          <Link to="/datenschutz">Datenschutz</Link><Link to="/changelog">Version {appVersion}</Link>
           <span>Änderungen ansehen</span>
-          <Link to="/datenschutz">Datenschutz</Link>
         </div>
       </aside>
       <div className="main-shell">
@@ -134,6 +134,7 @@ function Layout() {
           <button disabled={pending} onClick={() => void signOut()}>{pending ? 'Abmelden…' : 'Abmelden'}</button></> : <Link to="/login">Anmelden</Link>}</div>
       </header>
       {path !== '/kontosicherheit' && <MFAReminderBanner isSignedIn={player !== null} adminID={player?.role === 'ADMIN' ? player.id : undefined} path={path} />}
+      <PWAInstall />
       <main id="main-content" className={path === '/' ? undefined : 'secondary-page'} tabIndex={-1}>
         {error && <ErrorMessage>{error}</ErrorMessage>}
         <Routes />
@@ -176,8 +177,8 @@ function Gate() {
     )
   }
   // The guide, the addons pages and the account-security page must be readable before an
-  // account exists (ADR 083, ADR 085, ADR 092).
-  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/datenschutz' && path !== '/addons' && !path.startsWith('/addons/')) {
+  // account exists (ADR 083, ADR 085, ADR 092); so must the statistics (FR-1.4).
+  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/') && path !== '/statistics' && path !== '/datenschutz') {
     return <LoginPage />
   }
   return <Layout />

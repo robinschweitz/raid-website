@@ -22,6 +22,7 @@ import { SpecSelect } from '../components/SpecSelect'
 import { browserSupportsWebAuthn, createWebAuthnCredential, type WebAuthnBeginResponse } from '../webauthn'
 import { announceMFAChange, type MFAStatus } from '../accountSecurity'
 import { ErrorMessage } from '../components/ErrorMessage'
+import { PushNotificationSettings } from '../components/PushNotificationSettings'
 
 const CLASSES = [
   'Todesritter',
@@ -99,6 +100,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
   const [mergePlayers, setMergePlayers] = useState<Player[]>([])
   const [mergeSourceID, setMergeSourceID] = useState('')
   const [mergeReason, setMergeReason] = useState('')
+  const [anonymiseReason, setAnonymiseReason] = useState('')
   const [mergeCharacterTarget, setMergeCharacterTarget] = useState('')
   const [mergeCharacterSource, setMergeCharacterSource] = useState('')
   const [mergeCharacterReason, setMergeCharacterReason] = useState('')
@@ -431,6 +433,23 @@ function PlayerDetail({ playerID, initialView }: Props) {
         await load()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Konten zusammenführen fehlgeschlagen')
+      }
+    })
+  }
+
+  const anonymisePlayer = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isAdmin || !player) return
+    if (!window.confirm(`${player.name} wirklich anonymisieren? Login, Passwort, Sitzungen, MFA und Rising-Gods-Profildaten werden gelöscht. Das kann nicht rückgängig gemacht werden.`)) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.post(`/api/v1/players/${playerID}/anonymise`, { reason: anonymiseReason.trim() })
+        if (!isActive()) return
+        setAnonymiseReason('')
+        await load()
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Anonymisieren fehlgeschlagen')
       }
     })
   }
@@ -845,15 +864,24 @@ function PlayerDetail({ playerID, initialView }: Props) {
                <button type="submit" disabled={pending || !mergeSourceID || !mergeReason.trim()}>Zusammenführen</button>
              </form>
            </section>}
+           {isAdmin && !isOwnProfile && <section className="subcard">
+             <h3>Spieler anonymisieren</h3>
+             <p className="muted">Für Löschanfragen nach der Datenschutzerklärung. Login, Passwort, Sitzungen, MFA, Push-Abos und Rising-Gods-Profildaten werden gelöscht; der Spielername wird durch den Namen des ältesten Main-Charakters ersetzt. Raid-Historie, Loot, EP und Charakternamen bleiben erhalten, dieser Schritt ist also eine Pseudonymisierung und macht die Daten nicht anonym.</p>
+             <form className="inline-form" onSubmit={anonymisePlayer}>
+               <label>Grund (optional)<input aria-label="Grund für Anonymisierung" value={anonymiseReason} onChange={(event) => setAnonymiseReason(event.target.value)} /></label>
+               <button type="submit" disabled={pending}>Spieler anonymisieren</button>
+             </form>
+           </section>}
            {isOwnProfile && <section className="subcard">
             <h3>Passwort ändern</h3>
             <form className="inline-form" onSubmit={changeOwnPassword}>
               <input type="password" aria-label="Aktuelles Passwort" placeholder="Aktuelles Passwort" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" />
-              <input type="password" aria-label="Neues Passwort" placeholder="Neues Passwort (mind. 12 Zeichen)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
+              <input type="password" aria-label="Neues Passwort" placeholder="Neues Passwort (mind. 12 Zeichen, höchstens 1024 Bytes)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
               <button type="submit" disabled={pending || !currentPassword.trim() || !newPassword.trim()}>Passwort ändern</button>
             </form>
             {passwordStatus && <p className="muted" role="status">{passwordStatus}</p>}
           </section>}
+          {isOwnMember && <PushNotificationSettings />}
           {isOwnProfile && <section className="subcard">
             <h3>Multi-Faktor-Authentifizierung</h3>
             <p className="muted">Optional: Richte einen Authenticator-Code oder YubiKey ein. Du wirst beim Start einer Änderung nach deinem aktuellen Passwort gefragt. <Link to="/kontosicherheit">Warum das wichtig ist</Link></p>

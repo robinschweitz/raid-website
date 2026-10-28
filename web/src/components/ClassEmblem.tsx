@@ -19,5 +19,5 @@ export function ClassEmblem({ characterClass }: { characterClass: string }) {
   if (!iconName) {
     return <span className="class-emblem class-emblem--unknown" aria-hidden="true" />
   }
-  return <img className="class-emblem" src={`https://wow.zamimg.com/images/wow/icons/large/${iconName}.jpg`} alt="" aria-hidden="true" />
+  return <img className="class-emblem" src={`/class-icons/${iconName}.jpg`} alt="" aria-hidden="true" />
 }

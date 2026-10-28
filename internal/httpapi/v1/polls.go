@@ -1,11 +1,13 @@
 package v1
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"raid-website/internal/poll"
+	"raid-website/internal/push"
 	"raid-website/internal/validation"
 )
 
@@ -16,6 +18,19 @@ type createPollRequest struct {
 	PollType      string   `json:"poll_type"`
 	AllowMultiple bool     `json:"allow_multiple"`
 	Options       []string `json:"options"`
+}
+
+type editPollOption struct {
+	ID    int64  `json:"id"`
+	Label string `json:"label"`
+}
+
+type editPollRequest struct {
+	Title       string           `json:"title"`
+	Description string           `json:"description"`
+	ClosesAt    string           `json:"closes_at"`
+	Status      string           `json:"status"`
+	Options     []editPollOption `json:"options"`
 }
 
 type votePollRequest struct {
@@ -95,6 +110,7 @@ func (a *API) createPoll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusCreated, map[string]any{"data": p})
+	a.notifyAll(w, r, push.KindPoll, actor)
 }
 
 func (a *API) getPoll(w http.ResponseWriter, r *http.Request) {
@@ -212,6 +228,65 @@ func (a *API) closePoll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": p})
+}
+
+func (a *API) editPoll(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "login required")
+		return
+	}
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid poll id")
+		return
+	}
+	var req editPollRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	current, err := a.Polls.GetPoll(r.Context(), id)
+	if err != nil {
+		if isNotFound(err) {
+			WriteError(w, http.StatusNotFound, "not_found", "poll not found")
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, "internal", "could not load poll")
+		return
+	}
+	edit := poll.Edit{Title: req.Title, Description: req.Description, Status: validation.PollStatus(req.Status)}
+	if req.ClosesAt != "" {
+		t, err := time.Parse(time.RFC3339, req.ClosesAt)
+		if err != nil {
+			BadRequest(w, "closes_at must be RFC3339")
+			return
+		}
+		t = t.UTC()
+		edit.ClosesAt = &t
+	}
+	for _, option := range req.Options {
+		edit.Options = append(edit.Options, poll.EditOption{ID: option.ID, Label: option.Label})
+	}
+	plan, err := poll.PlanEdit(*current, edit, time.Now().UTC())
+	if err != nil {
+		BadRequest(w, strings.TrimPrefix(err.Error(), poll.ErrEditInvalid.Error()+": "))
+		return
+	}
+	if err := a.Polls.SaveEdit(r.Context(), *current, &plan, actor); err != nil {
+		if errors.Is(err, poll.ErrOptionHasVotes) {
+			WriteError(w, http.StatusConflict, "poll_option_has_votes", "an option with votes cannot be removed")
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, "internal", "could not update poll")
+		return
+	}
+	saved, err := a.Polls.GetPoll(r.Context(), id)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not load poll")
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": saved})
 }
 
 func normalizePollOptions(raw []string) []string {

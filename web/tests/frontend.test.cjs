@@ -207,7 +207,7 @@ test('every WotLK class has a distinct class icon and unknown classes fall back'
     const tree = ClassEmblem({ characterClass })
     assert.equal(tree.type, 'img')
     assert.equal(tree.props['aria-hidden'], 'true')
-    assert.match(tree.props.src, /^https:\/\/wow\.zamimg\.com\/images\/wow\/icons\/large\/classicon_[a-z]+\.jpg$/)
+    assert.match(tree.props.src, /^\/class-icons\/classicon_[a-z]+\.jpg$/)
     return tree.props.src
   })
   assert.equal(new Set(graphics).size, 10)
@@ -1115,6 +1115,14 @@ test('login has a synchronous guard and German network failure feedback', async 
   assert.equal(nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit' && text(n) === 'Anmelden')[0].props.disabled, false)
 })
 
+test('registration password field states the 1024-byte limit in German (REQ-AUTH-023)', () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/Login.tsx').LoginPage)
+  button(view, 'Registrieren').props.onClick()
+  view.render()
+  assert.match(text(view.tree), /höchstens 1024 Bytes/)
+})
+
 test('login goes back to the password step after too many wrong MFA codes', async () => {
   const s = setup()
   const { ApiError } = s.load('api.ts')
@@ -1321,6 +1329,45 @@ test('archived loot addition requires reason and sends roster character ID', asy
   assert.equal(write.body.awarded_to_character_id, 20)
   write.reject(new Error('offline'))
   await first
+})
+
+test('open raids withdraw loot without a reason while archived raids require one', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { attendance: [attendanceRow, recipientRow], loot: [lootRow] })
+  await flush(view)
+  button(view, 'Loot korrigieren').props.onClick()
+  view.render()
+  assert.equal(input(view, 'Loot-Begründung'), undefined, 'open raids show no reason field')
+  assert.equal(button(view, 'Loot zurückziehen').props.disabled, false)
+  button(view, 'Loot zurückziehen').props.onClick()
+  assert.equal(writes(s)[0].method, 'post')
+  assert.equal(writes(s)[0].url, '/api/v1/raids/1/loot/8/withdraw')
+  assert.deepEqual(writes(s)[0].body, {})
+  writes(s)[0].reject(new Error('offline'))
+  await flush(view)
+})
+
+test('archived loot withdrawal needs a trimmed reason before it is sent', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, completed)
+  await flush(view)
+  button(view, 'Loot korrigieren').props.onClick()
+  view.render()
+  assert.equal(button(view, 'Loot zurückziehen').props.disabled, true)
+  input(view, 'Loot-Begründung').props.onChange(change(' 	 '))
+  view.render()
+  assert.equal(button(view, 'Loot zurückziehen').props.disabled, true)
+  button(view, 'Loot zurückziehen').props.onClick()
+  assert.equal(writes(s).length, 0)
+  input(view, 'Loot-Begründung').props.onChange(change('  wrong recipient  '))
+  view.render()
+  assert.equal(button(view, 'Loot zurückziehen').props.disabled, false)
+  button(view, 'Loot zurückziehen').props.onClick()
+  assert.deepEqual(writes(s)[0].body, { reason: 'wrong recipient' })
+  writes(s)[0].reject(new Error('offline'))
+  await flush(view)
 })
 
 test('switching correction records resets reason and invalidates old handlers synchronously', async () => {
@@ -1934,6 +1981,22 @@ test('registration history names the player a redeemed code was linked to', asyn
   assert.match(page, /@mira ·\s+12\.10\.2026/)
   assert.match(page, /Eingelöst/)
   assert.ok(nodes(view.tree, (n) => n.props && n.props.to === '/players/3').length > 0, 'links to the player')
+})
+
+test('a name match shows the player and creates the code only with the Admin choice', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RegistrationRequests.tsx').RegistrationRequestsPage)
+  const request = { id: 9, requester_player_id: null, status: 'PENDING', purpose: 'NEW_ACCOUNT', external_source: 'rising-gods', external_profile_id: '5', external_profile_url: '', character_name: 'Mirabelle', class: 'Paladin', main_spec: 'Heilig', second_spec: '', level: 80, race: '', faction: '', created_at: '2026-10-12T10:00:00Z', updated_at: '2026-10-12T10:00:00Z', name_match: { player_id: 3, player_name: 'Mira' } }
+  s.requests.forEach((r) => r.resolve([request]))
+  await flush(view)
+  assert.match(text(view.tree), /Namensübereinstimmung/)
+  assert.equal(button(view, 'Code erstellen').props.disabled, true)
+  assert.ok(nodes(view.tree, (n) => n.props && n.props.to === '/players/3').length > 0, 'links to the matching player')
+  const attach = button(view, 'Diesem Spieler zuordnen').props.onClick()
+  const write = s.requests.find((r) => r.method === 'post')
+  assert.deepEqual(write.body, { match_choice: 'ATTACH', match_player_id: 3 })
+  write.reject(new Error('stop'))
+  await attach
 })
 
 test('guests get no wishlist controls and no wishlist reads in the catalog', async () => {
@@ -3275,7 +3338,7 @@ test('staff can mark a player as unsure; unsure is listed apart from declined', 
   resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [], absences: [{ player_id: 3, reason: '', status: 'DECLINED', created_at: '2030-01-01T00:00:00Z' }] })
   resolveIf(s, '/api/v1/players/1/characters', [])
   await flush(view)
-  assert.match(text(view.tree), /Absagen & Unsicher \(\s*1\s*\).*Krank.*Hat abgesagt/s)
+  assert.match(text(view.tree), /1\s*abgesagt.*Krank.*Hat abgesagt/s)
   select(view, 'Spieler markieren').props.onChange(change('2'))
   view.render()
   button(view, 'Als unsicher markieren').props.onClick()
@@ -3424,6 +3487,18 @@ test('completed raids do not offer removing participants', async () => {
   nodes(view.tree, (n) => n.type === 'button' && n.props.title === 'Teilnahme korrigieren')[0].props.onClick()
   view.render()
   assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Aus dem Raid entfernen').length, 0)
+})
+
+test('the recruitment editor waits for the saved template, so a late load cannot overwrite edits', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const { RaidRecruitment } = s.load('pages/Recruitment.tsx')
+  const view = s.mount(RaidRecruitment, { raidID: 8, seriesID: 3, attendance: [] })
+  assert.match(text(view.tree), /Vorlage wird geladen/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Setup leeren').length, 0, 'no editing before the template arrived')
+  const setupGrid = Array.from({ length: 5 }, () => ['Maintank', 'Offtank', 'Leer', 'Irgendein MDD', 'Irgendein RDD'])
+  resolveIf(s, '/api/v1/raids/8/recruitment-template', { text: 'Gespeichert', setup: setupGrid, updated_by: 1, updated_at: '2030-01-01T10:00:00Z' })
+  await flush(view)
+  assert.equal(button(view, 'Setup leeren').props.disabled, undefined)
 })
 
 test('recruitment template is loaded from the server, saved explicitly and the refresh only reloads the roster', async () => {
@@ -3623,6 +3698,18 @@ test('the mfa_setup_required error is shown in German (REQ-AUTH-020)', async () 
   }
 })
 
+test('the last_admin error is shown in German (REQ-ACCOUNT-015)', async () => {
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async () => ({ ok: false, status: 409, statusText: 'Conflict', headers: { get: () => 'application/json' }, json: async () => ({ error: { code: 'last_admin', message: 'at least one active admin must remain' } }), text: async () => '{"error":{"code":"last_admin","message":"at least one active admin must remain"}}' })
+  try {
+    const s = setup({ id: 7, role: 'ADMIN' })
+    const real = s.load('api.ts')
+    await assert.rejects(real.api.get('/api/v1/players'), (err) => err.code === 'last_admin' && /mindestens ein aktiver Admin/.test(err.message))
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
 test('the account-security deep link opens the profile account tab (ADR 092)', async () => {
   const s = setup({ id: 2, role: 'MEMBER' })
   const { PlayerDetailPage } = s.load('pages/PlayerDetail.tsx')
@@ -3638,24 +3725,493 @@ test('the account-security deep link opens the profile account tab (ADR 092)', a
   assert.equal(nodes(plain.tree, (n) => n.type === 'section' && n.props.id === 'profile-account')[0].props.hidden, true)
 })
 
-test('loot that went to nobody: listed for everyone, staff record more (ADR 089)', async () => {
+test('loot that went to nobody: listed for everyone, staff remove entries (ADR 089)', async () => {
   const s = setup()
-  const bosses = [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }]
-  const view = s.mount(s.load('components/UnclaimedLoot.tsx').UnclaimedLoot, { raidID: 1, canWrite: true, needsReason: false, bosses, version: 0 })
+  const { UnclaimedLootList } = s.load('components/UnclaimedLoot.tsx')
+  const view = s.mount(UnclaimedLootList, { raidID: 1, canWrite: true, needsReason: false, version: 0 })
   assert.equal(resolveIf(s, '/api/v1/raids/1/unclaimed-loot', [{ id: 1, boss: 'Saurfang', item_id: '50667', item_name: 'Gürtelbund des gerechten Zorns', outcome: 'DISENCHANTED', holder_name: 'Shanna', notes: '', source: 'addon' }]), true)
   await flush(view)
   assert.match(text(view.tree), /Gürtelbund des gerechten Zorns/)
   assert.match(text(view.tree), /Entzaubert/)
   assert.match(text(view.tree), /\(Addon\)/)
-  input(view, 'Name des Gegenstands').props.onChange(change('Bryntroll'))
-  view.render()
-  nodes(view.tree, (n) => n.type === 'form')[0].props.onSubmit({ preventDefault() {} })
-  assert.equal(writes(s)[0].url, '/api/v1/raids/1/unclaimed-loot')
-  assert.deepEqual(writes(s)[0].body, { catalog_boss_id: '', item_name: 'Bryntroll', outcome: 'NOBODY', holder_name: '', notes: '', reason: '' })
+  assert.equal(nodes(view.tree, (n) => n.type === 'form').length, 0)
+  button(view, 'Entfernen').props.onClick()
+  assert.equal(writes(s)[0].url, '/api/v1/unclaimed-loot/1/remove')
 
   const reader = setup({ id: 2, role: 'MEMBER' })
-  const empty = reader.mount(reader.load('components/UnclaimedLoot.tsx').UnclaimedLoot, { raidID: 1, canWrite: false, needsReason: false, bosses: [], version: 0 })
+  const empty = reader.mount(reader.load('components/UnclaimedLoot.tsx').UnclaimedLootList, { raidID: 1, canWrite: false, needsReason: false, version: 0 })
   assert.equal(resolveIf(reader, '/api/v1/raids/1/unclaimed-loot', []), true)
   await flush(empty)
   assert.doesNotMatch(text(empty.tree) || '', /Beute ohne Empfänger/)
+})
+
+test('the unclaimed-loot form records an item without loading the list and reports the add', async () => {
+  const s = setup()
+  let added = 0
+  const bosses = [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }]
+  const view = s.mount(s.load('components/UnclaimedLoot.tsx').UnclaimedLootForm, { raidID: 1, needsReason: true, bosses, onAdded: () => { added++ } })
+  assert.equal(s.requests.filter((r) => r.method === 'get').length, 0)
+  input(view, 'Name des Gegenstands').props.onChange(change('Bryntroll'))
+  view.render()
+  const submit = () => nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit')[0]
+  assert.equal(submit().props.disabled, true)
+  const reasonField = nodes(view.tree, (n) => n.type === 'label' && text(n).startsWith('Grund'))[0]
+  nodes(reasonField, (n) => n.type === 'input')[0].props.onChange(change('Nachgetragen'))
+  view.render()
+  assert.equal(submit().props.disabled, false)
+  nodes(view.tree, (n) => n.type === 'form')[0].props.onSubmit({ preventDefault() {} })
+  assert.equal(writes(s)[0].url, '/api/v1/raids/1/unclaimed-loot')
+  assert.deepEqual(writes(s)[0].body, { catalog_boss_id: '', item_name: 'Bryntroll', outcome: 'NOBODY', holder_name: '', notes: '', reason: 'Nachgetragen' })
+  writes(s)[0].resolve({ id: 7 })
+  await flush(view)
+  assert.equal(added, 1)
+})
+
+test('loot entry switches between a player award and loot that went to nobody', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+  await flush(view)
+  const kind = () => nodes(nodes(view.tree, (n) => n.type === 'label' && text(n).startsWith('Art der Erfassung'))[0], (n) => n.type === 'select')[0]
+  const unclaimedForm = () => nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'UnclaimedLootForm')[0]
+  assert.equal(kind().props.value, 'award')
+  assert.ok(select(view, 'Loot-Boss'))
+  assert.equal(unclaimedForm(), undefined)
+  kind().props.onChange(change('unclaimed'))
+  view.render()
+  assert.equal(select(view, 'Loot-Boss'), undefined)
+  assert.equal(unclaimedForm().props.raidID, 1)
+  assert.ok(nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'UnclaimedLootList')[0])
+})
+
+test('staff see the signup list with class emblems first and their own signup folded away', async () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const view = s.mount(s.load('components/RaidSignups.tsx').RaidSignups, {
+    raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' },
+    attendance: [{ id: 44, player_id: 3, character_id: 30, character_name: 'Direkt', class: 'Priester', spec: 'Heilig', role: 'HEAL' }],
+    players: [{ id: 1, name: 'Leitung', active: true }, { id: 2, name: 'Neu', active: true }, { id: 3, name: 'Gesetzt', active: true }], onRosterChange: async () => {},
+  })
+  resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, absences: [], entries: [
+    { id: 4, player_id: 2, character_id: 20, character_name: 'Funkenflug', class: 'Magier', spec: 'Feuer', attendance_id: 0, is_accepted: false, is_withdrawn: false },
+  ] })
+  resolveIf(s, '/api/v1/players/1/characters', [])
+  await flush(view)
+  const flat = text(view.tree)
+  assert.match(flat, /Anmeldeliste.*Neu.*Ausstehend.*Funkenflug.*Magier\s+·\s+Feuer.*Gesetzt.*In der Aufstellung.*Direkt.*Priester\s+·\s+Heilig.*Von der Raidleitung eingetragen.*Eigene Anmeldung/s)
+  assert.deepEqual(nodes(view.tree, (n) => n.type?.name === 'ClassEmblem').map((n) => n.props.characterClass), ['Magier', 'Priester'])
+  assert.equal(nodes(view.tree, (n) => n.type === 'details').length, 1, 'own signup is folded for staff')
+  button(view, 'In Aufstellung übernehmen').props.onClick()
+  assert.equal(writes(s)[0].url, '/api/v1/raids/8/signups/4/accept')
+})
+
+test('poll editor keeps option ids so renamed options keep their votes, and can reopen a poll', () => {
+  const s = setup({ id: 1, role: 'RAIDASSISTENT' })
+  const saved = []
+  const poll = { id: 5, title: 'Raidtag', description: '', poll_type: 'CHOICE', allow_multiple: false, status: 'CLOSED', closes_at: null, options: [{ id: 11, label: 'Mittwoch' }, { id: 12, label: 'Donnerstag' }] }
+  const view = s.mount(s.load('components/PollEditor.tsx').PollEditor, { poll, pending: false, onSave: (body) => saved.push(body), onCancel: () => {} })
+  nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Antwort 2')[0].props.onChange(change('Donnerstag 20 Uhr'))
+  view.render()
+  nodes(view.tree, (n) => n.type === 'button' && n.props['aria-label'] === 'Antwort 2 nach oben')[0].props.onClick()
+  view.render()
+  button(view, 'Antwort hinzufügen').props.onClick()
+  view.render()
+  nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Antwort 3')[0].props.onChange(change('Samstag'))
+  nodes(view.tree, (n) => n.type === 'select')[0].props.onChange(change('OPEN'))
+  view.render()
+  form(view).props.onSubmit(event)
+  assert.deepEqual(saved, [{ title: 'Raidtag', description: '', status: 'OPEN', closes_at: '', options: [{ id: 12, label: 'Donnerstag 20 Uhr' }, { id: 11, label: 'Mittwoch' }, { id: 0, label: 'Samstag' }] }])
+})
+
+test('install hint picks the browser prompt, iPhone steps, or nothing (FR-28.5)', () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { installHint } = s.load('installHint.ts')
+  const base = { isStandalone: false, isDismissed: false, hasPrompt: false, isIOS: false }
+  assert.equal(installHint(base), 'none', 'no prompt and no iPhone: nothing to offer')
+  assert.equal(installHint({ ...base, hasPrompt: true }), 'prompt')
+  assert.equal(installHint({ ...base, isIOS: true }), 'ios')
+  assert.equal(installHint({ ...base, hasPrompt: true, isStandalone: true }), 'none', 'already installed')
+  assert.equal(installHint({ ...base, isIOS: true, isDismissed: true }), 'none', 'hidden for this session')
+})
+
+test('install hint shows the iPhone steps and can be hidden (FR-28.5)', () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, writable: true, value: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', maxTouchPoints: 5 } })
+  try {
+    const s = setup({ id: 1, role: 'MEMBER' })
+    const view = s.mount(s.load('components/PWAInstall.tsx').PWAInstall)
+    view.render()
+    assert.match(text(view.tree), /Zum Home-Bildschirm/)
+    assert.equal(nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Installieren').length, 0, 'iPhone has no install button')
+    nodes(view.tree, (n) => n.type === 'button' && n.props['aria-label'] === 'Hinweis für diese Sitzung ausblenden')[0].props.onClick()
+    view.render()
+    assert.equal(view.tree, null)
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'navigator', previous)
+    else delete globalThis.navigator
+  }
+})
+
+test('the service worker caches nothing and handles no requests (FR-28.5, SC-052)', () => {
+  const worker = fs.readFileSync(path.resolve(__dirname, '../public/sw.js'), 'utf8')
+  assert.doesNotMatch(worker, /addEventListener\(\s*['"]fetch['"]/)
+  assert.doesNotMatch(worker, /caches\.|CacheStorage|importScripts/)
+  const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../public/manifest.webmanifest'), 'utf8'))
+  for (const size of ['192x192', '512x512']) {
+    const icon = manifest.icons.find((entry) => entry.sizes === size && entry.type === 'image/png')
+    assert.ok(icon && fs.existsSync(path.resolve(__dirname, '../public', icon.src.slice(1))), `PNG icon ${size}`)
+  }
+})
+
+function runServiceWorker() {
+  const listeners = {}
+  const shown = []
+  const opened = []
+  const self = {
+    location: { origin: 'https://raid.example' },
+    addEventListener: (type, fn) => { listeners[type] = fn },
+    skipWaiting: () => {},
+    registration: { showNotification: (title, options) => { shown.push({ title, options }); return Promise.resolve() } },
+    clients: { claim: () => Promise.resolve(), matchAll: () => Promise.resolve([]), openWindow: (url) => { opened.push(url); return Promise.resolve() } },
+  }
+  vm.runInNewContext(fs.readFileSync(path.resolve(__dirname, '../public/sw.js'), 'utf8'), { self, URL })
+  const fire = (type, event) => {
+    let pending = Promise.resolve()
+    listeners[type]({ ...event, waitUntil: (p) => { pending = p } })
+    return pending
+  }
+  return { listeners, shown, opened, fire }
+}
+
+test('a push shows only a fixed German text for its kind (FR-32, SC-053)', async () => {
+  const sw = runServiceWorker()
+  const data = (value) => ({ json: () => JSON.parse(value) })
+  await sw.fire('push', { data: data('{"kind":"poll","title":"Geheimer Titel"}') })
+  await sw.fire('push', { data: data('{"kind":"raid"}') })
+  await sw.fire('push', { data: data('{"kind":"roster"}') })
+  await sw.fire('push', { data: data('{"kind":"<b>unbekannt</b>"}') })
+  await sw.fire('push', { data: { json: () => { throw new Error('not json') } } })
+  await sw.fire('push', { data: null })
+  assert.deepEqual(sw.shown.map((n) => n.options.body), [
+    'Es gibt eine neue Umfrage.',
+    'Es wurde ein neuer Raid geplant.',
+    'Du stehst in einer Raid-Aufstellung.',
+    'Es gibt Neuigkeiten in RAID.',
+    'Es gibt Neuigkeiten in RAID.',
+    'Es gibt Neuigkeiten in RAID.',
+  ])
+  assert.ok(sw.shown.every((n) => n.title === 'RAID' && !JSON.stringify(n).includes('Geheim') && !JSON.stringify(n).includes('<b>')))
+  await sw.fire('notificationclick', { notification: { close: () => {}, data: sw.shown[0].options.data } })
+  assert.deepEqual(sw.opened, ['https://raid.example/#/polls'])
+})
+
+test('push opt-in states, including iPhone without installation (FR-32)', () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { pushAvailability, base64URLToBytes, subscriptionBody } = s.load('pushNotifications.ts')
+  const base = { hasPushAPI: true, isIOS: false, isStandalone: false, permission: 'default', serverEnabled: true }
+  assert.equal(pushAvailability(base), 'available')
+  assert.equal(pushAvailability({ ...base, serverEnabled: false }), 'server-off')
+  assert.equal(pushAvailability({ ...base, isIOS: true }), 'ios-install')
+  assert.equal(pushAvailability({ ...base, isIOS: true, isStandalone: true }), 'available')
+  assert.equal(pushAvailability({ ...base, hasPushAPI: false, permission: 'unsupported' }), 'unsupported')
+  assert.equal(pushAvailability({ ...base, permission: 'denied' }), 'denied')
+  assert.deepEqual(Array.from(base64URLToBytes('-_8')), [0xfb, 0xff])
+  assert.deepEqual(subscriptionBody({ endpoint: 'https://fcm.googleapis.com/x', expirationTime: null, keys: { p256dh: 'p', auth: 'a' } }), { endpoint: 'https://fcm.googleapis.com/x', p256dh: 'p', auth: 'a' })
+})
+
+test('push changes run one at a time and a failed one does not block the next (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { runExclusive } = s.load('pushNotifications.ts')
+  const events = []
+  let releaseFirst
+  const first = runExclusive(() => new Promise((resolve) => { events.push('first:start'); releaseFirst = () => { events.push('first:end'); resolve('a') } }))
+  const second = runExclusive(async () => { events.push('second:start'); throw new Error('boom') })
+  const third = runExclusive(async () => { events.push('third:start'); return 'c' })
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(events, ['first:start'])
+  releaseFirst()
+  assert.equal(await first, 'a')
+  await assert.rejects(second, /boom/)
+  assert.equal(await third, 'c')
+  assert.deepEqual(events, ['first:start', 'first:end', 'second:start', 'third:start'])
+})
+
+const pushCheckInHarness = () => {
+  const subscription = { endpoint: 'https://fcm.googleapis.com/x', drops: 0, unsubscribe: () => { subscription.drops++; return Promise.resolve(true) } }
+  return subscription
+}
+const immediateQueue = (step) => step(new AbortController().signal)
+const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+test('the push check-in keeps only a subscription the server confirms and fails closed (FR-32.3, ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const run = (subscription, ask, deadlineMs = 1000) => checkInWithDeadline({ queue: immediateQueue, getSubscription: () => Promise.resolve(subscription), ask, deadlineMs })
+
+  assert.equal(await run(null, () => Promise.resolve(true)), 'none')
+  const own = pushCheckInHarness()
+  assert.equal(await run(own, () => Promise.resolve(true)), 'active')
+  assert.equal(own.drops, 0)
+  const foreign = pushCheckInHarness()
+  assert.equal(await run(foreign, () => Promise.resolve(false)), 'dropped')
+  assert.equal(foreign.drops, 1)
+  const failed = pushCheckInHarness()
+  assert.equal(await run(failed, () => Promise.reject(new Error('offline'))), 'dropped')
+  assert.equal(failed.drops, 1)
+  let signal
+  const hanging = pushCheckInHarness()
+  assert.equal(await run(hanging, (_endpoint, given) => { signal = given; return new Promise(() => {}) }, 20), 'timeout')
+  await settle(5)
+  assert.equal(hanging.drops, 1)
+  assert.equal(signal.aborted, true)
+})
+
+test('a stalled unsubscribe never holds the check-in (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const stalled = { endpoint: 'https://fcm.googleapis.com/x', drops: 0, unsubscribe: () => { stalled.drops++; return new Promise(() => {}) } }
+  const started = Date.now()
+  const outcome = await checkInWithDeadline({ queue: immediateQueue, getSubscription: () => Promise.resolve(stalled), ask: () => Promise.resolve(false), deadlineMs: 1000 })
+  assert.equal(outcome, 'dropped')
+  assert.equal(stalled.drops, 1)
+  assert.ok(Date.now() - started < 500, 'the check-in waited for unsubscribe')
+})
+
+test('a push step that never finishes ends at the deadline and still drops the subscription (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline, runExclusive } = s.load('pushNotifications.ts')
+  const subscription = pushCheckInHarness()
+  const blocked = () => new Promise(() => {})
+  let asked = false
+  const outcome = await checkInWithDeadline({ queue: blocked, getSubscription: () => Promise.resolve(subscription), ask: () => { asked = true; return Promise.resolve(true) }, deadlineMs: 20 })
+  assert.equal(outcome, 'timeout')
+  await settle(5)
+  assert.equal(subscription.drops, 1)
+  assert.equal(asked, false)
+  // The real queue does not let one stalled step hold the next one forever.
+  void runExclusive(() => new Promise(() => {}), 20)
+  assert.equal(await runExclusive(async () => 'next', 20), 'next')
+})
+
+test('a timed-out check-in leaves a subscription alone that a newer change created (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const previous = { ...pushCheckInHarness(), endpoint: 'https://fcm.googleapis.com/previous' }
+  const newer = { ...pushCheckInHarness(), endpoint: 'https://fcm.googleapis.com/newer' }
+  let held = previous
+  newer.unsubscribe = () => { newer.drops++; return Promise.resolve(true) }
+  const outcome = await checkInWithDeadline({
+    queue: immediateQueue,
+    getSubscription: () => Promise.resolve(held),
+    // While the server does not answer, the player turns push on again and the browser gets a new subscription.
+    ask: () => { held = newer; return new Promise(() => {}) },
+    deadlineMs: 20,
+  })
+  assert.equal(outcome, 'timeout')
+  await settle(5)
+  assert.equal(newer.drops, 0, 'the newer subscription was dropped by the old check-in')
+})
+
+test('a push change that starts after the wait limit cancels the stalled one (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { runExclusive } = s.load('pushNotifications.ts')
+  let stalledSignal
+  const stalled = runExclusive((signal) => { stalledSignal = signal; return settle(60).then(() => signal.aborted) }, 20)
+  const newer = await runExclusive(async (signal) => signal.aborted, 20)
+  assert.equal(newer, false, 'the newer change runs normally')
+  assert.equal(await stalled, true, 'the stalled change sees it was cancelled')
+  assert.equal(stalledSignal.aborted, true)
+  // A read-only step waits the same way but cancels nothing.
+  let readSignal
+  const slow = runExclusive((signal) => { readSignal = signal; return settle(60) }, 20)
+  await runExclusive(async () => undefined, 20, false)
+  await slow
+  assert.equal(readSignal.aborted, false)
+})
+
+test('a cancelled enable keeps a subscription that existed before and removes only one it created (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { enableSubscription } = s.load('pushNotifications.ts')
+  const browserSub = (endpoint) => {
+    const sub = { endpoint, drops: 0, unsubscribe: () => { sub.drops++; return Promise.resolve(true) }, toJSON: () => ({ endpoint, keys: { p256dh: 'p', auth: 'a' } }) }
+    return sub
+  }
+
+  // An existing subscription, a stalled enable, and a newer change that cancels it.
+  const existing = browserSub('https://fcm.googleapis.com/existing')
+  let controller = new AbortController()
+  let registered = 0
+  const stalledExisting = enableSubscription({
+    getSubscription: () => settle(30).then(() => existing),
+    subscribe: () => Promise.reject(new Error('must not subscribe')),
+    register: () => { registered++; return Promise.resolve() },
+  }, controller.signal)
+  controller.abort()
+  await assert.rejects(stalledExisting, /superseded/)
+  assert.equal(existing.drops, 0, 'the existing subscription was removed by the cancelled enable')
+  assert.equal(registered, 0)
+
+  // Cancelled while the browser created a new subscription: that one is removed again.
+  const fresh = browserSub('https://fcm.googleapis.com/fresh')
+  controller = new AbortController()
+  const stalledCreate = enableSubscription({
+    getSubscription: () => Promise.resolve(null),
+    subscribe: () => settle(30).then(() => fresh),
+    register: () => { registered++; return Promise.resolve() },
+  }, controller.signal)
+  await settle(5)
+  controller.abort()
+  await assert.rejects(stalledCreate, /superseded/)
+  assert.equal(fresh.drops, 1)
+  assert.equal(registered, 0)
+
+  // Cancelled before anything happened: nothing is created.
+  controller = new AbortController()
+  controller.abort()
+  let subscribed = 0
+  await assert.rejects(enableSubscription({ getSubscription: () => Promise.resolve(null), subscribe: () => { subscribed++; return Promise.resolve(fresh) }, register: () => Promise.resolve() }, controller.signal), /superseded/)
+  assert.equal(subscribed, 0)
+
+  // Cancelled while the server request runs: an existing subscription still stays.
+  const kept = browserSub('https://fcm.googleapis.com/kept')
+  controller = new AbortController()
+  const cancelledRegister = enableSubscription({
+    getSubscription: () => Promise.resolve(kept),
+    subscribe: () => Promise.reject(new Error('must not subscribe')),
+    register: (_sub, signal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))),
+  }, controller.signal)
+  await settle(5)
+  controller.abort()
+  await assert.rejects(cancelledRegister, /aborted/)
+  assert.equal(kept.drops, 0)
+
+  // Not cancelled: a failed registration removes the subscription the server does not know.
+  const unknown = browserSub('https://fcm.googleapis.com/unknown')
+  await assert.rejects(enableSubscription({ getSubscription: () => Promise.resolve(unknown), subscribe: () => Promise.reject(new Error('no')), register: () => Promise.reject(new Error('server')) }, new AbortController().signal), /server/)
+  assert.equal(unknown.drops, 1)
+})
+
+test('a late check-in answer after the deadline changes nothing (ADR 103)', async () => {
+  const s = setup({ id: 1, role: 'MEMBER' })
+  const { checkInWithDeadline } = s.load('pushNotifications.ts')
+  const subscription = pushCheckInHarness()
+  const outcome = await checkInWithDeadline({ queue: immediateQueue, getSubscription: () => Promise.resolve(subscription), ask: () => settle(60).then(() => true), deadlineMs: 20 })
+  assert.equal(outcome, 'timeout')
+  await settle(80)
+  assert.equal(subscription.drops, 1, 'dropped once at the deadline and not kept by the late answer')
+})
+
+test('every sign-in path checks push in before the player is shown as signed in (ADR 103)', () => {
+  const read = (file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8')
+  const auth = read('src/auth.tsx')
+  // login, MFA code, security key, and session load: each awaits the check-in before setPlayer.
+  assert.equal((auth.match(/await checkInPush\(\)\s*\n(\s*\/\/[^\n]*\n)?\s*if \(requestVersion === version\.current\)/g) ?? []).length, 4)
+  const push = read('src/pushNotifications.ts')
+  assert.doesNotMatch(push, /localStorage/)
+  assert.match(push, /\/api\/v1\/push\/subscriptions\/sync/)
+  const settings = read('src/components/PushNotificationSettings.tsx')
+  assert.match(settings, /await pushActiveOnThisDevice\(\)/)
+  assert.match(settings, /addEventListener\('visibilitychange'/)
+  // The permission prompt stays outside the queue so it still belongs to the click.
+  assert.match(push, /requestPermission\(\)[\s\S]*await runExclusive\(/)
+})
+
+test('the browser is asked for notification permission only after a click (FR-32)', () => {
+  const sources = ['src/pushNotifications.ts', 'src/components/PushNotificationSettings.tsx', 'src/auth.tsx', 'src/App.tsx', 'src/components/PWAInstall.tsx']
+    .map((file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8'))
+  const calls = sources.join('\n').match(/requestPermission\(/g) ?? []
+  assert.equal(calls.length, 1)
+  assert.match(sources[0], /export async function enablePush[\s\S]*requestPermission\(/)
+  assert.match(sources[2], /if \(browserHasPushAPI\(\)\) await disablePushOnLogout\(\)\s*\n\s*try \{\s*\n\s*await api\.post<void>\('\/api\/v1\/auth\/logout'\)/)
+})
+
+const statisticsFixture = {
+  raids_by_status: [{ status: 'PLANNED', count: 1 }, { status: 'OPEN', count: 0 }, { status: 'COMPLETED', count: 3 }, { status: 'CANCELLED', count: 0 }],
+  class_distribution: [{ class: 'Magier', count: 2 }],
+  role_history: [{ role: 'TANK', count: 4 }],
+  loot_by_class: [{ class: 'Magier', count: 5 }],
+  top_attendance: [{ player_id: 3, player_name: 'Anna', count: 3 }],
+  top_loot: [{ player_id: 3, player_name: 'Anna', count: 5 }],
+}
+
+test('TestReqStats011_AC01 statistics render from the endpoint without a session', async () => {
+  const s = setup(null)
+  const view = s.mount(s.load('pages/Statistics.tsx').StatisticsPage)
+  s.requests[0].resolve(statisticsFixture)
+  await flush(view)
+  const cards = nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'StatCard').map((n) => [n.props.label, n.props.value])
+  assert.deepEqual(cards, [['Raids', 4], ['Archivierte Raids', 3], ['Aktive Charaktere', 2], ['Loot-Einträge', 5]])
+  const tables = nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'LeaderTable')
+  assert.deepEqual(tables.map((n) => n.props.rows[0].player_name), ['Anna', 'Anna'])
+  const app = fs.readFileSync(path.resolve(__dirname, '../src/App.tsx'), 'utf8')
+  assert.match(app, /path !== '\/addons' && !path\.startsWith\('\/addons\/'\) && path !== '\/statistics'/)
+})
+
+test('TestReqStats011_AC02 the page calls only the statistics endpoint', async () => {
+  const s = setup(null)
+  const view = s.mount(s.load('pages/Statistics.tsx').StatisticsPage)
+  s.requests[0].resolve(statisticsFixture)
+  await flush(view)
+  assert.deepEqual(s.requests.map((r) => `${r.method} ${r.url}`), ['get /api/v1/statistics'])
+})
+
+test('TestReqStats011_AC03 a failing endpoint shows the shared error component', async () => {
+  const s = setup(null)
+  const view = s.mount(s.load('pages/Statistics.tsx').StatisticsPage)
+  s.requests[0].reject(new Error('down'))
+  await flush(view)
+  const errors = nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'ErrorMessage')
+  assert.equal(errors.length, 1)
+  assert.match(text(errors[0]), /Statistiken konnten nicht geladen werden/)
+})
+
+test('the class icons are bundled with the site', () => {
+  const fs = require('node:fs')
+  const path = require('node:path')
+  for (const name of ['deathknight', 'druid', 'hunter', 'mage', 'paladin', 'priest', 'shaman', 'rogue', 'warlock', 'warrior']) {
+    assert.ok(fs.statSync(path.join(__dirname, '..', 'public', 'class-icons', `classicon_${name}.jpg`)).size > 0)
+  }
+})
+
+test('the EP-floor warning names the player and the points not taken and asks before saving', () => {
+  const { EpShortfallWarning } = setup().load('components/EpShortfallWarning.tsx')
+  let confirmed = 0
+  let cancelled = 0
+  const view = setup().mount(EpShortfallWarning, {
+    shortfalls: [{ player_id: 3, player_name: 'Sternfall', balance: 5, points_taken: 5, points_not_taken: 5 }],
+    pending: false,
+    onConfirm: () => { confirmed++ },
+    onCancel: () => { cancelled++ },
+  })
+  assert.match(text(view.tree), /Sternfall\s*: Es werden nur\s+5\s+EP abgezogen,\s+5\s+EP werden nicht abgezogen/)
+  const buttons = nodes(view.tree, (n) => n.type === 'button')
+  buttons.find((b) => /Trotzdem speichern/.test(text(b))).props.onClick()
+  buttons.find((b) => /Abbrechen/.test(text(b))).props.onClick()
+  assert.equal(confirmed, 1)
+  assert.equal(cancelled, 1)
+})
+
+test('an Admin confirms before anonymising another player and a declined confirmation sends nothing (FR-30.2)', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(s, 2)
+  await flush(view)
+  const anonymiseForm = () => nodes(view.tree, (node) => node.type === 'form' && node.props.onSubmit && nodes(node, (child) => child.type === 'button').some((b) => text(b) === 'Spieler anonymisieren'))[0]
+  assert.ok(anonymiseForm(), 'the anonymise form is shown to Admins on other profiles')
+  s.confirmAnswers.push(false)
+  await anonymiseForm().props.onSubmit({ preventDefault() {} })
+  assert.match(s.confirms[0], /anonymisieren/)
+  assert.equal(writes(s).length, 0)
+  void anonymiseForm().props.onSubmit({ preventDefault() {} })
+  await flush(view)
+  assert.equal(writes(s).length, 1)
+  assert.equal(writes(s)[0].url, '/api/v1/players/2/anonymise')
+  writes(s)[0].resolve({})
+})
+
+test('the own profile offers no anonymise action', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 1 })
+  resolvePlayer(s, 1)
+  await flush(view)
+  assert.equal(button(view, 'Spieler anonymisieren'), undefined)
 })

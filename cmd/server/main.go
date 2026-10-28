@@ -19,9 +19,12 @@ import (
 	"raid-website/internal/db"
 	"raid-website/internal/httpapi"
 	"raid-website/internal/migrations"
+	"raid-website/internal/push"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
+	"raid-website/internal/recruitment"
 	"raid-website/internal/registration"
+	"raid-website/internal/webui"
 )
 
 func main() {
@@ -35,6 +38,9 @@ func run() (err error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
+	}
+	if err := checkWebBuild(cfg.Env, webui.CheckBuilt); err != nil {
+		return err
 	}
 	bdb, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -51,16 +57,33 @@ func run() (err error) {
 	if err := detectNamingPatterns(ctx, bdb.DB); err != nil {
 		return fmt.Errorf("naming pattern detection: %w", err)
 	}
+	if err := reportInvalidRecruitmentSlots(ctx, bdb.DB); err != nil {
+		return fmt.Errorf("recruitment slot report: %w", err)
+	}
+	if removed, err := push.NewService(push.NewRepo(bdb.DB), nil, log.Printf).DeleteUnclaimed(ctx); err != nil {
+		return fmt.Errorf("push cleanup: %w", err)
+	} else if removed > 0 {
+		log.Printf("push: removed %d subscription(s) that never got a device", removed)
+	}
+	var vapidKey *push.VAPIDKey
+	if cfg.VAPIDPrivateKey != "" {
+		if vapidKey, err = push.ParseVAPIDKey(cfg.VAPIDPrivateKey, cfg.VAPIDSubject); err != nil {
+			return fmt.Errorf("config: %w", err)
+		}
+	} else {
+		log.Printf("web push off: VAPID_PRIVATE_KEY is not set")
+	}
 	risingGods := registration.RisingGodsClient{ProxyURL: cfg.RisingGodsProxyURL, ProxyToken: cfg.RisingGodsProxyToken}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
+		PrivacyContactName:    cfg.PrivacyContactName,
+		PrivacyContactAddress: cfg.PrivacyContactAddress,
 		CookieSecure:          cfg.CookieSecure,
 		TrustProxyHeaders:     cfg.TrustProxyHeaders,
 		PublicOrigin:          cfg.PublicOrigin,
 		AdminUsername:         cfg.AdminUsername,
 		AdminPassword:         cfg.AdminPassword,
-		PrivacyContactName:    cfg.PrivacyContactName,
-		PrivacyContactAddress: cfg.PrivacyContactAddress,
 		RegistrationFeed:      risingGods,
+		VAPIDKey:              vapidKey,
 	})
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)
@@ -73,6 +96,18 @@ func run() (err error) {
 	defer stop()
 	log.Printf("listening on %s", cfg.ListenAddr)
 	return serve(stopCtx, newHTTPServer(h), ln, shutdownTimeout)
+}
+
+// checkWebBuild stops a production start without the embedded frontend
+// (NFR-1.1, DR-13); development keeps working without a web build.
+func checkWebBuild(env string, check func() error) error {
+	if env != "production" {
+		return nil
+	}
+	if err := check(); err != nil {
+		return fmt.Errorf("web build: %w", err)
+	}
+	return nil
 }
 
 // Server limits from SECURITY.md SC-026. systemd stops the service after 30 s,
@@ -114,6 +149,22 @@ func serve(ctx context.Context, srv *http.Server, ln net.Listener, grace time.Du
 	}
 	if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
+	}
+	return nil
+}
+
+// reportInvalidRecruitmentSlots logs stored recruitment slots the allow-list no longer
+// accepts. It changes no data; the owner decides what to do with them (FR-23.4).
+func reportInvalidRecruitmentSlots(ctx context.Context, db bun.IDB) error {
+	invalid, err := recruitment.NewService(db).InvalidStoredSlots(ctx)
+	if err != nil {
+		return err
+	}
+	for _, slot := range invalid {
+		log.Printf("recruitment template %s=%d: group %d slot %d not accepted: %q", slot.Scope, slot.ID, slot.Group, slot.Slot, slot.Value)
+	}
+	if len(invalid) > 0 {
+		log.Printf("recruitment: %d stored slot(s) not accepted; no data was changed", len(invalid))
 	}
 	return nil
 }

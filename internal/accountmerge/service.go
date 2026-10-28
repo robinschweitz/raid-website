@@ -9,7 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"raid-website/internal/audit"
 	"raid-website/internal/enhancepoints"
+	"raid-website/internal/player"
 	"raid-website/internal/validation"
 )
 
@@ -56,6 +58,18 @@ func (s *Service) Merge(ctx context.Context, targetID, sourceID, actorID int64, 
 		}
 		if !source.Active {
 			return ErrSourceInactive
+		}
+
+		// The target keeps its own role, so only an Admin source that no active
+		// Admin target replaces can remove the last Admin (SC-047).
+		if source.Role == validation.RoleAdmin && (target.Role != validation.RoleAdmin || !target.Active) {
+			admins, err := repo.CountActiveAdmins(ctx)
+			if err != nil {
+				return fmt.Errorf("count active admins: %w", err)
+			}
+			if admins <= 1 {
+				return player.ErrLastAdmin
+			}
 		}
 
 		sourceLocks, err := repo.ListLocks(ctx, sourceID)
@@ -139,4 +153,61 @@ func auditJSON(v any) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+// AnonymiseAction is the audit action of an anonymisation. The audit display uses it
+// to recognise anonymised players, so it must not change.
+const AnonymiseAction = audit.ActionPlayerAnonymise
+
+// ErrAlreadyAnonymised is returned when the player was anonymised before.
+var ErrAlreadyAnonymised = errors.New("player is already anonymised")
+
+// Anonymise pseudonymises a player (FR-30.2): it deletes the login and every
+// credential, session, MFA, push and profile record in one transaction, and replaces
+// the name. History rows (rosters, loot, EP, audit) stay.
+func (s *Service) Anonymise(ctx context.Context, playerID, actorID int64, reason string) error {
+	if playerID <= 0 || actorID <= 0 {
+		return errors.New("player and actor are required")
+	}
+	reason = strings.TrimSpace(reason)
+	return s.repo.InTransaction(ctx, func(repo *Repo) error {
+		p, err := repo.GetPlayer(ctx, playerID)
+		if err != nil {
+			return fmt.Errorf("load player: %w", err)
+		}
+		done, err := repo.AnonymisedPlayer(ctx, playerID)
+		if err != nil {
+			return fmt.Errorf("check anonymised: %w", err)
+		}
+		if done {
+			return ErrAlreadyAnonymised
+		}
+		if p.Role == validation.RoleAdmin && p.Active {
+			admins, err := repo.CountActiveAdmins(ctx)
+			if err != nil {
+				return fmt.Errorf("count active admins: %w", err)
+			}
+			if admins <= 1 {
+				return player.ErrLastAdmin
+			}
+		}
+		newName := fmt.Sprintf("Ehemaliges Mitglied #%d", playerID)
+		source, err := repo.NameSource(ctx, playerID)
+		if err != nil {
+			return fmt.Errorf("find replacement name: %w", err)
+		}
+		if source != nil {
+			newName = source.Name
+		}
+		now := time.Now().UTC()
+		removed, err := repo.AnonymiseAccount(ctx, p, newName, now)
+		if err != nil {
+			return fmt.Errorf("anonymise player %d: %w", playerID, err)
+		}
+		// The snapshots carry no name, login or credential (SC-031); the old name must
+		// not reappear in the audit display (FR-30.4).
+		before := map[string]any{"id": playerID, "had_login": p.Username != nil, "role": p.Role}
+		after := map[string]any{"id": playerID, "anonymised": true, "removed": removed}
+		return repo.Audit(ctx, actorID, "player", playerID, AnonymiseAction, before, after, reason, now)
+	})
 }

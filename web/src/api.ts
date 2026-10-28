@@ -3,6 +3,8 @@ function germanGuardMessage(code: string, message?: string): string | undefined 
   if (code === 'forbidden' && message === 'insufficient permissions') return 'Dafür fehlt dir die Berechtigung.'
   if (code === 'unauthenticated' && message === 'login required') return 'Bitte melde dich an.'
   if (code === 'mfa_setup_required') return 'Als Admin musst du zuerst einen zweiten Faktor (Authenticator-App oder Sicherheitsschlüssel) einrichten.'
+  if (code === 'last_admin') return 'Es muss mindestens ein aktiver Admin bleiben. Mach zuerst einen anderen Spieler zum Admin.'
+  if (code === 'already_anonymised') return 'Dieser Spieler wurde bereits anonymisiert.'
   return message
 }
 
@@ -29,7 +31,10 @@ async function ensureCSRFToken(): Promise<string> {
   return csrfToken
 }
 
-async function request<T>(method: string, path: string, body?: unknown, envelope = false): Promise<T> {
+// RequestOptions lets a caller abort a request it no longer waits for.
+export type RequestOptions = { signal?: AbortSignal }
+
+async function request<T>(method: string, path: string, body?: unknown, envelope = false, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = body !== undefined ? { 'Content-Type': 'application/json' } : {}
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
     headers['X-CSRF-Token'] = await ensureCSRFToken()
@@ -39,6 +44,7 @@ async function request<T>(method: string, path: string, body?: unknown, envelope
     credentials: 'include',
     headers: Object.keys(headers).length > 0 ? headers : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: options.signal,
   })
   if (res.status === 204) {
     return undefined as T
@@ -65,9 +71,9 @@ async function request<T>(method: string, path: string, body?: unknown, envelope
 
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
+  post: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, false, options),
   postEnvelope: <T>(path: string, body?: unknown) => request<T>('POST', path, body, true),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
-  del: <T>(path: string) => request<T>('DELETE', path),
+  del: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('DELETE', path, body, false, options),
 }

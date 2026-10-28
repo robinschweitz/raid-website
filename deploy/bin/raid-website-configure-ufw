@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "must run as root" >&2
+    exit 1
+fi
+
+# Keep established SSH sessions alive while replacing the unrestricted rule.
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 80/tcp comment 'Raid Website HTTP redirect and ACME'
+ufw allow 443/tcp comment 'Raid Website HTTPS'
+ufw limit 22/tcp comment 'SSH rate limited'
+ufw --force delete allow 'Nginx Full' || true
+ufw --force delete allow OpenSSH || true
+ufw --force delete allow 22/tcp || true
+ufw --force enable
+ufw logging low
+ufw status verbose

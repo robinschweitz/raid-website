@@ -34,6 +34,13 @@ func (r *Repo) runInTx(ctx context.Context, fn func(context.Context, bun.Tx) err
 	return r.db.RunInTx(ctx, nil, fn)
 }
 
+// list returns every stored template.
+func (r *Repo) list(ctx context.Context) ([]row, error) {
+	var rows []row
+	err := r.db.NewSelect().Model(&rows).OrderExpr("id ASC").Scan(ctx)
+	return rows, err
+}
+
 // find returns the template stored for series_id or raid_id `col`, or nil.
 func (r *Repo) find(ctx context.Context, col string, id int64) (*row, error) {
 	found := new(row)

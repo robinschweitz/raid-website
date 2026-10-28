@@ -21,6 +21,7 @@ func sessionEndFixture(t *testing.T) (*Service, *player.Repo, *player.Player, st
 	if err != nil {
 		t.Fatal(err)
 	}
+	seedSecondAdmin(t, players)
 	device1, _, err := svc.Login(ctx, "owner", "initial-password")
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +44,7 @@ func isAuthenticated(t *testing.T, svc *Service, token string) bool {
 
 func TestReqAuth017_AC01(t *testing.T) {
 	svc, _, owner, device1, device2 := sessionEndFixture(t)
-	if err := svc.ChangeOwnPassword(context.Background(), owner.ID, device1, "initial-password", "replacement-password"); err != nil {
+	if err := svc.ChangeOwnPassword(context.Background(), owner.ID, device1, "", "initial-password", "replacement-password"); err != nil {
 		t.Fatal(err)
 	}
 	if !isAuthenticated(t, svc, device1) {
@@ -57,10 +58,10 @@ func TestReqAuth017_AC01(t *testing.T) {
 func TestReqAuth017_OwnPasswordFailureKeepsSessions(t *testing.T) {
 	svc, _, owner, device1, device2 := sessionEndFixture(t)
 	ctx := context.Background()
-	if err := svc.ChangeOwnPassword(ctx, owner.ID, device1, "wrong-password-x", "replacement-password"); err == nil {
+	if err := svc.ChangeOwnPassword(ctx, owner.ID, device1, "", "wrong-password-x", "replacement-password"); err == nil {
 		t.Fatal("wrong current password accepted")
 	}
-	if err := svc.ChangeOwnPassword(ctx, owner.ID, device1, "initial-password", "short"); err == nil {
+	if err := svc.ChangeOwnPassword(ctx, owner.ID, device1, "", "initial-password", "short"); err == nil {
 		t.Fatal("weak password accepted")
 	}
 	if !isAuthenticated(t, svc, device1) || !isAuthenticated(t, svc, device2) {
@@ -111,7 +112,7 @@ func TestReqAuth017_AC04(t *testing.T) {
 			}
 			var err error
 			if scenario == "own password" {
-				err = svc.ChangeOwnPassword(ctx, owner.ID, device1, "initial-password", "replacement-password")
+				err = svc.ChangeOwnPassword(ctx, owner.ID, device1, "", "initial-password", "replacement-password")
 			} else {
 				_, err = svc.SetCredentials(ctx, owner.ID, "renamed", "replacement-password", validation.RoleMember, 0)
 			}

@@ -1,0 +1,2 @@
+# Host files run on Linux; keep LF on every checkout (SC-037).
+deploy/** text eol=lf

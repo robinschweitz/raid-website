@@ -9,10 +9,18 @@ package webui
 
 import (
 	"embed"
+	"errors"
 	"io/fs"
+	"mime"
 	"net/http"
 	"strings"
 )
+
+func init() {
+	// The system MIME table differs per host; the web manifest needs its own type
+	// on every one (FR-28.5).
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
 
 //go:embed all:dist
 var distFS embed.FS
@@ -20,6 +28,27 @@ var distFS embed.FS
 // FS returns the compiled frontend assets rooted at the dist directory.
 func FS() (fs.FS, error) {
 	return fs.Sub(distFS, "dist")
+}
+
+// ErrNotBuilt reports that the embedded frontend has no index.html.
+var ErrNotBuilt = errors.New("web build missing: run cd web && npm ci && npm run build before go build")
+
+// CheckBuilt returns ErrNotBuilt when the binary was built without the
+// frontend, so production can refuse to start (NFR-1.1, DR-13).
+func CheckBuilt() error {
+	root, err := FS()
+	if err != nil {
+		return err
+	}
+	return checkIndex(root)
+}
+
+func checkIndex(root fs.FS) error {
+	info, err := fs.Stat(root, "index.html")
+	if err != nil || info.IsDir() {
+		return ErrNotBuilt
+	}
+	return nil
 }
 
 // Handler serves the embedded SPA and falls back to index.html for unknown

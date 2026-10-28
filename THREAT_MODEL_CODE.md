@@ -77,7 +77,7 @@ No numeric risk scores; the **Impact** line says in words what an attacker gains
 - **Impact:** someone whose new character carries the name of an old imported character gets that
   player's history and EP. The Admin issues the code and can see the linked player afterwards
   (FR-4.9).
-- **Status:** CONFIRMED. **Response:** Mitigate (OD-016: Admin confirms). **Rules:** FR-4.5, SC-049.
+- **Status:** CONFIRMED; fixed in #77 (the Admin's choice is stored with the code, redeem never matches by name). **Response:** Mitigate (OD-016: Admin confirms). **Rules:** FR-4.5, SC-049.
 
 **CT-006 — The last Admin can be demoted**
 - **Category:** Denial of service (administration). **Component:** `auth.SetCredentials`.
@@ -103,7 +103,7 @@ No numeric risk scores; the **Impact** line says in words what an attacker gains
 - **Evidence:** the WebAuthn library reports a clone warning when the authenticator's signature
   counter goes backwards; the code stores the new counter but never checks the warning.
 - **Impact:** a copied authenticator keeps working unnoticed (rare for hardware keys).
-- **Status:** CONFIRMED. **Response:** Mitigate. **Rules:** SC-048 (new).
+- **Status:** FIXED (issue #70). **Response:** Mitigate. **Rules:** SC-048.
 
 **CT-009 — MFA codes can be guessed without limit** — `VerifyMFAChallenge` had no failure counter.
 - **Status:** FIXED (PR #121, issue #62). **Response:** Mitigate. **Rules:** SC-011.
@@ -129,7 +129,7 @@ issue #60). **Rules:** SC-043.
 ### Request handling
 
 **CT-013 — CSRF check skipped without browser headers** — `csrfProtection` passes requests that
-carry neither `Origin` nor `Sec-Fetch-Site`. **Status:** CONFIRMED. **Rules:** SC-019.
+carry neither `Origin` nor `Sec-Fetch-Site`. **Status:** CONFIRMED.  Fixed in #68. **Rules:** SC-019.
 
 **CT-014 — No HTTP server timeouts** — `http.ListenAndServe` in `cmd/server/main.go`; also leaves
 GO-2026-6089 (HTTP/2 check without `ReadHeaderTimeout`) more exposed. **Status:** CONFIRMED.
@@ -159,7 +159,7 @@ CONFIRMED. **Rules:** SC-024.
 ### Build, deploy, and repository
 
 **CT-017 — Host scripts not in the repository** — `.gitignore` line `bin/` excludes `deploy/bin/`.
-**Status:** CONFIRMED. **Rules:** SC-037.
+**Status:** FIXED (scripts committed under `deploy/bin/`, host copies identical 2026-10-24, #105). **Rules:** SC-037.
 
 **CT-018 — `main` unprotected** — GitHub API: `protected: false`; ruleset "Protect" disabled.
 **Status:** FIXED (ruleset "Protect" active 2026-10-23, #107). **Rules:** SC-039.
@@ -395,7 +395,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-005 | CONFIRMED | Mitigate | App | SC-049, FR-4.5 | T-043 |
 | CT-006 | CONFIRMED | Mitigate | App | SC-047 | T-044 |
 | CT-007 | CONFIRMED | Mitigate | App | SC-023 | — |
-| CT-008 | CONFIRMED | Mitigate | App | SC-048 | T-045 |
+| CT-008 | FIXED | Mitigate | App | SC-048 | T-045 |
 | CT-009 | FIXED | Mitigate | App | SC-011 | T-005 |
 | CT-010 | FIXED | Mitigate | App | SC-012 | T-006 |
 | CT-011 | CONFIRMED | Mitigate | App | SC-014 | T-011 |
@@ -404,7 +404,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | CT-014 | CONFIRMED | Mitigate | App | SC-026 | T-017 |
 | CT-015 | CONFIRMED | Mitigate | App | SC-028 | T-016, T-035 |
 | CT-016 | CONFIRMED | Eliminate | App | SC-038 | T-022 |
-| CT-017 | CONFIRMED | Mitigate | Ops | SC-037 | T-013 |
+| CT-017 | FIXED | Mitigate | Ops | SC-037 | T-013 |
 | CT-018 | FIXED | Mitigate | Ops | SC-039 | T-012 |
 | CT-019 | CONFIRMED | Mitigate | Ops | SC-036 | T-014 |
 | CT-020 | CONFIRMED | Eliminate | App | SC-024 | T-024 |

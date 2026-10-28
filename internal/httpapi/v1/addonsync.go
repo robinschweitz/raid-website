@@ -13,6 +13,9 @@ import (
 // addon (RaidLedger; formerly RaidSync).
 type AddonSyncHandlers struct {
 	AddonSync *addonsync.Service
+	// Roster sends the roster notifications of FR-32.2 after an import; nil
+	// sends none.
+	Roster *API
 }
 
 // Register adds the addon exchange routes.
@@ -134,12 +137,19 @@ func (h AddonSyncHandlers) applyRosterImport(w http.ResponseWriter, r *http.Requ
 		BadRequest(w, "malformed json body")
 		return
 	}
+	var before map[int64]bool
+	if h.Roster != nil {
+		before = h.Roster.rosterSnapshot(r.Context(), raidID)
+	}
 	results, err := h.AddonSync.ApplyRosterImport(r.Context(), raidID, actor, req.Payload, req.Selections)
 	if err != nil {
 		writeAddonSyncError(w, err)
 		return
 	}
 	writeListJSON(w, results)
+	if h.Roster != nil {
+		h.Roster.notifyNewRosterPlayers(w, r, raidID, actor, before)
+	}
 }
 
 func writeAddonSyncError(w http.ResponseWriter, err error) {

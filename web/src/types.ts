@@ -83,6 +83,8 @@ export interface RegistrationRequest {
   updated_at: string
   // Redeemed requests: the player the code was used for (ADR 084).
   linked_player?: { player_id: number, player_name: string, username: string | null, used_at: string }
+  // Open new-account requests: a player without login owns a character with this name (SC-049).
+  name_match?: { player_id: number, player_name: string }
 }
 
 // Admin-only account overview (ADR 084).
@@ -112,6 +114,8 @@ export interface RegistrationCode {
   used_by_player_id: number | null
   used_by_username: string | null
   revoked_at: string | null
+  match_choice: '' | 'ATTACH' | 'NEW'
+  match_player_id: number | null
 }
 
 export interface AuditLogEntry {
@@ -277,6 +281,9 @@ export interface CatalogItem {
   dps?: number;
 }
 export type CatalogMode = 'NORMAL' | 'HEROIC' | 'HARDMODE'
+
+// A recorded boss kill of a raid (FR-29).
+export interface BossKill { id: number; raid_id: number; catalog_boss_id: string; boss: string; difficulty: CatalogMode }
 export const catalogModeLabels: Record<CatalogMode, string> = { NORMAL: 'Normal', HEROIC: 'Heroisch', HARDMODE: 'Hardmode' }
 export interface CatalogItemDrop extends CatalogItem {
   boss_id: string
@@ -591,4 +598,20 @@ export interface AddonLootImportResult {
   character_name: string
   code: string
   message: string
+}
+
+export interface PlayerCount {
+  player_id: number
+  player_name: string
+  count: number
+}
+
+// Public aggregates of GET /api/v1/statistics (FR-27.3).
+export interface Statistics {
+  raids_by_status: { status: string; count: number }[]
+  class_distribution: { class: string; count: number }[]
+  role_history: { role: string; count: number }[]
+  loot_by_class: { class: string; count: number }[]
+  top_attendance: PlayerCount[]
+  top_loot: PlayerCount[]
 }

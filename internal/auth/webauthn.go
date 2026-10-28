@@ -26,6 +26,10 @@ const (
 	webauthnPurposeLogin        = "LOGIN"
 )
 
+// ErrClonedSecurityKey marks a login that the WebAuthn library flagged as a
+// possible cloned key (SC-048). It is always wrapped together with ErrInvalidMFA.
+var ErrClonedSecurityKey = errors.New("security key signature counter did not increase")
+
 type WebAuthnBeginRegistration struct {
 	Session string                       `json:"session"`
 	Options *protocol.CredentialCreation `json:"options"`
@@ -146,7 +150,7 @@ func (s *Service) FinishWebAuthnMFA(ctx context.Context, webAuthnSessionToken st
 		return "", nil, err
 	}
 	if stored.MFAChallengeID == nil {
-		return "", nil, ErrInvalidMFA
+		return "", nil, withPlayer(stored.PlayerID, ErrInvalidMFA)
 	}
 	user, err := s.webAuthnUser(ctx, stored.PlayerID)
 	if err != nil {
@@ -158,7 +162,12 @@ func (s *Service) FinishWebAuthnMFA(ctx context.Context, webAuthnSessionToken st
 	}
 	credential, err := w.FinishLogin(user, *session, requestWithBody(response))
 	if err != nil {
-		return "", nil, fmt.Errorf("finish webauthn login: %w", err)
+		return "", nil, withPlayer(stored.PlayerID, fmt.Errorf("finish webauthn login: %w", err))
+	}
+	// SC-048: a counter that did not increase means the key may be cloned.
+	// Reject before anything is stored, so the stored counter stays unchanged.
+	if credential.Authenticator.CloneWarning {
+		return "", nil, withPlayer(stored.PlayerID, fmt.Errorf("%w: %w", ErrInvalidMFA, ErrClonedSecurityKey))
 	}
 	if err := s.updateWebAuthnCredential(ctx, stored.PlayerID, credential, now); err != nil {
 		return "", nil, err

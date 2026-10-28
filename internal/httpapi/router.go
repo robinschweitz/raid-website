@@ -14,6 +14,7 @@ import (
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
 	"raid-website/internal/auth"
+	"raid-website/internal/bosskill"
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	v1 "raid-website/internal/httpapi/v1"
@@ -21,6 +22,7 @@ import (
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
 	"raid-website/internal/poll"
+	"raid-website/internal/push"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcompletion"
 	"raid-website/internal/raidcorrection"
@@ -37,14 +39,18 @@ import (
 
 // Options controls optional runtime behaviour of the HTTP layer.
 type Options struct {
+	PrivacyContactName    string
+	PrivacyContactAddress string
 	CookieSecure          bool
 	TrustProxyHeaders     bool
 	PublicOrigin          string
 	AdminUsername         string
 	AdminPassword         string
-	PrivacyContactName    string
-	PrivacyContactAddress string
 	RegistrationFeed      registration.ExternalClient
+	// VAPIDKey switches Web Push on (FR-32); nil leaves it off.
+	VAPIDKey *push.VAPIDKey
+	// PushSender replaces the HTTP push sender, for tests.
+	PushSender push.Sender
 }
 
 // New constructs the HTTP handler tree with all v1 dependencies wired.
@@ -83,6 +89,10 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		return nil, fmt.Errorf("bootstrap admin: %w", err)
 	}
 
+	pushSvc := push.NewService(push.NewRepo(db), opts.VAPIDKey, log.Printf)
+	if opts.PushSender != nil {
+		pushSvc = pushSvc.WithSender(opts.PushSender)
+	}
 	corrections := raidcorrection.NewService(raidcorrection.NewRepo(db)).WithExternalClient(registrationFeed)
 	api := v1.NewAPI(v1.Deps{
 		DB:                db,
@@ -108,6 +118,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		Shadowmourne:      shadowmourne.NewService(shadowmourne.NewRepo(db), chars),
 		Registration:      registrationSvc,
 		AccountMerge:      accountmerge.NewService(accountmerge.NewRepo(db)),
+		Push:              pushSvc,
 	})
 
 	mux := http.NewServeMux()
@@ -118,11 +129,12 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	v1.PrivacyHandlers{Contact: v1.PrivacyContact{Name: opts.PrivacyContactName, Address: opts.PrivacyContactAddress}}.Register(mux)
 	unclaimed := unclaimedloot.NewService(unclaimedloot.NewRepo(db), raids, catalog)
 	v1.UnclaimedHandlers{Unclaimed: unclaimed}.Register(mux)
-	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed)}.Register(mux)
+	v1.BossKillHandlers{Kills: bosskill.NewService(bosskill.NewRepo(db)), Corrections: corrections}.Register(mux)
+	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed), Roster: api}.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)
 	if spa, err := webui.Handler(); err == nil {
 		mux.Handle("/", spa)
 	}
 
-	return requestID(securityHeaders(opts.CookieSecure)(logging(csrfProtection(authenticate(authSvc)(mux))))), nil
+	return requestID(securityHeaders(opts.CookieSecure)(logging(csrfProtection(opts.TrustProxyHeaders)(authenticate(authSvc)(mux))))), nil
 }

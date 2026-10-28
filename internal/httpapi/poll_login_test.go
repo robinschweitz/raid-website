@@ -61,6 +61,7 @@ func TestReqRaid013_AC01(t *testing.T) {
 				t.Fatalf("new request: %v", err)
 			}
 			req.Header.Set("Content-Type", "application/json")
+			addCSRF(req)
 			for k, v := range tc.header {
 				req.Header.Set(k, v)
 			}

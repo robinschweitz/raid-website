@@ -29,6 +29,7 @@ const fieldLabels: Record<string, string> = {
   sort_order: 'Reihenfolge', queue_position: 'Listenplatz', shards_collected: 'Gesammelte Splitter', shard_target: 'Splitterziel', next_collector: 'Nächster Sammler', neighbor: 'Getauschter Listenplatz', color: 'Farbe', username: 'Benutzername', password_changed: 'Passwort geändert',
   security_key: 'Sicherheitsschlüssel', purpose: 'Zweck', locked_at: 'Gesperrt am', used_at: 'Verwendet am',
   expired_at: 'Abgelaufen am', sent_at: 'Versendet am', revoked_at: 'Widerrufen am', expires_at: 'Gültig bis',
+  difficulty: 'Schwierigkeit', removed_at: 'Entfernt am', remove_reason: 'Grund für Entfernung',
 }
 
 const hiddenFields = new Set([
@@ -36,7 +37,7 @@ const hiddenFields = new Set([
   'raid_id', 'created_at', 'updated_at', 'name_changed_at', 'external_source', 'external_profile_id',
   'external_profile_url', 'catalog_boss_id', 'item_id', 'item_lock_id', 'request_id', 'source',
   'series_id', 'previous_raid_id', 'raid_leader_id', 'catalog_instance_id', 'created_by', 'created_by_player_id',
-  'used_by_player_id', 'used_by_username', 'guild_rank_id', 'actor_id', 'options', 'requester_player_id',
+  'used_by_player_id', 'used_by_username', 'removed_by_player_id', 'guild_rank_id', 'actor_id', 'options', 'requester_player_id',
 ])
 
 const valueLabels: Record<string, string> = {
@@ -45,6 +46,7 @@ const valueLabels: Record<string, string> = {
   ARCHIVED: 'Archiviert', ACTIVE: 'Aktiv', USED: 'Verwendet', EXPIRED: 'Abgelaufen', ADMIN: 'Admin',
   RAIDASSISTENT: 'Raidassistent', MEMBER: 'Mitglied', GUEST: 'Gast', pending: 'Offen', approved: 'Freigegeben',
   rejected: 'Abgelehnt', consumed: 'Eingelöst', DECLINED: 'Abgesagt', TENTATIVE: 'Unsicher', QUEUED: 'Wartet', COLLECTING: 'Sammelt', new_account: 'Neues Konto', claim: 'Charakter übernehmen',
+  NORMAL: 'Normal', HEROIC: 'Heroisch', HARDMODE: 'Hardmode',
 }
 
 const isoTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
@@ -107,6 +109,7 @@ function actionLabel(entry: AuditLogEntry, before: AuditSnapshot): string {
   if (entry.action === 'cancel' && entry.entity_type === 'item_lock') return 'Aufgehoben'
   if (entry.action === 'create' && entry.entity_type === 'wishlist_item') return 'Auf die Wunschliste gesetzt'
   if (entry.action === 'delete' && entry.entity_type === 'wishlist_item') return 'Von der Wunschliste entfernt'
+  if (entry.action === 'remove' && entry.entity_type === 'raid_boss_kill') return 'Bosskill entfernt'
   const labels: Record<string, string> = {
     create: 'Angelegt', plan: 'Vorausgeplant', cancel: 'Abgesagt', archive: 'Archiviert', create_successor: 'Folgeraid angelegt', delete: 'Gelöscht',
     close: 'Geschlossen', vote: 'Abgestimmt', set_account: 'Zugang geändert', password_change: 'Passwort geändert',
@@ -150,6 +153,7 @@ function entityDescription(entry: AuditLogEntry, before: AuditSnapshot, after: A
     case 'raid_signup': return `Raid-Anmeldung für Raid #${entry.entity_id}`
     case 'raid_recruitment_template': return 'Raid-Gesuchtext'
     case 'unclaimed_loot': return `Beute ohne Empfänger: ${textValue(snapshot, 'item_name') || 'Unbekannter Gegenstand'}${raid}`
+    case 'raid_boss_kill': return `Bosskill: ${textValue(snapshot, 'boss') || 'Unbekannter Boss'}${raid}`
     case 'boss_order': return `Boss-Reihenfolge: Instanz ${textValue(snapshot, 'instance_id') || '?'}`
     case 'shadowmourne_entry': return `Schattengram: ${textValue(snapshot, 'character_name') || `#${entry.entity_id}`}`
     case 'shadowmourne_raid_task': return `Schattengram-Einteilung für Raid #${entry.entity_id}`

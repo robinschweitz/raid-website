@@ -37,6 +37,9 @@ var (
 	ErrProfileAmbiguous = errors.New("multiple rising-gods profiles match character name")
 	ErrProfileMissing   = errors.New("character has no rising-gods profile")
 	ErrRequestExists    = errors.New("registration request already exists for profile")
+
+	ErrMatchChoiceRequired = errors.New("name match needs an admin choice")
+	ErrMatchChoiceInvalid  = errors.New("name match choice invalid")
 )
 
 type Service struct {
@@ -344,6 +347,13 @@ func (s *Service) ListRequests(ctx context.Context, statuses []string) ([]Reques
 		return nil, err
 	}
 	for i := range rows {
+		if rows[i].Status == StatusPending || rows[i].Status == StatusApproved {
+			match, err := s.findNameMatch(ctx, s.players, s.characters, &rows[i])
+			if err != nil {
+				return nil, err
+			}
+			rows[i].NameMatch = match
+		}
 		redemption, ok := byRequest[rows[i].ID]
 		if !ok {
 			continue
@@ -441,7 +451,46 @@ func (s *Service) ListCodesByRequest(ctx context.Context, requestID int64) ([]Co
 	return codes, nil
 }
 
-func (s *Service) CreateCode(ctx context.Context, actorID, requestID int64) (*GeneratedCode, error) {
+// findNameMatch returns the player without a login that owns a character with
+// the requested name, when no character is linked to the request's profile.
+// Only an Admin decision turns such a match into an attached login (SC-049).
+func (s *Service) findNameMatch(ctx context.Context, players *player.Repo, chars *character.Repo, req *Request) (*NameMatch, error) {
+	if req.Purpose != PurposeNewAccount || req.RequesterPlayerID != nil {
+		return nil, nil
+	}
+	if _, err := chars.FindByExternalProfile(ctx, req.ExternalSource, req.ExternalProfileID); err == nil {
+		return nil, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	candidates, err := chars.ListByName(ctx, req.CharacterName)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range candidates {
+		p, err := players.Get(ctx, c.PlayerID)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if p.Username == nil && p.PasswordHash == "" {
+			return &NameMatch{PlayerID: p.ID, PlayerName: p.Name}, nil
+		}
+	}
+	return nil, nil
+}
+
+// codeAudit is the audit snapshot of a created code: the request state and the
+// Admin's name-match choice, never the code itself (SC-031).
+type codeAudit struct {
+	requestAudit
+	MatchChoice   string `json:"match_choice"`
+	MatchPlayerID *int64 `json:"match_player_id"`
+}
+
+func (s *Service) CreateCode(ctx context.Context, actorID, requestID int64, choice MatchChoiceInput) (*GeneratedCode, error) {
 	req, err := s.repo.GetRequest(ctx, requestID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -460,6 +509,24 @@ func (s *Service) CreateCode(ctx context.Context, actorID, requestID int64) (*Ge
 	code := &Code{RequestID: requestID, CodeHash: hash, CreatedByPlayerID: actorID, CreatedAt: now, ExpiresAt: now.Add(codeTTL)}
 	err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		repo := NewRepo(tx)
+		match, err := s.findNameMatch(ctx, s.players.WithTx(tx), s.characters.WithTx(tx), req)
+		if err != nil {
+			return err
+		}
+		switch {
+		case match == nil && choice.Choice != "":
+			return ErrMatchChoiceInvalid
+		case match == nil:
+		case choice.Choice == "":
+			return ErrMatchChoiceRequired
+		case choice.Choice == MatchNew:
+			code.MatchChoice = MatchNew
+		case choice.Choice == MatchAttach && choice.PlayerID == match.PlayerID:
+			code.MatchChoice = MatchAttach
+			code.MatchPlayerID = &match.PlayerID
+		default:
+			return ErrMatchChoiceInvalid
+		}
 		before := requestSnapshot(req)
 		req.Status = StatusApproved
 		req.UpdatedAt = now
@@ -469,7 +536,7 @@ func (s *Service) CreateCode(ctx context.Context, actorID, requestID int64) (*Ge
 		if err := repo.CreateCode(ctx, code); err != nil {
 			return err
 		}
-		return audit.NewRepo(tx).Record(ctx, actorID, "registration_request", req.ID, "create_code", before, requestSnapshot(req), "")
+		return audit.NewRepo(tx).Record(ctx, actorID, "registration_request", req.ID, "create_code", before, codeAudit{requestSnapshot(req), code.MatchChoice, code.MatchPlayerID}, "")
 	})
 	if err != nil {
 		return nil, err
@@ -564,7 +631,7 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 		if req.RequesterPlayerID != nil || req.Purpose != PurposeNewAccount {
 			return 0, ErrForbidden
 		}
-		hash, err := auth.HashPassword(password)
+		hash, err := auth.HashPassword(ctx, password)
 		if err != nil {
 			return 0, err
 		}
@@ -587,6 +654,7 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 			}
 			p.Username = &uname
 			p.PasswordHash = hash
+			p.Role = memberAtLeast(p.Role)
 			p.UpdatedAt = now
 			if err := players.Update(ctx, p); err != nil {
 				return 0, err
@@ -596,8 +664,13 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return 0, err
 		}
-		if existing, err := chars.FindByName(ctx, req.CharacterName); err == nil {
-			p, err := players.Get(ctx, existing.PlayerID)
+		// SC-049: a character name alone never attaches a login. Only the player
+		// the Admin confirmed when creating the code is used.
+		if code.MatchChoice == MatchAttach && code.MatchPlayerID != nil {
+			p, err := players.Get(ctx, *code.MatchPlayerID)
+			if errors.Is(err, sql.ErrNoRows) {
+				return 0, ErrInvalid
+			}
 			if err != nil {
 				return 0, err
 			}
@@ -606,21 +679,25 @@ func (s *Service) RedeemNewAccount(ctx context.Context, codeValue, username, pas
 			}
 			p.Username = &uname
 			p.PasswordHash = hash
+			p.Role = memberAtLeast(p.Role)
 			p.UpdatedAt = now
 			if err := players.Update(ctx, p); err != nil {
 				return 0, err
 			}
 			created = p
 			return p.ID, nil
-		} else if !errors.Is(err, sql.ErrNoRows) {
-			return 0, err
 		}
-		p := &player.Player{Name: req.CharacterName, Username: &uname, PasswordHash: hash, Role: validation.RoleGuest, Active: true, CreatedAt: now, UpdatedAt: now}
+		// FR-4.5: an account from a registration code is a MEMBER, also when the
+		// login is attached to an existing player above (ADR 103). Existing GUEST
+		// accounts with a login keep their role (FR-4.10); only an Admin promotes them.
+		p := &player.Player{Name: req.CharacterName, Username: &uname, PasswordHash: hash, Role: validation.RoleMember, Active: true, CreatedAt: now, UpdatedAt: now}
 		if err := players.Create(ctx, p); err != nil {
 			return 0, err
 		}
 		created = p
-		if err := s.attachCharacter(ctx, tx, chars, p.ID, req, &p.ID, now); err != nil {
+		// The new player gets a character of its own; an existing character of the
+		// same name stays with its owner (SC-049).
+		if err := chars.Create(ctx, characterFromRequest(p.ID, req, now)); err != nil {
 			return 0, err
 		}
 		return p.ID, nil
@@ -770,4 +847,13 @@ func hashCode(code string) string {
 	}
 	sum := sha256.Sum256([]byte(normalized))
 	return hex.EncodeToString(sum[:])
+}
+
+// memberAtLeast returns MEMBER for a player without a login who gets one from a
+// registration code (FR-4.5, ADR 103); a higher role stays as it is.
+func memberAtLeast(role validation.Role) validation.Role {
+	if role.AtLeast(validation.RoleMember) {
+		return role
+	}
+	return validation.RoleMember
 }

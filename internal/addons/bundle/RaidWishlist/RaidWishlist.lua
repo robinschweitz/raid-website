@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-2.0-only
 -- RaidWishlist: the raid member's side of RaidLedger, for WoW 3.3.5a / Lua 5.1.
 -- Imports the wishlist exported by the guild website (WL2), offers a one-click
 -- roll (or rolls automatically) when the raid lead's ledger starts a roll on a
@@ -9,6 +10,7 @@ local Wishlist = CreateFrame("Frame", "RaidWishlistFrame", UIParent)
 local PREFIX = "FLLedger"
 local AUTO_DELAY = 1        -- seconds before an automatic roll
 local SPEC_LABELS = { ms = "MS", os = "OS" }
+local DEFAULT_REMINDER_KEYWORDS = "roll,würfel"
 -- Disenchanted or banked items have a holder but count for nobody.
 local NO_TALLY = { disenchanted = true, bank = true }
 local TOKEN_NAMES = { "Weiheabzeichen" }
@@ -29,6 +31,16 @@ local function lower(value)
     return string.lower(value or "")
 end
 
+-- Lua 5.1 lowercases ASCII only. The catalogue needs the German letters too,
+-- while still treating search text as literal text rather than a pattern.
+local function catalogueLower(value)
+    value = string.lower(value or "")
+    value = string.gsub(value, "Ä", "ä")
+    value = string.gsub(value, "Ö", "ö")
+    value = string.gsub(value, "Ü", "ü")
+    return string.gsub(value, "ẞ", "ß")
+end
+
 local function playerName()
     return UnitName("player") or ""
 end
@@ -47,8 +59,20 @@ local function split(text)
     return fields
 end
 
+-- An item the client has never seen has no name yet: GetItemInfo answers only
+-- from the client's cache and 3.3.5a has no event when an item arrives. A
+-- hidden tooltip asks the server; the ticker redraws once the names are there.
+local itemScan = CreateFrame("GameTooltip", "RaidWishlistItemScan", UIParent, "GameTooltipTemplate")
+local askedItems = {}      -- itemID -> GetTime() of the last request, until it arrived
 local function itemLink(itemID)
-    return (itemID and select(2, GetItemInfo(itemID))) or ("item:" .. tostring(itemID or 0))
+    local link = itemID and select(2, GetItemInfo(itemID))
+    if link then return link end
+    if itemID and (not askedItems[itemID] or GetTime() - askedItems[itemID] > 30) then
+        askedItems[itemID] = GetTime()
+        itemScan:SetOwner(UIParent, "ANCHOR_NONE")
+        itemScan:SetHyperlink("item:" .. itemID)
+    end
+    return string.format(L["[Item %d]"], itemID or 0)
 end
 
 local function isToken(link)
@@ -69,14 +93,32 @@ local function ensureDatabase()
     return db, db.chars[me]
 end
 
+local function reminderKeywords(char)
+    return char.reminderKeywords or DEFAULT_REMINDER_KEYWORDS
+end
+
+-- Keywords count only outside item links: "[Trollbane]" is no "roll".
+local function matchingReminderKeyword(message, char)
+    local text = lower((string.gsub(message, "|H.-|h.-|h", "")))
+    for keyword in string.gmatch(reminderKeywords(char), "[^,]+") do
+        if keyword ~= "" and string.find(text, lower(keyword), 1, true) then return true end
+    end
+    return false
+end
+
 local MAX_ENHANCED = 50     -- X = min(EP, 50), the website's rule
 
--- enhancedPoints is X for an enhanced main-spec roll: the EP balance from the
--- last export, minus what enhanced wins since then cost, at most 50.
-local function enhancedPoints(char)
+-- currentBalance is the EP balance from the last export or typed value, minus
+-- what enhanced wins since then cost. enhancedPoints is X for an enhanced
+-- main-spec roll: that balance, at most 50.
+local function currentBalance(char)
     local balance = char.balance or 0
     for _, spent in pairs(char.spent or {}) do balance = balance - spent end
-    return math.max(0, math.min(balance, MAX_ENHANCED))
+    return math.max(0, balance)
+end
+
+local function enhancedPoints(char)
+    return math.min(currentBalance(char), MAX_ENHANCED)
 end
 
 -- The roll range for a wishlist entry: main spec 1-100 (1+X..100+X when the
@@ -253,7 +295,9 @@ local function applyAward(f)
     local low, high = tonumber(f[14]), tonumber(f[15])
     local mine = award.state ~= "deleted" and isPlayer(award.winner or award.recipient)
     char.spent = char.spent or {}
-    if mine and low and high == low + 99 and low > 1 and award.at >= (char.exportedAt or 0) then
+    -- balanceAt, not exportedAt: editing a wish makes a new list version but
+    -- not a new balance (lists saved before 2.3.0 have only exportedAt).
+    if mine and low and high == low + 99 and low > 1 and award.at >= (char.balanceAt or char.exportedAt or 0) then
         char.spent[key] = low - 1
     else
         char.spent[key] = nil
@@ -360,6 +404,10 @@ local function label(parent, template, size, color, name)
     return text
 end
 
+-- InputBoxTemplate draws its left border 5 px left of the edit box; boxes
+-- sit this far in so the border lines up with the labels above them.
+local INPUT_INSET = 5
+
 local function flatButton(parent, name, caption, width, height)
     local button = CreateFrame("Button", name, parent)
     button:SetWidth(width)
@@ -375,11 +423,10 @@ end
 -- listRow is one line of a list: the item on the left, then `columns`
 -- ({ key, width, color, justify }) on the right; row.columns[key] holds their
 -- texts (named <row name><Key>, e.g. RaidWishlistRaid1Recipient).
-local ROW_WIDTH = 460
 local function listRow(parent, index, columns, name)
     local row = CreateFrame("Button", name, parent)
     row:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, -28 - (index - 1) * 17)
-    row:SetWidth(ROW_WIDTH)
+    row:SetPoint("RIGHT", parent, "RIGHT", -8, 0)
     row:SetHeight(16)
     row:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground" })
     row:SetBackdropColor(0, 0, 0, 0)
@@ -406,9 +453,30 @@ local function listRow(parent, index, columns, name)
     return row
 end
 
-Wishlist:SetWidth(500)
-Wishlist:SetHeight(440)
+local RAID_NAMES = {
+    NAXX = L["Naxxramas"], OS = L["Obsidian Sanctum"], EOE = L["Eye of Eternity"],
+    ULD = L["Ulduar"], TOC = L["Trial of the Crusader"], ONY = L["Onyxia's Lair"],
+    ICC = L["Icecrown Citadel"], RS = L["Ruby Sanctum"],
+}
+
+local function catalogueName(record)
+    return GetLocale() == "deDE" and record[4] or record[3]
+end
+
+local function catalogueRaidNames(record)
+    local raids = {}
+    for code in string.gmatch(record[2], "[^,]+") do table.insert(raids, RAID_NAMES[code] or code) end
+    return table.concat(raids, ", ")
+end
+
+-- The default and smallest size; users may make it larger and scale it
+-- (raider feedback 2026-10-24: high- and low-resolution clients).
+local WIDTH, HEIGHT = 500, 440
+Wishlist:SetWidth(WIDTH)
+Wishlist:SetHeight(HEIGHT)
 Wishlist:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+Wishlist:SetResizable(true)
+Wishlist:SetMinResize(WIDTH, HEIGHT)
 Wishlist:SetFrameStrata("DIALOG")
 Wishlist:SetClampedToScreen(true)
 Wishlist:EnableMouse(true)
@@ -464,6 +532,9 @@ swatch:SetPoint("TOPLEFT", colorButton, "TOPLEFT", 6, -6)
 swatch:SetPoint("BOTTOMRIGHT", colorButton, "BOTTOMRIGHT", -6, 6)
 themeColor(swatch, "texture", "accent")
 
+local editOpen = flatButton(Wishlist, "RaidWishlistEditOpen", L["EDIT"], 66, 24)
+editOpen:SetPoint("RIGHT", colorButton, "LEFT", -6, 0)
+
 ---------------------------------------------------------------------------
 -- Tabs (2.0, raid feedback 2026-10-20 "you cannot scroll down the loot"):
 -- one full-height list per tab, each scrolling with the mouse wheel, instead
@@ -471,15 +542,16 @@ themeColor(swatch, "texture", "accent")
 ---------------------------------------------------------------------------
 local tabBar = CreateFrame("Frame", nil, Wishlist)
 tabBar:SetPoint("TOPLEFT", Wishlist, "TOPLEFT", 12, -44)
-tabBar:SetWidth(476)
+tabBar:SetPoint("RIGHT", Wishlist, "RIGHT", -12, 0)
 tabBar:SetHeight(22)
 
+local CONTENT_TOP, CONTENT_BOTTOM = -72, 30
 local content = CreateFrame("Frame", nil, Wishlist)
-content:SetPoint("TOPLEFT", Wishlist, "TOPLEFT", 12, -72)
-content:SetWidth(476)
-content:SetHeight(338)
+content:SetPoint("TOPLEFT", Wishlist, "TOPLEFT", 12, CONTENT_TOP)
+content:SetPoint("BOTTOMRIGHT", Wishlist, "BOTTOMRIGHT", -12, CONTENT_BOTTOM)
 
-local LIST_ROWS = 17
+-- Each list shows as many rows (17 px) as its pane holds: 17 at the default size.
+local function rowsFit(height) return math.max(1, math.floor((height - 28 - 21) / 17)) end
 local lists = {}            -- id -> { pane, rows, offset, count, position, heading, empty, tab }
 local listOrder = {}
 local currentList
@@ -489,20 +561,32 @@ local function addList(id, name, caption, columns, emptyText)
     pane:SetAllPoints(content)
     makeBackdrop(pane, "pane", 0.97)
     pane:Hide()
-    local list = { id = id, pane = pane, rows = {}, offset = 0, count = 0, caption = caption }
+    local list = { id = id, pane = pane, rows = {}, pool = {}, offset = 0, count = 0, caption = caption }
     list.heading = label(pane, "GameFontNormal", 11, {1.00, 0.82, 0.32})
     list.heading:SetPoint("TOPLEFT", pane, "TOPLEFT", 12, -10)
     list.empty = label(pane, "GameFontNormalSmall", 11, "dim")
     list.empty:SetPoint("CENTER", pane, "CENTER", 0, -8)
     list.empty:SetJustifyH("CENTER")
     list.empty:SetText(emptyText)
-    for i = 1, LIST_ROWS do list.rows[i] = listRow(pane, i, columns, name .. i) end
+    -- list.fit(n) makes the first n rows of the pool the list and hides the rest.
+    function list.fit(count)
+        for i = 1, math.max(count, table.getn(list.pool)) do
+            if i <= count then
+                list.pool[i] = list.pool[i] or listRow(pane, i, columns, name .. i)
+                list.rows[i] = list.pool[i]
+            else
+                list.rows[i] = nil
+                list.pool[i]:Hide()
+            end
+        end
+    end
+    list.fit(rowsFit(HEIGHT + CONTENT_TOP - CONTENT_BOTTOM))
     list.position = label(pane, "GameFontNormalSmall", 9, "faint", name .. "Position")
     list.position:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -12, 7)
     list.position:SetJustifyH("RIGHT")
     pane:EnableMouseWheel(true)
     pane:SetScript("OnMouseWheel", function(_, delta)
-        list.offset = math.max(0, math.min(list.offset - delta * 3, list.count - LIST_ROWS))
+        list.offset = math.max(0, math.min(list.offset - delta * 3, list.count - table.getn(list.rows)))
         if list.draw then list.draw() end
     end)
     local tab = flatButton(tabBar, "RaidWishlistTab" .. id, "", 110, 22)
@@ -513,15 +597,19 @@ local function addList(id, name, caption, columns, emptyText)
     return list
 end
 
+local settingsOpen = flatButton(tabBar, "RaidWishlistSettingsOpen", L["SETTINGS"], 90, 22)
+settingsOpen:SetPoint("TOPRIGHT", tabBar, "TOPRIGHT", 0, 0)
+
 -- place sets how many entries a list has, clamps its offset and says which
--- of them are shown; the rows then show entries offset+1 .. offset+LIST_ROWS.
+-- of them are shown; the rows then show entries offset+1 .. offset+(rows).
 local function place(list, count)
+    local rows = table.getn(list.rows)
     list.count = count
-    list.offset = math.max(0, math.min(list.offset, count - LIST_ROWS))
+    list.offset = math.max(0, math.min(list.offset, count - rows))
     if count > 0 then list.empty:Hide() else list.empty:Show() end
-    if count > LIST_ROWS then
+    if count > rows then
         list.position:SetText(string.format(L["%d-%d / %d  (mouse wheel)"], list.offset + 1,
-            math.min(count, list.offset + LIST_ROWS), count))
+            math.min(count, list.offset + rows), count))
     else
         list.position:SetText("")
     end
@@ -572,7 +660,6 @@ tallyText:SetJustifyH("RIGHT")
 
 local status = label(Wishlist, "GameFontNormalSmall", 10, "faint")
 status:SetPoint("BOTTOMLEFT", Wishlist, "BOTTOMLEFT", 16, 12)
-status:SetPoint("BOTTOMRIGHT", Wishlist, "BOTTOMRIGHT", -16, 12)
 status:SetJustifyH("LEFT")
 status:SetWordWrap(false)
 status:SetText(L["Rolls start from the raid lead's RaidLedger  |  /wish help"])
@@ -580,8 +667,7 @@ status:SetText(L["Rolls start from the raid lead's RaidLedger  |  /wish help"])
 -- Import overlay: takes the place of the tabs and lists while shown.
 local importPanel = CreateFrame("Frame", "RaidWishlistImportPanel", Wishlist)
 importPanel:SetPoint("TOPLEFT", Wishlist, "TOPLEFT", 12, -44)
-importPanel:SetWidth(476)
-importPanel:SetHeight(366)
+importPanel:SetPoint("BOTTOMRIGHT", Wishlist, "BOTTOMRIGHT", -12, CONTENT_BOTTOM)
 makeBackdrop(importPanel, "pane", 0.99)
 importPanel:SetFrameLevel(Wishlist:GetFrameLevel() + 5)
 importPanel:Hide()
@@ -603,8 +689,8 @@ local importText = CreateFrame("EditBox", "RaidWishlistImportText", importScroll
 importText:SetMultiLine(true)
 importText:SetAutoFocus(false)
 importText:SetFontObject(ChatFontNormal)
-importText:SetWidth(440)
-importText:SetHeight(240)
+importText:SetWidth(WIDTH - 60)
+importText:SetHeight(HEIGHT - 200)
 importScroll:SetScrollChild(importText)
 importText:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 -- A multi-line edit box is only as tall as its text, so a click below the
@@ -623,10 +709,264 @@ importButton:SetPoint("BOTTOMRIGHT", importPanel, "BOTTOMRIGHT", -10, 10)
 local importCancel = flatButton(importPanel, nil, L["CANCEL"], 80, 24)
 importCancel:SetPoint("RIGHT", importButton, "LEFT", -6, 0)
 
+-- Manual entries use the same stored format as website imports, so sharing,
+-- rolling and raid tallies need no separate path.
+local editorPanel = CreateFrame("Frame", "RaidWishlistEditorPanel", Wishlist)
+editorPanel:SetPoint("TOPLEFT", Wishlist, "TOPLEFT", 12, -44)
+editorPanel:SetPoint("BOTTOMRIGHT", Wishlist, "BOTTOMRIGHT", -12, CONTENT_BOTTOM)
+makeBackdrop(editorPanel, "pane", 0.99)
+editorPanel:SetFrameLevel(Wishlist:GetFrameLevel() + 5)
+editorPanel:Hide()
+local editorTitle = label(editorPanel, "GameFontNormal", 12, {1.00, 0.82, 0.32})
+editorTitle:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12, -12)
+editorTitle:SetText(L["EDIT WISHLIST"])
+local editorItemLabel = label(editorPanel, "GameFontNormalSmall", 10, "soft")
+editorItemLabel:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12, -206)
+editorItemLabel:SetText(L["Item ID (manual fallback)"])
+local editorItem = CreateFrame("EditBox", "RaidWishlistEditorItem", editorPanel, "InputBoxTemplate")
+editorItem:SetAutoFocus(false)
+editorItem:SetMaxLetters(8)
+editorItem:SetWidth(115)
+editorItem:SetHeight(22)
+editorItem:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12 + INPUT_INSET, -222)
+local catalogueSearchLabel = label(editorPanel, "GameFontNormalSmall", 10, "soft")
+catalogueSearchLabel:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12, -42)
+catalogueSearchLabel:SetText(L["Search item name"])
+local catalogueSearch = CreateFrame("EditBox", "RaidWishlistCatalogueSearch", editorPanel, "InputBoxTemplate")
+catalogueSearch:SetAutoFocus(false)
+catalogueSearch:SetMaxLetters(60)
+catalogueSearch:SetWidth(270)
+catalogueSearch:SetHeight(22)
+catalogueSearch:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12 + INPUT_INSET, -58)
+local catalogueSearchButton = flatButton(editorPanel, "RaidWishlistCatalogueGo", L["SEARCH"], 78, 22)
+catalogueSearchButton:SetPoint("LEFT", catalogueSearch, "RIGHT", 6, 0)
+local catalogueFilters = {
+    raids = {
+        { nil, L["ALL RAIDS"] }, { "NAXX", RAID_NAMES.NAXX }, { "OS", RAID_NAMES.OS }, { "EOE", RAID_NAMES.EOE },
+        { "ULD", RAID_NAMES.ULD }, { "TOC", RAID_NAMES.TOC }, { "ONY", RAID_NAMES.ONY }, { "ICC", RAID_NAMES.ICC },
+        { "RS", RAID_NAMES.RS },
+    },
+    qualities = {
+        -- The catalogue holds only epic and legendary loot.
+        { nil, L["ALL QUALITIES"] }, { 4, L["Epic"] }, { 5, L["Legendary"] },
+    },
+}
+catalogueFilters.raidButton = flatButton(editorPanel, "RaidWishlistCatalogueFilter", L["ALL RAIDS"], 170, 22)
+catalogueFilters.raidButton:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12, -86)
+catalogueFilters.qualityButton = flatButton(editorPanel, "RaidWishlistCatalogueQuality", L["ALL QUALITIES"], 170, 22)
+catalogueFilters.qualityButton:SetPoint("LEFT", catalogueFilters.raidButton, "RIGHT", 6, 0)
+local catalogueStatus = label(editorPanel, "GameFontNormalSmall", 10, "faint")
+catalogueStatus:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12, -114)
+catalogueStatus:SetPoint("RIGHT", editorPanel, "RIGHT", -12, 0)
+catalogueStatus:SetWordWrap(false)
+local catalogueRows, catalogueResults, catalogueOffset = {}, {}, 0
+for i = 1, 4 do
+    local row = listRow(editorPanel, i, { { "raid", 120, "soft", "LEFT" } }, "RaidWishlistCatalogue" .. i)
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 8, -131 - (i - 1) * 17)
+    row:SetPoint("RIGHT", editorPanel, "RIGHT", -8, 0)
+    row:Hide()
+    catalogueRows[i] = row
+end
+local editorNoteLabel = label(editorPanel, "GameFontNormalSmall", 10, "soft")
+editorNoteLabel:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12, -252)
+editorNoteLabel:SetText(L["Note (optional)"])
+local editorNote = CreateFrame("EditBox", "RaidWishlistEditorNote", editorPanel, "InputBoxTemplate")
+editorNote:SetAutoFocus(false)
+editorNote:SetMaxLetters(120)
+editorNote:SetHeight(22)
+editorNote:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12 + INPUT_INSET, -268)
+editorNote:SetPoint("RIGHT", editorPanel, "RIGHT", -12, 0)
+local editorMS = flatButton(editorPanel, "RaidWishlistEditorMS", L["MAIN SPEC"], 92, 24)
+editorMS:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12, -308)
+local editorOS = flatButton(editorPanel, "RaidWishlistEditorOS", L["OFF SPEC"], 92, 24)
+editorOS:SetPoint("LEFT", editorMS, "RIGHT", 6, 0)
+local editorEnhanced = flatButton(editorPanel, "RaidWishlistEditorEnhanced", L["ENHANCED"], 96, 24)
+editorEnhanced:SetPoint("LEFT", editorOS, "RIGHT", 6, 0)
+local editorStatus = label(editorPanel, "GameFontNormalSmall", 10, "faint")
+editorStatus:SetPoint("TOPLEFT", editorPanel, "TOPLEFT", 12, -294)
+editorStatus:SetPoint("RIGHT", editorPanel, "RIGHT", -12, 0)
+editorStatus:SetWordWrap(false)
+local editorSave = flatButton(editorPanel, "RaidWishlistEditorSave", L["SAVE"], 104, 24)
+editorSave:SetPoint("BOTTOMRIGHT", editorPanel, "BOTTOMRIGHT", -10, 10)
+local editorDelete = flatButton(editorPanel, "RaidWishlistEditorDelete", L["DELETE"], 80, 24)
+editorDelete:SetPoint("RIGHT", editorSave, "LEFT", -6, 0)
+local editorCancel = flatButton(editorPanel, nil, L["CANCEL"], 80, 24)
+editorCancel:SetPoint("RIGHT", editorDelete, "LEFT", -6, 0)
+local editorSettingsOpen = flatButton(editorPanel, "RaidWishlistSettingsFromEditor", L["SETTINGS"], 100, 24)
+editorSettingsOpen:SetPoint("BOTTOMLEFT", editorPanel, "BOTTOMLEFT", 10, 10)
+local editorEntry, editorSpec, editorEnhancedValue
+
+local settingsPanel = CreateFrame("Frame", "RaidWishlistSettingsPanel", Wishlist)
+settingsPanel:SetPoint("TOPLEFT", Wishlist, "TOPLEFT", 12, -44)
+settingsPanel:SetPoint("BOTTOMRIGHT", Wishlist, "BOTTOMRIGHT", -12, CONTENT_BOTTOM)
+makeBackdrop(settingsPanel, "pane", 0.99)
+settingsPanel:SetFrameLevel(Wishlist:GetFrameLevel() + 5)
+settingsPanel:Hide()
+local settingsTitle = label(settingsPanel, "GameFontNormal", 12, {1.00, 0.82, 0.32})
+settingsTitle:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 12, -12)
+settingsTitle:SetText(L["SETTINGS"])
+-- Both sections get one gold heading (raider screenshot 2026-10-26: the
+-- points had a heading and a label with the same words).
+local pointsTitle = label(settingsPanel, "GameFontNormal", 12, {1.00, 0.82, 0.32})
+pointsTitle:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 12, -42)
+pointsTitle:SetText(L["ENHANCE POINTS"])
+local editorPoints = CreateFrame("EditBox", "RaidWishlistEditorPoints", settingsPanel, "InputBoxTemplate")
+editorPoints:SetAutoFocus(false)
+editorPoints:SetMaxLetters(6)
+editorPoints:SetWidth(72)
+editorPoints:SetHeight(22)
+editorPoints:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 12 + INPUT_INSET, -64)
+local editorPointsSave = flatButton(settingsPanel, "RaidWishlistEditorPointsSave", L["SET POINTS"], 112, 22)
+editorPointsSave:SetPoint("LEFT", editorPoints, "RIGHT", 8, 0)
+local reminderTitle = label(settingsPanel, "GameFontNormal", 12, {1.00, 0.82, 0.32})
+reminderTitle:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 12, -122)
+reminderTitle:SetText(L["CHAT ROLL REMINDER"])
+local reminderHint = label(settingsPanel, "GameFontNormalSmall", 10, "soft")
+reminderHint:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 12, -146)
+reminderHint:SetPoint("RIGHT", settingsPanel, "RIGHT", -12, 0)
+reminderHint:SetWordWrap(true)
+reminderHint:SetJustifyH("LEFT")
+reminderHint:SetText(L["A reminder needs a wishlisted item link and a keyword."])
+-- Off by default (user decision 2026-10-26): chat only opens prompts once
+-- the player switches the reminder on.
+local reminderOn = flatButton(settingsPanel, "RaidWishlistReminderOn", "", 180, 24)
+reminderOn:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 12, -184)
+local reminderAll = flatButton(settingsPanel, "RaidWishlistReminderAll", "", 180, 24)
+reminderAll:SetPoint("LEFT", reminderOn, "RIGHT", 8, 0)
+local reminderKeywordsLabel = label(settingsPanel, "GameFontNormalSmall", 10, "soft")
+reminderKeywordsLabel:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 12, -222)
+reminderKeywordsLabel:SetText(L["Keywords (comma-separated)"])
+local reminderKeywordsBox = CreateFrame("EditBox", "RaidWishlistReminderKeywords", settingsPanel, "InputBoxTemplate")
+reminderKeywordsBox:SetAutoFocus(false)
+reminderKeywordsBox:SetMaxLetters(160)
+reminderKeywordsBox:SetHeight(22)
+reminderKeywordsBox:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 12 + INPUT_INSET, -238)
+reminderKeywordsBox:SetPoint("RIGHT", settingsPanel, "RIGHT", -12, 0)
+local settingsStatus = label(settingsPanel, "GameFontNormalSmall", 10, "faint")
+settingsStatus:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 12, -276)
+settingsStatus:SetPoint("RIGHT", settingsPanel, "RIGHT", -12, 0)
+settingsStatus:SetWordWrap(false)
+local reminderSave = flatButton(settingsPanel, "RaidWishlistReminderSave", L["SAVE SETTINGS"], 144, 24)
+reminderSave:SetPoint("BOTTOMRIGHT", settingsPanel, "BOTTOMRIGHT", -10, 10)
+local reminderCancel = flatButton(settingsPanel, "RaidWishlistReminderCancel", L["CANCEL"], 80, 24)
+reminderCancel:SetPoint("RIGHT", reminderSave, "LEFT", -6, 0)
+
+---------------------------------------------------------------------------
+-- Size and scale: the grip in the lower right corner sizes the window (up to
+-- the screen's edges), - / + beside it scale it (60-150%). Both are saved
+-- account-wide in RaidWishlistDB.window; /wish reset restores the defaults.
+---------------------------------------------------------------------------
+local windowSize = {}
+do
+    local SCALE_MIN, SCALE_MAX = 0.6, 1.5
+    local grip = CreateFrame("Button", "RaidWishlistResize", Wishlist)
+    grip:SetWidth(16)
+    grip:SetHeight(16)
+    grip:SetPoint("BOTTOMRIGHT", Wishlist, "BOTTOMRIGHT", -4, 4)
+    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+
+    local scaleUp = flatButton(Wishlist, "RaidWishlistScaleUp", "+", 20, 18)
+    scaleUp:SetPoint("BOTTOMRIGHT", Wishlist, "BOTTOMRIGHT", -24, 8)
+    local scaleValue = label(Wishlist, "GameFontNormalSmall", 10, "soft", "RaidWishlistScaleValue")
+    scaleValue:SetPoint("RIGHT", scaleUp, "LEFT", -2, 0)
+    scaleValue:SetWidth(32)
+    scaleValue:SetJustifyH("CENTER")
+    local scaleDown = flatButton(Wishlist, "RaidWishlistScaleDown", "-", 20, 18)
+    scaleDown:SetPoint("RIGHT", scaleValue, "LEFT", -2, 0)
+    status:SetPoint("RIGHT", scaleDown, "LEFT", -8, 0)
+
+    local function saved()
+        local db = ensureDatabase()
+        db.window = db.window or {}
+        return db.window
+    end
+    local function showScale() scaleValue:SetText(string.format("%d%%", math.floor(Wishlist:GetScale() * 100 + 0.5))) end
+
+    -- A larger scale may shrink the window to keep it on the screen.
+    local function fitScreen()
+        local scale = Wishlist:GetScale()
+        local maxWidth = math.max(WIDTH, math.floor(UIParent:GetWidth() / scale))
+        local maxHeight = math.max(HEIGHT, math.floor(UIParent:GetHeight() / scale))
+        Wishlist:SetWidth(math.max(WIDTH, math.min(Wishlist:GetWidth(), maxWidth)))
+        Wishlist:SetHeight(math.max(HEIGHT, math.min(Wishlist:GetHeight(), maxHeight)))
+    end
+    local function relayout()
+        local height = Wishlist:GetHeight() + CONTENT_TOP - CONTENT_BOTTOM
+        for _, list in ipairs(listOrder) do list.fit(rowsFit(height)) end
+        importText:SetWidth(Wishlist:GetWidth() - 60)
+        importText:SetHeight(Wishlist:GetHeight() - 200)
+        showScale()
+        if Wishlist:IsShown() and windowSize.redraw then windowSize.redraw() end
+    end
+    Wishlist:SetScript("OnSizeChanged", relayout)
+    local function saveSize()
+        local window = saved()
+        window.width, window.height = math.floor(Wishlist:GetWidth() + 0.5), math.floor(Wishlist:GetHeight() + 0.5)
+    end
+
+    -- The window grows right and down, up to the screen's edges.
+    grip:SetScript("OnMouseDown", function()
+        local scale = Wishlist:GetScale()
+        local left, top = Wishlist:GetLeft() or 0, Wishlist:GetTop() or HEIGHT
+        Wishlist:SetMaxResize(math.max(WIDTH, math.floor(UIParent:GetWidth() / scale - left)), math.max(HEIGHT, math.floor(top)))
+        Wishlist:StartSizing("BOTTOMRIGHT")
+    end)
+    grip:SetScript("OnMouseUp", function()
+        Wishlist:StopMovingOrSizing()
+        saveSize()
+        relayout()
+    end)
+
+    -- windowSize.setScale: 0.6-1.5, saved; false when out of range.
+    function windowSize.setScale(scale)
+        scale = tonumber(scale)
+        if not scale or scale < SCALE_MIN - 0.001 or scale > SCALE_MAX + 0.001 then return false end
+        -- Saves the rounded value: the client reads its scale back as a 32-bit float.
+        scale = math.floor(scale * 10 + 0.5) / 10
+        Wishlist:SetScale(scale)
+        saved().scale = scale
+        fitScreen()
+        saveSize()
+        relayout()
+        return true
+    end
+    scaleUp:SetScript("OnClick", function() windowSize.setScale(Wishlist:GetScale() + 0.1) end)
+    scaleDown:SetScript("OnClick", function() windowSize.setScale(Wishlist:GetScale() - 0.1) end)
+
+    -- Restores the saved size and scale (at login, after the SavedVariables).
+    function windowSize.restore()
+        local window = saved()
+        Wishlist:SetScale(window.scale or 1)
+        Wishlist:SetWidth(window.width or WIDTH)
+        Wishlist:SetHeight(window.height or HEIGHT)
+        fitScreen()
+        relayout()
+    end
+    function windowSize.reset()
+        ensureDatabase().window = nil
+        Wishlist:ClearAllPoints()
+        Wishlist:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        windowSize.restore()
+    end
+    function windowSize.command(rest)
+        local percent = tonumber(rest)
+        if percent and windowSize.setScale(percent / 100) then
+            say(string.format(L["window scale: %d%%."], math.floor(Wishlist:GetScale() * 100 + 0.5)))
+        else
+            say(string.format(L["usage: /wish scale <%d-%d> (percent)"], SCALE_MIN * 100, SCALE_MAX * 100))
+        end
+    end
+    windowSize.grip, windowSize.up, windowSize.down = grip, scaleUp, scaleDown
+    showScale()
+end
+
 -- Roll prompt: one click rolls the wishlisted spec and points.
 local Prompt = CreateFrame("Frame", "RaidWishlistPrompt", UIParent)
 Prompt:SetWidth(340)
-Prompt:SetHeight(104)
+Prompt:SetHeight(106)
 -- At the top of the screen, above the raid lead's RaidLedger window
 -- (live run 638949e7b728 showed the prompt covering its panes).
 Prompt:SetPoint("TOP", UIParent, "TOP", 0, -20)
@@ -655,10 +995,13 @@ promptNote:SetPoint("TOPRIGHT", promptItem, "BOTTOMRIGHT", 0, -4)
 promptNote:SetJustifyH("LEFT")
 promptNote:SetWordWrap(false)
 
-local rollButton = flatButton(Prompt, "RaidWishlistRoll", L["ROLL"], 170, 26)
-rollButton:SetPoint("BOTTOMLEFT", Prompt, "BOTTOMLEFT", 12, 10)
+-- The buttons fill the row with the same 12 px margin on the left, right and
+-- bottom (raider screenshot 2026-10-26: they sat left with empty space right).
 local skipButton = flatButton(Prompt, "RaidWishlistSkip", L["SKIP"], 80, 26)
-skipButton:SetPoint("LEFT", rollButton, "RIGHT", 8, 0)
+skipButton:SetPoint("BOTTOMRIGHT", Prompt, "BOTTOMRIGHT", -12, 12)
+local rollButton = flatButton(Prompt, "RaidWishlistRoll", L["ROLL"], 170, 26)
+rollButton:SetPoint("BOTTOMLEFT", Prompt, "BOTTOMLEFT", 12, 12)
+rollButton:SetPoint("RIGHT", skipButton, "LEFT", -8, 0)
 
 ---------------------------------------------------------------------------
 -- Refresh
@@ -676,7 +1019,7 @@ local function updateWishlist()
     local count = table.getn(char.items)
     list.heading:SetText(count > 0 and string.format(L["MY WISHLIST (%d)"], count) or L["MY WISHLIST"])
     place(list, count)
-    for i = 1, LIST_ROWS do
+    for i = 1, table.getn(wishRows) do
         local row, entry = wishRows[i], char.items[i + list.offset]
         row.entry = entry
         if entry then
@@ -708,7 +1051,7 @@ local function updateRaid()
     local items, tokens = myTally()
     tallyText:SetText(string.format(L["YOU: ITEMS %d MS / %d OS  |  TOKENS %d MS / %d OS"],
         items.ms, items.os, tokens.ms, tokens.os))
-    for i = 1, LIST_ROWS do
+    for i = 1, table.getn(raidRows) do
         local row, award = raidRows[i], awards[i + list.offset]
         row.award = award
         if award then
@@ -738,7 +1081,7 @@ local function updateOpen()
     local count = table.getn(items)
     list.heading:SetText(count > 0 and string.format(L["OPEN ITEMS (%d)"], count) or L["OPEN ITEMS"])
     place(list, count)
-    for i = 1, LIST_ROWS do
+    for i = 1, table.getn(openRows) do
         local row, item = openRows[i], items[i + list.offset]
         row.open = item
         if item then
@@ -771,6 +1114,286 @@ local function refresh()
     updateOpen()
     updateRaid()
     if currentList then drawTabs() else lists.show(select(2, ensureDatabase()).tab) end
+end
+windowSize.redraw = refresh
+
+local function closeOverlay(panel)
+    panel:Hide()
+    tabBar:Show()
+    content:Show()
+end
+
+local function updateEditorButtons()
+    local msColor = editorSpec == "ms" and palette.buttonOn or palette.button
+    local osColor = editorSpec == "os" and palette.buttonOn or palette.button
+    local enhancedColor = editorEnhancedValue and palette.buttonOn or palette.button
+    editorMS:SetBackdropColor(msColor[1], msColor[2], msColor[3], 0.98)
+    editorOS:SetBackdropColor(osColor[1], osColor[2], osColor[3], 0.98)
+    editorEnhanced:SetBackdropColor(enhancedColor[1], enhancedColor[2], enhancedColor[3], 0.98)
+    editorEnhanced:SetText(editorEnhancedValue and L["ENHANCED: ON"] or L["ENHANCED: OFF"])
+end
+
+local function drawCatalogueResults()
+    catalogueOffset = math.max(0, math.min(catalogueOffset, table.getn(catalogueResults) - table.getn(catalogueRows)))
+    for i, row in ipairs(catalogueRows) do
+        local record = catalogueResults[i + catalogueOffset]
+        row.record = record
+        if record then
+            row:SetText(catalogueName(record))
+            row.columns.raid:SetText(catalogueRaidNames(record))
+            row:Show()
+        else
+            row:Hide()
+        end
+    end
+end
+
+local function clearCatalogueResults()
+    catalogueResults, catalogueOffset = {}, 0
+    drawCatalogueResults()
+end
+
+local function updateCatalogueFilters()
+    catalogueFilters.raidButton:SetText(catalogueFilters.raid and RAID_NAMES[catalogueFilters.raid] or L["ALL RAIDS"])
+    for _, option in ipairs(catalogueFilters.qualities) do
+        if option[1] == catalogueFilters.quality then catalogueFilters.qualityButton:SetText(option[2]) end
+    end
+end
+
+local function searchCatalogue()
+    local query = trim(catalogueSearch:GetText())
+    if query == "" then
+        catalogueStatus:SetText(L["Enter an item name to search the raid catalogue."])
+        clearCatalogueResults()
+        return
+    end
+    if string.len(query) > 60 then
+        catalogueStatus:SetText(L["Search names can be at most 60 characters."])
+        clearCatalogueResults()
+        return
+    end
+    if string.find(query, "|", 1, true) then
+        catalogueStatus:SetText(L["Search text cannot contain |."])
+        clearCatalogueResults()
+        return
+    end
+    query = catalogueLower(query)
+    catalogueResults, catalogueOffset = {}, 0
+    for _, record in ipairs(ns.catalogue or {}) do
+        if string.find(catalogueLower(record[3]), query, 1, true)
+            or string.find(catalogueLower(record[4]), query, 1, true) then
+            if (not catalogueFilters.raid or string.find("," .. record[2] .. ",", "," .. catalogueFilters.raid .. ",", 1, true))
+                and (not catalogueFilters.quality or record[5] == catalogueFilters.quality) then
+                table.insert(catalogueResults, record)
+            end
+        end
+    end
+    if table.getn(catalogueResults) == 0 then
+        catalogueStatus:SetText(L["No raid loot matches that name."])
+    else
+        catalogueStatus:SetText(string.format(L["%d catalogue matches (mouse wheel for more)."], table.getn(catalogueResults)))
+    end
+    drawCatalogueResults()
+end
+
+for _, row in ipairs(catalogueRows) do
+    row:SetScript("OnClick", function(self)
+        if self.record then
+            editorItem:SetText(tostring(self.record[1]))
+            editorStatus:SetText(string.format(L["Selected item ID: %d"], self.record[1]))
+        end
+    end)
+end
+editorPanel:EnableMouseWheel(true)
+editorPanel:SetScript("OnMouseWheel", function(_, delta)
+    if table.getn(catalogueResults) > table.getn(catalogueRows) then
+        catalogueOffset = catalogueOffset - delta * 3
+        drawCatalogueResults()
+    end
+end)
+
+local function showEditor(entry)
+    editorEntry = entry
+    editorSpec = entry and entry.spec or "ms"
+    editorEnhancedValue = entry and entry.enhanced or false
+    editorItem:SetText(entry and tostring(entry.itemID) or "")
+    editorNote:SetText(entry and entry.note or "")
+    catalogueSearch:SetText("")
+    catalogueStatus:SetText("")
+    clearCatalogueResults()
+    catalogueFilters.raidMenu:Hide()
+    catalogueFilters.qualityMenu:Hide()
+    updateCatalogueFilters()
+    editorSave:SetText(entry and L["SAVE"] or L["ADD TO WISHLIST"])
+    if entry then editorDelete:Show() else editorDelete:Hide() end
+    editorStatus:SetText("")
+    updateEditorButtons()
+    Wishlist:Show()
+    importPanel:Hide()
+    settingsPanel:Hide()
+    tabBar:Hide()
+    content:Hide()
+    editorPanel:Show()
+end
+
+-- A manual change is a newer list for the ledger, but the balance and the
+-- wins it already counts stay as they were.
+local function newListVersion(char)
+    char.balanceAt = char.balanceAt or char.exportedAt
+    char.exportedAt = time()
+end
+
+local function normalizePriorities(char)
+    for i, entry in ipairs(char.items) do entry.priority = i end
+end
+
+local function saveEditor()
+    local itemID = tonumber(trim(editorItem:GetText()))
+    if not itemID or itemID <= 0 or itemID ~= math.floor(itemID) then
+        editorStatus:SetText(L["Enter a positive item ID."])
+        return
+    end
+    local _, char = ensureDatabase()
+    -- A selected entry is changed in place, even its item ID; it never merges
+    -- into another entry. A new item that is already listed updates that entry.
+    local entry, listed = editorEntry, findWish(itemID)
+    if entry and listed and listed ~= entry then
+        editorStatus:SetText(L["That item is already on your wishlist."])
+        return
+    end
+    entry = entry or listed
+    if not entry then
+        entry = { itemID = itemID, priority = table.getn(char.items) + 1 }
+        table.insert(char.items, entry)
+    end
+    entry.itemID, entry.spec = itemID, editorSpec
+    entry.enhanced = editorSpec == "ms" and editorEnhancedValue or nil
+    entry.note = string.sub(string.gsub(editorNote:GetText() or "", "|", ""), 1, 120)
+    newListVersion(char)
+    normalizePriorities(char)
+    shareAt = GetTime() + 1
+    refresh()
+    lists.show("wish")
+    editorItem:ClearFocus()
+    editorNote:ClearFocus()
+    catalogueSearch:ClearFocus()
+    closeOverlay(editorPanel)
+    status:SetText(L["Saved wishlist item."])
+end
+
+-- The settings page edits a copy: SAVE SETTINGS stores all of it, CANCEL
+-- drops all of it, the sender-mode button included. SET POINTS is a shortcut
+-- that stores the points alone.
+local settings = { draft = {} }
+
+-- typedPoints reads the points field: a whole number from 0 to 999999, or nil
+-- after naming the problem.
+function settings.typedPoints()
+    local value = trim(editorPoints:GetText())
+    local points = string.match(value, "^%d+$") and tonumber(value)
+    if not points or points > 999999 then
+        settingsStatus:SetText(L["Enter a whole number from 0 to 999999."])
+        return nil
+    end
+    return points
+end
+
+-- The typed value is the current balance, not an addition to past wins: the
+-- wins counted so far are in it, later ones count against it.
+function settings.setBalance(char, points)
+    char.balance, char.spent, char.balanceAt = points, {}, time()
+end
+
+function settings.saveEnhancePoints()
+    local points = settings.typedPoints()
+    if not points then return end
+    local _, char = ensureDatabase()
+    settings.setBalance(char, points)
+    settings.draft.points = tostring(points)
+    editorPoints:SetText(settings.draft.points)
+    editorPoints:ClearFocus()
+    refresh()
+    settingsStatus:SetText(string.format(L["Enhance points set to %d."], points))
+end
+
+local function deleteEditor()
+    if not editorEntry then
+        editorStatus:SetText(L["No wishlist item selected."])
+        return
+    end
+    local _, char = ensureDatabase()
+    for i, entry in ipairs(char.items) do
+        if entry == editorEntry then table.remove(char.items, i); break end
+    end
+    newListVersion(char)
+    normalizePriorities(char)
+    shareAt = GetTime() + 1
+    refresh()
+    lists.show("wish")
+    editorItem:ClearFocus()
+    editorNote:ClearFocus()
+    catalogueSearch:ClearFocus()
+    closeOverlay(editorPanel)
+    status:SetText(L["Removed wishlist item."])
+end
+
+function settings.updateReminderButton()
+    reminderOn:SetText(settings.draft.reminderOn and L["CHAT REMINDER: ON"] or L["CHAT REMINDER: OFF"])
+    local color = settings.draft.reminderOn and palette.buttonOn or palette.button
+    reminderOn:SetBackdropColor(color[1], color[2], color[3], 0.98)
+    reminderAll:SetText(settings.draft.reminderAll and L["All group members"] or L["Only the master looter"])
+    color = settings.draft.reminderAll and palette.buttonOn or palette.button
+    reminderAll:SetBackdropColor(color[1], color[2], color[3], 0.98)
+end
+
+function settings.show()
+    local _, char = ensureDatabase()
+    -- The real balance, not the capped roll bonus, so saving it unchanged
+    -- never lowers it.
+    settings.draft.points = tostring(currentBalance(char))
+    settings.draft.reminderAll = char.reminderAll
+    settings.draft.reminderOn = char.reminderOn
+    editorPoints:SetText(settings.draft.points)
+    reminderKeywordsBox:SetText(reminderKeywords(char))
+    settingsStatus:SetText("")
+    settings.updateReminderButton()
+    Wishlist:Show()
+    importPanel:Hide()
+    editorPanel:Hide()
+    tabBar:Hide()
+    content:Hide()
+    settingsPanel:Show()
+end
+
+function settings.close()
+    editorPoints:ClearFocus()
+    reminderKeywordsBox:ClearFocus()
+    closeOverlay(settingsPanel)
+end
+
+function settings.save()
+    local points = settings.typedPoints()
+    if not points then return end
+    local words = {}
+    -- Stored as typed and lowered only to compare: lowering can mangle
+    -- "ü" (playbook), so a stored "würfel" would never match again.
+    local value = string.sub(string.gsub(reminderKeywordsBox:GetText() or "", "|", ""), 1, 160)
+    for word in string.gmatch(value, "[^,%s]+") do
+        if string.len(word) <= 32 then table.insert(words, word) end
+    end
+    if table.getn(words) == 0 then
+        settingsStatus:SetText(L["Enter at least one reminder keyword."])
+        return
+    end
+    local _, char = ensureDatabase()
+    -- Unchanged points keep the wins counted since the last balance.
+    if tostring(points) ~= settings.draft.points then settings.setBalance(char, points) end
+    char.reminderAll = settings.draft.reminderAll
+    char.reminderOn = settings.draft.reminderOn
+    char.reminderKeywords = table.concat(words, ",")
+    settings.close()
+    refresh()
+    status:SetText(L["Settings saved."])
 end
 
 ---------------------------------------------------------------------------
@@ -816,6 +1439,11 @@ end)
 local function onRollStart(f)
     local itemID, seconds, round = tonumber(f[5]), tonumber(f[6]), tonumber(f[7]) or 1
     if not itemID or not seconds or f[4] == "" then return end
+    -- The first roll of a new raid can be its first message: switch to that
+    -- raid before asking what was received (last raid's awards do not count).
+    local before = ensureDatabase().raid.session
+    if not followSession(f[2] or "") then return end
+    if ensureDatabase().raid.session ~= before then refresh() end
     local entry = findWish(itemID)
     if not entry or entry.received then return end
     if round > 1 then
@@ -862,6 +1490,18 @@ end
 local function groupChannel()
     if GetNumRaidMembers() and GetNumRaidMembers() > 0 then return "RAID" end
     if GetNumPartyMembers() and GetNumPartyMembers() > 0 then return "PARTY" end
+end
+
+local function isMasterLooter(name)
+    local method, partyMaster, raidMaster = GetLootMethod()
+    if method ~= "master" then return false end
+    local master
+    if GetNumRaidMembers() and GetNumRaidMembers() > 0 then
+        master = raidMaster and GetRaidRosterInfo(raidMaster)
+    elseif partyMaster then
+        master = UnitName("party" .. partyMaster)
+    end
+    return master and lower(master) == lower(name)
 end
 
 -- shareWishlist sends this character's wishlist to the group so the raid
@@ -923,12 +1563,45 @@ local function onAddonMessage(prefix, message, channel, sender)
     end
 end
 
+-- Chat from another loot addon is untrusted text. It only creates a prompt
+-- after both a user-selected keyword and a wishlisted item link match.
+local function onChatReminder(message, sender)
+    if type(message) ~= "string" or not sender or isPlayer(sender) then return end
+    -- RaidLedger starts its rolls by addon message; its "[Loot]" lines
+    -- (parked items, BoE winners, counted rolls) are no roll to join.
+    if string.find(message, "^%[Loot%]") then return end
+    local _, char = ensureDatabase()
+    if not char.reminderOn or not matchingReminderKeyword(message, char) then return end
+    if not char.reminderAll and not isMasterLooter(sender) then return end
+    for id in string.gmatch(message, "|Hitem:(%d+):") do
+        local entry = findWish(tonumber(id))
+        if entry and not entry.received then
+            local key = "chat:" .. lower(sender) .. ":" .. id .. ":" .. lower(message)
+            if rolled[key] then return end
+            if not Wishlist:IsShown() then
+                refresh()
+                lists.show("wish")
+                Wishlist:Show()
+            end
+            if char.auto then
+                pendingRoll = { entry = entry, key = key, at = GetTime() + AUTO_DELAY }
+                status:SetText(string.format(L["Auto-roll: %s for %s in a moment."], rangeLabel(entry), itemLink(entry.itemID)))
+            else
+                showPrompt(entry, key, 30)
+            end
+            return
+        end
+    end
+end
+
 ---------------------------------------------------------------------------
 -- Import, buttons, events
 ---------------------------------------------------------------------------
 local function showImport(show)
     if show then
         Wishlist:Show()
+        editorPanel:Hide()
+        settingsPanel:Hide()
         importPanel:Show()
         tabBar:Hide()
         content:Hide()
@@ -952,6 +1625,7 @@ local function importWishlist()
     end
     local _, char = ensureDatabase()
     char.items, char.exportedAt, char.balance, char.spent = list.items, list.exportedAt, list.balance, {}
+    char.balanceAt = list.exportedAt
     shareAt = GetTime() + 1     -- the raid lead's ledger learns the new list
     importText:SetText("")
     showImport(false)
@@ -1019,6 +1693,78 @@ colorButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 importOpen:SetScript("OnClick", function() showImport(not importPanel:IsShown()) end)
 importCancel:SetScript("OnClick", function() showImport(false) end)
 importButton:SetScript("OnClick", importWishlist)
+editOpen:SetScript("OnClick", function() showEditor() end)
+catalogueSearchButton:SetScript("OnClick", searchCatalogue)
+catalogueFilters.createMenu = function(anchor, options, prefix, selected)
+    local menu = CreateFrame("Frame", nil, editorPanel)
+    menu:SetWidth(170)
+    menu:SetHeight(table.getn(options) * 20 + 8)
+    menu:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -2)
+    menu:SetFrameStrata("DIALOG")
+    makeBackdrop(menu, "pane", 1)
+    menu:Hide()
+    menu.buttons = {}
+    for i, option in ipairs(options) do
+        local button = flatButton(menu, prefix .. i, option[2], 162, 18)
+        button:SetPoint("TOPLEFT", menu, "TOPLEFT", 4, -4 - (i - 1) * 20)
+        button:SetScript("OnClick", function() selected(i) end)
+        menu.buttons[i] = button
+    end
+    return menu
+end
+catalogueFilters.raidMenu = catalogueFilters.createMenu(catalogueFilters.raidButton, catalogueFilters.raids,
+    "RaidWishlistCatalogueR", function(i)
+        catalogueFilters.raid = catalogueFilters.raids[i][1]
+        catalogueFilters.raidMenu:Hide()
+        updateCatalogueFilters()
+        if trim(catalogueSearch:GetText()) ~= "" then searchCatalogue() end
+    end)
+catalogueFilters.qualityMenu = catalogueFilters.createMenu(catalogueFilters.qualityButton, catalogueFilters.qualities,
+    "RaidWishlistCatalogueQ", function(i)
+        catalogueFilters.quality = catalogueFilters.qualities[i][1]
+        catalogueFilters.qualityMenu:Hide()
+        updateCatalogueFilters()
+        if trim(catalogueSearch:GetText()) ~= "" then searchCatalogue() end
+    end)
+catalogueFilters.raidButton:SetScript("OnClick", function()
+    catalogueFilters.qualityMenu:Hide()
+    if catalogueFilters.raidMenu:IsShown() then catalogueFilters.raidMenu:Hide() else catalogueFilters.raidMenu:Show() end
+end)
+catalogueFilters.qualityButton:SetScript("OnClick", function()
+    catalogueFilters.raidMenu:Hide()
+    if catalogueFilters.qualityMenu:IsShown() then catalogueFilters.qualityMenu:Hide() else catalogueFilters.qualityMenu:Show() end
+end)
+catalogueSearch:SetScript("OnEnterPressed", function(self)
+    self:ClearFocus()
+    searchCatalogue()
+end)
+catalogueSearch:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+editorMS:SetScript("OnClick", function() editorSpec = "ms"; updateEditorButtons() end)
+editorOS:SetScript("OnClick", function() editorSpec = "os"; editorEnhancedValue = false; updateEditorButtons() end)
+editorEnhanced:SetScript("OnClick", function()
+    if editorSpec == "ms" then editorEnhancedValue = not editorEnhancedValue; updateEditorButtons() end
+end)
+editorSave:SetScript("OnClick", saveEditor)
+editorPointsSave:SetScript("OnClick", settings.saveEnhancePoints)
+editorDelete:SetScript("OnClick", deleteEditor)
+editorCancel:SetScript("OnClick", function()
+    editorItem:ClearFocus()
+    editorNote:ClearFocus()
+    catalogueSearch:ClearFocus()
+    closeOverlay(editorPanel)
+end)
+settingsOpen:SetScript("OnClick", settings.show)
+editorSettingsOpen:SetScript("OnClick", settings.show)
+reminderOn:SetScript("OnClick", function()
+    settings.draft.reminderOn = not settings.draft.reminderOn or nil
+    settings.updateReminderButton()
+end)
+reminderAll:SetScript("OnClick", function()
+    settings.draft.reminderAll = not settings.draft.reminderAll or nil
+    settings.updateReminderButton()
+end)
+reminderSave:SetScript("OnClick", settings.save)
+reminderCancel:SetScript("OnClick", settings.close)
 autoButton:SetScript("OnClick", function()
     local _, char = ensureDatabase()
     setAuto(not char.auto)
@@ -1033,9 +1779,18 @@ local function buttonTip(button, text)
 end
 buttonTip(autoButton, L["Auto-roll: roll on wishlisted items by yourself, without the prompt (e.g. while away)."])
 buttonTip(importOpen, L["Import: paste your wishlist export from the guild website."])
+buttonTip(editOpen, L["Edit: add, change or remove wishlist items."])
+buttonTip(catalogueSearchButton, L["Catalogue search: find WotLK raid loot by English or German name."])
+buttonTip(catalogueFilters.raidButton, L["Click to open the raid filter"])
+buttonTip(catalogueFilters.qualityButton, L["Click to open the item quality filter"])
+buttonTip(settingsOpen, L["Settings: set Enhance points and chat roll reminders."])
+buttonTip(editorSettingsOpen, L["Settings: set Enhance points and chat roll reminders."])
 buttonTip(wishList.tab, L["Your wishlist in rank order, with the roll range you would use."])
 buttonTip(openList.tab, L["Loot still waiting to be rolled: on the corpse, or parked with a raider."])
 buttonTip(raidList.tab, L["Who got what this raid, and your items so far."])
+buttonTip(windowSize.grip, L["Drag to resize the window"])
+buttonTip(windowSize.up, L["Make the window larger (up to 150%)"])
+buttonTip(windowSize.down, L["Make the window smaller (down to 60%)"])
 
 local function showTooltip(owner, link, extra)
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
@@ -1045,7 +1800,21 @@ local function showTooltip(owner, link, extra)
     GameTooltip:Show()
 end
 
+for _, row in ipairs(catalogueRows) do
+    row:SetScript("OnEnter", function(self)
+        if self.record then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink("item:" .. self.record[1])
+            GameTooltip:AddLine(catalogueRaidNames(self.record), 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(L["Click: select this item for your wishlist"], 1, 1, 1)
+            GameTooltip:Show()
+        end
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
 for _, row in ipairs(wishRows) do
+    row:SetScript("OnClick", function(self) if self.entry then showEditor(self.entry) end end)
     row:SetScript("OnEnter", function(self)
         if self.entry then
             showTooltip(self, itemLink(self.entry.itemID), string.format(L["Wishlist: %s"], rangeLabel(self.entry))
@@ -1141,9 +1910,14 @@ end
 
 Wishlist:RegisterEvent("PLAYER_LOGIN")
 Wishlist:RegisterEvent("CHAT_MSG_ADDON")
+Wishlist:RegisterEvent("CHAT_MSG_RAID")
+Wishlist:RegisterEvent("CHAT_MSG_RAID_LEADER")
+Wishlist:RegisterEvent("CHAT_MSG_PARTY")
+Wishlist:RegisterEvent("CHAT_MSG_PARTY_LEADER")
 Wishlist:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
         ensureDatabase()
+        windowSize.restore()
         applyTheme()
         placeMinimapButton()
         syncAt = GetTime() + 10
@@ -1153,6 +1927,29 @@ Wishlist:SetScript("OnEvent", function(self, event, ...)
             ForgeTestBridge:RegisterFrame("RaidWishlistImportOpen", importOpen)
             ForgeTestBridge:RegisterFrame("RaidWishlistImportText", importText)
             ForgeTestBridge:RegisterFrame("RaidWishlistImportButton", importButton)
+            ForgeTestBridge:RegisterFrame("RaidWishlistEditOpen", editOpen)
+            ForgeTestBridge:RegisterFrame("RaidWishlistSettingsOpen", settingsOpen)
+            ForgeTestBridge:RegisterFrame("RaidWishlistCatalogueSearch", catalogueSearch)
+            ForgeTestBridge:RegisterFrame("RaidWishlistCatalogueFilter", catalogueFilters.raidButton)
+            ForgeTestBridge:RegisterFrame("RaidWishlistCatalogueQuality", catalogueFilters.qualityButton)
+            ForgeTestBridge:RegisterFrame("RaidWishlistCatalogueR2", catalogueFilters.raidMenu.buttons[2])
+            ForgeTestBridge:RegisterFrame("RaidWishlistCatalogueQ2", catalogueFilters.qualityMenu.buttons[2])
+            ForgeTestBridge:RegisterFrame("RaidWishlistCatalogueGo", catalogueSearchButton)
+            ForgeTestBridge:RegisterFrame("RaidWishlistCatalogue1", catalogueRows[1])
+            ForgeTestBridge:RegisterFrame("RaidWishlistEditorItem", editorItem)
+            ForgeTestBridge:RegisterFrame("RaidWishlistEditorPoints", editorPoints)
+            ForgeTestBridge:RegisterFrame("RaidWishlistEditorPointsSave", editorPointsSave)
+            ForgeTestBridge:RegisterFrame("RaidWishlistEditorNote", editorNote)
+            ForgeTestBridge:RegisterFrame("RaidWishlistEditorMS", editorMS)
+            ForgeTestBridge:RegisterFrame("RaidWishlistEditorOS", editorOS)
+            ForgeTestBridge:RegisterFrame("RaidWishlistEditorSave", editorSave)
+            ForgeTestBridge:RegisterFrame("RaidWishlistEditorDelete", editorDelete)
+            ForgeTestBridge:RegisterFrame("RaidWishlistSettingsFromEditor", editorSettingsOpen)
+            ForgeTestBridge:RegisterFrame("RaidWishlistReminderKeywords", reminderKeywordsBox)
+            ForgeTestBridge:RegisterFrame("RaidWishlistReminderOn", reminderOn)
+            ForgeTestBridge:RegisterFrame("RaidWishlistReminderAll", reminderAll)
+            ForgeTestBridge:RegisterFrame("RaidWishlistReminderSave", reminderSave)
+            ForgeTestBridge:RegisterFrame("RaidWishlistReminderCancel", reminderCancel)
             ForgeTestBridge:RegisterFrame("RaidWishlistPrompt", Prompt)
             ForgeTestBridge:RegisterFrame("RaidWishlistRoll", rollButton)
             ForgeTestBridge:RegisterFrame("RaidWishlistWish1", wishRows[1])
@@ -1160,6 +1957,7 @@ Wishlist:SetScript("OnEvent", function(self, event, ...)
             ForgeTestBridge:RegisterFrame("RaidWishlistOpen1", openRows[1])
             ForgeTestBridge:RegisterFrame("RaidWishlistMinimap", MinimapButton)
             ForgeTestBridge:RegisterFrame("RaidWishlistColor", colorButton)
+            ForgeTestBridge:RegisterFrame("RaidWishlistResize", windowSize.grip)
             ForgeTestBridge:RegisterFrame("RaidWishlistImportField", importBack)
             ForgeTestBridge:RegisterFrame("RaidWishlistRaid1Recipient", raidRows[1].columns.recipient)
             for _, list in ipairs(listOrder) do
@@ -1168,6 +1966,8 @@ Wishlist:SetScript("OnEvent", function(self, event, ...)
         end
     elseif event == "CHAT_MSG_ADDON" then
         onAddonMessage(...)
+    elseif event == "CHAT_MSG_RAID" or event == "CHAT_MSG_RAID_LEADER" or event == "CHAT_MSG_PARTY" or event == "CHAT_MSG_PARTY_LEADER" then
+        onChatReminder(...)
     end
 end)
 
@@ -1193,6 +1993,17 @@ ticker:SetScript("OnUpdate", function(_, elapsed)
         requestSync()
         shareWishlist()
     end
+    -- Items asked from the server: redraw once one arrived (no event tells us).
+    if next(askedItems) then
+        local arrived = false
+        for itemID in pairs(askedItems) do
+            if GetItemInfo(itemID) then askedItems[itemID] = nil; arrived = true end
+        end
+        if arrived then
+            refresh()
+            if prompt then promptItem:SetText(itemLink(prompt.entry.itemID)) end
+        end
+    end
     if shareAt and now >= shareAt then
         shareAt = nil
         shareWishlist()
@@ -1207,11 +2018,16 @@ end)
 local HELP = {
     L["/wish - show or hide your wishlist"],
     L["/wish import - paste the wishlist export from the guild website"],
+    L["/wish edit - add a wishlist item without an export"],
     L["/wish auto on|off - roll automatically on wishlisted items (e.g. while away)"],
     L["/wish sync - ask the raid lead's ledger for this raid's awards"],
     L["/wish minimap on|off - show or hide the minimap button"],
     L["/wish color [reset] - pick the window color, or go back to the default"],
     L["/wish share on|off - show your wishlist to the raid lead's ledger (on by default)"],
+    L["/wish remind on|off - open the roll prompt for chat announcements (off by default)"],
+    L["/wish remind all|master - chat roll reminders from all group members or only the master looter"],
+    L["/wish scale <percent> - make the window smaller or larger; drag its lower right corner to resize it"],
+    L["/wish reset - the window back to the middle, normal size and scale"],
 }
 
 SLASH_RAIDWISHLIST1 = "/wish"
@@ -1223,6 +2039,8 @@ SlashCmdList["RAIDWISHLIST"] = function(message)
         toggleWindow()
     elseif command == "import" then
         showImport(true)
+    elseif command == "edit" then
+        showEditor()
     elseif command == "auto" and (rest == "on" or rest == "off") then
         setAuto(rest == "on")
     elseif command == "share" and (rest == "on" or rest == "off") then
@@ -1231,6 +2049,16 @@ SlashCmdList["RAIDWISHLIST"] = function(message)
         say(rest == "on" and L["your wishlist is shared with the raid lead's ledger."]
             or L["your wishlist is no longer shared."])
         if rest == "on" then shareAt = GetTime() + 1 end
+    elseif command == "remind" and (rest == "on" or rest == "off") then
+        local _, char = ensureDatabase()
+        char.reminderOn = rest == "on" or nil
+        say(rest == "on" and L["chat roll reminders are on."] or L["chat roll reminders are off."])
+    elseif command == "remind" and (rest == "all" or rest == "master") then
+        -- Sets, never toggles: a repeated command (or plan step) keeps the state.
+        local _, char = ensureDatabase()
+        char.reminderAll = rest == "all" or nil
+        say(rest == "all" and L["chat roll reminders: all group members."]
+            or L["chat roll reminders: only the master looter."])
     elseif command == "minimap" and (rest == "on" or rest == "off") then
         setMinimapButton(rest == "on")
     elseif command == "color" or command == "colour" then
@@ -1241,6 +2069,11 @@ SlashCmdList["RAIDWISHLIST"] = function(message)
             Wishlist:Show()
             pickColor()
         end
+    elseif command == "scale" then
+        windowSize.command(rest)
+    elseif command == "reset" then
+        windowSize.reset()
+        Wishlist:Show()
     elseif command == "sync" then
         if requestSync() then say(L["asked the raid lead's ledger for this raid's awards."]) else say(L["not in a group."]) end
     else

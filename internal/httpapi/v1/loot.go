@@ -34,6 +34,7 @@ type createLootRequest struct {
 	ItemLockID           *int64      `json:"item_lock_id"`
 	Notes                string      `json:"notes"`
 	Reason               string      `json:"reason"`
+	ConfirmEPShortfall   bool        `json:"confirm_ep_shortfall"`
 }
 
 type correctLootRequest struct {
@@ -46,6 +47,7 @@ type correctLootRequest struct {
 	AwardMethod          *loot.Method    `json:"award_method"`
 	Notes                *string         `json:"notes"`
 	Reason               string          `json:"reason"`
+	ConfirmEPShortfall   bool            `json:"confirm_ep_shortfall"`
 }
 
 func (a *API) correctLoot(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +81,7 @@ func (a *API) correctLoot(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	row, err := a.Corrections.CorrectLoot(r.Context(), raidID, id, actor, req.Reason, func(row *loot.Award) {
+	row, err := a.Corrections.CorrectLoot(epConfirm(r, req.ConfirmEPShortfall), raidID, id, actor, req.Reason, func(row *loot.Award) {
 		if req.CatalogBossID != nil {
 			row.CatalogBossID = catalogBossID
 		}
@@ -195,7 +197,7 @@ func (a *API) createLoot(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:            now,
 		UpdatedAt:            now,
 	}
-	if err := a.Corrections.SaveLoot(r.Context(), award, actor, req.Reason); err != nil {
+	if err := a.Corrections.SaveLoot(epConfirm(r, req.ConfirmEPShortfall), award, actor, req.Reason); err != nil {
 		writeCorrectionError(w, err)
 		return
 	}
@@ -206,7 +208,8 @@ func (a *API) createLoot(w http.ResponseWriter, r *http.Request) {
 }
 
 type withdrawLootRequest struct {
-	Reason string `json:"reason"`
+	Reason             string `json:"reason"`
+	ConfirmEPShortfall bool   `json:"confirm_ep_shortfall"`
 }
 
 func (a *API) withdrawLoot(w http.ResponseWriter, r *http.Request) {
@@ -226,7 +229,7 @@ func (a *API) withdrawLoot(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	row, err := a.Corrections.WithdrawLoot(r.Context(), raidID, id, actor, req.Reason)
+	row, err := a.Corrections.WithdrawLoot(epConfirm(r, req.ConfirmEPShortfall), raidID, id, actor, req.Reason)
 	if err != nil {
 		writeCorrectionError(w, err)
 		return

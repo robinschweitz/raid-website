@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -16,6 +17,20 @@ type Repo struct {
 
 func NewRepo(db bun.IDB) *Repo {
 	return &Repo{db: db}
+}
+
+// UpgradePasswordHash replaces a verified hash with a new one of the same
+// password. It only writes while the old hash is still stored, so a password
+// change that ran meanwhile is not undone.
+func (r *Repo) UpgradePasswordHash(ctx context.Context, playerID int64, oldHash, newHash string) error {
+	_, err := r.db.NewUpdate().Model((*player.Player)(nil)).
+		Set("password_hash = ?", newHash).
+		Where("id = ? AND password_hash = ?", playerID, oldHash).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("upgrade password hash of player %d: %w", playerID, err)
+	}
+	return nil
 }
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo {
@@ -94,6 +109,52 @@ func (r *Repo) DeleteExpired(ctx context.Context, before time.Time) error {
 
 func (r *Repo) CreateLoginAttempt(ctx context.Context, a *LoginAttempt) error {
 	_, err := r.db.NewInsert().Model(a).Exec(ctx)
+	return err
+}
+
+// ReserveLoginAttempt checks the per-username-and-address limit and the
+// per-address limit and, when neither is reached, stores the attempt as
+// failed, all in one transaction. With the single database connection (DR-9)
+// no other login runs between the count and the insert, so parallel attempts
+// are counted one by one (SC-008, SC-043). At a limit it stores nothing and
+// returns ErrLoginRateLimited.
+func (r *Repo) ReserveLoginAttempt(ctx context.Context, username, clientIP string, at, since time.Time, usernameLimit, addressLimit int) (int64, error) {
+	var attemptID int64
+	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		repo := r.WithTx(tx)
+		addressCount, err := repo.CountFailedLoginAttemptsFromAddress(ctx, clientIP, since)
+		if err != nil {
+			return fmt.Errorf("count address login attempts: %w", err)
+		}
+		if addressCount >= addressLimit {
+			return ErrLoginRateLimited
+		}
+		count, err := repo.CountFailedLoginAttempts(ctx, username, clientIP, since)
+		if err != nil {
+			return fmt.Errorf("count login attempts: %w", err)
+		}
+		if count >= usernameLimit {
+			return ErrLoginRateLimited
+		}
+		attempt := &LoginAttempt{Username: username, ClientIP: clientIP, Success: false, CreatedAt: at}
+		if err := repo.CreateLoginAttempt(ctx, attempt); err != nil {
+			return fmt.Errorf("store login attempt: %w", err)
+		}
+		attemptID = attempt.ID
+		return nil
+	})
+	return attemptID, err
+}
+
+// MarkLoginAttemptSucceeded records that a reserved attempt logged in.
+func (r *Repo) MarkLoginAttemptSucceeded(ctx context.Context, id int64) error {
+	_, err := r.db.NewUpdate().Model((*LoginAttempt)(nil)).Set("success = ?", true).Where("id = ?", id).Exec(ctx)
+	return err
+}
+
+// DeleteLoginAttempt removes a reserved attempt whose password was never checked.
+func (r *Repo) DeleteLoginAttempt(ctx context.Context, id int64) error {
+	_, err := r.db.NewDelete().Model((*LoginAttempt)(nil)).Where("id = ?", id).Exec(ctx)
 	return err
 }
 

@@ -1,10 +1,26 @@
-export const appVersion = '1.0.62'
+export const appVersion = '1.0.63'
 
 export const changelog = [
   {
     version: appVersion,
     title: 'Begrenzte Charaktersuche für Besucher',
     changes: ['Ohne Anmeldung sind zehn neue Charaktersuchen und Registrierungsanfragen pro zehn Minuten möglich. Gespeicherte Suchergebnisse und angemeldete Mitglieder bleiben erreichbar.'],
+  },
+  {
+    version: '1.0.62',
+    title: 'RaidWishlist 2.3.0',
+    changes: [
+      'Neue RaidWishlist-Version zum Herunterladen unter „Addons“. Mit BEARBEITEN (oder /wish edit) änderst du deine Wunschliste direkt im Spiel: Der Raidkatalog findet epische und legendäre Beute aus allen WotLK-Raids nach deutschem oder englischem Namen, mit Filtern für Raid und Qualität.',
+      'Unter EINSTELLUNGEN trägst du deinen EP-Stand für Enhanced ein, ohne die Liste neu zu importieren.',
+      'Neue Chat-Würfel-Erinnerung für Raids ohne RaidLedger (Standard: aus): Schreibt der Plündermeister ein Item von deiner Liste mit „roll“ oder „würfel“ in den Chat, öffnet sich die Würfel-Abfrage.',
+    ],
+  },
+  {
+    version: '1.0.61',
+    title: 'Beute ohne Empfänger direkt beim Loot erfassen',
+    changes: [
+      'Unter „Loot erfassen“ wählt die Raidleitung jetzt zuerst die Art: an einen Spieler vergeben oder entzaubert, für die Gildenbank oder von niemandem gewollt. Der eigene Kasten zum Eintragen unter „Beute ohne Empfänger“ entfällt; die Liste bleibt dort.',
+    ],
   },
   {
     version: '1.0.60',

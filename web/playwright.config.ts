@@ -27,6 +27,8 @@ export default defineConfig({
   webServer: {
     command: webServerCommand,
     env: {
+      PRIVACY_CONTACT_NAME: 'Gildenverwaltung (Test)',
+      PRIVACY_CONTACT_ADDRESS: 'kontakt@example.invalid',
       PORT: String(port),
       LISTEN_ADDR: `127.0.0.1:${port}`,
       DATABASE_URL: 'file:raid.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)',

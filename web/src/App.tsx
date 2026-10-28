@@ -123,7 +123,7 @@ function Layout() {
           </>}
         </nav>
         <div className="sidebar-footer">
-          <Link to="/datenschutz">Datenschutz</Link><Link to="/changelog">Version {appVersion}</Link>
+          <Link to="/datenschutz">Datenschutz</Link><br /><Link to="/changelog">Version {appVersion}</Link>
           <span>Änderungen ansehen</span>
         </div>
       </aside>

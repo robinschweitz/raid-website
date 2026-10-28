@@ -8,6 +8,6 @@ test('guide: personal data export', async ({ page, request }, info) => {
   await signIn(page, admin)
   await page.goto(`/#/players/${player.id}/konto`)
   await expect(page.getByRole('button', { name: 'Daten als JSON herunterladen', exact: true })).toBeVisible()
-  await page.getByRole('heading', { name: 'Konto', exact: true }).scrollIntoViewIfNeeded()
+  await page.getByRole('heading', { name: 'Konto', exact: true }).evaluate((element) => element.scrollIntoView({ block: 'start' }))
   await guideSnapshot(page, info, '52-spieler-konto-admin')
 })

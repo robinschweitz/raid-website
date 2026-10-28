@@ -159,6 +159,6 @@ func writeSeriesError(w http.ResponseWriter, err error) bool {
 	default:
 		return false
 	}
-	WriteError(w, status, code, err.Error())
+	WriteError(w, status, code, stableErrorMessage(code))
 	return true
 }

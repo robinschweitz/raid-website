@@ -205,7 +205,7 @@ func (a *API) archiveRaid(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, raidcompletion.ErrInvalidExclusion):
 			WriteError(w, http.StatusBadRequest, "invalid_exclusion", "Nur Spieler aus der Aufstellung, die abgesagt haben, können von den EP ausgenommen werden.")
 		case errors.Is(err, raidcompletion.ErrRosterIncomplete):
-			WriteError(w, http.StatusConflict, "roster_incomplete", err.Error())
+			WriteError(w, http.StatusConflict, "roster_incomplete", stableErrorMessage("roster_incomplete"))
 		default:
 			WriteError(w, http.StatusInternalServerError, "internal", "could not archive raid")
 		}

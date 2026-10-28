@@ -134,7 +134,7 @@ func TestReqPoll007_AC03(t *testing.T) {
 
 	past := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
 	status, body := do(t, client, http.MethodPut, pollURL, lead, map[string]any{"title": "Termin", "description": "", "closes_at": past, "status": "OPEN", "options": []any{}})
-	if status != http.StatusBadRequest || !strings.Contains(string(body), "closes_at") {
+	if status != http.StatusBadRequest || !strings.Contains(string(body), "invalid_request") {
 		t.Fatalf("an open poll with a past closing time: want 400, got %d %s", status, body)
 	}
 	status, body = do(t, client, http.MethodPut, pollURL, lead, map[string]any{"title": "Termin", "description": "", "closes_at": "", "status": "OPEN", "options": []any{}})

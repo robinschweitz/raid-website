@@ -151,6 +151,7 @@ export function LoginPage() {
         <GuildCrest />
         <p className="eyebrow">Bratwurst des Schicksals</p>
         <h1>Raidverwaltung</h1>
+        <p><Link to="/passwort-zuruecksetzen">Passwort vergessen? Reset-Code einlösen</Link></p>
         <div className="login-tabs" role="tablist" aria-label="Anmeldung">
           <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>Anmelden</button>
           <button type="button" className={mode === 'request' ? 'active' : ''} onClick={() => setMode('request')}>Code anfordern</button>

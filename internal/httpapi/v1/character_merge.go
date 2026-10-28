@@ -37,13 +37,13 @@ func (a *API) mergeCharacter(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, character.ErrNotFound):
-			WriteError(w, http.StatusNotFound, "not_found", err.Error())
+			WriteError(w, http.StatusNotFound, "not_found", stableErrorMessage("not_found"))
 		case errors.Is(err, character.ErrForbidden):
-			WriteError(w, http.StatusForbidden, "forbidden", err.Error())
+			WriteError(w, http.StatusForbidden, "forbidden", stableErrorMessage("forbidden"))
 		case errors.Is(err, character.ErrMergeDifferentOwner), errors.Is(err, character.ErrMergeConflict), errors.Is(err, character.ErrMergeInactive):
-			WriteError(w, http.StatusConflict, "merge_conflict", err.Error())
+			WriteError(w, http.StatusConflict, "merge_conflict", stableErrorMessage("merge_conflict"))
 		case errors.Is(err, character.ErrMergeSame), errors.Is(err, character.ErrReasonRequired):
-			WriteError(w, http.StatusUnprocessableEntity, "invalid_merge", err.Error())
+			WriteError(w, http.StatusUnprocessableEntity, "invalid_merge", stableErrorMessage("invalid_merge"))
 		default:
 			WriteError(w, http.StatusInternalServerError, "internal", "could not merge characters")
 		}

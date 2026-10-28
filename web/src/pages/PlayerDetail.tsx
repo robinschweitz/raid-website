@@ -95,7 +95,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
   const [claimStatus, setClaimStatus] = useState('')
 
   const [accUser, setAccUser] = useState('')
-  const [accPass, setAccPass] = useState('')
+  const [resetCode, setResetCode] = useState('')
   const [accRole, setAccRole] = useState<Role>('MEMBER')
   const [mergePlayers, setMergePlayers] = useState<Player[]>([])
   const [mergeSourceID, setMergeSourceID] = useState('')
@@ -124,6 +124,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
 
   const load = useCallback(async () => {
     if (!isActive()) return
+    setResetCode('')
     const version = ++loadVersion.current
     setError('')
     try {
@@ -404,14 +405,26 @@ function PlayerDetail({ playerID, initialView }: Props) {
       try {
         await api.put<Player>(`/api/v1/players/${playerID}/account`, {
           username: accUser,
-          password: accPass,
           role: accRole,
         })
         if (!isActive()) return
-        setAccPass('')
         await load()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Konto speichern fehlgeschlagen')
+      }
+    })
+  }
+
+  const createResetCode = async () => {
+    if (!isAdmin) return
+    await submit(async () => {
+      setError('')
+      setResetCode('')
+      try {
+        const result = await api.post<{ code: string }>(`/api/v1/players/${playerID}/reset-code`)
+        if (isActive()) setResetCode(result.code)
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Reset-Code konnte nicht erstellt werden.')
       }
     })
   }
@@ -433,6 +446,18 @@ function PlayerDetail({ playerID, initialView }: Props) {
         await load()
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Konten zusammenführen fehlgeschlagen')
+      }
+    })
+  }
+
+  const exportPlayer = async () => {
+    if (!isAdmin) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.downloadJSON(`/api/v1/players/${playerID}/export`, `spieler-${playerID}.json`)
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Datenexport fehlgeschlagen.')
       }
     })
   }
@@ -834,13 +859,6 @@ function PlayerDetail({ playerID, initialView }: Props) {
             <h3>Kontodaten</h3>
            <form className="inline-form" onSubmit={setAccount}>
               <input aria-label="Benutzername" placeholder="Benutzername" value={accUser} onChange={(e) => setAccUser(e.target.value)} required />
-              {!isOwnProfile && <input
-                type="password"
-                aria-label="Passwort (leer = unverändert)"
-                placeholder="Passwort (leer = unverändert)"
-                value={accPass}
-                onChange={(e) => setAccPass(e.target.value)}
-              />}
               <select aria-label="Kontorolle" value={accRole} onChange={(e) => setAccRole(e.target.value as Role)}>
                 {ROLES.map((r) => (
                   <option key={r} value={r}>
@@ -853,6 +871,12 @@ function PlayerDetail({ playerID, initialView }: Props) {
             {isOwnProfile && <p className="muted">Dein eigenes Passwort änderst du im separaten Bereich darunter.</p>}
            </section>}
            {isAdmin && <section className="subcard">
+             <h3>Passwort zurücksetzen</h3>
+             <p className="muted">Sende den Code ingame an den Main-Charakter dieses Spielers. Er gilt 72 Stunden und ersetzt ältere unbenutzte Codes. Beim Einlösen werden das Passwort geändert, MFA entfernt und alle Sitzungen beendet.</p>
+             <button type="button" disabled={pending} onClick={() => void createResetCode()}>Reset-Code erstellen</button>
+             {resetCode && <div role="status"><p>Dieser Code wird nur jetzt angezeigt. Nach dem Verlassen der Seite kann er nicht erneut angezeigt werden.</p><label>Reset-Code<input aria-label="Reset-Code" readOnly value={resetCode} onFocus={(event) => event.target.select()} /></label><button type="button" onClick={() => { void navigator.clipboard.writeText(resetCode).then(() => setCopyStatus('Reset-Code kopiert.'), () => setCopyStatus('Bitte den Code im Feld markieren und manuell kopieren.')) }}>Reset-Code kopieren</button><p>{copyStatus}</p></div>}
+           </section>}
+           {isAdmin && <section className="subcard">
              <h3>Konto zusammenführen</h3>
              <p className="muted">Der Quellaccount wird deaktiviert. Seine Charaktere, Locks und sein EP-Guthaben werden diesem Konto zugeordnet; Quell-Sitzungen und MFA werden widerrufen.</p>
              <form className="inline-form" onSubmit={mergeAccount}>
@@ -863,6 +887,11 @@ function PlayerDetail({ playerID, initialView }: Props) {
                <label>Grund<input aria-label="Grund für Kontozusammenführung" value={mergeReason} onChange={(event) => setMergeReason(event.target.value)} required /></label>
                <button type="submit" disabled={pending || !mergeSourceID || !mergeReason.trim()}>Zusammenführen</button>
              </form>
+           </section>}
+           {isAdmin && <section className="subcard">
+             <h3>Persönliche Daten exportieren</h3>
+             <p className="muted">Für Auskunftsanfragen über den Datenschutzkontakt: Konto, Charaktere und Spielhistorie als JSON-Datei, ohne Passwörter, MFA-Geheimnisse oder Sitzungsschlüssel.</p>
+             <button type="button" disabled={pending} onClick={() => void exportPlayer()}>Daten als JSON herunterladen</button>
            </section>}
            {isAdmin && !isOwnProfile && <section className="subcard">
              <h3>Spieler anonymisieren</h3>

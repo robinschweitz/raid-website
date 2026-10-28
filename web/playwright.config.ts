@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { e2eTOTPKey } from './e2e/totp-key'
 
 // End-to-end tests run the real Go server against a fresh SQLite database in
 // web/.e2e. `npm run e2e` builds the frontend first, because the server embeds it.
@@ -29,6 +30,7 @@ export default defineConfig({
     env: {
       PRIVACY_CONTACT_NAME: 'Gildenverwaltung (Test)',
       PRIVACY_CONTACT_ADDRESS: 'kontakt@example.invalid',
+      TOTP_ENCRYPTION_KEY: e2eTOTPKey,
       PORT: String(port),
       LISTEN_ADDR: `127.0.0.1:${port}`,
       DATABASE_URL: 'file:raid.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)',

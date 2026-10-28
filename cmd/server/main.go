@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"raid-website/internal/auth"
 	"raid-website/internal/config"
 	"raid-website/internal/db"
 	"raid-website/internal/httpapi"
@@ -54,6 +55,9 @@ func run() (err error) {
 	if _, err := m.Migrate(ctx); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
+	if err := auth.NewRepo(bdb.DB).PruneSecurityRecords(ctx, time.Now().UTC()); err != nil {
+		log.Printf("authentication cleanup: %v", err)
+	}
 	if err := detectNamingPatterns(ctx, bdb.DB); err != nil {
 		return fmt.Errorf("naming pattern detection: %w", err)
 	}
@@ -74,7 +78,12 @@ func run() (err error) {
 		log.Printf("web push off: VAPID_PRIVATE_KEY is not set")
 	}
 	risingGods := registration.RisingGodsClient{ProxyURL: cfg.RisingGodsProxyURL, ProxyToken: cfg.RisingGodsProxyToken}
+	totpEncryption, err := auth.NewTOTPEncryptionWithPrevious(cfg.TOTPEncryptionKey, cfg.TOTPEncryptionKeysPrevious)
+	if err != nil {
+		return err
+	}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
+		TOTPEncryption:        totpEncryption,
 		PrivacyContactName:    cfg.PrivacyContactName,
 		PrivacyContactAddress: cfg.PrivacyContactAddress,
 		CookieSecure:          cfg.CookieSecure,

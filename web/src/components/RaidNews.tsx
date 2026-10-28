@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api'
+import { ErrorMessage } from './ErrorMessage'
 import { atLeast, type Player } from '../types'
 
 type News = { id: number; title: string; body: string; important: boolean; published: boolean; acknowledged: boolean; created_at: string }
@@ -51,7 +52,7 @@ export function RaidNews({ player }: { player: Player | null }) {
   }
   return <section className="card" aria-label="Raid-News">
     <div className="section-heading"><h2>Raid-News</h2><span className="eyebrow">Mitteilungen</span></div>
-    {error && <p role="alert">{error}</p>}
+    {error && <ErrorMessage>{error}</ErrorMessage>}
     {items.length === 0 && <p className="muted">Keine Raid-News vorhanden.</p>}
     {items.map((item) => <article key={item.id} style={{ marginBottom: '1rem', overflowWrap: 'anywhere' }}>
       <h3>{item.important ? '📣 ' : ''}{item.title}</h3>

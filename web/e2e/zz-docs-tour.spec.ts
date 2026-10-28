@@ -2,11 +2,7 @@ import { expect, test, type APIRequestContext, type Page, type TestInfo } from '
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-<<<<<<< HEAD
-import { seedAccountPassword, admin, apiAs } from './fixtures'
-=======
-import { admin, apiAs, signIn } from './fixtures'
->>>>>>> origin/main
+import { seedAccountPassword, admin, apiAs, signIn } from './fixtures'
 
 // Screenshots for the user guide (Anleitung page). Runs only with DOCS_TOUR=1:
 //   DOCS_TOUR=1 npx playwright test e2e/zz-docs-tour.spec.ts

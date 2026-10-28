@@ -21,6 +21,8 @@ func NewRepo(db bun.IDB) *Repo { return &Repo{db: db} }
 func (r *Repo) WithTx(tx bun.Tx) *Repo { return &Repo{db: tx} }
 
 func (r *Repo) CreateRequest(ctx context.Context, req *Request) error {
+	req.RawProfileJSON = ""
+	req.Level, req.Race, req.Faction = 0, "", ""
 	_, err := r.db.NewInsert().Model(req).Exec(ctx)
 	if err != nil && strings.Contains(err.Error(), "active_registration_request_exists") {
 		return ErrRequestExists
@@ -44,6 +46,8 @@ func (r *Repo) FindBlockingRequest(ctx context.Context, source, profileID string
 }
 
 func (r *Repo) UpdateRequest(ctx context.Context, req *Request) error {
+	req.RawProfileJSON = ""
+	req.Level, req.Race, req.Faction = 0, "", ""
 	_, err := r.db.NewUpdate().Model(req).WherePK().Exec(ctx)
 	return err
 }

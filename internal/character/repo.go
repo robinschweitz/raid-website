@@ -31,6 +31,7 @@ func (r *Repo) correctInTransaction(ctx context.Context, fn func(*Repo, *player.
 }
 
 func (r *Repo) Create(ctx context.Context, c *Character) error {
+	c.ExternalProfileJSON = ""
 	_, err := r.db.NewInsert().Model(c).Exec(ctx)
 	return err
 }
@@ -70,6 +71,7 @@ func (r *Repo) FindByExternalProfile(ctx context.Context, source, profileID stri
 }
 
 func (r *Repo) Update(ctx context.Context, c *Character) error {
+	c.ExternalProfileJSON = ""
 	_, err := r.db.NewUpdate().Model(c).WherePK().Exec(ctx)
 	return err
 }

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -12,7 +13,8 @@ import (
 )
 
 type Repo struct {
-	db bun.IDB
+	db         bun.IDB
+	encryption *TOTPEncryption
 }
 
 func NewRepo(db bun.IDB) *Repo {
@@ -34,7 +36,7 @@ func (r *Repo) UpgradePasswordHash(ctx context.Context, playerID int64, oldHash,
 }
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo {
-	return &Repo{db: tx}
+	return &Repo{db: tx, encryption: r.encryption}
 }
 
 // InTransaction runs account changes using a transaction-bound player repository.
@@ -48,7 +50,7 @@ func (r *Repo) InTransaction(ctx context.Context, fn func(*player.Repo) error) e
 // transaction using transaction-bound repositories.
 func (r *Repo) InAccountTransaction(ctx context.Context, fn func(*player.Repo, *Repo) error) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		return fn(player.NewRepo(tx), NewRepo(tx))
+		return fn(player.NewRepo(tx), r.WithTx(tx))
 	})
 }
 
@@ -88,6 +90,7 @@ func (r *Repo) TouchSession(ctx context.Context, id int64, at time.Time) error {
 		Model((*Session)(nil)).
 		Set("last_seen_at = ?", at).
 		Where("id = ?", id).
+		Where("last_seen_at <= ?", at.Add(-sessionTouchInterval)).
 		Exec(ctx)
 	return err
 }
@@ -103,7 +106,7 @@ func (r *Repo) DeleteByHash(ctx context.Context, tokenHash string) error {
 }
 
 func (r *Repo) DeleteExpired(ctx context.Context, before time.Time) error {
-	_, err := r.db.NewDelete().Model((*Session)(nil)).Where("expires_at < ?", before).Exec(ctx)
+	_, err := r.db.NewDelete().Model((*Session)(nil)).Where("expires_at <= ?", before).Exec(ctx)
 	return err
 }
 
@@ -185,10 +188,25 @@ func (r *Repo) GetMFASettings(ctx context.Context, playerID int64) (*MFASettings
 	if err != nil {
 		return nil, err
 	}
+	if r.encryption != nil {
+		s.TOTPSecret, err = r.encryption.decrypt(playerID, s.TOTPSecret)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return s, nil
 }
 
 func (r *Repo) UpsertMFASettings(ctx context.Context, s *MFASettings) error {
+	stored := *s
+	if r.encryption != nil {
+		var err error
+		stored.TOTPSecret, err = r.encryption.encrypt(s.PlayerID, s.TOTPSecret)
+		if err != nil {
+			return err
+		}
+	}
+	s = &stored
 	_, err := r.db.NewInsert().Model(s).
 		On("CONFLICT(player_id) DO UPDATE").
 		Set("totp_secret = EXCLUDED.totp_secret").
@@ -331,4 +349,88 @@ func (r *Repo) FindWebAuthnSession(ctx context.Context, sessionHash, purpose str
 func (r *Repo) MarkWebAuthnSessionUsed(ctx context.Context, id int64, at time.Time) error {
 	_, err := r.db.NewUpdate().Model((*WebAuthnSession)(nil)).Set("used_at = ?", at).Where("id = ?", id).Where("used_at IS NULL").Exec(ctx)
 	return err
+}
+
+// WithTOTPEncryption configures encryption for this repository and its transactions.
+func (r *Repo) WithTOTPEncryption(e *TOTPEncryption) *Repo { return &Repo{db: r.db, encryption: e} }
+
+// MigrateTOTPSecrets encrypts existing plaintext before serving requests. Any
+// failure rolls back every row and exposes only the number of failures.
+func (r *Repo) MigrateTOTPSecrets(ctx context.Context) error {
+	if r.encryption == nil {
+		return errTOTPEncryption
+	}
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var rows []MFASettings
+		if err := tx.NewSelect().Model(&rows).Scan(ctx); err != nil {
+			return fmt.Errorf("TOTP migration failed for %d row(s)", 1)
+		}
+		failures := 0
+		for _, row := range rows {
+			if row.TOTPSecret == "" {
+				continue
+			}
+			plain := row.TOTPSecret
+			if strings.HasPrefix(plain, "v1:") {
+				decoded, err := r.encryption.decrypt(row.PlayerID, plain)
+				if err != nil {
+					failures++
+					continue
+				}
+				if strings.HasPrefix(plain, "v1:"+r.encryption.keyID+":") {
+					continue
+				}
+				plain = decoded
+			}
+			stored, err := r.encryption.encrypt(row.PlayerID, plain)
+			if err != nil {
+				failures++
+				continue
+			}
+			if _, err := tx.NewUpdate().Model((*MFASettings)(nil)).Set("totp_secret = ?", stored).Where("player_id = ?", row.PlayerID).Exec(ctx); err != nil {
+				failures++
+			}
+		}
+		if failures > 0 {
+			return fmt.Errorf("TOTP migration failed for %d row(s)", failures)
+		}
+		// Check persisted values too: a trigger or unexpected write cannot leave plaintext behind.
+		rows = nil
+		if err := tx.NewSelect().Model(&rows).Scan(ctx); err != nil {
+			return fmt.Errorf("TOTP migration failed for %d row(s)", 1)
+		}
+		for _, row := range rows {
+			if row.TOTPSecret != "" && !strings.HasPrefix(row.TOTPSecret, "v1:"+r.encryption.keyID+":") {
+				failures++
+				continue
+			}
+			if _, err := r.encryption.decrypt(row.PlayerID, row.TOTPSecret); err != nil {
+				failures++
+			}
+		}
+		if failures > 0 {
+			return fmt.Errorf("TOTP migration failed for %d row(s)", failures)
+		}
+		return nil
+	})
+}
+
+// PruneSecurityRecords deletes data after its authentication purpose ends (SC-038).
+// The transaction preserves current rate-limit attempts if any cleanup fails.
+func (r *Repo) PruneSecurityRecords(ctx context.Context, now time.Time) error {
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.NewDelete().Model((*LoginAttempt)(nil)).Where("created_at < ?", now.Add(-loginFailureWindow)).Exec(ctx); err != nil {
+			return fmt.Errorf("prune login attempts: %w", err)
+		}
+		if err := r.WithTx(tx).DeleteExpired(ctx, now); err != nil {
+			return fmt.Errorf("prune sessions: %w", err)
+		}
+		if _, err := tx.NewDelete().Model((*MFAChallenge)(nil)).Where("expires_at <= ? OR used_at IS NOT NULL", now).Exec(ctx); err != nil {
+			return fmt.Errorf("prune MFA challenges: %w", err)
+		}
+		if _, err := tx.NewDelete().Model((*WebAuthnSession)(nil)).Where("expires_at <= ? OR used_at IS NOT NULL", now).Exec(ctx); err != nil {
+			return fmt.Errorf("prune WebAuthn sessions: %w", err)
+		}
+		return nil
+	})
 }

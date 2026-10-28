@@ -25,14 +25,16 @@ import (
 )
 
 const (
-	defaultSessionTTL         = 30 * 24 * time.Hour
-	MinPasswordLength         = 12
-	loginFailureLimit         = 5
-	loginFailureWindow        = 15 * time.Minute
-	addressFailureLimit       = 30
-	mfaChallengeTTL           = 5 * time.Minute
-	mfaFailureLimit           = 5
-	totpPeriodSeconds   int64 = 30
+	defaultSessionTTL          = 30 * 24 * time.Hour
+	sessionIdleTTL             = 7 * 24 * time.Hour
+	sessionTouchInterval       = time.Hour
+	MinPasswordLength          = 12
+	loginFailureLimit          = 5
+	loginFailureWindow         = 15 * time.Minute
+	addressFailureLimit        = 30
+	mfaChallengeTTL            = 5 * time.Minute
+	mfaFailureLimit            = 5
+	totpPeriodSeconds    int64 = 30
 
 	// CookieName is the name of the session cookie.
 	CookieName = "raid_session"
@@ -491,6 +493,10 @@ func (a *loginAttempt) releaseUndecided(ctx context.Context) {
 
 // Authenticate resolves a raw session token. Missing, unknown, or expired sessions return nil, nil.
 func (s *Service) Authenticate(ctx context.Context, token string) (*player.Player, error) {
+	return s.authenticateAt(ctx, token, time.Now().UTC())
+}
+
+func (s *Service) authenticateAt(ctx context.Context, token string, now time.Time) (*player.Player, error) {
 	if token == "" {
 		return nil, nil
 	}
@@ -501,8 +507,7 @@ func (s *Service) Authenticate(ctx context.Context, token string) (*player.Playe
 		}
 		return nil, fmt.Errorf("find authentication session: %w", err)
 	}
-	now := time.Now().UTC()
-	if !now.Before(sess.ExpiresAt) {
+	if !now.Before(sess.ExpiresAt) || !now.Before(sess.LastSeenAt.Add(sessionIdleTTL)) {
 		return nil, nil
 	}
 	p, err := s.players.Get(ctx, sess.PlayerID)
@@ -515,8 +520,10 @@ func (s *Service) Authenticate(ctx context.Context, token string) (*player.Playe
 	if !p.Active {
 		return nil, ErrInactive
 	}
-	if err := s.sessions.TouchSession(ctx, sess.ID, now); err != nil {
-		return nil, fmt.Errorf("touch authentication session: %w", err)
+	if !now.Before(sess.LastSeenAt.Add(sessionTouchInterval)) {
+		if err := s.sessions.TouchSession(ctx, sess.ID, now); err != nil {
+			log.Printf("touch authentication session: %v", err)
+		}
 	}
 	return p, nil
 }

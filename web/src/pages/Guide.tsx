@@ -380,6 +380,7 @@ export function GuidePage() {
       </ol>
       <p>Im Reiter <strong>Verlauf</strong> zeigt die Spalte <strong>Verknüpfter Spieler</strong>, für welchen Spieler ein Code eingelöst wurde, mit Login-Namen und Datum.</p>
       <p><strong>Beispiel:</strong> Die Anfrage für den Charakter <em>Mirabelle</em> ist eingelöst und mit dem Spieler <em>Mira</em> (Login <code>@mira</code>) verknüpft.</p>
+      <p>Ein alter Registrierungscode ist nicht wiederherstellbar. Unter „Details“ prüfst du Status und Gültigkeit. Stelle bei Verlust einen neuen Code aus, kopiere ihn zur Weitergabe und widerrufe den alten Code.</p>
       <Shot name="53-registrierung" caption="Verlauf: welcher Code welchem Spieler zugeordnet wurde" />
       <h3>Wer hat schon ein Konto?</h3>
       <p>Unter <strong>Spieler</strong> sehen Admins zu jedem Spieler seine <strong>Charaktere</strong>, das <strong>Konto</strong> und die <strong>Rolle</strong>. Oben steht, wie viele Spieler schon ein Konto haben. Wurde ein Charakter versehentlich dem falschen Spieler zugeordnet, öffne beim bisherigen Spieler den Reiter „Charaktere“, klicke beim Charakter auf <strong>Verschieben</strong> und wähle den richtigen Spieler. Die Raid-Aufstellungen zeigen danach den richtigen Spieler; Loot und EP bleiben unverändert.</p>

@@ -404,12 +404,12 @@ func TestEnhancedCompletedCorrectionEligibilityDelta(t *testing.T) {
 	f.archiveHistory()
 	suffix := fmt.Sprintf("/loot/%d", id)
 	f.request(http.MethodPatch, suffix, map[string]any{"award_method": "ENHANCED", "reason": "enhanced winner"}, http.StatusOK)
-	f.points(f.first, 10) // 70 - 50 cost - 10 eligibility delta, no reconstructed reward.
+	f.points(f.first, 20) // 70 - 50 cost; tokens do not change EP eligibility.
 	f.request(http.MethodPatch, suffix, map[string]any{"award_method": "SECOND", "reason": "undo"}, http.StatusOK)
 	f.points(f.first, 70)
 	f.tokenBalance(f.first, 1)
 	entries, err := enhancepoints.NewRepo(f.db).ListByPlayer(context.Background(), f.first)
-	if err != nil || len(entries) != 5 || entries[0].Type != "legacy_open" || entries[0].Amount != 70 {
+	if err != nil || len(entries) != 3 || entries[0].Type != "legacy_open" || entries[0].Amount != 70 {
 		t.Fatalf("history: %v %v", entries, err)
 	}
 }
@@ -522,7 +522,7 @@ func TestEnhancedLootCancelledRejectsAndArchiveRequiresReason(t *testing.T) {
 				f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"notes": "clarification", "reason": "archived note"}, http.StatusOK)
 				f.points(f.first, 20)
 				f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"award_method": "SECOND", "reason": "refund"}, http.StatusOK)
-				f.points(f.first, 80)
+				f.points(f.first, 70)
 			} else {
 				f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"award_method": "SECOND", "reason": "blocked refund"}, http.StatusConflict)
 			}

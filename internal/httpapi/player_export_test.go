@@ -91,3 +91,41 @@ func TestReqPrivacy012_AC03(t *testing.T) {
 		t.Fatalf("missing player=%d", status)
 	}
 }
+
+func TestReqPrivacy012_AnonymisedIdentityStaysHidden(t *testing.T) {
+	srv, db := setupServer(t)
+	ctx := context.Background()
+	seedAccount(t, db, "privacy-export-admin", "export-admin-password", validation.RoleAdmin)
+	targetID := seedAccount(t, db, "erased-login-unique", "export-member-password", validation.RoleMember)
+	otherID := seedAccount(t, db, "export-other", "export-other-password", validation.RoleMember)
+	token := login(t, srv.Client(), srv, "privacy-export-admin", "export-admin-password")
+	seedPrivacyChar(t, db, targetID, "Retainedmage", true, time.Now().UTC())
+	if err := audit.NewRepo(db).Record(ctx, otherID, "player", targetID, "update", nil,
+		map[string]any{"name": "Erased identity unique", "username": "erased-login-unique", "role": "MEMBER"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	status, body := do(t, srv.Client(), http.MethodPost, fmt.Sprintf("%s/api/v1/players/%d/anonymise", srv.URL, targetID), token, map[string]any{})
+	if status != http.StatusNoContent {
+		t.Fatalf("anonymise=%d %s", status, body)
+	}
+	// Also export the actor: their history includes the erased player's account edit,
+	// but need not include that player's anonymisation marker.
+	for _, id := range []int64{targetID, otherID} {
+		status, body = do(t, srv.Client(), http.MethodGet, fmt.Sprintf("%s/api/v1/players/%d/export", srv.URL, id), token, nil)
+		if status != http.StatusOK {
+			t.Fatalf("export=%d %s", status, body)
+		}
+		for _, identity := range []string{"Erased identity unique", "erased-login-unique"} {
+			if strings.Contains(string(body), identity) {
+				t.Errorf("export for %d reveals anonymised identity %q", id, identity)
+			}
+		}
+	}
+	var stored string
+	if err := db.NewSelect().TableExpr("audit_log").Column("after_json").Where("entity_type = 'player' AND entity_id = ? AND action = 'update'", fmt.Sprint(targetID)).Scan(ctx, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stored, "Erased identity unique") {
+		t.Fatal("export changed the append-only audit snapshot")
+	}
+}

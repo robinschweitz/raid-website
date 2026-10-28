@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
+	"raid-website/internal/audit"
 	"raid-website/internal/player"
 	"raid-website/internal/validation"
 )
@@ -40,9 +42,31 @@ func (s *Service) Export(ctx context.Context, actorID, playerID int64) (*PlayerE
 		if err != nil {
 			return err
 		}
+		anonymised := make(map[int64]bool)
 		for _, row := range sections["audit"] {
+			hideIdentity := false
+			if row["entity_type"] == "player" {
+				entityID, _ := row["entity_id"].(string)
+				id, err := strconv.ParseInt(entityID, 10, 64)
+				if err != nil {
+					return err
+				}
+				var known bool
+				hideIdentity, known = anonymised[id]
+				if !known {
+					// The marker may be outside this player's selected audit history.
+					hideIdentity, err = repo.AnonymisedPlayer(ctx, id)
+					if err != nil {
+						return err
+					}
+					anonymised[id] = hideIdentity
+				}
+			}
 			for _, field := range []string{"before_json", "after_json"} {
 				if value, ok := row[field].(string); ok {
+					if hideIdentity {
+						value = audit.HidePlayerIdentity(value)
+					}
 					row[field] = redactExportSnapshot(value)
 				}
 			}

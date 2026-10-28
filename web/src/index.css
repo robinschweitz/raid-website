@@ -2020,11 +2020,10 @@ input[type='checkbox'] {
 }
 .raid-news-form > label:not(.raid-news-check) {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: stretch;
   gap: .4rem;
   min-width: 0;
-  text-align: center;
 }
 .raid-news-form input:not([type="checkbox"]),
 .raid-news-form textarea { width: 100%; min-width: 0; }

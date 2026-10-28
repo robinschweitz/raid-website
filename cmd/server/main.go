@@ -15,11 +15,14 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"raid-website/internal/audit"
 	"raid-website/internal/auth"
+	"raid-website/internal/character"
 	"raid-website/internal/config"
 	"raid-website/internal/db"
 	"raid-website/internal/httpapi"
 	"raid-website/internal/migrations"
+	"raid-website/internal/player"
 	"raid-website/internal/push"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidseries"
@@ -103,6 +106,32 @@ func run() (err error) {
 	}
 	stopCtx, stop := signal.NotifyContext(ctx, syscall.SIGTERM, os.Interrupt)
 	defer stop()
+	nameSync := registration.NewService(bdb.DB, player.NewRepo(bdb.DB), character.NewRepo(bdb.DB), audit.NewRepo(bdb.DB), nil, risingGods)
+	go func() {
+		// Delay startup checks to avoid slowing server readiness.
+		startup := time.NewTimer(time.Minute)
+		defer startup.Stop()
+		select {
+		case <-stopCtx.Done():
+			return
+		case <-startup.C:
+		}
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			renamed, err := nameSync.SyncLinkedCharacterNames(stopCtx)
+			if err != nil && stopCtx.Err() == nil {
+				log.Printf("Rising-Gods rename sync: %d renamed; errors: %v", renamed, err)
+			} else if renamed > 0 {
+				log.Printf("Rising-Gods rename sync: %d renamed", renamed)
+			}
+			select {
+			case <-stopCtx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
 	log.Printf("listening on %s", cfg.ListenAddr)
 	return serve(stopCtx, newHTTPServer(h), ln, shutdownTimeout)
 }

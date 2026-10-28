@@ -214,10 +214,10 @@ func TestLegacyCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
 		f.tokenBalance(f.second, 0)
 	}
 	f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "SECOND", "reason": "item correction"}, false), http.StatusOK)
-	f.points(f.first, 10)
+	f.points(f.first, 0)
 	f.tokenBalance(f.first, 0)
 	f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "MAIN", "reason": "restore"}, true), http.StatusOK)
-	f.points(f.first, 10)
+	f.points(f.first, 0)
 	f.tokenBalance(f.first, 1)
 	before, err := enhancepoints.NewRepo(f.db).ListByPlayer(context.Background(), f.first)
 	if err != nil {

@@ -16,6 +16,7 @@ type renameProfileClient struct {
 func (c *renameProfileClient) SearchCharacters(context.Context, string) ([]ExternalCharacter, error) {
 	return nil, nil
 }
+
 func (c *renameProfileClient) LoadCharacter(_ context.Context, id string) (ExternalCharacter, string, error) {
 	return ExternalCharacter{ProfileID: id, Name: c.name, Class: "Magier", MainSpec: "Feuer", Level: 80, Faction: "Alliance"}, "", nil
 }

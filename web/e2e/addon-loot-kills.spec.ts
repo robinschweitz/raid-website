@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { guideSnapshot } from './guide-snapshot'
 import { admin, apiAs, createMember, signIn } from './fixtures'
 
 test('addon loot asks for a boss difficulty and records loot and kill together', async ({ page, request }, testInfo) => {
@@ -21,6 +22,8 @@ test('addon loot asks for a boss difficulty and records loot and kill together',
   await expect(mode).toHaveCount(1)
   await expect(panel.getByRole('button', { name: '1 Gegenstand übernehmen' })).toBeDisabled()
   await mode.selectOption('NORMAL')
+  await panel.scrollIntoViewIfNeeded()
+  await guideSnapshot(page, testInfo, '37b-addon-loot')
   await panel.getByRole('button', { name: '1 Gegenstand übernehmen' }).click()
   await expect(panel.getByRole('status', { name: 'Importergebnis' })).toContainText('Übernommen')
   const kills = (await (await request.get(`/api/v1/raids/${raid.id}/kills`)).json()).data

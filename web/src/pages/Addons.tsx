@@ -368,10 +368,20 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
           <li>Im Spiel <strong>IMPORT</strong> klicken (oder <code>/wish import</code>), mit <kbd>Strg</kbd>+<kbd>V</kbd> einfügen und <strong>IMPORTIEREN</strong>.</li>
         </ol>
         <p>Ein Import ersetzt die alte Liste. Ein Export für einen anderen Charakter wird abgelehnt, damit dein Twink nicht auf die Liste deines Mains würfelt.</p>
-        <Tip><strong>EP aktuell halten:</strong> Der Export enthält deinen EP-Stand für Enhanced. Nach neuen EP einfach neu exportieren und importieren.</Tip>
+        <Tip><strong>EP aktuell halten:</strong> Der Export enthält deinen EP-Stand für Enhanced. Nach neuen EP einfach neu exportieren und importieren oder den Stand unter <strong>EINSTELLUNGEN</strong> eintragen.</Tip>
       </Feature>
 
-      <Feature title="2. Würfeln mit einem Klick">
+      <Feature title="2. Wunschliste im Spiel bearbeiten" shot={<Shot name="raidwishlist-katalog" caption="BEARBEITEN: Raidkatalog mit Suche und Filtern" width={466} height={410} />}>
+        <p>Ohne Website geht es auch: <strong>BEARBEITEN</strong> (oder <code>/wish edit</code>) öffnet den Editor. Im <strong>Raidkatalog</strong> suchst du ein Item nach seinem deutschen oder englischen Namen. Er kennt die epische und legendäre Beute aus Naxxramas, Obsidiansanktum, Auge der Ewigkeit, Ulduar, Prüfung des Kreuzfahrers, Onyxias Hort, Eiskronenzitadelle und Rubinsanktum.</p>
+        <ul>
+          <li>Die Knöpfe unter der Suche filtern nach Raid und Qualität. Mit der Maus über einem Treffer siehst du den Item-Tooltip, ein Klick wählt ihn aus. Gleichnamige Items (10er, 25er, heroisch) unterscheidest du am Tooltip.</li>
+          <li>Dann <strong>HAUPTSPEC</strong> oder <strong>ZWEITSPEC</strong> wählen, bei Main-Spec auf Wunsch <strong>VERBESSERT</strong> (Enhanced), eine Notiz eintragen und <strong>ZUR WUNSCHLISTE</strong>. Neue Items kommen ans Ende der Liste. Die Item-ID kannst du auch direkt eintippen.</li>
+          <li>Ein Klick auf einen Eintrag der Wunschliste öffnet ihn zum Ändern oder <strong>LÖSCHEN</strong>.</li>
+          <li>Die geänderte Liste geht wie ein Import an RaidLedger der Raidleitung. Ein neuer Import von der Website ersetzt sie wieder.</li>
+        </ul>
+      </Feature>
+
+      <Feature title="3. Würfeln mit einem Klick">
         <p>Startet die Raidleitung einen Wurf auf ein Item von deiner Liste, erscheint oben am Bildschirm ein Hinweis mit Rang und Notiz und zwei Knöpfen: <strong>WÜRFELN MS 21-120</strong> (dein Spec und Bereich) oder <strong>PASSEN</strong>.</p>
         <ul>
           <li><strong>AUTO-WURF: AN</strong> würfelt etwa eine Sekunde nach dem Start für dich, z. B. wenn du kurz weg bist.</li>
@@ -380,7 +390,16 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
         </ul>
       </Feature>
 
-      <Feature title="3. Drei Reiter, jede Liste scrollbar">
+      <Feature title="4. Einstellungen: EP und Chat-Erinnerung" shot={<Shot name="raidwishlist-einstellungen" caption="EINSTELLUNGEN: EP-Stand und Chat-Würfel-Erinnerung" width={466} height={410} />}>
+        <p><strong>EINSTELLUNGEN</strong> (oben rechts im Fenster oder im Editor) hat zwei Teile:</p>
+        <ul>
+          <li><strong>ENHANCE-PUNKTE:</strong> dein aktueller EP-Stand, wenn du nicht von der Website importierst. Der Wert ersetzt den alten Stand und bestimmt den Bereich für Enhanced.</li>
+          <li><strong>CHAT-WÜRFEL-ERINNERUNG:</strong> für Raids ohne RaidLedger, Standard: aus. Ist sie <strong>AN</strong>, öffnet sich die Würfel-Abfrage, wenn der Plündermeister ein Item von deiner Liste zusammen mit einem Schlüsselwort (Standard: <code>roll</code>, <code>würfel</code>) in den Gruppen- oder Raidchat schreibt. Statt nur dem Plündermeister kannst du alle Gruppenmitglieder zulassen. Ansagen von RaidLedger selbst lösen keine zweite Abfrage aus.</li>
+        </ul>
+        <p><strong>EINSTELLUNGEN SPEICHERN</strong> speichert alles, <strong>ABBRECHEN</strong> verwirft die Änderungen.</p>
+      </Feature>
+
+      <Feature title="5. Drei Reiter, jede Liste scrollbar">
         <p>Jeder Reiter ist eine Liste über die ganze Fensterhöhe, die mit dem <strong>Mausrad</strong> scrollt. Unten rechts steht, welche Einträge du siehst („18-30 / 30“), die Reiter zählen ihre Einträge mit.</p>
         <ul>
           <li><strong>WUNSCHLISTE:</strong> deine Wünsche nach Rang, mit Notiz und Würfelbereich. Erhaltene Wünsche zeigen <strong>ERHALTEN</strong>. Ein Item, das dein Spiel noch nie gesehen hat, steht kurz als <code>[Gegenstand 12345]</code> da, bis der Server seinen Namen schickt.</li>
@@ -389,15 +408,15 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
         </ul>
       </Feature>
 
-      <Feature title="4. In deiner Farbe" shot={<Shot name="raidwishlist-farbe" caption="Der Farbknopf oben öffnet die Farbauswahl" width={466} height={409} />}>
+      <Feature title="6. In deiner Farbe" shot={<Shot name="raidwishlist-farbe" caption="Der Farbknopf oben öffnet die Farbauswahl" width={466} height={409} />}>
         <p>Das Fenster sieht aus wie RaidLedger, in deiner Farbe: Der Farbknopf oben (oder <code>/wish color</code>) öffnet die Farbauswahl, Rechtsklick (oder <code>/wish color reset</code>) geht zurück auf Grün. Die Farbe gilt für alle deine Charaktere. Sehr dunkle Farben hellt das Addon auf, damit die Schrift lesbar bleibt.</p>
       </Feature>
 
-      <Feature title="5. Größe und Skalierung">
+      <Feature title="7. Größe und Skalierung">
         <p>Für große und kleine Bildschirme: Die Ecke unten rechts im Fenster ziehen macht es größer (bis zum Bildschirmrand, mindestens 500 × 440), die Listen zeigen dann mehr Zeilen. <strong>–</strong> und <strong>+</strong> unten im Fenster (oder <code>/wish scale 80</code>) machen das ganze Fenster kleiner oder größer, von 60 bis 150 %. Größe und Skalierung gelten für alle deine Charaktere. <code>/wish reset</code> setzt das Fenster in die Mitte, in normaler Größe und auf 100 %.</p>
       </Feature>
 
-      <Feature title="6. Die Raidleitung weiß, was du willst">
+      <Feature title="8. Die Raidleitung weiß, was du willst">
         <p>Deine Liste (Items, Spec, Enhanced, Reihenfolge) geht an RaidLedger der Raidleitung. Sie sieht bei jedem Drop, wie viele und wer ihn wollen. <strong>Notizen bleiben privat.</strong> <code>/wish share off</code> schaltet das Teilen ab.</p>
       </Feature>
     </section>
@@ -426,9 +445,12 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
           <tbody>
             <tr><td><code>/wish</code></td><td>Fenster ein- und ausblenden</td></tr>
             <tr><td><code>/wish import</code></td><td>Wunschliste einfügen</td></tr>
+            <tr><td><code>/wish edit</code></td><td>Wunschliste im Spiel bearbeiten (Raidkatalog)</td></tr>
             <tr><td><code>/wish auto on|off</code></td><td>Automatisch würfeln oder nachfragen</td></tr>
             <tr><td><code>/wish sync</code></td><td>Vergaben dieses Raids von der Raidleitung holen</td></tr>
             <tr><td><code>/wish share on|off</code></td><td>Wunschliste mit der Raidleitung teilen (Standard: an)</td></tr>
+            <tr><td><code>/wish remind on|off</code></td><td>Chat-Würfel-Erinnerung an oder aus (Standard: aus)</td></tr>
+            <tr><td><code>/wish remind all|master</code></td><td>Erinnerung von allen Gruppenmitgliedern oder nur vom Plündermeister</td></tr>
             <tr><td><code>/wish minimap on|off</code></td><td>Minimap-Knopf ein- oder ausblenden</td></tr>
             <tr><td><code>/wish color</code> · <code>/wish color reset</code></td><td>Fensterfarbe wählen oder zurück auf Grün</td></tr>
             <tr><td><code>/wish scale &lt;Prozent&gt;</code></td><td>Fenster kleiner oder größer (60–150 %)</td></tr>

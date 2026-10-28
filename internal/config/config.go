@@ -10,18 +10,19 @@ import (
 )
 
 type Config struct {
-	TOTPEncryptionKey    []byte
-	Port                 string
-	ListenAddr           string
-	DatabaseURL          string
-	Env                  string
-	CookieSecure         bool
-	TrustProxyHeaders    bool
-	PublicOrigin         string
-	AdminUsername        string
-	AdminPassword        string
-	RisingGodsProxyURL   string
-	RisingGodsProxyToken string
+	TOTPEncryptionKeysPrevious [][]byte
+	TOTPEncryptionKey          []byte
+	Port                       string
+	ListenAddr                 string
+	DatabaseURL                string
+	Env                        string
+	CookieSecure               bool
+	TrustProxyHeaders          bool
+	PublicOrigin               string
+	AdminUsername              string
+	AdminPassword              string
+	RisingGodsProxyURL         string
+	RisingGodsProxyToken       string
 	// VAPIDPrivateKey and VAPIDSubject switch Web Push on (FR-32, SC-054).
 	VAPIDPrivateKey string
 	VAPIDSubject    string
@@ -59,6 +60,18 @@ func Load() (*Config, error) {
 			return nil, errors.New("TOTP_ENCRYPTION_KEY must be base64 encoding of 32 bytes")
 		}
 		c.TOTPEncryptionKey = key
+	}
+	if raw := strings.TrimSpace(os.Getenv("TOTP_ENCRYPTION_KEYS_PREVIOUS")); raw != "" {
+		if len(c.TOTPEncryptionKey) == 0 {
+			return nil, errors.New("previous TOTP keys require a current key")
+		}
+		for _, encoded := range strings.Split(raw, ",") {
+			key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
+			if err != nil || len(key) != 32 {
+				return nil, errors.New("TOTP_ENCRYPTION_KEYS_PREVIOUS must contain comma-separated base64 32-byte keys")
+			}
+			c.TOTPEncryptionKeysPrevious = append(c.TOTPEncryptionKeysPrevious, key)
+		}
 	}
 	if (c.VAPIDPrivateKey == "") != (c.VAPIDSubject == "") {
 		return nil, errors.New("VAPID_PRIVATE_KEY and VAPID_SUBJECT must be set together")

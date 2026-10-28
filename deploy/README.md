@@ -380,5 +380,11 @@ refuses to start; correct the configuration or restore the snapshot and retry.
 A successful restart leaves existing authenticator apps and recovery codes usable.
 Without the key, a server with stored TOTP cannot start, and a fresh server cannot
 create TOTP secrets. This applies in development too. A repeat startup does not
-rewrite values already under this key. Previous-key rotation is tracked in #65;
-do not replace or discard the key until that support is deployed.
+rewrite values already under this key. To rotate after #65, stop the service and take the deployment snapshot. Put the
+old base64 key in `TOTP_ENCRYPTION_KEYS_PREVIOUS` (comma-separated for several),
+set a newly generated `TOTP_ENCRYPTION_KEY`, then start the service. Startup
+re-encrypts all old-key rows atomically. Check startup succeeds and verify a TOTP
+login before removing the previous key from the environment and restarting.
+Keep every old key with the backup key material until the last snapshot using it
+expires: removing it from the live environment does not remove that obligation.
+An unknown key ID stops startup; restore the missing key rather than deleting data.

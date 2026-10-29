@@ -12,6 +12,8 @@ import (
 type Config struct {
 	TOTPEncryptionKeysPrevious [][]byte
 	TOTPEncryptionKey          []byte
+	PrivacyContactName         string
+	PrivacyContactAddress      string
 	Port                       string
 	ListenAddr                 string
 	DatabaseURL                string
@@ -40,19 +42,21 @@ func Load() (*Config, error) {
 		}
 	}
 	c := &Config{
-		Port:                 port,
-		ListenAddr:           listenAddr,
-		DatabaseURL:          getEnv("DATABASE_URL", "file:raid.db?_pragma=journal_mode(WAL)"),
-		Env:                  env,
-		CookieSecure:         getEnv("COOKIE_SECURE", "") == "true" || env == "production",
-		TrustProxyHeaders:    getEnv("TRUST_PROXY_HEADERS", "") == "true",
-		PublicOrigin:         strings.TrimSpace(getEnv("PUBLIC_ORIGIN", "")),
-		AdminUsername:        getEnv("ADMIN_USERNAME", "Robin"),
-		AdminPassword:        getEnv("ADMIN_PASSWORD", "development-password"),
-		RisingGodsProxyURL:   strings.TrimRight(strings.TrimSpace(getEnv("RISING_GODS_PROXY_URL", "")), "/"),
-		RisingGodsProxyToken: strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
-		VAPIDPrivateKey:      strings.TrimSpace(getEnv("VAPID_PRIVATE_KEY", "")),
-		VAPIDSubject:         strings.TrimSpace(getEnv("VAPID_SUBJECT", "")),
+		PrivacyContactName:    strings.TrimSpace(os.Getenv("PRIVACY_CONTACT_NAME")),
+		PrivacyContactAddress: strings.TrimSpace(os.Getenv("PRIVACY_CONTACT_ADDRESS")),
+		Port:                  port,
+		ListenAddr:            listenAddr,
+		DatabaseURL:           getEnv("DATABASE_URL", "file:raid.db?_pragma=journal_mode(WAL)"),
+		Env:                   env,
+		CookieSecure:          getEnv("COOKIE_SECURE", "") == "true" || env == "production",
+		TrustProxyHeaders:     getEnv("TRUST_PROXY_HEADERS", "") == "true",
+		PublicOrigin:          strings.TrimSpace(getEnv("PUBLIC_ORIGIN", "")),
+		AdminUsername:         getEnv("ADMIN_USERNAME", "Robin"),
+		AdminPassword:         getEnv("ADMIN_PASSWORD", "development-password"),
+		RisingGodsProxyURL:    strings.TrimRight(strings.TrimSpace(getEnv("RISING_GODS_PROXY_URL", "")), "/"),
+		RisingGodsProxyToken:  strings.TrimSpace(getEnv("RISING_GODS_PROXY_TOKEN", "")),
+		VAPIDPrivateKey:       strings.TrimSpace(getEnv("VAPID_PRIVATE_KEY", "")),
+		VAPIDSubject:          strings.TrimSpace(getEnv("VAPID_SUBJECT", "")),
 	}
 	if raw := strings.TrimSpace(os.Getenv("TOTP_ENCRYPTION_KEY")); raw != "" {
 		key, err := base64.StdEncoding.DecodeString(raw)
@@ -91,6 +95,9 @@ func Load() (*Config, error) {
 		}
 	}
 	if env == "production" {
+		if c.PrivacyContactName == "" || c.PrivacyContactAddress == "" {
+			return nil, errors.New("production requires PRIVACY_CONTACT_NAME and PRIVACY_CONTACT_ADDRESS")
+		}
 		username := strings.TrimSpace(os.Getenv("ADMIN_USERNAME"))
 		password := os.Getenv("ADMIN_PASSWORD")
 		if username == "" || strings.EqualFold(username, "Robin") || strings.TrimSpace(password) == "" || password == "test" || password == "development-password" {

@@ -28,6 +28,8 @@ export default defineConfig({
   webServer: {
     command: webServerCommand,
     env: {
+      PRIVACY_CONTACT_NAME: 'Gildenverwaltung (Test)',
+      PRIVACY_CONTACT_ADDRESS: 'kontakt@example.invalid',
       TOTP_ENCRYPTION_KEY: e2eTOTPKey,
       PORT: String(port),
       LISTEN_ADDR: `127.0.0.1:${port}`,

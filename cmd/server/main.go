@@ -86,14 +86,16 @@ func run() (err error) {
 		return err
 	}
 	h, err := httpapi.New(bdb.DB, httpapi.Options{
-		TOTPEncryption:    totpEncryption,
-		CookieSecure:      cfg.CookieSecure,
-		TrustProxyHeaders: cfg.TrustProxyHeaders,
-		PublicOrigin:      cfg.PublicOrigin,
-		AdminUsername:     cfg.AdminUsername,
-		AdminPassword:     cfg.AdminPassword,
-		RegistrationFeed:  risingGods,
-		VAPIDKey:          vapidKey,
+		TOTPEncryption:        totpEncryption,
+		PrivacyContactName:    cfg.PrivacyContactName,
+		PrivacyContactAddress: cfg.PrivacyContactAddress,
+		CookieSecure:          cfg.CookieSecure,
+		TrustProxyHeaders:     cfg.TrustProxyHeaders,
+		PublicOrigin:          cfg.PublicOrigin,
+		AdminUsername:         cfg.AdminUsername,
+		AdminPassword:         cfg.AdminPassword,
+		RegistrationFeed:      risingGods,
+		VAPIDKey:              vapidKey,
 	})
 	if err != nil {
 		return fmt.Errorf("http initialization: %w", err)

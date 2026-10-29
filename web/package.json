@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "node --test tests/frontend.test.cjs tests/design.test.cjs tests/boss-data.test.cjs tests/recruitment.test.cjs tests/raid-setup.test.cjs tests/my-raids.test.cjs tests/guide.test.cjs tests/addons.test.cjs tests/account-security.test.cjs tests/error-message.test.cjs tests/min-text-size.test.cjs",
+    "test": "node --test tests/frontend.test.cjs tests/design.test.cjs tests/boss-data.test.cjs tests/recruitment.test.cjs tests/raid-setup.test.cjs tests/my-raids.test.cjs tests/guide.test.cjs tests/addons.test.cjs tests/account-security.test.cjs tests/error-message.test.cjs tests/min-text-size.test.cjs tests/privacy.test.cjs",
     "preview": "vite preview",
     "e2e": "npm run build && playwright test"
   },

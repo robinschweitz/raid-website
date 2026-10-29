@@ -65,6 +65,8 @@ without it, because the WebAuthn relying party comes only from it (SC-007). Also
 set `COOKIE_SECURE=true` and `TRUST_PROXY_HEADERS=true`. Configure nginx and request the certificate before
 starting the service.
 
+Set `PRIVACY_CONTACT_NAME` (responsible person) and `PRIVACY_CONTACT_ADDRESS` (contact address) in the protected environment file. Production refuses to start without both.
+
 Push notifications (FR-32) are optional and stay off until both
 `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` are set (SC-054). Create the key once on
 any machine with Go and add both lines to `/etc/raid-website.env`; the

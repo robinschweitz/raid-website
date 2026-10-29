@@ -39,13 +39,15 @@ import (
 
 // Options controls optional runtime behaviour of the HTTP layer.
 type Options struct {
-	TOTPEncryption    *auth.TOTPEncryption
-	CookieSecure      bool
-	TrustProxyHeaders bool
-	PublicOrigin      string
-	AdminUsername     string
-	AdminPassword     string
-	RegistrationFeed  registration.ExternalClient
+	TOTPEncryption        *auth.TOTPEncryption
+	PrivacyContactName    string
+	PrivacyContactAddress string
+	CookieSecure          bool
+	TrustProxyHeaders     bool
+	PublicOrigin          string
+	AdminUsername         string
+	AdminPassword         string
+	RegistrationFeed      registration.ExternalClient
 	// VAPIDKey switches Web Push on (FR-32); nil leaves it off.
 	VAPIDKey *push.VAPIDKey
 	// PushSender replaces the HTTP push sender, for tests.
@@ -132,6 +134,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	v1.CatalogHandlers{Catalog: catalog}.Register(mux)
 	v1.AddonHandlers{Addons: bundledAddons}.Register(mux)
 	v1.StatisticsHandlers{Statistics: statistics.NewService(statistics.NewRepo(db))}.Register(mux)
+	v1.PrivacyHandlers{Contact: v1.PrivacyContact{Name: opts.PrivacyContactName, Address: opts.PrivacyContactAddress}}.Register(mux)
 	unclaimed := unclaimedloot.NewService(unclaimedloot.NewRepo(db), raids, catalog)
 	v1.UnclaimedHandlers{Unclaimed: unclaimed}.Register(mux)
 	v1.BossKillHandlers{Kills: bosskill.NewService(bosskill.NewRepo(db)), Corrections: corrections}.Register(mux)

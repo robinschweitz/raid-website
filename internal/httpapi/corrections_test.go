@@ -212,8 +212,8 @@ func TestLegacyCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
 	suffix := fmt.Sprintf("/loot/%d", awardID)
 	for i := 0; i < 3; i++ {
 		f.request(http.MethodPatch, suffix, map[string]any{"awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar, "reason": "recipient correction"}, http.StatusOK)
-		f.points(f.first, 10)
-		f.points(f.second, 0)
+		f.points(f.first, 0)
+		f.points(f.second, 10)
 		f.tokenBalance(f.first, 0)
 		f.tokenBalance(f.second, 1)
 		f.request(http.MethodPatch, suffix, map[string]any{"awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "reason": "undo recipient correction"}, http.StatusOK)
@@ -223,7 +223,7 @@ func TestLegacyCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
 		f.tokenBalance(f.second, 0)
 	}
 	f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "SECOND", "reason": "item correction"}, false), http.StatusOK)
-	f.points(f.first, 10)
+	f.points(f.first, 0)
 	f.tokenBalance(f.first, 0)
 	f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "MAIN", "reason": "restore"}, true), http.StatusOK)
 	f.points(f.first, 0)

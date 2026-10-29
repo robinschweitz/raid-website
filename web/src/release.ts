@@ -1,4 +1,4 @@
-export const appVersion = '1.0.71'
+export const appVersion = '1.0.73'
 
 export const changelog = [
   {
@@ -7,32 +7,34 @@ export const changelog = [
     changes: ['Beim ersten Beuteeintrag eines Bosses wird der Kill mit der gewählten Schwierigkeit in derselben Transaktion erfasst. Bei widersprüchlicher Schwierigkeit wird nichts gespeichert.'],
   },
   {
-    version: '1.0.70',
+    version: '1.0.72',
     title: 'Verständliche Fehlermeldungen ohne interne Details',
     changes: ['Fehler beim Kontospeichern und bei Korrekturen zeigen feste deutsche Meldungen. Interne Datenbankfehler bleiben im Serverprotokoll.'],
   },
   {
-    version: '1.0.69',
+    version: '1.0.71',
     title: 'Reset-Code einlösen',
     changes: ['Über „Passwort vergessen?“ lässt sich ein einmaliger Reset-Code einlösen. Alle bisherigen Sitzungen und zweiten Faktoren werden dabei entfernt.'],
   },
   {
-    version: '1.0.68',
+    version: '1.0.70',
     title: 'Passwort-Reset mit einmaligem Code',
     changes: ['Admins erstellen im Konto-Tab einen 72 Stunden gültigen Reset-Code und senden ihn ingame. Fremde Passwörter werden nicht mehr direkt gesetzt.'],
   },
   {
-    version: '1.0.67',
+    version: '1.0.69',
     title: 'Persönliche Daten als JSON exportieren',
     changes: ['Admins können Auskunftsanfragen im Konto-Tab eines Spielers mit einem protokollierten JSON-Export beantworten. Passwörter, MFA-Geheimnisse und Sitzungsschlüssel werden nicht exportiert.'],
   },
   {
-    version: '1.0.66',
+    version: '1.0.68',
     title: 'Begrenzte Charaktersuche für Besucher',
     changes: ['Ohne Anmeldung sind zehn neue Charaktersuchen und Registrierungsanfragen pro zehn Minuten möglich. Gespeicherte Suchergebnisse und angemeldete Mitglieder bleiben erreichbar.'],
   },
-  { version: '1.0.65', title: 'Registrierungscodes nachreichen', changes: ['Admins können verlorene Codes anhand ihres Verlaufs ersetzen und alte Codes widerrufen. Der Code selbst wird nur einmal angezeigt.'] },
-  { version: '1.0.64', title: 'Datenschutzerklärung', changes: ['Die öffentliche Datenschutzseite nennt Kontakt, gespeicherte Daten, Aufbewahrung und Auskunftsrechte.'] },
+  { version: '1.0.67', title: 'Registrierungscodes nachreichen', changes: ['Admins können verlorene Codes anhand ihres Verlaufs ersetzen und alte Codes widerrufen. Der Code selbst wird nur einmal angezeigt.'] },
+  { version: '1.0.66', title: 'Datenschutzerklärung', changes: ['Die öffentliche Datenschutzseite nennt Kontakt, gespeicherte Daten, Aufbewahrung und Auskunftsrechte.'] },
+  { version: '1.0.65', title: 'Raid-News einfacher bearbeiten', changes: ['Der Editor für Raid-News hat jetzt geordnete Eingabefelder, gut erkennbare Optionen und eine eigene Speichern-Zeile. Auf dem Handy steht alles untereinander.'] },
+  { version: '1.0.64', title: 'Raid-News auf der Übersicht', changes: ['Die Raidleitung kann Mitteilungen veröffentlichen. Wichtige Meldungen erscheinen beim Öffnen der Übersicht und lassen sich einmalig bestätigen. Alle veröffentlichten Raid-News bleiben auf der Startseite lesbar.'] },
   {
     version: '1.0.63',
     title: 'Sitzungen enden nach sieben Tagen ohne Nutzung',

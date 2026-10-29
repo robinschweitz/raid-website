@@ -9,6 +9,7 @@ import { AttendanceRing } from '../components/AttendanceRing'
 import { BossProgression } from '../components/BossProgression'
 import { RaidCompositionCard } from '../components/RaidCompositionCard'
 import { GuildNotifications } from '../components/GuildNotifications'
+import { RaidNews } from '../components/RaidNews'
 import { PlayerProfilePanel } from '../components/PlayerProfilePanel'
 import { MyRaidsPanel } from '../components/MyRaidsPanel'
 import { atLeast } from '../types'
@@ -95,7 +96,9 @@ export function DashboardPage() {
   }, [polls, player])
 
   const confirmedCount = attendance?.filter((a) => !a.is_bench).length ?? 0
-  const totalCount = attendance?.length ?? 0
+  const requiredPlayers = nextRaid?.raid_size ?? 0
+  const openSlots = Math.max(0, requiredPlayers - confirmedCount)
+  const overCapacity = Math.max(0, confirmedCount - requiredPlayers)
 
   return <div className="dashboard">
     <div className="page-heading">
@@ -106,6 +109,7 @@ export function DashboardPage() {
       <Link to="/raids">Alle Raids ansehen &rarr;</Link>
     </div>
     {error && <ErrorMessage>{error}</ErrorMessage>}
+    <RaidNews player={player} />
 
     {player && atLeast(player.role, 'MEMBER') && !loading && <MyRaidsPanel playerID={player.id} raids={raids} characters={characters} />}
 
@@ -141,13 +145,14 @@ export function DashboardPage() {
       </section>
 
       <section className="card widget-attendance">
-        <div className="section-heading"><h2>Anwesenheit</h2><span className="eyebrow">Best&auml;tigt</span></div>
+        <div className="section-heading"><h2>Raid-Auslastung</h2><span className="eyebrow">Aufstellung</span></div>
         {attendance ? <div className="attendance-ring-container">
-          <AttendanceRing confirmed={confirmedCount} total={totalCount} />
+          <AttendanceRing confirmed={confirmedCount} requiredPlayers={requiredPlayers} />
           <div className="attendance-details">
-            <div className="attendance-detail-row"><span className="muted">Best&auml;tigt</span><strong>{confirmedCount}</strong></div>
+            <div className="attendance-detail-row"><span className="muted">Aufgestellt</span><strong>{confirmedCount} / {requiredPlayers || "–"}</strong></div>
             <div className="attendance-detail-row"><span className="muted">Ersatzbank</span><strong>{attendance.filter((a) => a.is_bench).length}</strong></div>
-            <div className="attendance-detail-row"><span className="muted">Gesamt</span><strong>{totalCount}</strong></div>
+            <div className="attendance-detail-row"><span className="muted">Freie Plätze</span><strong>{requiredPlayers ? openSlots : "–"}</strong></div>
+            {overCapacity > 0 && <div className="attendance-detail-row"><span className="muted">Überbelegung</span><strong>+{overCapacity}</strong></div>}
           </div>
         </div> : <p className="muted">Keine Daten verf&uuml;gbar.</p>}
       </section>

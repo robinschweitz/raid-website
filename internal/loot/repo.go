@@ -123,14 +123,28 @@ func (r *Repo) ListByPlayer(ctx context.Context, playerID int64) ([]Award, error
 }
 
 func (r *Repo) PlayerHasMainSpecAward(ctx context.Context, raidID, playerID int64) (bool, error) {
-	count, err := r.db.NewSelect().Model((*Award)(nil)).
+	var awards []Award
+	err := r.db.NewSelect().Model(&awards).
+		Column("item_id", "item_name").
 		Where("raid_id = ?", raidID).
 		Where("awarded_to_player_id = ?", playerID).
 		Where("is_main_spec = ?", true).
 		Where("withdrawn_at IS NULL").
-		Count(ctx)
+		Scan(ctx)
 	if err != nil {
 		return false, err
 	}
-	return count > 0, nil
+	for _, award := range awards {
+		// Tokens and Shadowfrost shards are tracked as loot but do not
+		// disqualify a player from the +10 EP no-main-loot raid bonus.
+		if IsTokenAward(award.ItemName) || award.ItemID == "50274" {
+			continue
+		}
+		name := NormalizeItemName(award.ItemName)
+		if name == "schattenfrostsplitter" || name == "seelensplitter" || name == "shadowfrost shard" {
+			continue
+		}
+		return true, nil
+	}
+	return false, nil
 }

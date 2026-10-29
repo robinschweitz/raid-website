@@ -321,3 +321,8 @@ None open. The owner resolved AQ-1 to AQ-8 on 2026-10-22; the answers are in the
 - **AQ-8** `go mod tidy`, delete `internal/logger` (DR-11, DR-12).
 
 Addon loot imports (#96) reserve the SQLite writer before a fresh preview/kill read. The addon coordinator binds every repository and both loot services to the same transaction, so selected awards, unclaimed entries, kills, lock changes, EP and audit writes commit together or roll back together.
+
+### Raid-News (#202)
+- `raid_news` stores publication status and text; `raid_news_acknowledgements` stores per-player confirmation.
+- v1 endpoints read published posts and require raid-assistant role for management; signed-in actors acknowledge published important posts.
+- Dashboard loads news independently of raid data.

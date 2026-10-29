@@ -486,3 +486,8 @@ None open. The owner resolved DQ-1 to DQ-5 on 2026-10-22; the answers are in the
 - **DQ-3** No text below 12px.
 - **DQ-4** New screens are designed in their implementation issues.
 - **DQ-5** One shared error component with `role="alert"`.
+
+
+### Raid-News (Owner 2026-10-28)
+- Dashboard news use existing cards and German labels. Important unread messages display a labelled dialog with “Verstanden”.
+- News rendered as plain text respecting line breaks. Staff editing behind a disclosure.

@@ -1,3 +1,4 @@
+-- 084 is the already deployed raid-news migration; 085 is reserved for loot difficulty.
 CREATE TABLE password_reset_codes (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  player_id INTEGER NOT NULL REFERENCES players(id),

@@ -108,8 +108,18 @@ func TestCharacterCRUDAndRename(t *testing.T) {
 	if err := json.Unmarshal(body, &reloadOut); err != nil {
 		t.Fatalf("decode reload profile: %v", err)
 	}
-	if reloadOut.Data.Name != "Newname" || reloadOut.Data.MainSpec != "Schutz (Tank)" || reloadOut.Data.SecondSpec != "Furor" || reloadOut.Data.GearScore == nil || *reloadOut.Data.GearScore != gearScore {
+	if reloadOut.Data.Name != "RenamedOnRisingGods" || reloadOut.Data.MainSpec != "Schutz (Tank)" || reloadOut.Data.SecondSpec != "Furor" || reloadOut.Data.GearScore == nil || *reloadOut.Data.GearScore != gearScore {
 		t.Fatalf("unexpected reload result: %+v", reloadOut.Data)
+	}
+	status, body = do(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/characters/%d/name-history", srv.URL, charID), token, nil)
+	if status != http.StatusOK {
+		t.Fatalf("name history after reload: status %d body %s", status, body)
+	}
+	if err := json.Unmarshal(body, &histOut); err != nil {
+		t.Fatalf("decode history after reload: %v", err)
+	}
+	if len(histOut.Data) != 2 || histOut.Data[1].OldName != "Newname" || histOut.Data[1].NewName != "RenamedOnRisingGods" {
+		t.Fatalf("unexpected history after reload: %s", body)
 	}
 }
 

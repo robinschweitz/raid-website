@@ -476,3 +476,9 @@ Decided by the owner on 2026-10-24 (Web Push):
 Decided by the owner on 2026-10-25 (review fixes):
 
 - **OD-022** Review fixes of 2026-10-25: login attempts are reserved before hashing and end in exactly one state at the credential decision; a 5-second, cancellable wait for a hashing slot with `503 server_busy`; push subscriptions belong to a player on a device, survive that player's next sign-in there, and never reach another player; an Admin without MFA does not see other players' account fields; a GUEST player attached by a registration code becomes MEMBER → SC-005, SC-008, SC-040, SC-043, SC-053, FR-4.5, FR-32.3, ADR 103.
+
+
+### Raid-News (#202)
+- All message text is untrusted, rendered as plain text, never HTML.
+- Create/edit require server-side RAIDASSISTENT authorization; drafts are available only from staff endpoint.
+- Confirmation takes player ID exclusively from authenticated session.

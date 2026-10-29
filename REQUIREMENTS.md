@@ -76,6 +76,8 @@ implemented yet when it differs from the code.
 - **FR-4.9** The admin request list MUST show the linked player, login, and date after a code is redeemed. (ADR 084)
 - **FR-4.10** The system MUST NOT change the role of existing GUEST accounts (players who already have a login) automatically. An ADMIN promotes them (FR-1.9). A player without a login who gets one from a registration code follows FR-4.5. (Owner 2026-10-22, OQ-3; Owner 2026-10-25, ADR 103)
 
+- **FR-4.11** The Admin registration UI MUST show existing code status and validity, explain why plaintext is not recoverable, and offer replacement issuance and revocation using the existing authorized actions. (ADR 106; Owner 2026-10-23)
+
 ### 5. Players and accounts
 
 - **FR-5.1** An ADMIN MUST be able to create a player and set the login name, password, and role of a player. (ADR 010)

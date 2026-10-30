@@ -211,7 +211,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Error responses MUST use the `{"error": {"code", "message"}}` envelope with a stable code. 5xx messages MUST be generic and MUST NOT contain error chains, SQL, file paths, stack traces, or upstream responses.
 - **Enforcement:** `WriteError` call sites in `internal/httpapi/v1`.
-- **Evidence:** FR-7.5, ADR 053. Code: compliant; some 4xx messages pass domain sentinel texts (`err.Error()`), which contain no internal data.
+- **Evidence:** FR-7.5, ADR 053. Code: compliant since #113: known domain errors use stable codes and fixed German messages; unexpected account-save failures are logged and return generic `500 internal`. No response writer uses `err.Error()`.
 - **Verification:** Forced repository failure returns `internal` with a generic message.
 
 ### Web frontend and transport (V3, V12)
@@ -250,7 +250,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** For the requests that FR-7.6 limits, one client address (SC-006) MUST NOT start more than 10 in 10 minutes. Answers served from the cache MUST NOT count. Further requests get HTTP 429 with a stable code. The counter is in memory (DR-9).
 - **Enforcement:** `GET /api/v1/external/rising-gods/characters`, `POST /api/v1/auth/registration-requests`; counter in `registration` or the HTTP layer.
-- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: none. Threats: T-016, T-035.
+- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: compliant since #79: the registration service shares a mutex-protected in-memory ten-request budget across visitor searches and registration requests; cached answers bypass it, authenticated callers are exempt, and expired address counters are removed. Threats: T-016, T-035.
 - **Verification:** The eleventh uncached visitor search within 10 minutes returns 429 without an upstream request; a logged-in user is not limited.
 
 **SC-029 - Worker access**
@@ -296,6 +296,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Enforcement:** `deploy/bin/raid-website-backup` (`--offsite`, `--restore-test`); `raid-website-backup-offsite.timer` (daily), `raid-website-backup-restore-test.timer` (monthly); Storage Box snapshot plan (daily, 10 kept).
 - **Evidence:** NFR-2.3, NFR-2.5, ADR 070, ADR 099, OD-007 (owner, 2026-10-24). Code and host: compliant since #109. The first copy was uploaded on 2026-10-24 and restored on the host and on the owner's PC; the site started with the restored data. Threats: T-011, T-030.
 - **Verification:** `systemctl start raid-website-backup-offsite.service` adds one `.tar.gpg` and its `.sha256`, and a second run adds nothing. `systemctl start raid-website-backup-restore-test.service` succeeds. A wrong target makes the upload unit fail. Decrypting with the owner's passphrase on another machine gives a database that passes `PRAGMA integrity_check`.
+- **Restore encryption:** The isolated restore test uses only archived TOTP keys, never live-key fallback or production integration credentials. The launcher allowlist and invalid-key failures are covered by `deploy/test_backup_restore.py` (#212).
 
 ### Platform, build, and supply chain (V13, V15)
 
@@ -352,7 +353,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** A password reset MUST use a single-use reset code that an Admin creates for a player and sends in game to that player's main character, with the same randomness, hashing, and revocation as registration codes (SC-013) and a lifetime of 72 hours. Redeeming it MUST set a new password (SC-005), MUST remove the player's TOTP settings, recovery codes, and security keys, and MUST end all sessions of the player (SC-017), in one audited transaction. An Admin MUST NOT set another player's password directly for a reset. Creating a reset code MUST revoke any earlier unused reset code of the same player. Failed redemptions of reset and registration codes MUST count against the per-address limit of SC-043. Creating and redeeming a reset code MUST be logged as security events (SC-041). The in-game message is the only notification channel; a player who did not ask for the reset notices because their old password stops working (accepted: the site stores no e-mail). A reset of an ADMIN is followed by SC-040.
 - **Enforcement:** reset-code workflow in `registration`, on the registration-code infrastructure (owner 2026-10-23, backlog #48); `auth`.
-- **Evidence:** FR-5.8, OD-014, OD-018 (owner, 2026-10-23). Code: **not compliant** — not built; Admins set passwords directly. Threats: T-026.
+- **Evidence:** FR-5.8, OD-014, OD-018 (owner, 2026-10-23). Code: Admin code creation, 72-hour expiry, hash-only storage, replacement revocation and the prohibition on directly setting another player's password are built in #81. Redemption is built in #82: one transaction changes the password, consumes the code, removes MFA and all sessions, revokes push delivery and records counts without secrets. Reset and registration redemptions share the per-address failed-attempt budget. The operator command is tracked in #83. Threats: T-026.
 - **Verification:** A redeemed code works once; afterwards old sessions return 401, MFA is off, and the new password logs in; a second code revokes the first; the 31st failed redemption from one address in 15 minutes is rejected; a code older than 72 hours is rejected.
 
 **SC-043 - Login limit per client address**
@@ -415,7 +416,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** A command `cmd/reset-code`, run on the server as the application user, MUST create a reset code (SC-042) for a named player and print it once. It MUST open the database directly, MUST NOT be reachable over HTTP, MUST write an audit entry with the actor "server operator", and MUST be logged as a security event (SC-041). It MUST NOT set a password or remove MFA itself; that happens only when the code is redeemed.
 - **Enforcement:** `cmd/reset-code` (new) using the `registration` reset-code service.
-- **Evidence:** FR-3.11, OD-019 (owner, 2026-10-23). Code: **not built**. Threats: T-049.
+- **Evidence:** FR-3.11, OD-019 (owner, 2026-10-23). Code: built in #83: `cmd/reset-code` uses the shared reset service, audits as "server operator", logs a security event without the code and prints it once. Threats: T-049.
 - **Verification:** Running the command for the only Admin prints a code that works once within 72 hours; the audit log shows the operator entry; no HTTP route reaches the command.
 
 **SC-052 - Service worker without cache; push shows fixed texts only**

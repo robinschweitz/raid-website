@@ -14,8 +14,8 @@ import (
 func TestReqAuth023_AC01_PasswordEndpointsRejectOver1024Bytes(t *testing.T) {
 	srv, db := setupServer(t)
 	client := srv.Client()
-	memberID := seedAccount(t, db, "pw-member", "member-password", validation.RoleMember)
-	seedAccount(t, db, "pw-admin", "admin-password", validation.RoleAdmin)
+	seedAccount(t, db, "pw-member", "member-password", validation.RoleMember)
+	adminID := seedAccount(t, db, "pw-admin", "admin-password", validation.RoleAdmin)
 	member := login(t, client, srv, "pw-member", "member-password")
 	admin := login(t, client, srv, "pw-admin", "admin-password")
 	tooLong := strings.Repeat("a", 1025)
@@ -30,7 +30,7 @@ func TestReqAuth023_AC01_PasswordEndpointsRejectOver1024Bytes(t *testing.T) {
 	status, body := do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/password", member, map[string]any{"current_password": "member-password", "new_password": tooLong})
 	assertTooLong("change own password", status, body)
 
-	status, body = do(t, client, http.MethodPut, fmt.Sprintf("%s/api/v1/players/%d/account", srv.URL, memberID), admin, map[string]any{"username": "pw-member", "password": tooLong, "role": "MEMBER"})
+	status, body = do(t, client, http.MethodPut, fmt.Sprintf("%s/api/v1/players/%d/account", srv.URL, adminID), admin, map[string]any{"username": "pw-admin", "password": tooLong, "role": "ADMIN"})
 	assertTooLong("admin account save", status, body)
 
 	status, body = do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": "unbekannt", "username": "neuling", "password": tooLong})

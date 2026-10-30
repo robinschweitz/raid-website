@@ -384,6 +384,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	}
 
 	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
+		"difficulty":              "NORMAL",
 		"catalog_boss_id":         ordinaryBoss,
 		"item_id":                 ordinaryItem,
 		"awarded_to_player_id":    rewarded,
@@ -396,6 +397,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 
 	// Process all loot before final archiving. An off-spec token does not change EP eligibility.
 	status, body = do(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", srv.URL, raidID), token, map[string]any{
+		"difficulty":              "NORMAL",
 		"catalog_boss_id":         tokenBoss,
 		"item_id":                 tokenItem,
 		"awarded_to_player_id":    plain,

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,6 +95,9 @@ func bundledICCDrops(t *testing.T, db *bun.DB) (tokenBoss, tokenItem, ordinaryBo
 }
 
 func (f *correctionFixture) selection(body map[string]any, token bool) map[string]any {
+	if _, ok := body["difficulty"]; !ok {
+		body["difficulty"] = "NORMAL"
+	}
 	body["catalog_boss_id"], body["item_id"] = f.ordinaryBoss, f.ordinaryItem
 	if token {
 		body["catalog_boss_id"], body["item_id"] = f.tokenBoss, f.tokenItem
@@ -103,6 +107,11 @@ func (f *correctionFixture) selection(body map[string]any, token bool) map[strin
 
 func (f *correctionFixture) request(method, suffix string, body any, want int) []byte {
 	f.t.Helper()
+	if method == http.MethodPatch && strings.HasPrefix(suffix, "/loot/") {
+		if values, ok := body.(map[string]any); ok {
+			delete(values, "difficulty")
+		}
+	}
 	status, result := do(f.t, f.srv.Client(), method, fmt.Sprintf("%s/api/v1/raids/%d%s", f.srv.URL, f.raidID, suffix), f.token, body)
 	if status != want {
 		f.t.Fatalf("%s %s: want %d got %d: %s", method, suffix, want, status, result)

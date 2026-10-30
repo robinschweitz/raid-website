@@ -1,10 +1,12 @@
 package httpapi_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"raid-website/internal/auth"
 	"strings"
 	"testing"
 	"time"
@@ -291,11 +293,15 @@ func TestAccountProvisioning(t *testing.T) {
 	adminToken := login(t, client, srv, "admin", "pw")
 
 	memberID := createPlayer(t, client, srv, adminToken, "Newbie")
+	// Seed an existing password; Admin account saves may change login and role only.
+	if _, err := auth.NewService(player.NewRepo(bdb), auth.NewRepo(bdb)).SetCredentials(context.Background(), memberID, "initial-login", "valid-secret", validation.RoleGuest, 0); err != nil {
+		t.Fatal(err)
+	}
 
 	status, body := do(t, client, http.MethodPut, fmt.Sprintf("%s/api/v1/players/%d/account", srv.URL, memberID), adminToken, map[string]any{
 		"username": "newbie",
-		"password": "valid-secret",
-		"role":     "MEMBER",
+
+		"role": "MEMBER",
 	})
 	if status != http.StatusOK {
 		t.Fatalf("set account: status %d body %s", status, body)
@@ -334,10 +340,13 @@ func TestPlayerListSummaryAndAccountVisibility(t *testing.T) {
 	firstID := createPlayer(t, client, srv, adminToken, "First")
 	secondID := createPlayer(t, client, srv, adminToken, "Second")
 	for id, username := range map[int64]string{firstID: "first-login", secondID: "second-login"} {
+		if _, err := auth.NewService(player.NewRepo(bdb), auth.NewRepo(bdb)).SetCredentials(context.Background(), id, username, "valid-secret", validation.RoleGuest, 0); err != nil {
+			t.Fatal(err)
+		}
 		status, body := do(t, client, http.MethodPut, fmt.Sprintf("%s/api/v1/players/%d/account", srv.URL, id), adminToken, map[string]any{
 			"username": username,
-			"password": "valid-secret",
-			"role":     "MEMBER",
+
+			"role": "MEMBER",
 		})
 		if status != http.StatusOK {
 			t.Fatalf("set account %s: status %d body %s", username, status, body)

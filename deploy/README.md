@@ -65,6 +65,8 @@ without it, because the WebAuthn relying party comes only from it (SC-007). Also
 set `COOKIE_SECURE=true` and `TRUST_PROXY_HEADERS=true`. Configure nginx and request the certificate before
 starting the service.
 
+Set `PRIVACY_CONTACT_NAME` (responsible person) and `PRIVACY_CONTACT_ADDRESS` (contact address) in the protected environment file. Production refuses to start without both.
+
 Push notifications (FR-32) are optional and stay off until both
 `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` are set (SC-054). Create the key once on
 any machine with Go and add both lines to `/etc/raid-website.env`; the
@@ -143,7 +145,11 @@ and the server has no API token.
 On the first day of each month `raid-website-backup-restore-test.timer`
 downloads the newest copy, checks both checksums, decrypts it, checks the
 database, and starts `/opt/raid-website/server` on a throwaway copy
-(development mode, `127.0.0.1:18080`, as `raidweb`). A failed upload or restore
+(development mode, `127.0.0.1:18080`, as `raidweb`). The launcher reads only
+`TOTP_ENCRYPTION_KEY` and `TOTP_ENCRYPTION_KEYS_PREVIOUS` from the archived
+environment; it never executes that file, prints key values, or enables the
+restored copy's production integrations. Missing or incorrect archived keys
+fail the test rather than falling back to live keys. A failed upload or restore
 test fails its unit; check with `systemctl --failed` and
 `journalctl -u raid-website-backup-offsite.service -u raid-website-backup-restore-test.service`.
 
@@ -367,6 +373,24 @@ and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
    was rotated. Check the audit log for changes made during the incident and
    correct them as Admin. Re-enable `raid-website-update.timer`. Record any
    spec gap you found in `SECURITY.md` or `THREAT_MODEL.md`.
+
+### Recover the only Admin with a reset code (SC-051)
+
+Use the deployed version after its database migrations have completed. With the
+same protected environment and service user as the server, run:
+
+```sh
+go run ./cmd/reset-code --player-id 123
+# Or use an unambiguous exact player name / login:
+go run ./cmd/reset-code --player 'Player name'
+```
+
+The command prints the 72-hour code once and revokes earlier unused codes. Send
+it ingame to that player's main character; do not paste it into a ticket or log.
+Unknown/ambiguous names fail without a write; use the numeric ID when needed.
+The audit identifies the actor as `server operator`; the security event contains
+only the player ID. Redemption requires #82 and removes MFA and all sessions.
+The Admin must set up MFA again before using Admin functions (SC-040).
 
 ### TOTP encryption (SC-014)
 

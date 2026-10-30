@@ -44,8 +44,8 @@ func TestArchiveAPIRosterIncompleteAndHistoricalCompatibility(t *testing.T) {
 	url := fmt.Sprintf("%s/api/v1/raids/%d/archive", srv.URL, rd.ID)
 	status, body := do(t, srv.Client(), http.MethodPost, url, token, nil)
 	assertArchiveCode(t, status, body, "roster_incomplete")
-	if !strings.Contains(string(body), fmt.Sprintf("attendance %d", row.ID)) {
-		t.Fatalf("missing incomplete attendance identifier: %s", body)
+	if !strings.Contains(string(body), "Die Teilnahme ist unvollständig.") {
+		t.Fatalf("missing fixed incomplete attendance message: %s", body)
 	}
 	stored, err := raids.Get(ctx, rd.ID)
 	if err != nil || stored.CompletedAt != nil || stored.ArchivedAt != nil {

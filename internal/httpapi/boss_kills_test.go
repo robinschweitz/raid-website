@@ -138,7 +138,7 @@ func TestReqRaid015_AC04(t *testing.T) {
 	killModes(t, f)
 	kill := f.recordKill("HEROIC", http.StatusCreated).Data
 	f.attend(f.first, f.firstChar)
-	awardID := correctionID(t, f.request(http.MethodPost, "/loot", f.selection(map[string]any{"awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "award_method": "MAIN"}, false), http.StatusCreated))
+	awardID := correctionID(t, f.request(http.MethodPost, "/loot", f.selection(map[string]any{"awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "award_method": "MAIN", "difficulty": "HEROIC"}, false), http.StatusCreated))
 
 	body := f.request(http.MethodPatch, fmt.Sprintf("/kills/%d", kill.ID), map[string]any{"difficulty": "NORMAL"}, http.StatusConflict)
 	if code := errorCode(t, body); code != "kill_has_loot" {

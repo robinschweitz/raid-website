@@ -55,7 +55,7 @@ export function RaidNews({ player }: { player: Player | null }) {
     {error && <ErrorMessage>{error}</ErrorMessage>}
     {items.length === 0 && <p className="muted">Keine Raid-News vorhanden.</p>}
     {items.map((item) => <article key={item.id} style={{ marginBottom: '1rem', overflowWrap: 'anywhere' }}>
-      <h3>{item.important ? '📣 ' : ''}{item.title}</h3>
+      <h3>{item.important ? '' : ''}{item.title}</h3>
       <p style={{ whiteSpace: 'pre-wrap' }}>{item.body}</p>
       <small className="muted">{new Date(item.created_at).toLocaleDateString('de-DE')}</small>
     </article>)}
@@ -64,10 +64,13 @@ export function RaidNews({ player }: { player: Player | null }) {
       <form onSubmit={save} className="raid-news-form">
         <label className="raid-news-title">Titel<input maxLength={120} required value={draft.title} onChange={(e) => setDraft((old) => ({ ...old, title: e.target.value }))} /></label>
         <label className="raid-news-body">Nachricht<textarea maxLength={4000} required rows={4} value={draft.body} onChange={(e) => setDraft((old) => ({ ...old, body: e.target.value }))} /></label>
-        <label className="raid-news-check"><input type="checkbox" checked={draft.important} onChange={(e) => setDraft((old) => ({ ...old, important: e.target.checked }))} /> Wichtig (Popup)</label>
-        <label className="raid-news-check"><input type="checkbox" checked={draft.published} onChange={(e) => setDraft((old) => ({ ...old, published: e.target.checked }))} /> Veröffentlicht</label>
-        <div className="raid-news-actions"><button disabled={busy} type="submit">{editing === null ? 'Veröffentlichen / speichern' : 'Änderungen speichern'}</button>
-        {editing !== null && <button type="button" onClick={() => { setEditing(null); setDraft(emptyDraft) }}>Abbrechen</button>}
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '0.5rem', marginTop: '0.5rem', textAlign: 'center' }}>
+          <label className="raid-news-check"><input type="checkbox" checked={draft.important} onChange={(e) => setDraft((old) => ({ ...old, important: e.target.checked }))} /> Wichtig</label>
+          <label className="raid-news-check"><input type="checkbox" checked={draft.published} onChange={(e) => setDraft((old) => ({ ...old, published: e.target.checked }))} /> Veröffentlicht</label>
+          <div className="raid-news-actions" style={{ marginLeft: 'auto' }}>
+            <button disabled={busy} type="submit">{editing === null ? 'Veröffentlichen / speichern' : 'Änderungen speichern'}</button>
+            {editing !== null && <button type="button" onClick={() => { setEditing(null); setDraft(emptyDraft) }}>Abbrechen</button>}
+          </div>
         </div>
       </form>
       {manage.map((item) => <div key={item.id} className="actions">

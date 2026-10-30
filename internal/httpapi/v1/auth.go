@@ -520,11 +520,15 @@ func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := a.Auth.SetCredentials(r.Context(), id, req.Username, req.Password, role, actorID)
 	if err != nil {
+		if errors.Is(err, auth.ErrResetRequired) {
+			WriteError(w, http.StatusForbidden, "password_reset_required", "Für andere Spieler muss ein Reset-Code erstellt werden.")
+			return
+		}
 		if writePasswordBusy(w, err) {
 			return
 		}
 		if isNotFound(err) {
-			WriteError(w, http.StatusNotFound, "not_found", "player not found")
+			WriteError(w, http.StatusNotFound, "not_found", stableErrorMessage("not_found"))
 			return
 		}
 		if errors.Is(err, player.ErrLastAdmin) {
@@ -532,14 +536,14 @@ func (a *API) setAccount(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, auth.ErrWeakPassword) {
-			WriteError(w, http.StatusUnprocessableEntity, "password_too_short", "password must be at least 12 characters")
+			WriteError(w, http.StatusUnprocessableEntity, "password_too_short", "Das Passwort muss mindestens 12 Zeichen lang sein.")
 			return
 		}
 		if errors.Is(err, auth.ErrPasswordTooLong) {
 			WriteError(w, http.StatusUnprocessableEntity, "password_too_long", passwordTooLongMessage)
 			return
 		}
-		WriteError(w, http.StatusUnprocessableEntity, "invalid_request", err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	a.securityEvent(w, r, "account_changed", slog.Int64("player_id", id), slog.Int64("actor_id", actorID),

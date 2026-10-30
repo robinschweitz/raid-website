@@ -2,11 +2,13 @@ package loot
 
 import (
 	"context"
+	"strings"
 
 	"github.com/uptrace/bun"
 
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
+	"raid-website/internal/bosskill"
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/lootcatalog"
@@ -122,6 +124,39 @@ func (r *Repo) ListByPlayer(ctx context.Context, playerID int64) ([]Award, error
 	return as, nil
 }
 
+// FillCharacterNames sets the current character name on awards without a stored
+// name. It changes only the given rows, never the database: website awards keep
+// the character ID alone, and historical awards keep their stored name.
+func (r *Repo) FillCharacterNames(ctx context.Context, awards []Award) error {
+	var characterIDs []int64
+	for _, award := range awards {
+		if award.AwardedToCharacterID != nil && strings.TrimSpace(award.AwardedToCharacterName) == "" {
+			characterIDs = append(characterIDs, *award.AwardedToCharacterID)
+		}
+	}
+	if len(characterIDs) == 0 {
+		return nil
+	}
+	var characters []character.Character
+	err := r.db.NewSelect().Model(&characters).
+		Column("id", "name").
+		Where("id IN (?)", bun.List(characterIDs)).
+		Scan(ctx)
+	if err != nil {
+		return err
+	}
+	names := make(map[int64]string, len(characters))
+	for _, c := range characters {
+		names[c.ID] = c.Name
+	}
+	for i := range awards {
+		if awards[i].AwardedToCharacterID != nil && strings.TrimSpace(awards[i].AwardedToCharacterName) == "" {
+			awards[i].AwardedToCharacterName = names[*awards[i].AwardedToCharacterID]
+		}
+	}
+	return nil
+}
+
 func (r *Repo) PlayerHasMainSpecAward(ctx context.Context, raidID, playerID int64) (bool, error) {
 	var awards []Award
 	err := r.db.NewSelect().Model(&awards).
@@ -148,3 +183,6 @@ func (r *Repo) PlayerHasMainSpecAward(ctx context.Context, raidID, playerID int6
 	}
 	return false, nil
 }
+
+// Kills binds the kill repository to the same transaction as loot.
+func (r *Repo) Kills() *bosskill.Repo { return bosskill.NewRepo(r.db) }

@@ -46,7 +46,7 @@ test('Admin ohne zweiten Faktor wird zur Einrichtung geschickt', async ({ page, 
   const newAdmin = { username: 'e2e-admin-ohne-mfa', password: 'admin-ohne-mfa-password', name: 'Neuer Admin', character: 'Wachturm', characterClass: 'Krieger', mainSpec: 'Schutz', secondSpec: 'Waffen' }
   const { playerID } = await createMember(request, newAdmin)
   const api = await apiAs(request, admin)
-  await api.put(`/api/v1/players/${playerID}/account`, { username: newAdmin.username, password: newAdmin.password, role: 'ADMIN' })
+  await api.put(`/api/v1/players/${playerID}/account`, { username: newAdmin.username, role: 'ADMIN' })
 
   await signIn(page, newAdmin)
   const notice = page.getByRole('alert').filter({ hasText: 'Als Admin brauchst du einen zweiten Faktor' })

@@ -97,7 +97,7 @@ export async function seedGuild(request: APIRequestContext) {
   const people: Record<string, number> = {}
   for (const [user, role, name] of [[assistant, 'RAIDASSISTENT', 'Raidassistent'], [member, 'MEMBER', 'Mitglied']] as const) {
     const created = await api.post('/api/v1/players', { name })
-    await api.put(`/api/v1/players/${created.id}/account`, { username: user.username, password: user.password, role })
+    await provisionAccount(request, api, created.id, user.username, user.password, role)
     people[role] = created.id
   }
   const db = new DatabaseSync(databasePath)
@@ -113,7 +113,7 @@ export interface MemberSetup { username: string; password: string; name: string;
 export async function createMember(request: APIRequestContext, setup: MemberSetup) {
   const api = await apiAs(request, admin)
   const created = await api.post('/api/v1/players', { name: setup.name })
-  await api.put(`/api/v1/players/${created.id}/account`, { username: setup.username, password: setup.password, role: 'MEMBER' })
+  await provisionAccount(request, api, created.id, setup.username, setup.password, 'MEMBER')
   const db = new DatabaseSync(databasePath)
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '+00:00')
   const character = db.prepare('INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)').run(created.id, setup.character, setup.characterClass, setup.mainSpec, setup.secondSpec, now, now)
@@ -168,4 +168,14 @@ export async function snapshot(page: Page, testInfo: TestInfo, name: string, foc
 export function berlinDate(days: number) {
   const date = new Date(Date.now() + days * 86_400_000)
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(date)
+}
+
+
+// Account setup follows the same reset-code path an Admin and member use.
+export async function provisionAccount(request: APIRequestContext, api: Awaited<ReturnType<typeof apiAs>>, playerID: number, username: string, password: string, role: string) {
+  await api.put(`/api/v1/players/${playerID}/account`, { username, role })
+  const generated = await api.post(`/api/v1/players/${playerID}/reset-code`, {})
+  const csrf = (await (await request.get('/api/v1/auth/csrf')).json()).data.token as string
+  const response = await request.post('/api/v1/auth/reset-password', { data: { code: generated.code, password }, headers: { 'X-CSRF-Token': csrf } })
+  expect(response.status(), await response.text()).toBe(204)
 }

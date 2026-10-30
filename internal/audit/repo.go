@@ -45,7 +45,7 @@ func (r *Repo) List(ctx context.Context) ([]Entry, error) {
 	var entries []Entry
 	err := r.db.NewSelect().
 		TableExpr("audit_log AS audit").
-		ColumnExpr("audit.id, audit.actor_id, players.name AS actor_name, audit.entity_type, audit.entity_id, audit.action, audit.before_json, audit.after_json, audit.reason, audit.created_at").
+		ColumnExpr("audit.id, audit.actor_id, CASE WHEN audit.actor_id IS NULL AND audit.action = 'reset_code_created' AND audit.reason = 'server operator' THEN 'server operator' ELSE players.name END AS actor_name, audit.entity_type, audit.entity_id, audit.action, audit.before_json, audit.after_json, audit.reason, audit.created_at").
 		Join("LEFT JOIN players ON players.id = audit.actor_id").
 		OrderExpr("audit.created_at DESC, audit.id DESC").
 		Scan(ctx, &entries)
@@ -78,22 +78,24 @@ func hideAnonymised(entries []Entry) {
 			e.ActorName = nil
 		}
 		if e.EntityType == "player" && anonymised[e.EntityID] {
-			e.BeforeJSON = stripPlayerIdentity(e.BeforeJSON)
-			e.AfterJSON = stripPlayerIdentity(e.AfterJSON)
+			e.BeforeJSON = HidePlayerIdentity(e.BeforeJSON)
+			e.AfterJSON = HidePlayerIdentity(e.AfterJSON)
 		}
 	}
 }
 
-func stripPlayerIdentity(snapshot string) string {
+// HidePlayerIdentity hides an erased player's name and login without changing history.
+// Both audit views and personal-data exports must apply this to player snapshots.
+func HidePlayerIdentity(snapshot string) string {
 	var fields map[string]any
 	if json.Unmarshal([]byte(snapshot), &fields) != nil || fields == nil {
-		return snapshot
+		return ""
 	}
 	delete(fields, "name")
 	delete(fields, "username")
 	out, err := json.Marshal(fields)
 	if err != nil {
-		return snapshot
+		return ""
 	}
 	return string(out)
 }

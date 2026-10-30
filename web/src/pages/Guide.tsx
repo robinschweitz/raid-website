@@ -258,6 +258,9 @@ export function GuidePage() {
       <p>Im Reiter <strong>Konto</strong> änderst du dein Passwort. Freiwillig kannst du eine Authenticator-App oder einen Sicherheitsschlüssel als zweiten Faktor einrichten. Warum sich das lohnt, steht unter <Link to="/kontosicherheit">Kontosicherheit</Link>.</p>
       <p>Ebenfalls freiwillig: Unter <strong>Benachrichtigungen</strong> schaltest du für dein Gerät Meldungen bei neuen Umfragen, neuen Raids und deinem Platz in einer Aufstellung ein. Der Browser fragt erst nach, wenn du auf den Knopf drückst. Auf iPhone und iPad geht das nur mit RAID auf dem Home-Bildschirm (ab iOS 16.4). Die Meldungen bleiben auf diesem Gerät eingeschaltet, auch wenn du dich später neu anmeldest. Sie enden, wenn du dich abmeldest, wenn sich jemand anderes auf dem Gerät anmeldet und, nach einer Passwortänderung, auf deinen anderen Geräten.</p>
       <Shot name="21-konto" caption="Konto: Passwort und Zwei-Faktor" />
+      <h3>Passwort vergessen</h3>
+      <p>Bitte einen Admin ingame um einen Reset-Code für deinen Main-Charakter. Öffne <Link to="/passwort-zuruecksetzen">Passwort zurücksetzen</Link>, gib den Code und ein neues Passwort ein. Danach meldest du dich neu an und richtest deinen zweiten Faktor wieder ein.</p>
+      <Shot name="23-passwort-zuruecksetzen" caption="Einmaligen Reset-Code mit neuem Passwort einlösen" />
       <h3>Umfragen</h3>
       <p>Unter <Link to="/polls">Umfragen</Link> Antwort wählen und <strong>Abstimmen</strong> klicken.</p>
       <p>Die Raidleitung kann eine Umfrage mit <strong>Bearbeiten</strong> nachträglich ändern: Titel, Beschreibung, Ende, Antworten, und eine geschlossene Umfrage wieder öffnen. Eine umbenannte Antwort behält ihre Stimmen; eine Antwort, für die schon jemand gestimmt hat, lässt sich nicht entfernen.</p>
@@ -337,7 +340,10 @@ export function GuidePage() {
 
     <Section id="loot" audience="raidleitung" title="Loot eintragen und archivieren">
       <h3>Loot eintragen</h3>
+      <p>Beim Addon-Import wählst du einmal je Boss ohne Kill die Schwierigkeit. Alle ausgewählten Zeilen und neuen Kills werden gemeinsam gespeichert; bei einem Fehler wird nichts davon übernommen.</p>
+      <p>Für einen Boss ohne Kill wird der Kill mit der gewählten Schwierigkeit zusammen mit der Beute gespeichert. Bei einer widersprüchlichen Schwierigkeit wird nichts gespeichert; lade dann den Raid neu.</p>
       <p>Gewürfelt wird im Spiel. Hier wird nur eingetragen, wer was bekommen hat: Reiter <strong>Loot</strong>, <strong>Loot erfassen</strong>, bei <strong>Art der Erfassung</strong> <em>An Spieler vergeben</em> lassen, Boss und Modus wählen, Item suchen, Empfänger und Vergabeart wählen.</p>
+
       <div className="table-scroll">
         <table className="table">
           <thead><tr><th>Vergabeart</th><th>Bedeutung</th><th>+10 EP beim Archivieren?</th></tr></thead>
@@ -351,6 +357,7 @@ export function GuidePage() {
       </div>
       <Shot name="37-loot" caption="Loot erfassen" />
       <p><strong>Schneller mit dem Addon:</strong> In RaidLedger auf <strong>EXPORT</strong> klicken, den Text unter <em>Loot aus Addon importieren</em> einfügen, <strong>Vorschau</strong>, jede Zeile prüfen und übernehmen. Download und alle Funktionen stehen unter <Link to="/addons/raidledger">Addons → RaidLedger</Link>.</p>
+      <Shot name="37b-addon-loot" caption="Addon-Loot: Schwierigkeit einmal pro Boss wählen und gemeinsam übernehmen" />
       <h3>Bosskills</h3>
       <p>Im Reiter <strong>Loot</strong> steht über der Beute ohne Empfänger der Kasten <strong>Bosskills</strong> mit jedem getöteten Boss und seiner Schwierigkeit. Alle Angemeldeten sehen ihn. Wurde nichts erfasst, steht dort, dass keine Kills erfasst sind. Die Raidleitung öffnet <strong>Kill eintragen</strong>, wählt Boss und Schwierigkeit, ändert die Schwierigkeit in der Liste oder entfernt einen Kill; solange es für den Boss noch Beute gibt, geht das nicht. Im archivierten Raid ist ein Grund nötig. Auf der Übersicht sind die getöteten Bosse des nächsten Raids hervorgehoben.</p>
       <h3>Beute ohne Empfänger</h3>
@@ -380,6 +387,7 @@ export function GuidePage() {
       </ol>
       <p>Im Reiter <strong>Verlauf</strong> zeigt die Spalte <strong>Verknüpfter Spieler</strong>, für welchen Spieler ein Code eingelöst wurde, mit Login-Namen und Datum.</p>
       <p><strong>Beispiel:</strong> Die Anfrage für den Charakter <em>Mirabelle</em> ist eingelöst und mit dem Spieler <em>Mira</em> (Login <code>@mira</code>) verknüpft.</p>
+      <p>Ein alter Registrierungscode ist nicht wiederherstellbar. Unter „Details“ prüfst du Status und Gültigkeit. Stelle bei Verlust einen neuen Code aus, kopiere ihn zur Weitergabe und widerrufe den alten Code.</p>
       <Shot name="53-registrierung" caption="Verlauf: welcher Code welchem Spieler zugeordnet wurde" />
       <h3>Wer hat schon ein Konto?</h3>
       <p>Unter <strong>Spieler</strong> sehen Admins zu jedem Spieler seine <strong>Charaktere</strong>, das <strong>Konto</strong> und die <strong>Rolle</strong>. Oben steht, wie viele Spieler schon ein Konto haben. Wurde ein Charakter versehentlich dem falschen Spieler zugeordnet, öffne beim bisherigen Spieler den Reiter „Charaktere“, klicke beim Charakter auf <strong>Verschieben</strong> und wähle den richtigen Spieler. Die Raid-Aufstellungen zeigen danach den richtigen Spieler; Loot und EP bleiben unverändert.</p>
@@ -394,9 +402,10 @@ export function GuidePage() {
       <p><strong>Beispiel:</strong> Mit „Ohne Konto“ siehst du, dass <em>Altes Eisen</em> (Charaktere Klingensturm und Funkelbart) und <em>Grimmbart</em> sich noch nicht registriert haben. So weißt du, wen du ansprechen musst.</p>
       <Shot name="51b-spieler-ohne-konto" caption="Nur Spieler ohne Konto" />
       <h3>Rolle ändern, Passwort zurücksetzen</h3>
-      <p>Unter <strong>Spieler</strong> auf den Namen klicken, Reiter <strong>Konto</strong>. Dort Rolle wählen (z. B. <code>MEMBER</code>), bei Bedarf ein neues Passwort setzen, <strong>Speichern</strong>.</p>
+      <p>Unter <strong>Spieler</strong> auf den Namen klicken, Reiter <strong>Konto</strong>. Dort Rolle wählen (z. B. <code>MEMBER</code>), <strong>Speichern</strong>. Für ein vergessenes Passwort erstellst du darunter einen <strong>Reset-Code</strong> und sendest ihn ingame an den Main-Charakter. Der Code gilt 72 Stunden, wird nur einmal angezeigt und ersetzt ältere unbenutzte Codes.</p>
       <p><strong>Beispiel:</strong> Ein älteres Konto ist noch <code>GUEST</code>. Du stellst <code>MEMBER</code> ein und speicherst. Ab sofort kann er sich für Raids anmelden.</p>
       <Shot name="52-spieler-konto-admin" caption="Spielerkonto als Admin" />
+      <p>Für Auskunftsanfragen über den Datenschutzkontakt öffnest du im Konto-Tab <strong>Persönliche Daten exportieren</strong> und wählst <strong>Daten als JSON herunterladen</strong>. Der Export enthält die gespeicherte Spielhistorie ohne Passwörter, MFA-Geheimnisse oder Sitzungsschlüssel; der Zugriff wird protokolliert.</p>
       <p>Hat jemand zwei Accounts, nutze <strong>Konto zusammenführen</strong> mit einem Grund. Unter <strong>Spieler</strong> → <strong>Neuer Spieler</strong> legst du jemanden ohne Login an.</p>
       <h3>Raidserien</h3>
       <p>Eine Raidserie ist ein fester Raid wie <em>ICC25 Donnerstag</em>: Wochentag, Uhrzeit, Rhythmus, Namensvorlage (<code>{'ICC25-{number}'}</code>), Raidleitung, Instanz und Größe. Dort stellst du auch ein, wie viele Wochen automatisch im Voraus geplant werden.</p>
@@ -429,7 +438,7 @@ export function GuidePage() {
         <dt>Warum habe ich keine +10 EP bekommen?</dt>
         <dd>Wahrscheinlich hast du ein Main-Spec- oder Enhanced-Item bekommen. Schau in deinem Profil unter EP in die Historie.</dd>
         <dt>Passwort vergessen?</dt>
-        <dd>Ein Admin setzt dir ein neues. Danach änderst du es selbst im Profil unter Konto.</dd>
+        <dd>Bitte einen Admin ingame um einen Reset-Code für deinen Main-Charakter. Der Code gilt 72 Stunden. Öffne bei der Anmeldung <strong>Passwort vergessen? Reset-Code einlösen</strong> und gib Code und neues Passwort ein. Beim Einlösen werden dein Passwort geändert, alle Sitzungen beendet und MFA entfernt; richte danach deinen zweiten Faktor erneut ein.</dd>
       </dl>
     </Section>
   </div>

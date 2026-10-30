@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"raid-website/internal/bosskill"
 	"raid-website/internal/loot"
 )
 
@@ -23,18 +24,19 @@ func lootAwardResponses(awards []loot.Award) []lootAwardResponse {
 }
 
 type createLootRequest struct {
-	CatalogBossID        *string     `json:"catalog_boss_id"`
-	Boss                 string      `json:"boss"`
-	ItemID               string      `json:"item_id"`
-	ItemName             string      `json:"item_name"`
-	AwardedToPlayerID    int64       `json:"awarded_to_player_id"`
-	AwardedToCharacterID *int64      `json:"awarded_to_character_id"`
-	AwardMethod          loot.Method `json:"award_method"`
-	RequestID            *string     `json:"request_id"`
-	ItemLockID           *int64      `json:"item_lock_id"`
-	Notes                string      `json:"notes"`
-	Reason               string      `json:"reason"`
-	ConfirmEPShortfall   bool        `json:"confirm_ep_shortfall"`
+	Difficulty           bosskill.Difficulty `json:"difficulty"`
+	CatalogBossID        *string             `json:"catalog_boss_id"`
+	Boss                 string              `json:"boss"`
+	ItemID               string              `json:"item_id"`
+	ItemName             string              `json:"item_name"`
+	AwardedToPlayerID    int64               `json:"awarded_to_player_id"`
+	AwardedToCharacterID *int64              `json:"awarded_to_character_id"`
+	AwardMethod          loot.Method         `json:"award_method"`
+	RequestID            *string             `json:"request_id"`
+	ItemLockID           *int64              `json:"item_lock_id"`
+	Notes                string              `json:"notes"`
+	Reason               string              `json:"reason"`
+	ConfirmEPShortfall   bool                `json:"confirm_ep_shortfall"`
 }
 
 type correctLootRequest struct {
@@ -141,6 +143,10 @@ func (a *API) listLoot(w http.ResponseWriter, r *http.Request) {
 		return len(ranks)
 	}
 	sort.SliceStable(awards, func(i, j int) bool { return rank(awards[i]) < rank(awards[j]) })
+	if err := a.LootRepo.FillCharacterNames(r.Context(), awards); err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not list loot")
+		return
+	}
 	writeListJSON(w, lootAwardResponses(awards))
 }
 
@@ -152,6 +158,10 @@ func (a *API) listPlayerLoot(w http.ResponseWriter, r *http.Request) {
 	}
 	awards, err := a.LootRepo.ListByPlayer(r.Context(), id)
 	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not list loot")
+		return
+	}
+	if err := a.LootRepo.FillCharacterNames(r.Context(), awards); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list loot")
 		return
 	}
@@ -180,6 +190,7 @@ func (a *API) createLoot(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UTC()
 	award := &loot.Award{
+		Difficulty:           req.Difficulty,
 		CatalogBossID:        req.CatalogBossID,
 		RaidID:               raidID,
 		Boss:                 req.Boss,

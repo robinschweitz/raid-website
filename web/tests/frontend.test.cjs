@@ -2237,7 +2237,7 @@ for (const method of ['MAIN', 'SECOND', 'ENHANCED', 'BOE']) {
     const write = writes(s)[0]
     assert.equal(write.url, '/api/v1/raids/1/loot')
     assert.deepEqual(JSON.parse(JSON.stringify(write.body)), {
-      catalog_boss_id: 'boss:1', item_id: '12345', award_method: method,
+      difficulty: 'NORMAL', catalog_boss_id: 'boss:1', item_id: '12345', award_method: method,
       awarded_to_player_id: 2, awarded_to_character_id: 20, notes: '', request_id: write.body.request_id,
     })
     assert.match(write.body.request_id, /^[0-9a-f-]{36}$/)
@@ -2411,7 +2411,8 @@ test('associated loot filters by persisted instance and size, preserves mixed so
   assert.equal(write.body.award_method, 'ENHANCED')
   assert.match(write.body.request_id, /^[0-9a-f-]{36}$/)
   assert.equal(write.body.item_id, '12345')
-  for (const key of ['boss', 'item_name', 'boss_id', 'instance_id', 'raid_size', 'difficulty', 'loot_mode']) assert.equal(key in write.body, false)
+  assert.equal(write.body.difficulty, 'HEROIC')
+  for (const key of ['boss', 'item_name', 'boss_id', 'instance_id', 'raid_size', 'loot_mode']) assert.equal(key in write.body, false)
   write.reject(new Error('offline'))
   await first
   view.render()
@@ -4220,4 +4221,96 @@ test('the own profile offers no anonymise action', async () => {
   resolvePlayer(s, 1)
   await flush(view)
   assert.equal(button(view, 'Spieler anonymisieren'), undefined)
+})
+
+test('TestReqRaid017_AC01 addon import asks once per missing boss and requires both choices', async () => {
+  const s = setup()
+  const view = s.mount(s.load('components/AddonLootImport.tsx').AddonLootImport, { raidID: 1, onImported: async () => {} })
+  nodes(view.tree, (n) => n.type === 'textarea')[0].props.onChange(change('RS1|LOOT|1|Recorder|1'))
+  view.render()
+  button(view, 'Vorschau').props.onClick()
+  const row = (key, boss) => ({ line_key: key, line_number: Number(key), state: 'given', item_id: 'item', item_name: 'Item', character_id: 10, character_name: 'Mage', recipient_name: 'Mage', catalog_boss_id: boss, boss_options: [{ id: boss, name: boss }], award_method: 'MAIN', is_importable: true, is_already_imported: false, is_unclaimed: false, warnings: [], errors: [] })
+  writes(s)[0].resolve({ raid_id: 1, recorder: 'Recorder', warnings: [], recipient_options: [{ character_id: 10, character_name: 'Mage' }], rows: [row('1', 'Boss A'), row('2', 'Boss A'), row('3', 'Boss B')], missing_kills: [{ boss_id: 'Boss A', boss_name: 'Boss A', difficulties: ['NORMAL', 'HEROIC'] }, { boss_id: 'Boss B', boss_name: 'Boss B', difficulties: ['NORMAL'] }] })
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.type === 'select' && n.props['aria-label']?.startsWith('Schwierigkeit für ')).length, 2)
+  assert.equal(button(view, '3 Gegenstände übernehmen').props.disabled, true)
+  select(view, 'Schwierigkeit für Boss A').props.onChange(change('HEROIC'))
+  view.render()
+  assert.equal(button(view, '3 Gegenstände übernehmen').props.disabled, true)
+  select(view, 'Schwierigkeit für Boss B').props.onChange(change('NORMAL'))
+  view.render()
+  assert.equal(button(view, '3 Gegenstände übernehmen').props.disabled, false)
+  button(view, '3 Gegenstände übernehmen').props.onClick()
+  assert.deepEqual(writes(s)[1].body.selections.map((row) => row.difficulty), ['HEROIC', 'HEROIC', 'NORMAL'])
+  writes(s)[1].reject(new Error('offline'))
+  await flush(view)
+})
+
+test('Admin reset codes appear once and replace direct password entry (REQ-ACCOUNT-017)', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(s, 2)
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Passwort (leer = unverändert)').length, 0)
+  button(view, 'Reset-Code erstellen').props.onClick()
+  const request = s.requests.find((r) => r.url.endsWith('/2/reset-code'))
+  request.resolve({ code: 'BD-ONCE-ONLY-CODE' })
+  await flush(view)
+  assert.match(text(view.tree), /nur jetzt angezeigt/)
+  assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Reset-Code')[0].props.value, 'BD-ONCE-ONLY-CODE')
+  view.render({ playerID: 3 })
+  resolvePlayer(s, 3)
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Reset-Code').length, 0)
+})
+
+test('reset password page submits once and clears the secret after success (REQ-ACCOUNT-018)', async () => {
+  const s = setup(null)
+  const view = s.mount(s.load('pages/ResetPassword.tsx').ResetPasswordPage)
+  nodes(view.tree, (n) => n.props['aria-label'] === 'Reset-Code')[0].props.onChange(change('BD-CODE-ONLY-ONCE'))
+  nodes(view.tree, (n) => n.props['aria-label'] === 'Neues Passwort')[0].props.onChange(change('new-password-123'))
+  view.render()
+  const handler = form(view).props.onSubmit
+  const first = handler(event)
+  await handler(event)
+  assert.equal(writes(s).length, 1)
+  assert.deepEqual(writes(s)[0].body, { code: 'BD-CODE-ONLY-ONCE', password: 'new-password-123' })
+  writes(s)[0].resolve(undefined)
+  await first
+  await flush(view)
+  assert.match(text(view.tree), /Dein Passwort wurde geändert/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'input').length, 0)
+})
+
+test('only Admins can start the personal-data download (REQ-PRIVACY-012)', async () => {
+  const s = setup()
+  const downloads = []
+  s.api.downloadJSON = async (...args) => downloads.push(args)
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(s, 2)
+  await flush(view)
+  button(view, 'Daten als JSON herunterladen').props.onClick()
+  await flush(view)
+  assert.deepEqual(downloads, [['/api/v1/players/2/export', 'spieler-2.json']])
+  const member = setup({ id: 2, role: 'MEMBER' })
+  const own = member.mount(member.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(member, 2)
+  await flush(own)
+  assert.equal(button(own, 'Daten als JSON herunterladen'), undefined)
+})
+
+test('visitor search limit is shown in German on registration (REQ-ACCOUNT-014)', async () => {
+  const s = setup(null)
+  const { ApiError } = s.load('api.ts')
+  const view = s.mount(s.load('pages/Login.tsx').LoginPage)
+  button(view, 'Code anfordern').props.onClick()
+  view.render()
+  input(view, 'Mindestens 3 Zeichen').props.onChange(change('Mage'))
+  view.render()
+  const pending = button(view, 'Suchen').props.onClick()
+  const request = s.requests.find((r) => r.url.includes('/external/rising-gods/characters'))
+  request.reject(new ApiError(429, 'search_limit', 'Zu viele Anfragen. Bitte in zehn Minuten erneut versuchen.'))
+  await pending
+  await flush(view)
+  assert.match(text(view.tree), /Zu viele Anfragen.*zehn Minuten/)
 })

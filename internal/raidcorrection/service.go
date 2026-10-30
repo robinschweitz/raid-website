@@ -364,6 +364,7 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 				row.ID = old.ID
 				row.RaidID = old.RaidID
 			}
+			row.Difficulty = old.Difficulty
 			row.CreatedAt = old.CreatedAt
 			row.AwardedAt = old.AwardedAt
 			row.AwardedByPlayerID = old.AwardedByPlayerID
@@ -380,13 +381,18 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		if err != nil {
 			return err
 		}
+		if row.ID == 0 {
+			if err := loot.EnsureBossKill(ctx, r.loot, row, reason); err != nil {
+				return err
+			}
+		}
 		if !completed && row.ID == 0 {
 			row.UpdatedAt = time.Now().UTC()
 			row.CreatedAt = row.UpdatedAt
 			row.AwardedAt = row.UpdatedAt
 			row.AwardedByPlayerID = actor
 			row.Source = "manual"
-			if err := loot.AwardInTransaction(ctx, r.loot, row, reason); err != nil {
+			if err := loot.AwardPreparedInTransaction(ctx, r.loot, row, reason); err != nil {
 				return err
 			}
 			return nil

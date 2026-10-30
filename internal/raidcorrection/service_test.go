@@ -92,7 +92,7 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 				t.Fatal(err)
 			}
 			if scenario.legacyLoot {
-				if err := r.loot.CreateAward(ctx, &loot.Award{RaidID: rd.ID, ItemName: "historical offspec item", AwardedToPlayerID: players[0].ID, AwardedByPlayerID: players[0].ID, Source: "legacy_import", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}); err != nil {
+				if err := r.loot.CreateAward(ctx, &loot.Award{Difficulty: "NORMAL", RaidID: rd.ID, ItemName: "historical offspec item", AwardedToPlayerID: players[0].ID, AwardedByPlayerID: players[0].ID, Source: "legacy_import", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -140,7 +140,7 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 			}
 			assertBalance(players[0].ID, baseline)
 			assertCorrectionAmounts(players[0].ID)
-			award := &loot.Award{RaidID: rd.ID, CatalogBossID: &drop.BossID, ItemID: drop.ItemID, AwardedToPlayerID: players[0].ID, AwardedToCharacterID: &chars[0].ID, AwardMethod: loot.Second}
+			award := &loot.Award{Difficulty: "NORMAL", RaidID: rd.ID, CatalogBossID: &drop.BossID, ItemID: drop.ItemID, AwardedToPlayerID: players[0].ID, AwardedToCharacterID: &chars[0].ID, AwardMethod: loot.Second}
 			if err := s.SaveLoot(ctx, award, players[0].ID, "missing offspec loot"); err != nil {
 				t.Fatal(err)
 			}

@@ -117,7 +117,7 @@ func TestCatalogBundledAwardsValidateAndPreserveSnapshots(t *testing.T) {
 	if err != nil || len(awards) != 0 {
 		t.Fatalf("invalid award persisted: %v %v", awards, err)
 	}
-	body := map[string]any{"catalog_boss_id": "36612", "item_id": "50759", "boss": "Untrusted", "item_name": "Untrusted", "award_method": "ENHANCED", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "request_id": "catalog-award"}
+	body := map[string]any{"difficulty": "NORMAL", "catalog_boss_id": "36612", "item_id": "50759", "boss": "Untrusted", "item_name": "Untrusted", "award_method": "ENHANCED", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "request_id": "catalog-award"}
 	id := correctionID(t, f.request(http.MethodPost, "/loot", body, http.StatusCreated))
 	if retry := correctionID(t, f.request(http.MethodPost, "/loot", body, http.StatusCreated)); retry != id {
 		t.Fatal("duplicate catalog award")
@@ -145,7 +145,7 @@ func TestChestEncounterAwardsAndPermissionBoundary(t *testing.T) {
 		if err != nil || len(items) == 0 {
 			t.Fatal("missing encounter", bossID, err)
 		}
-		body := map[string]any{"catalog_boss_id": bossID, "item_id": items[0].ItemID, "award_method": "SECOND", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "request_id": "chest-" + bossID}
+		body := map[string]any{"difficulty": "NORMAL", "catalog_boss_id": bossID, "item_id": items[0].ItemID, "award_method": "SECOND", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "request_id": "chest-" + bossID}
 		status, response := do(t, f.srv.Client(), http.MethodPost, fmt.Sprintf("%s/api/v1/raids/%d/loot", f.srv.URL, f.raidID), member, body)
 		if status != http.StatusForbidden {
 			t.Fatalf("member chest award: %d %s", status, response)

@@ -437,6 +437,18 @@ function PlayerDetail({ playerID, initialView }: Props) {
     })
   }
 
+  const exportPlayer = async () => {
+    if (!isAdmin) return
+    await submit(async () => {
+      setError('')
+      try {
+        await api.downloadJSON(`/api/v1/players/${playerID}/export`, `spieler-${playerID}.json`)
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Datenexport fehlgeschlagen.')
+      }
+    })
+  }
+
   const anonymisePlayer = async (event: FormEvent) => {
     event.preventDefault()
     if (!isAdmin || !player) return
@@ -863,6 +875,11 @@ function PlayerDetail({ playerID, initialView }: Props) {
                <label>Grund<input aria-label="Grund für Kontozusammenführung" value={mergeReason} onChange={(event) => setMergeReason(event.target.value)} required /></label>
                <button type="submit" disabled={pending || !mergeSourceID || !mergeReason.trim()}>Zusammenführen</button>
              </form>
+           </section>}
+           {isAdmin && <section className="subcard">
+             <h3>Persönliche Daten exportieren</h3>
+             <p className="muted">Für Auskunftsanfragen über den Datenschutzkontakt: Konto, Charaktere und Spielhistorie als JSON-Datei, ohne Passwörter, MFA-Geheimnisse oder Sitzungsschlüssel.</p>
+             <button type="button" disabled={pending} onClick={() => void exportPlayer()}>Daten als JSON herunterladen</button>
            </section>}
            {isAdmin && !isOwnProfile && <section className="subcard">
              <h3>Spieler anonymisieren</h3>

@@ -1,8 +1,13 @@
-export const appVersion = '1.0.68'
+export const appVersion = '1.0.69'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Persönliche Daten als JSON exportieren',
+    changes: ['Admins können Auskunftsanfragen im Konto-Tab eines Spielers mit einem protokollierten JSON-Export beantworten. Passwörter, MFA-Geheimnisse und Sitzungsschlüssel werden nicht exportiert.'],
+  },
+  {
+    version: '1.0.68',
     title: 'Begrenzte Charaktersuche für Besucher',
     changes: ['Ohne Anmeldung sind zehn neue Charaktersuchen und Registrierungsanfragen pro zehn Minuten möglich. Gespeicherte Suchergebnisse und angemeldete Mitglieder bleiben erreichbar.'],
   },

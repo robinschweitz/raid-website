@@ -270,7 +270,7 @@ func (a *API) editPoll(w http.ResponseWriter, r *http.Request) {
 	}
 	plan, err := poll.PlanEdit(*current, edit, time.Now().UTC())
 	if err != nil {
-		BadRequest(w, strings.TrimPrefix(err.Error(), poll.ErrEditInvalid.Error()+": "))
+		BadRequest(w, "Die Angaben zur Umfrage sind ungültig. Bitte Titel, Status, Ende und Antwortoptionen prüfen.")
 		return
 	}
 	if err := a.Polls.SaveEdit(r.Context(), *current, &plan, actor); err != nil {

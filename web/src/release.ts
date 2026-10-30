@@ -1,8 +1,13 @@
-export const appVersion = '1.0.71'
+export const appVersion = '1.0.72'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Verständliche Fehlermeldungen ohne interne Details',
+    changes: ['Fehler beim Kontospeichern und bei Korrekturen zeigen feste deutsche Meldungen. Interne Datenbankfehler bleiben im Serverprotokoll.'],
+  },
+  {
+    version: '1.0.71',
     title: 'Reset-Code einlösen',
     changes: ['Über „Passwort vergessen?“ lässt sich ein einmaliger Reset-Code einlösen. Alle bisherigen Sitzungen und zweiten Faktoren werden dabei entfernt.'],
   },

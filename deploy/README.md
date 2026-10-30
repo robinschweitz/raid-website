@@ -145,7 +145,11 @@ and the server has no API token.
 On the first day of each month `raid-website-backup-restore-test.timer`
 downloads the newest copy, checks both checksums, decrypts it, checks the
 database, and starts `/opt/raid-website/server` on a throwaway copy
-(development mode, `127.0.0.1:18080`, as `raidweb`). A failed upload or restore
+(development mode, `127.0.0.1:18080`, as `raidweb`). The launcher reads only
+`TOTP_ENCRYPTION_KEY` and `TOTP_ENCRYPTION_KEYS_PREVIOUS` from the archived
+environment; it never executes that file, prints key values, or enables the
+restored copy's production integrations. Missing or incorrect archived keys
+fail the test rather than falling back to live keys. A failed upload or restore
 test fails its unit; check with `systemctl --failed` and
 `journalctl -u raid-website-backup-offsite.service -u raid-website-backup-restore-test.service`.
 

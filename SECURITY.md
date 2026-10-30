@@ -296,6 +296,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Enforcement:** `deploy/bin/raid-website-backup` (`--offsite`, `--restore-test`); `raid-website-backup-offsite.timer` (daily), `raid-website-backup-restore-test.timer` (monthly); Storage Box snapshot plan (daily, 10 kept).
 - **Evidence:** NFR-2.3, NFR-2.5, ADR 070, ADR 099, OD-007 (owner, 2026-10-24). Code and host: compliant since #109. The first copy was uploaded on 2026-10-24 and restored on the host and on the owner's PC; the site started with the restored data. Threats: T-011, T-030.
 - **Verification:** `systemctl start raid-website-backup-offsite.service` adds one `.tar.gpg` and its `.sha256`, and a second run adds nothing. `systemctl start raid-website-backup-restore-test.service` succeeds. A wrong target makes the upload unit fail. Decrypting with the owner's passphrase on another machine gives a database that passes `PRAGMA integrity_check`.
+- **Restore encryption:** The isolated restore test uses only archived TOTP keys, never live-key fallback or production integration credentials. The launcher allowlist and invalid-key failures are covered by `deploy/test_backup_restore.py` (#212).
 
 ### Platform, build, and supply chain (V13, V15)
 

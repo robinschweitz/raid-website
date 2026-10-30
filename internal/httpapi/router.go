@@ -136,7 +136,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	v1.StatisticsHandlers{Statistics: statistics.NewService(statistics.NewRepo(db))}.Register(mux)
 	v1.PrivacyHandlers{Contact: v1.PrivacyContact{Name: opts.PrivacyContactName, Address: opts.PrivacyContactAddress}}.Register(mux)
 	unclaimed := unclaimedloot.NewService(unclaimedloot.NewRepo(db), raids, catalog)
-	v1.UnclaimedHandlers{Unclaimed: unclaimed}.Register(mux)
+	v1.UnclaimedHandlers{Unclaimed: unclaimed, Corrections: corrections}.Register(mux)
 	v1.BossKillHandlers{Kills: bosskill.NewService(bosskill.NewRepo(db)), Corrections: corrections}.Register(mux)
 	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(addonsync.NewRepo(db), raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed), Roster: api}.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)

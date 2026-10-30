@@ -403,6 +403,7 @@ All controls are native HTML elements (`button`, `input`, `select`, `textarea`, 
 - **Copy box:** for addon exports, numbered steps and one "Export kopieren" button; if the
   clipboard is blocked, the text is shown selected for manual copying (ADR 081).
 
+- **Loot entry:** one form for awards and for items that went to nobody. "Vergabemethode" comes before the recipient and also offers Entzaubern, Gildenbank and Wollte niemand; Entzaubern asks for the disenchanting roster character in the recipient field, Gildenbank and Wollte niemand replace that field with an optional "Bei" field (FR-15.1, ADR 107).
 - **Install hint:** one thin line under the top bar in the `info` colour, styled like the
   account-security reminder: phone icon, a bold sentence, muted detail, the browser's
   "Installieren" button where offered, and a quiet close button (FR-28.5, ADR 101). App icons

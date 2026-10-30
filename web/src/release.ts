@@ -1,8 +1,13 @@
-export const appVersion = '1.0.75'
+export const appVersion = '1.0.76'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Loot ohne Empfänger im Loot-Formular',
+    changes: ['Entzaubern, Gildenbank und Wollte niemand stehen jetzt direkt bei der Vergabemethode. Beim Entzaubern wird der Charakter aus dem Raidroster gewählt, der entzaubert hat. Boss und Item kommen wie bei jeder Vergabe aus dem Katalog, und ein fehlender Boss-Kill wird mit eingetragen.', 'Die Übersicht zählt eingetragene Bosskills jetzt richtig und zeigt getötete Bosse ausgegraut und durchgestrichen.'],
+  },
+  {
+    version: '1.0.75',
     title: 'Charakternamen im Loot',
     changes: ['In den Loot-Listen steht jetzt immer der Name des Charakters. Bisher zeigte das Spielerprofil bei neuerem Loot nur „Charakterprofil“.'],
   },

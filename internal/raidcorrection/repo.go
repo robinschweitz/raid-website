@@ -11,8 +11,10 @@ import (
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
+	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
 	"raid-website/internal/raid"
+	"raid-website/internal/unclaimedloot"
 )
 
 // Repo owns the transaction boundary for cross-domain corrections.
@@ -26,10 +28,12 @@ type Repo struct {
 	points     *enhancepoints.Repo
 	audit      *audit.Repo
 	kills      *bosskill.Repo
+	unclaimed  *unclaimedloot.Service
 }
 
 func NewRepo(db bun.IDB) *Repo {
-	return &Repo{db: db, attendance: attendance.NewRepo(db), loot: loot.NewRepo(db), raids: raid.NewRepo(db), players: player.NewRepo(db), characters: character.NewRepo(db), points: enhancepoints.NewRepo(db), audit: audit.NewRepo(db), kills: bosskill.NewRepo(db)}
+	unclaimed := unclaimedloot.NewService(unclaimedloot.NewRepo(db), raid.NewRepo(db), lootcatalog.NewService(lootcatalog.NewRepo(db)))
+	return &Repo{unclaimed: unclaimed, db: db, attendance: attendance.NewRepo(db), loot: loot.NewRepo(db), raids: raid.NewRepo(db), players: player.NewRepo(db), characters: character.NewRepo(db), points: enhancepoints.NewRepo(db), audit: audit.NewRepo(db), kills: bosskill.NewRepo(db)}
 }
 
 func (r *Repo) WithTx(tx bun.Tx) *Repo { return NewRepo(tx) }

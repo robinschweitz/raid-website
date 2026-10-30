@@ -1,7 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import { useSubmission } from '../useSubmission'
-import type { CatalogBoss } from '../types'
 import { ErrorMessage } from './ErrorMessage'
 
 // Loot that went to nobody (ADR 089): disenchanted, for the guild bank, or
@@ -20,62 +19,6 @@ interface UnclaimedEntry {
 }
 
 const outcomeLabels: Record<Outcome, string> = { DISENCHANTED: 'Entzaubert', BANK: 'Gildenbank', NOBODY: 'Wollte niemand' }
-
-interface FormProps {
-  raidID: number
-  needsReason: boolean
-  bosses: CatalogBoss[]
-  onAdded: () => void
-}
-
-// UnclaimedLootForm records one item that went to nobody. It sits inside the
-// raid's loot entry, next to the form for player awards.
-export function UnclaimedLootForm({ raidID, needsReason, bosses, onAdded }: FormProps) {
-  const { pending, submit, isActive } = useSubmission()
-  const [error, setError] = useState('')
-  const [bossID, setBossID] = useState('')
-  const [itemName, setItemName] = useState('')
-  const [outcome, setOutcome] = useState<Outcome>('NOBODY')
-  const [holder, setHolder] = useState('')
-  const [notes, setNotes] = useState('')
-  const [reason, setReason] = useState('')
-
-  const add = (event: FormEvent) => {
-    event.preventDefault()
-    void submit(async () => {
-      setError('')
-      try {
-        await api.post(`/api/v1/raids/${raidID}/unclaimed-loot`, { catalog_boss_id: bossID, item_name: itemName, outcome, holder_name: holder, notes, reason })
-        setItemName('')
-        setHolder('')
-        setNotes('')
-        setReason('')
-        onAdded()
-      } catch (err) {
-        if (isActive()) setError(err instanceof ApiError ? err.message : 'Konnte nicht gespeichert werden.')
-      }
-    })
-  }
-
-  return <div className="unclaimed-loot">
-    <p className="muted">Entzaubert, für die Gildenbank oder von niemandem gewollt. Zählt für keinen Spieler und kostet keine EP.</p>
-    {error && <ErrorMessage>{error}</ErrorMessage>}
-    <form className="unclaimed-form" onSubmit={add}>
-      <label>Boss<select value={bossID} onChange={(e) => setBossID(e.target.value)}>
-        <option value="">Ohne Boss</option>
-        {bosses.map((boss) => <option key={boss.id} value={boss.id}>{boss.name}</option>)}
-      </select></label>
-      <label>Item<input value={itemName} required placeholder="Name des Gegenstands" onChange={(e) => setItemName(e.target.value)} /></label>
-      <label>Verbleib<select value={outcome} onChange={(e) => setOutcome(e.target.value as Outcome)}>
-        {Object.entries(outcomeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-      </select></label>
-      <label>Bei<input value={holder} placeholder="Wer hat es (optional)" onChange={(e) => setHolder(e.target.value)} /></label>
-      <label>Notizen<input value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
-      {needsReason && <label>Grund (Pflicht im archivierten Raid)<input value={reason} onChange={(e) => setReason(e.target.value)} /></label>}
-      <div className="actions"><button type="submit" disabled={pending || !itemName.trim() || (needsReason && !reason.trim())}>Eintragen</button></div>
-    </form>
-  </div>
-}
 
 interface ListProps {
   raidID: number
@@ -117,7 +60,7 @@ export function UnclaimedLootList({ raidID, canWrite, needsReason, version }: Li
   return <section className="unclaimed-loot loot-unclaimed-list" aria-label="Beute ohne Empfänger">
     <h3>Beute ohne Empfänger</h3>
     {error && <ErrorMessage>{error}</ErrorMessage>}
-    {entries.length === 0 ? <p className="muted">Noch nichts eingetragen. Neue Einträge über „Loot erfassen“ mit „Entzaubert / Gildenbank / Niemand wollte es“.</p> : <>
+    {entries.length === 0 ? <p className="muted">Noch nichts eingetragen. Neue Einträge über „Loot erfassen“ mit der Vergabemethode Entzaubern, Gildenbank oder Wollte niemand.</p> : <>
       {canWrite && needsReason && <label className="unclaimed-reason">Grund zum Entfernen (Pflicht im archivierten Raid)<input value={reason} onChange={(e) => setReason(e.target.value)} /></label>}
       <div className="table-scroll"><table className="table small">
         <thead><tr><th>Item</th><th>Boss</th><th>Verbleib</th><th>Bei</th><th>Notizen</th>{canWrite && <th></th>}</tr></thead>

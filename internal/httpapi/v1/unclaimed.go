@@ -4,13 +4,18 @@ import (
 	"errors"
 	"net/http"
 
+	"raid-website/internal/bosskill"
 	"raid-website/internal/raid"
+	"raid-website/internal/raidcorrection"
 	"raid-website/internal/unclaimedloot"
 	"raid-website/internal/validation"
 )
 
 // UnclaimedHandlers expose loot that went to nobody (ADR 089).
-type UnclaimedHandlers struct{ Unclaimed *unclaimedloot.Service }
+type UnclaimedHandlers struct {
+	Unclaimed   *unclaimedloot.Service
+	Corrections *raidcorrection.Service
+}
 
 // Register mounts the reads for signed-in users and the writes for raid staff.
 func (h UnclaimedHandlers) Register(mux *http.ServeMux) {
@@ -20,13 +25,14 @@ func (h UnclaimedHandlers) Register(mux *http.ServeMux) {
 }
 
 type unclaimedRequest struct {
-	CatalogBossID string `json:"catalog_boss_id"`
-	ItemID        string `json:"item_id"`
-	ItemName      string `json:"item_name"`
-	Outcome       string `json:"outcome"`
-	HolderName    string `json:"holder_name"`
-	Notes         string `json:"notes"`
-	Reason        string `json:"reason"`
+	CatalogBossID           string `json:"catalog_boss_id"`
+	ItemID                  string `json:"item_id"`
+	Difficulty              string `json:"difficulty"`
+	DisenchanterCharacterID *int64 `json:"disenchanter_character_id"`
+	Outcome                 string `json:"outcome"`
+	HolderName              string `json:"holder_name"`
+	Notes                   string `json:"notes"`
+	Reason                  string `json:"reason"`
 }
 
 func (h UnclaimedHandlers) list(w http.ResponseWriter, r *http.Request) {
@@ -59,8 +65,8 @@ func (h UnclaimedHandlers) create(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	entry, err := h.Unclaimed.Create(r.Context(), actor, id, unclaimedloot.Input{CatalogBossID: req.CatalogBossID, ItemID: req.ItemID,
-		ItemName: req.ItemName, Outcome: unclaimedloot.Outcome(req.Outcome), HolderName: req.HolderName, Notes: req.Notes, Reason: req.Reason})
+	entry, err := h.Corrections.RecordUnclaimed(r.Context(), id, actor, unclaimedloot.Input{CatalogBossID: req.CatalogBossID, ItemID: req.ItemID,
+		Outcome: unclaimedloot.Outcome(req.Outcome), HolderName: req.HolderName, Notes: req.Notes, Reason: req.Reason}, bosskill.Difficulty(req.Difficulty), req.DisenchanterCharacterID)
 	if err != nil {
 		unclaimedError(w, err)
 		return
@@ -110,6 +116,6 @@ func unclaimedError(w http.ResponseWriter, err error) {
 	case errors.Is(err, unclaimedloot.ErrAlreadyRemoved):
 		WriteError(w, http.StatusConflict, "already_removed", "Dieser Eintrag ist schon entfernt.")
 	default:
-		WriteError(w, http.StatusInternalServerError, "internal", "Beute ohne Empfänger konnte nicht gespeichert werden.")
+		writeCorrectionError(w, err)
 	}
 }

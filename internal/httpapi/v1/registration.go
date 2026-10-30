@@ -36,6 +36,11 @@ func registrationError(w http.ResponseWriter, err error) {
 		return
 	}
 	switch {
+	case errors.Is(err, registration.ErrResetCodeInvalid):
+		WriteError(w, http.StatusBadRequest, "reset_code_invalid", "Reset-Code ungültig oder abgelaufen.")
+	case errors.Is(err, auth.ErrLoginRateLimited):
+		w.Header().Set("Retry-After", "900")
+		WriteError(w, http.StatusTooManyRequests, "login_rate_limited", "Zu viele fehlgeschlagene Versuche. Bitte später erneut versuchen.")
 	case errors.Is(err, registration.ErrSearchLimit):
 		w.Header().Set("Retry-After", "600")
 		WriteError(w, http.StatusTooManyRequests, "search_limit", "Zu viele Anfragen. Bitte in zehn Minuten erneut versuchen.")
@@ -237,7 +242,7 @@ func (a *API) registerWithCode(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	token, p, err := a.Registration.RedeemNewAccount(r.Context(), req.Code, req.Username, req.Password)
+	token, p, err := a.Registration.RedeemNewAccountFromAddress(r.Context(), req.Code, req.Username, req.Password, clientAddress(r, a.TrustProxyHeaders))
 	if err != nil {
 		registrationError(w, err)
 		return

@@ -126,7 +126,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   Loot DTOs carry `award_method`, never a client-set `is_main_spec`.
 - **Security events and account recovery.** Security events are written as structured lines to
   the systemd journal, which keeps them 30 days (SC-041). Password-reset codes reuse the
-  registration-code infrastructure in `registration` (owner 2026-10-23, backlog #48; hash-only reset-code creation built in #81, redemption tracked in #82), and the personal-data export
+  registration-code infrastructure in `registration` (owner 2026-10-23, backlog #48; hash-only reset-code creation built in #81, redemption built in #82), and the personal-data export
   (FR-30.7) is built in `accountmerge` next to anonymisation (#86). Admin-only `GET /api/v1/players/{id}/export` returns an audited, transaction-consistent JSON snapshot with explicitly selected fields and redacted audit snapshots. Player snapshots use the same identity hiding as the audit view (FR-30.4), checking anonymisation markers even outside the selected player's history. Reset codes remain tracked separately.
 - **No background jobs.** Deadlines (signup close, MFA expiry) are evaluated on each request.
   Planning ahead runs on series save and archive (FR-9.7). The only periodic work is on the host

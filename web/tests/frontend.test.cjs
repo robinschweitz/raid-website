@@ -4234,6 +4234,24 @@ test('Admin reset codes appear once and replace direct password entry (REQ-ACCOU
   assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Reset-Code').length, 0)
 })
 
+test('reset password page submits once and clears the secret after success (REQ-ACCOUNT-018)', async () => {
+  const s = setup(null)
+  const view = s.mount(s.load('pages/ResetPassword.tsx').ResetPasswordPage)
+  nodes(view.tree, (n) => n.props['aria-label'] === 'Reset-Code')[0].props.onChange(change('BD-CODE-ONLY-ONCE'))
+  nodes(view.tree, (n) => n.props['aria-label'] === 'Neues Passwort')[0].props.onChange(change('new-password-123'))
+  view.render()
+  const handler = form(view).props.onSubmit
+  const first = handler(event)
+  await handler(event)
+  assert.equal(writes(s).length, 1)
+  assert.deepEqual(writes(s)[0].body, { code: 'BD-CODE-ONLY-ONCE', password: 'new-password-123' })
+  writes(s)[0].resolve(undefined)
+  await first
+  await flush(view)
+  assert.match(text(view.tree), /Dein Passwort wurde geändert/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'input').length, 0)
+})
+
 test('only Admins can start the personal-data download (REQ-PRIVACY-012)', async () => {
   const s = setup()
   const downloads = []

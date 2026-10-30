@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"raid-website/internal/audit"
+	"raid-website/internal/auth"
 	"raid-website/internal/player"
+	"raid-website/internal/push"
 	"strings"
 	"time"
 
@@ -140,4 +142,57 @@ func (r *Repo) createResetCode(ctx context.Context, row *ResetCode) error {
 }
 func (r *Repo) auditReset(ctx context.Context, actorID, playerID int64, action string, details map[string]any, reason string) error {
 	return audit.NewRepo(r.db).Record(ctx, actorID, "player", playerID, action, nil, details, reason)
+}
+
+func (r *Repo) reserveCodeAttempt(ctx context.Context, address string, now time.Time) (int64, error) {
+	return auth.NewRepo(r.db).ReserveLoginAttempt(ctx, "", address, now, now.Add(-15*time.Minute), 30, 30)
+}
+func (r *Repo) releaseCodeAttempt(ctx context.Context, id int64) error {
+	return auth.NewRepo(r.db).DeleteLoginAttempt(ctx, id)
+}
+func (r *Repo) validResetCode(ctx context.Context, hash string, now time.Time) (*ResetCode, error) {
+	row := new(ResetCode)
+	err := r.db.NewSelect().Model(row).Where("code_hash = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?", hash, now).Scan(ctx)
+	return row, err
+}
+func (r *Repo) consumeResetCode(ctx context.Context, id int64, now time.Time) error {
+	result, err := r.db.NewUpdate().Model((*ResetCode)(nil)).Set("used_at = ?", now).Where("id = ? AND used_at IS NULL AND revoked_at IS NULL", id).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return ErrResetCodeInvalid
+	}
+	return nil
+}
+func (r *Repo) applyPasswordReset(ctx context.Context, playerID int64, hash string, now time.Time) (map[string]int64, error) {
+	p, err := r.resetPlayer(ctx, playerID)
+	if err != nil {
+		return nil, err
+	}
+	p.PasswordHash = hash
+	p.UpdatedAt = now
+	if err := player.NewRepo(r.db).Update(ctx, p); err != nil {
+		return nil, err
+	}
+	removed := map[string]int64{}
+	for _, table := range []string{"sessions", "player_mfa_settings", "mfa_recovery_codes", "mfa_login_challenges", "webauthn_credentials", "webauthn_sessions"} {
+		result, err := r.db.NewDelete().Table(table).Where("player_id = ?", playerID).Exec(ctx)
+		if err != nil {
+			return nil, err
+		}
+		count, err := result.RowsAffected()
+		if err != nil {
+			return nil, err
+		}
+		removed[table] = count
+	}
+	if err := push.RevokeForPlayer(ctx, r.db, playerID, playerID, ""); err != nil {
+		return nil, err
+	}
+	return removed, nil
 }

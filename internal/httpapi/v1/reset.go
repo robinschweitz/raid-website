@@ -25,3 +25,22 @@ func (a *API) createResetCode(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	WriteJSON(w, http.StatusCreated, map[string]any{"data": result})
 }
+
+func (a *API) redeemResetCode(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Code     string `json:"code"`
+		Password string `json:"password"`
+	}
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "Ungültige Anfrage.")
+		return
+	}
+	if err := a.Registration.RedeemResetCode(r.Context(), req.Code, req.Password, clientAddress(r, a.TrustProxyHeaders)); err != nil {
+		a.securityEvent(w, r, "password_reset_failed")
+		registrationError(w, err)
+		return
+	}
+	a.securityEvent(w, r, "password_reset_redeemed")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusNoContent)
+}

@@ -88,6 +88,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/password", RequireAuth(a.changeOwnPassword))
 	mux.HandleFunc("GET /api/v1/external/rising-gods/characters", a.searchRisingGodsCharacters)
 	mux.HandleFunc("POST /api/v1/auth/registration-requests", a.createRegistrationRequest)
+	mux.HandleFunc("POST /api/v1/auth/reset-password", a.redeemResetCode)
 	mux.HandleFunc("POST /api/v1/auth/register-with-code", a.registerWithCode)
 	mux.HandleFunc("GET /api/v1/registration-requests", RequireRole(validation.RoleAdmin, a.listRegistrationRequests))
 	mux.HandleFunc("GET /api/v1/registration-requests/{id}/codes", RequireRole(validation.RoleAdmin, a.listRegistrationCodes))

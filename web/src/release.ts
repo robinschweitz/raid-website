@@ -1,8 +1,13 @@
-export const appVersion = '1.0.70'
+export const appVersion = '1.0.71'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Reset-Code einlösen',
+    changes: ['Über „Passwort vergessen?“ lässt sich ein einmaliger Reset-Code einlösen. Alle bisherigen Sitzungen und zweiten Faktoren werden dabei entfernt.'],
+  },
+  {
+    version: '1.0.70',
     title: 'Passwort-Reset mit einmaligem Code',
     changes: ['Admins erstellen im Konto-Tab einen 72 Stunden gültigen Reset-Code und senden ihn ingame. Fremde Passwörter werden nicht mehr direkt gesetzt.'],
   },

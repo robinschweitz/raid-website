@@ -3,6 +3,7 @@ import { useSubmission } from './useSubmission'
 import { AuthProvider, useAuth } from './auth'
 import { Link, navigate, useRoute } from './router'
 import { atLeast } from './types'
+import { ResetPasswordPage } from './pages/ResetPassword'
 import { LoginPage } from './pages/Login'
 import { DashboardPage } from './pages/Dashboard'
 import { RaidDetailPage } from './pages/RaidDetail'
@@ -76,6 +77,7 @@ function Routes() {
   if (parts[0] === 'anleitung') return <GuidePage />
   if (parts[0] === 'schattengram') return <ShadowmournePage />
   if (parts[0] === 'addons') return <AddonsPage addonID={parts[1]} />
+  if (parts[0] === 'passwort-zuruecksetzen') return <ResetPasswordPage />
   if (parts[0] === 'kontosicherheit') return <AccountSecurityPage />
   return <p className="muted">Seite nicht gefunden.</p>
 }
@@ -178,7 +180,7 @@ function Gate() {
   }
   // The guide, the addons pages and the account-security page must be readable before an
   // account exists (ADR 083, ADR 085, ADR 092); so must the statistics (FR-1.4).
-  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/') && path !== '/statistics' && path !== '/datenschutz') {
+  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/') && path !== '/statistics' && path !== '/passwort-zuruecksetzen' && path !== '/datenschutz') {
     return <LoginPage />
   }
   return <Layout />

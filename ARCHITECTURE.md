@@ -95,7 +95,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   ordered by name and then ID.
 - **Operator reset command.** A new `cmd/reset-code` opens the database with the server's
   configuration and calls the `registration` reset-code service directly, like `cmd/sync-addons`
-  calls `internal/addons`; it has no HTTP surface (SC-051, OD-019). Not built.
+  calls `internal/addons`; it has no HTTP surface (SC-051, OD-019). Built in #83: `--player-id` or an unambiguous exact name/login; the command prints the code once and records the server operator in the audit and security journal.
 - **Privacy.** `accountmerge.Anonymise` (`POST /api/v1/players/{id}/anonymise`, Admin only) is built
   (FR-30.2–30.5, SC-032). It runs in one transaction, reuses the last-Admin check, and writes the
   audit entry `player_anonymise`; the audit reader (`audit.Repo.List`) uses that entry to hide the

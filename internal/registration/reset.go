@@ -80,6 +80,18 @@ func (s *Service) createResetCode(ctx context.Context, actorID, playerID int64, 
 	return &GeneratedResetCode{Record: *row, Code: plain}, nil
 }
 
+// CreateOperatorResetCode is used only by the host command; no HTTP route calls it.
+func (s *Service) CreateOperatorResetCode(ctx context.Context, playerID int64, name string) (*GeneratedResetCode, error) {
+	if playerID <= 0 {
+		p, err := s.repo.operatorResetPlayer(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		playerID = p.ID
+	}
+	return s.createResetCode(ctx, 0, playerID, true)
+}
+
 // ErrResetCodeInvalid covers unknown, expired, revoked and consumed codes alike.
 var ErrResetCodeInvalid = errors.New("reset code invalid or expired")
 

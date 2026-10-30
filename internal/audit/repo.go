@@ -45,7 +45,7 @@ func (r *Repo) List(ctx context.Context) ([]Entry, error) {
 	var entries []Entry
 	err := r.db.NewSelect().
 		TableExpr("audit_log AS audit").
-		ColumnExpr("audit.id, audit.actor_id, players.name AS actor_name, audit.entity_type, audit.entity_id, audit.action, audit.before_json, audit.after_json, audit.reason, audit.created_at").
+		ColumnExpr("audit.id, audit.actor_id, CASE WHEN audit.actor_id IS NULL AND audit.action = 'reset_code_created' AND audit.reason = 'server operator' THEN 'server operator' ELSE players.name END AS actor_name, audit.entity_type, audit.entity_id, audit.action, audit.before_json, audit.after_json, audit.reason, audit.created_at").
 		Join("LEFT JOIN players ON players.id = audit.actor_id").
 		OrderExpr("audit.created_at DESC, audit.id DESC").
 		Scan(ctx, &entries)

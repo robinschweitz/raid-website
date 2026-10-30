@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"raid-website/internal/audit"
 	"raid-website/internal/auth"
 	"raid-website/internal/player"
@@ -142,6 +143,17 @@ func (r *Repo) createResetCode(ctx context.Context, row *ResetCode) error {
 }
 func (r *Repo) auditReset(ctx context.Context, actorID, playerID int64, action string, details map[string]any, reason string) error {
 	return audit.NewRepo(r.db).Record(ctx, actorID, "player", playerID, action, nil, details, reason)
+}
+
+func (r *Repo) operatorResetPlayer(ctx context.Context, name string) (*player.Player, error) {
+	var rows []player.Player
+	if err := r.db.NewSelect().Model(&rows).Where("name = ? OR username = ?", name, strings.ToLower(strings.TrimSpace(name))).Scan(ctx); err != nil {
+		return nil, err
+	}
+	if len(rows) != 1 {
+		return nil, fmt.Errorf("player name is unknown or ambiguous; use --player-id")
+	}
+	return &rows[0], nil
 }
 
 func (r *Repo) reserveCodeAttempt(ctx context.Context, address string, now time.Time) (int64, error) {

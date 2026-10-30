@@ -42,7 +42,7 @@ func TestAwardMethodMigrationPreservesHistory(t *testing.T) {
 	}
 	// Inspect the version-six schema without requiring later columns.
 	var awards []Award
-	err = database.DB.NewSelect().Model(&awards).ExcludeColumn("catalog_boss_id", "awarded_to_character_name", "withdrawn_at", "withdrawn_by_player_id", "withdrawn_reason").Where("raid_id = ?", 1).Order("id ASC").Scan(ctx)
+	err = database.DB.NewSelect().Model(&awards).ExcludeColumn("difficulty", "catalog_boss_id", "awarded_to_character_name", "withdrawn_at", "withdrawn_by_player_id", "withdrawn_reason").Where("raid_id = ?", 1).Order("id ASC").Scan(ctx)
 	if err != nil || len(awards) != 2 {
 		t.Fatalf("awards %v error %v", awards, err)
 	}

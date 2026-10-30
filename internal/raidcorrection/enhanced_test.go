@@ -96,7 +96,7 @@ func TestConcurrentEnhancedAwardsAcrossDatabaseHandles(t *testing.T) {
 					if sameRequest {
 						requestID = "same"
 					}
-					award := &loot.Award{RaidID: rd.ID, CatalogBossID: &drop.BossID, ItemID: drop.ItemID, AwardMethod: loot.Enhanced, AwardedToPlayerID: p.ID, AwardedToCharacterID: &c.ID, RequestID: &requestID}
+					award := &loot.Award{Difficulty: "NORMAL", RaidID: rd.ID, CatalogBossID: &drop.BossID, ItemID: drop.ItemID, AwardMethod: loot.Enhanced, AwardedToPlayerID: p.ID, AwardedToCharacterID: &c.ID, RequestID: &requestID}
 					if err := service.SaveLoot(ctx, award, p.ID, ""); err != nil {
 						errs <- err
 						return

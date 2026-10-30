@@ -646,7 +646,7 @@ func TestAddonRosterImportPermissionsAndRaidState(t *testing.T) {
 // raidsyncAward is an addon line as importLine writes it.
 func (f *correctionFixture) raidsyncAward(requestID string, actor int64) *loot.Award {
 	now := time.Now().UTC()
-	return &loot.Award{RaidID: f.raidID, CatalogBossID: &f.ordinaryBoss, ItemID: f.ordinaryItem, AwardedToPlayerID: f.first, AwardedToCharacterID: &f.firstChar, AwardedByPlayerID: actor, Source: "manual", AwardMethod: loot.Main, RequestID: &requestID, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
+	return &loot.Award{Difficulty: "NORMAL", RaidID: f.raidID, CatalogBossID: &f.ordinaryBoss, ItemID: f.ordinaryItem, AwardedToPlayerID: f.first, AwardedToCharacterID: &f.firstChar, AwardedByPlayerID: actor, Source: "manual", AwardMethod: loot.Main, RequestID: &requestID, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
 }
 
 func TestAddonLootRequestIsRaidScopedAcrossStaff(t *testing.T) {

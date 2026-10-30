@@ -2237,7 +2237,7 @@ for (const method of ['MAIN', 'SECOND', 'ENHANCED', 'BOE']) {
     const write = writes(s)[0]
     assert.equal(write.url, '/api/v1/raids/1/loot')
     assert.deepEqual(JSON.parse(JSON.stringify(write.body)), {
-      catalog_boss_id: 'boss:1', item_id: '12345', award_method: method,
+      difficulty: 'NORMAL', catalog_boss_id: 'boss:1', item_id: '12345', award_method: method,
       awarded_to_player_id: 2, awarded_to_character_id: 20, notes: '', request_id: write.body.request_id,
     })
     assert.match(write.body.request_id, /^[0-9a-f-]{36}$/)
@@ -2411,7 +2411,8 @@ test('associated loot filters by persisted instance and size, preserves mixed so
   assert.equal(write.body.award_method, 'ENHANCED')
   assert.match(write.body.request_id, /^[0-9a-f-]{36}$/)
   assert.equal(write.body.item_id, '12345')
-  for (const key of ['boss', 'item_name', 'boss_id', 'instance_id', 'raid_size', 'difficulty', 'loot_mode']) assert.equal(key in write.body, false)
+  assert.equal(write.body.difficulty, 'HEROIC')
+  for (const key of ['boss', 'item_name', 'boss_id', 'instance_id', 'raid_size', 'loot_mode']) assert.equal(key in write.body, false)
   write.reject(new Error('offline'))
   await first
   view.render()

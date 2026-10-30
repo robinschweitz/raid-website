@@ -1,8 +1,13 @@
-export const appVersion = '1.0.72'
+export const appVersion = '1.0.73'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Boss-Kill zusammen mit Beute erfassen',
+    changes: ['Beim ersten Beuteeintrag eines Bosses wird der Kill mit der gewählten Schwierigkeit in derselben Transaktion erfasst. Bei widersprüchlicher Schwierigkeit wird nichts gespeichert.'],
+  },
+  {
+    version: '1.0.72',
     title: 'Verständliche Fehlermeldungen ohne interne Details',
     changes: ['Fehler beim Kontospeichern und bei Korrekturen zeigen feste deutsche Meldungen. Interne Datenbankfehler bleiben im Serverprotokoll.'],
   },

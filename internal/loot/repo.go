@@ -7,6 +7,7 @@ import (
 
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
+	"raid-website/internal/bosskill"
 	"raid-website/internal/character"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/lootcatalog"
@@ -148,3 +149,6 @@ func (r *Repo) PlayerHasMainSpecAward(ctx context.Context, raidID, playerID int6
 	}
 	return false, nil
 }
+
+// Kills binds the kill repository to the same transaction as loot.
+func (r *Repo) Kills() *bosskill.Repo { return bosskill.NewRepo(r.db) }

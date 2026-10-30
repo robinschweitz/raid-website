@@ -208,6 +208,7 @@ implemented yet when it differs from the code.
 - **FR-14.9** Staff MUST be able to withdraw a manual loot award. A reason MUST be required only for an archived raid (FR-26.5). The award MUST stay stored as withdrawn. (ADR 032; Owner 2026-10-22, OQ-1)
 - **FR-14.10** Cancelled raids MUST reject loot writes. (ADR 032)
 - **FR-14.11** The UI MUST mark an item that was already awarded in the raid. It MUST allow a second award of the same item. (ADR 069)
+- **FR-14.12** Loot lists MUST show the recipient character's name. An award without a stored name MUST show the current name of its linked character; a stored name stays as it is. (Owner 2026-10-30)
 
 ### 15. Unclaimed loot
 

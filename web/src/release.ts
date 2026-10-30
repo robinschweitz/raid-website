@@ -1,8 +1,13 @@
-export const appVersion = '1.0.74'
+export const appVersion = '1.0.75'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Charakternamen im Loot',
+    changes: ['In den Loot-Listen steht jetzt immer der Name des Charakters. Bisher zeigte das Spielerprofil bei neuerem Loot nur „Charakterprofil“.'],
+  },
+  {
+    version: '1.0.74',
     title: 'Addon-Loot gemeinsam mit Boss-Kills importieren',
     changes: ['Die Importvorschau fragt einmal pro Boss ohne Kill nach der Schwierigkeit. Bei einem Fehler wird der gesamte Import zurückgerollt, einschließlich Kills, Beute, Locks und EP.'],
   },

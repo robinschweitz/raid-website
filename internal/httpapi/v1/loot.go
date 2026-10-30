@@ -143,6 +143,10 @@ func (a *API) listLoot(w http.ResponseWriter, r *http.Request) {
 		return len(ranks)
 	}
 	sort.SliceStable(awards, func(i, j int) bool { return rank(awards[i]) < rank(awards[j]) })
+	if err := a.LootRepo.FillCharacterNames(r.Context(), awards); err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not list loot")
+		return
+	}
 	writeListJSON(w, lootAwardResponses(awards))
 }
 
@@ -154,6 +158,10 @@ func (a *API) listPlayerLoot(w http.ResponseWriter, r *http.Request) {
 	}
 	awards, err := a.LootRepo.ListByPlayer(r.Context(), id)
 	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not list loot")
+		return
+	}
+	if err := a.LootRepo.FillCharacterNames(r.Context(), awards); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list loot")
 		return
 	}

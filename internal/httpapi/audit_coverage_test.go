@@ -82,7 +82,7 @@ func TestEverydayChangesAreAudited(t *testing.T) {
 	call(admin, http.MethodPatch, fmt.Sprintf("/api/v1/raid-series/%d", seriesID), map[string]any{"start_time": "19:30"}, http.StatusOK)
 
 	newPlayerID := id(call(admin, http.MethodPost, "/api/v1/players", map[string]any{"name": "Neuling"}, http.StatusCreated))
-	call(admin, http.MethodPut, fmt.Sprintf("/api/v1/players/%d/account", newPlayerID), map[string]any{"username": "neuling", "password": "ein-langes-passwort", "role": "MEMBER"}, http.StatusOK)
+	call(admin, http.MethodPut, fmt.Sprintf("/api/v1/players/%d/account", newPlayerID), map[string]any{"username": "neuling", "role": "MEMBER"}, http.StatusOK)
 
 	call(admin, http.MethodPost, fmt.Sprintf("/api/v1/raids/%d/cancel", raidID), nil, http.StatusOK)
 	call(member, http.MethodPost, "/api/v1/auth/password", map[string]any{"current_password": "member-password", "new_password": "ein-neues-langes-passwort"}, http.StatusNoContent)
@@ -131,7 +131,7 @@ func TestEverydayChangesAreAudited(t *testing.T) {
 	find("raid_series", "update", adminID)
 	find("player", "create", adminID)
 	account := find("player", "set_account", adminID)
-	if !strings.Contains(account.AfterJSON, `"password_changed":true`) || strings.Contains(account.AfterJSON, "password_hash") || strings.Contains(account.AfterJSON, "ein-langes-passwort") {
+	if !strings.Contains(account.AfterJSON, `"password_changed":false`) || strings.Contains(account.AfterJSON, "password_hash") || strings.Contains(account.AfterJSON, "ein-langes-passwort") {
 		t.Fatalf("account audit must not leak secrets: %s", account.AfterJSON)
 	}
 	if row := find("player", "password_change", memberID); strings.Contains(row.AfterJSON, "passwort") {

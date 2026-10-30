@@ -395,7 +395,7 @@ export function GuidePage() {
       <p><strong>Beispiel:</strong> Mit „Ohne Konto“ siehst du, dass <em>Altes Eisen</em> (Charaktere Klingensturm und Funkelbart) und <em>Grimmbart</em> sich noch nicht registriert haben. So weißt du, wen du ansprechen musst.</p>
       <Shot name="51b-spieler-ohne-konto" caption="Nur Spieler ohne Konto" />
       <h3>Rolle ändern, Passwort zurücksetzen</h3>
-      <p>Unter <strong>Spieler</strong> auf den Namen klicken, Reiter <strong>Konto</strong>. Dort Rolle wählen (z. B. <code>MEMBER</code>), bei Bedarf ein neues Passwort setzen, <strong>Speichern</strong>.</p>
+      <p>Unter <strong>Spieler</strong> auf den Namen klicken, Reiter <strong>Konto</strong>. Dort Rolle wählen (z. B. <code>MEMBER</code>), <strong>Speichern</strong>. Für ein vergessenes Passwort erstellst du darunter einen <strong>Reset-Code</strong> und sendest ihn ingame an den Main-Charakter. Der Code gilt 72 Stunden, wird nur einmal angezeigt und ersetzt ältere unbenutzte Codes.</p>
       <p><strong>Beispiel:</strong> Ein älteres Konto ist noch <code>GUEST</code>. Du stellst <code>MEMBER</code> ein und speicherst. Ab sofort kann er sich für Raids anmelden.</p>
       <Shot name="52-spieler-konto-admin" caption="Spielerkonto als Admin" />
       <p>Für Auskunftsanfragen über den Datenschutzkontakt öffnest du im Konto-Tab <strong>Persönliche Daten exportieren</strong> und wählst <strong>Daten als JSON herunterladen</strong>. Der Export enthält die gespeicherte Spielhistorie ohne Passwörter, MFA-Geheimnisse oder Sitzungsschlüssel; der Zugriff wird protokolliert.</p>
@@ -431,7 +431,7 @@ export function GuidePage() {
         <dt>Warum habe ich keine +10 EP bekommen?</dt>
         <dd>Wahrscheinlich hast du ein Main-Spec- oder Enhanced-Item bekommen. Schau in deinem Profil unter EP in die Historie.</dd>
         <dt>Passwort vergessen?</dt>
-        <dd>Ein Admin setzt dir ein neues. Danach änderst du es selbst im Profil unter Konto.</dd>
+        <dd>Bitte einen Admin ingame um einen Reset-Code für deinen Main-Charakter. Der Code gilt 72 Stunden. Beim Einlösen werden dein Passwort geändert, alle Sitzungen beendet und MFA entfernt; richte danach deinen zweiten Faktor erneut ein.</dd>
       </dl>
     </Section>
   </div>

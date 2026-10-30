@@ -1,8 +1,13 @@
-export const appVersion = '1.0.69'
+export const appVersion = '1.0.70'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Passwort-Reset mit einmaligem Code',
+    changes: ['Admins erstellen im Konto-Tab einen 72 Stunden gültigen Reset-Code und senden ihn ingame. Fremde Passwörter werden nicht mehr direkt gesetzt.'],
+  },
+  {
+    version: '1.0.69',
     title: 'Persönliche Daten als JSON exportieren',
     changes: ['Admins können Auskunftsanfragen im Konto-Tab eines Spielers mit einem protokollierten JSON-Export beantworten. Passwörter, MFA-Geheimnisse und Sitzungsschlüssel werden nicht exportiert.'],
   },

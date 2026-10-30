@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext, type Page, type TestInfo } from '
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { admin, apiAs, signIn } from './fixtures'
+import { seedAccountPassword, admin, apiAs, signIn } from './fixtures'
 
 // Screenshots for the user guide (Anleitung page). Runs only with DOCS_TOUR=1:
 //   DOCS_TOUR=1 npx playwright test e2e/zz-docs-tour.spec.ts
@@ -79,7 +79,8 @@ test.beforeAll(async ({ request }) => {
   for (const [name, person] of Object.entries(people)) {
     const created = await api.post('/api/v1/players', { name })
     ids[name] = created.id
-    await api.put(`/api/v1/players/${created.id}/account`, { username: name.toLowerCase(), password: pw(name), role: person.role })
+    await api.put(`/api/v1/players/${created.id}/account`, { username: name.toLowerCase(), role: person.role })
+    seedAccountPassword(created.id, pw(name))
     const [charName, cls, main, second] = person.char
     const row = db.prepare('INSERT INTO characters (player_id, name, class, main_spec, second_spec, is_main, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)').run(created.id, charName, cls, main, second, now, now)
     chars[name] = Number(row.lastInsertRowid)

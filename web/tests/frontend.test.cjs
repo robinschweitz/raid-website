@@ -4216,6 +4216,24 @@ test('the own profile offers no anonymise action', async () => {
   assert.equal(button(view, 'Spieler anonymisieren'), undefined)
 })
 
+test('Admin reset codes appear once and replace direct password entry (REQ-ACCOUNT-017)', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(s, 2)
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Passwort (leer = unverändert)').length, 0)
+  button(view, 'Reset-Code erstellen').props.onClick()
+  const request = s.requests.find((r) => r.url.endsWith('/2/reset-code'))
+  request.resolve({ code: 'BD-ONCE-ONLY-CODE' })
+  await flush(view)
+  assert.match(text(view.tree), /nur jetzt angezeigt/)
+  assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Reset-Code')[0].props.value, 'BD-ONCE-ONLY-CODE')
+  view.render({ playerID: 3 })
+  resolvePlayer(s, 3)
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Reset-Code').length, 0)
+})
+
 test('only Admins can start the personal-data download (REQ-PRIVACY-012)', async () => {
   const s = setup()
   const downloads = []

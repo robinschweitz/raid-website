@@ -62,6 +62,8 @@ func rejectWithoutAccount(ctx context.Context, password string) error {
 	return ErrInvalidCredentials
 }
 
+var ErrResetRequired = errors.New("use a reset code for another player")
+
 var (
 	// ErrInvalidCredentials is returned when a username/password pair does not match.
 	ErrInvalidCredentials = errors.New("invalid credentials")
@@ -257,6 +259,9 @@ func (s *Service) BootstrapAdmin(ctx context.Context, username, password string)
 
 // SetCredentials assigns login credentials and role to an existing player.
 func (s *Service) SetCredentials(ctx context.Context, playerID int64, username, password string, role validation.Role, actorID int64) (*player.Player, error) {
+	if actorID > 0 && actorID != playerID && password != "" {
+		return nil, ErrResetRequired
+	}
 	var updated *player.Player
 	err := s.sessions.InAccountTransaction(ctx, func(players *player.Repo, sessions *Repo) error {
 		p, err := players.Get(ctx, playerID)

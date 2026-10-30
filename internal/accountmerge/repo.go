@@ -82,6 +82,9 @@ func (r *Repo) InsertPointTransaction(ctx context.Context, row *enhancepoints.Tr
 }
 
 func (r *Repo) RevokeSourceAuth(ctx context.Context, playerID int64) (map[string]int64, error) {
+	if _, err := r.db.NewUpdate().Table("password_reset_codes").Set("revoked_at = ?", time.Now().UTC()).Where("player_id = ? AND used_at IS NULL AND revoked_at IS NULL", playerID).Exec(ctx); err != nil {
+		return nil, err
+	}
 	tables := []string{"sessions", "webauthn_sessions", "mfa_login_challenges", "mfa_recovery_codes", "webauthn_credentials", "player_mfa_settings", "push_subscriptions"}
 	counts := make(map[string]int64, len(tables))
 	for _, table := range tables {
@@ -118,6 +121,7 @@ func (r *Repo) MoveHistoricalReferences(ctx context.Context, sourceID, targetID 
 		{"enhance_point_transactions", "actor_id"}, {"item_locks", "actor_id"}, {"polls", "created_by"},
 		{"poll_votes", "player_id"}, {"audit_log", "actor_id"},
 		{"raid_quick_add_requests", "actor_id"}, {"registration_requests", "requester_player_id"},
+		{"password_reset_codes", "player_id"}, {"password_reset_codes", "created_by_player_id"},
 		{"registration_codes", "created_by_player_id"}, {"registration_codes", "used_by_player_id"},
 		{"raid_boss_kills", "created_by_player_id"}, {"raid_boss_kills", "removed_by_player_id"},
 	}

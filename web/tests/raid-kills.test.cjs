@@ -28,12 +28,12 @@ const find = (node, test, found = []) => {
 }
 
 const { BossProgression } = load('components/BossProgression.tsx', {
-  './bossData': { getBossesForInstance: () => [{ name: 'Lord Mark’gar', icon: 'a', id: 'ICCLordMarrowgar' }, { name: 'Professor Seuchenfaust', icon: 'b', id: 'ICCPutricide' }] },
+  './bossData': { getBossesForInstance: () => [{ name: 'Lord Mark’gar', icon: 'a', id: '36612' }, { name: 'Professor Seuchenfaust', icon: 'b', id: '36678' }] },
   '../types': { catalogModeLabels: { NORMAL: 'Normal', HEROIC: 'Heroisch', HARDMODE: 'Hardmode' } },
 })
 
 test('TestReqRaid018_AC01 recorded kills mark their boss and show the difficulty', () => {
-  const tree = BossProgression({ catalogInstanceId: '631', kills: [{ id: 1, boss: 'Professor Seuchenmord', catalog_boss_id: 'ICCPutricide', difficulty: 'HEROIC' }] })
+  const tree = BossProgression({ catalogInstanceId: '631', kills: [{ id: 1, boss: 'Professor Seuchenmord', catalog_boss_id: '36678', difficulty: 'HEROIC' }] })
   const killed = find(tree, (n) => n.type === 'li' && /killed/.test(n.props.className))
   assert.equal(killed.length, 1)
   assert.match(text(killed[0]), /Professor Seuchenfaust · getötet \(Heroisch\)/)
@@ -77,4 +77,14 @@ test('TestReqRaid018_AC01 every ICC encounter carries the ID of a catalog boss, 
   for (const boss of bosses) assert.ok(catalogNames.has(boss.id), `${boss.name}: ${boss.id}`)
   assert.equal(new Set(bosses.map((boss) => boss.id)).size, 12)
   for (const id of ['ICCLordMarrowgar', 'ICCLanathel', 'ICCGunshipBattle']) assert.ok(bosses.some((boss) => boss.id === id), id)
+})
+
+test('ICC boss IDs are the stored catalog IDs that kills refer to', () => {
+  const root = path.join(srcDir, '..', '..')
+  const bossData = fs.readFileSync(path.join(srcDir, 'components/bossData.ts'), 'utf8')
+  const catalogIDs = fs.readFileSync(path.join(root, 'internal/lootcatalog/bundled.go'), 'utf8')
+  const icc = bossData.slice(bossData.indexOf("'631': ["), bossData.indexOf("'649': ["))
+  const ids = [...icc.matchAll(/encounter\('[^']+', '[^']+', '([^']+)'\)/g)].map((match) => match[1])
+  assert.equal(ids.length, 12)
+  for (const id of ids) assert.ok(catalogIDs.includes(`return "${id}"`), `${id} is no stored catalog ID`)
 })

@@ -124,3 +124,38 @@ func TestUnclaimedLootNeedsARaidCatalogContext(t *testing.T) {
 		t.Fatalf("a raid without instance rejects manual entries: %d %s", status, body)
 	}
 }
+
+func TestDisenchantedLootNamesARosterCharacter(t *testing.T) {
+	f := newCorrectionFixture(t)
+	url := fmt.Sprintf("%s/api/v1/raids/%d/unclaimed-loot", f.srv.URL, f.raidID)
+	entry := map[string]any{"catalog_boss_id": f.ordinaryBoss, "item_id": f.ordinaryItem, "difficulty": "NORMAL", "outcome": "DISENCHANTED", "holder_name": "Ignoriert"}
+	for name, character := range map[string]any{"missing": nil, "not in roster": f.firstChar} {
+		entry["disenchanter_character_id"] = character
+		status, body := do(t, f.srv.Client(), http.MethodPost, url, f.token, entry)
+		if status != http.StatusBadRequest || !strings.Contains(string(body), "recipient_not_in_roster") {
+			t.Fatalf("%s: %d %s", name, status, body)
+		}
+	}
+	if kills, err := bosskill.NewRepo(f.db).ListByRaid(context.Background(), f.raidID); err != nil || len(kills) != 0 {
+		t.Fatalf("a rejected entry stores no kill: %+v %v", kills, err)
+	}
+	f.attend(f.first, f.firstChar)
+	entry["disenchanter_character_id"] = f.firstChar
+	status, body := do(t, f.srv.Client(), http.MethodPost, url, f.token, entry)
+	var response struct {
+		Data struct {
+			HolderName string `json:"holder_name"`
+		}
+	}
+	if err := json.Unmarshal(body, &response); err != nil || status != http.StatusCreated {
+		t.Fatalf("create: %d %s", status, body)
+	}
+	if response.Data.HolderName != f.characterName(f.firstChar) {
+		t.Fatalf("the disenchanter is the holder: %s", body)
+	}
+	status, body = do(t, f.srv.Client(), http.MethodGet, fmt.Sprintf("%s/api/v1/raids/%d/loot", f.srv.URL, f.raidID), f.token, nil)
+	var awards struct{ Data []struct{ ID int64 } }
+	if err := json.Unmarshal(body, &awards); err != nil || status != http.StatusOK || len(awards.Data) != 0 {
+		t.Fatalf("disenchanting is no loot award: %d %s", status, body)
+	}
+}

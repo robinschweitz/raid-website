@@ -11,7 +11,11 @@ boss's kill unrecorded although the boss had clearly died.
 ## Decision
 
 - **One form (owner, 2026-10-30).** "Vergabemethode" also offers Entzaubern, Gildenbank and
-  Wollte niemand. These hide the recipient and store through `POST .../unclaimed-loot`.
+  Wollte niemand. They store through `POST .../unclaimed-loot`. Gildenbank and Wollte niemand
+  hide the recipient.
+- **Entzaubern names a player.** A disenchanted item needs the roster character who
+  disenchanted it, checked on the server. Its name is stored as the holder; the item stays
+  unclaimed loot, with no EP effect and no loot count for that player (FR-15.2).
 - **Catalog pair required.** A manual entry needs a boss and an item that are a catalog pair of
   the raid's instance and size, checked on the server like an award (FR-14.2). Free text and
   "no boss" are gone for manual entries. Raids without an instance cannot take manual entries

@@ -212,7 +212,7 @@ implemented yet when it differs from the code.
 
 ### 15. Unclaimed loot
 
-- **FR-15.1** Staff MUST be able to record an item that went to nobody, with outcome DISENCHANTED, BANK, or NOBODY, optional holder name, and notes. The boss and item MUST be a pair of the bundled catalog for the instance and size of the raid, with the errors of FR-14.2. Entries that exist already and addon imports (FR-20.10) keep their own rules. (ADR 089, 107)
+- **FR-15.1** Staff MUST be able to record an item that went to nobody, with outcome DISENCHANTED, BANK, or NOBODY, and notes. DISENCHANTED MUST name the roster character who disenchanted the item, stored as its holder; BANK and NOBODY take an optional holder name. The boss and item MUST be a pair of the bundled catalog for the instance and size of the raid, with the errors of FR-14.2. Entries that exist already and addon imports (FR-20.10) keep their own rules. (ADR 089, 107)
 - **FR-15.2** Unclaimed loot MUST NOT affect EP, loot counts, tokens, or item locks. (ADR 089)
 - **FR-15.3** Staff MUST be able to remove an entry. Removal MUST archive the entry. (ADR 089)
 - **FR-15.4** Cancelled raids MUST reject unclaimed loot. Archived raids MUST require a reason for add and remove. (ADR 089)

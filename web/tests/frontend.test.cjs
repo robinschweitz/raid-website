@@ -3758,18 +3758,47 @@ test('loot entry uses the same form for player awards and unclaimed outcomes', a
   assert.ok(select(view, 'Loot-Boss'))
   assert.ok(recipient())
   assert.equal(holder(), undefined)
-  for (const outcome of ['DISENCHANTED', 'BANK', 'NOBODY']) {
+  for (const outcome of ['BANK', 'NOBODY']) {
     method().props.onChange(change(outcome))
     view.render()
     assert.equal(method().props.value, outcome)
     assert.ok(select(view, 'Loot-Boss'), 'boss selector remains in the same form')
-    assert.equal(recipient(), undefined, 'unclaimed loot has no recipient')
+    assert.equal(recipient(), undefined, 'this outcome has no player')
     assert.ok(holder())
   }
+  method().props.onChange(change('DISENCHANTED'))
+  view.render()
+  assert.ok(recipient(), 'disenchanting names the roster character')
+  assert.equal(holder(), undefined)
+  assert.match(text(view.tree), /Entzaubert von/)
   method().props.onChange(change('MAIN'))
   view.render()
   assert.ok(recipient())
   assert.ok(nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'UnclaimedLootList')[0])
+})
+
+test('disenchanting needs a roster character and sends it instead of a holder name', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+  await flush(view)
+  select(view, 'Loot-Vergabemethode').props.onChange(change('DISENCHANTED'))
+  view.render()
+  await chooseSourceDrop(s, view)
+  const submit = () => nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit' && n.props.className === 'primary-action').at(-1)
+  assert.equal(submit().props.disabled, true)
+  assert.match(text(view.tree), /Charakter wählen, der entzaubert hat/)
+  const recipient = nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Loot-Empfänger')[0]
+  recipient.props.onChange(change('20'))
+  view.render()
+  assert.equal(submit().props.disabled, false)
+  const lootForm = nodes(view.tree, (n) => n.type === 'form' && nodes(n, (child) => child.props?.['aria-label'] === 'Loot-Boss').length > 0)[0]
+  void lootForm.props.onSubmit({ preventDefault() {} })
+  await flush(view)
+  const write = writes(s).at(-1)
+  assert.equal(write.url, '/api/v1/raids/1/unclaimed-loot')
+  assert.equal(write.body.disenchanter_character_id, 20)
+  assert.equal('holder_name' in write.body, false)
 })
 
 test('an unclaimed outcome saves the catalog drop with its difficulty and needs no roster', async () => {

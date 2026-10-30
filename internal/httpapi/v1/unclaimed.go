@@ -25,13 +25,14 @@ func (h UnclaimedHandlers) Register(mux *http.ServeMux) {
 }
 
 type unclaimedRequest struct {
-	CatalogBossID string `json:"catalog_boss_id"`
-	ItemID        string `json:"item_id"`
-	Difficulty    string `json:"difficulty"`
-	Outcome       string `json:"outcome"`
-	HolderName    string `json:"holder_name"`
-	Notes         string `json:"notes"`
-	Reason        string `json:"reason"`
+	CatalogBossID           string `json:"catalog_boss_id"`
+	ItemID                  string `json:"item_id"`
+	Difficulty              string `json:"difficulty"`
+	DisenchanterCharacterID *int64 `json:"disenchanter_character_id"`
+	Outcome                 string `json:"outcome"`
+	HolderName              string `json:"holder_name"`
+	Notes                   string `json:"notes"`
+	Reason                  string `json:"reason"`
 }
 
 func (h UnclaimedHandlers) list(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +66,7 @@ func (h UnclaimedHandlers) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	entry, err := h.Corrections.RecordUnclaimed(r.Context(), id, actor, unclaimedloot.Input{CatalogBossID: req.CatalogBossID, ItemID: req.ItemID,
-		Outcome: unclaimedloot.Outcome(req.Outcome), HolderName: req.HolderName, Notes: req.Notes, Reason: req.Reason}, bosskill.Difficulty(req.Difficulty))
+		Outcome: unclaimedloot.Outcome(req.Outcome), HolderName: req.HolderName, Notes: req.Notes, Reason: req.Reason}, bosskill.Difficulty(req.Difficulty), req.DisenchanterCharacterID)
 	if err != nil {
 		unclaimedError(w, err)
 		return

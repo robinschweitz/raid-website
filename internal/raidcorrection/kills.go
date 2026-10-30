@@ -44,8 +44,9 @@ func (s *Service) RecordKill(ctx context.Context, raidID, actor int64, catalogBo
 
 // RecordUnclaimed stores an item that went to nobody (FR-15.1). The boss and
 // item must be a catalog pair of the raid, and a missing kill joins the same
-// transaction (FR-29.7), so a failure stores neither.
-func (s *Service) RecordUnclaimed(ctx context.Context, raidID, actor int64, input unclaimedloot.Input, difficulty bosskill.Difficulty) (*unclaimedloot.Entry, error) {
+// transaction (FR-29.7), so a failure stores neither. A disenchanted item names
+// the roster character who disenchanted it as its holder.
+func (s *Service) RecordUnclaimed(ctx context.Context, raidID, actor int64, input unclaimedloot.Input, difficulty bosskill.Difficulty, disenchanterID *int64) (*unclaimedloot.Entry, error) {
 	var entry *unclaimedloot.Entry
 	err := s.repo.InTransaction(ctx, func(r *Repo) error {
 		if _, err := s.check(ctx, r, raidID, actor, input.Reason); err != nil {
@@ -53,6 +54,13 @@ func (s *Service) RecordUnclaimed(ctx context.Context, raidID, actor int64, inpu
 		}
 		if !input.Outcome.Valid() {
 			return unclaimedloot.ErrInvalid
+		}
+		if input.Outcome == unclaimedloot.Disenchanted {
+			holder, err := s.disenchanter(ctx, r, raidID, disenchanterID)
+			if err != nil {
+				return err
+			}
+			input.HolderName = holder
 		}
 		bossID := strings.TrimSpace(input.CatalogBossID)
 		drop := &loot.Award{RaidID: raidID, CatalogBossID: &bossID, ItemID: strings.TrimSpace(input.ItemID), AwardedByPlayerID: actor, Difficulty: difficulty}
@@ -67,6 +75,31 @@ func (s *Service) RecordUnclaimed(ctx context.Context, raidID, actor int64, inpu
 		return nil, err
 	}
 	return entry, nil
+}
+
+// disenchanter returns the name of the roster character who disenchanted an item.
+func (s *Service) disenchanter(ctx context.Context, r *Repo, raidID int64, characterID *int64) (string, error) {
+	if characterID == nil {
+		return "", loot.ErrRoster
+	}
+	rows, err := r.attendance.ListByRaid(ctx, raidID)
+	if err != nil {
+		return "", err
+	}
+	for _, row := range rows {
+		if row.CharacterID != *characterID {
+			continue
+		}
+		if name := strings.TrimSpace(row.CharacterName); name != "" {
+			return name, nil
+		}
+		live, err := r.characters.Get(ctx, row.CharacterID)
+		if err != nil {
+			return "", referenceError(err)
+		}
+		return live.Name, nil
+	}
+	return "", loot.ErrRoster
 }
 
 // ChangeKillDifficulty corrects the difficulty of a kill (FR-29.14). It is

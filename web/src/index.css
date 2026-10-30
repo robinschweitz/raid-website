@@ -1422,6 +1422,18 @@ input[type='checkbox'] {
   box-shadow: 0 0 8px rgba(134, 217, 242, 0.2);
 }
 
+.boss-icon.killed img {
+  filter: grayscale(1) brightness(0.65);
+}
+
+.boss-icon.killed::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to top right, transparent calc(50% - 1px), var(--accent) calc(50% - 1px), var(--accent) calc(50% + 1px), transparent calc(50% + 1px));
+}
+
 .boss-icon.current {
   background: rgba(134, 217, 242, 0.25);
   border-color: var(--accent);

@@ -212,7 +212,7 @@ implemented yet when it differs from the code.
 
 ### 15. Unclaimed loot
 
-- **FR-15.1** Staff MUST be able to record an item that went to nobody, with outcome DISENCHANTED, BANK, or NOBODY, holder name, optional boss of the raid instance, and notes. (ADR 089)
+- **FR-15.1** Staff MUST be able to record an item that went to nobody, with outcome DISENCHANTED, BANK, or NOBODY, optional holder name, and notes. The boss and item MUST be a pair of the bundled catalog for the instance and size of the raid, with the errors of FR-14.2. Entries that exist already and addon imports (FR-20.10) keep their own rules. (ADR 089, 107)
 - **FR-15.2** Unclaimed loot MUST NOT affect EP, loot counts, tokens, or item locks. (ADR 089)
 - **FR-15.3** Staff MUST be able to remove an entry. Removal MUST archive the entry. (ADR 089)
 - **FR-15.4** Cancelled raids MUST reject unclaimed loot. Archived raids MUST require a reason for add and remove. (ADR 089)
@@ -345,7 +345,7 @@ implemented yet when it differs from the code.
 - **FR-29.4** The dashboard MAY show progress from recorded kills. It MUST NOT show kills that were not recorded. (Owner 2026-10-22, OQ-7)
 - **FR-29.5** Staff MUST be able to record and remove a kill. These writes MUST follow the raid-state rules of FR-13.11, the reason rule of FR-26.5, and MUST be audited. (Owner 2026-10-22, OQ-11)
 - **FR-29.6** A kill MUST have one difficulty: NORMAL, HEROIC, or HARDMODE. The system MUST offer only the difficulties that the catalog has for that boss and raid size. A raid MUST have at most one kill per boss. (Owner 2026-10-22, OQ-11)
-- **FR-29.7** When staff record loot of a boss that has no kill in the raid, the system MUST ask for the difficulty and MUST create the kill in the same transaction as the loot. (Owner 2026-10-22, OQ-11)
+- **FR-29.7** When staff record loot of a boss that has no kill in the raid, an award or an item that went to nobody (FR-15.1), the system MUST ask for the difficulty and MUST create the kill in the same transaction as the loot. An item that went to nobody does not block FR-29.9 or FR-29.14. (Owner 2026-10-22, OQ-11; ADR 107)
 - **FR-29.8** The addon loot import MUST ask for the difficulty once per boss without a kill, and MUST create the kill as in FR-29.7. (Owner 2026-10-22, OQ-11)
 - **FR-29.9** Removal of a kill MUST be rejected while the raid has loot of that boss that is not withdrawn. (Owner 2026-10-22, OQ-11)
 - **FR-29.10** The system MUST NOT create kills for loot recorded before this feature. Such raids MUST show that no kills are recorded. (Owner 2026-10-22, OQ-11)

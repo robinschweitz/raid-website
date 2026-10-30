@@ -11,6 +11,8 @@ interface Props {
   bosses: CatalogBoss[]
   catalog: LootCatalog | null
   raidSize: number | null
+  // Changes when a loot write may have created a kill.
+  version?: string
 }
 
 // Difficulties the catalog offers for a boss at this raid size (FR-29.6).
@@ -20,7 +22,7 @@ function difficultiesFor(catalog: LootCatalog | null, bossID: string, raidSize: 
 }
 
 // The kills of a raid (FR-29). Everyone signed in reads them; staff manage them.
-export function RaidKills({ raidID, canWrite, needsReason, bosses, catalog, raidSize }: Props) {
+export function RaidKills({ raidID, canWrite, needsReason, bosses, catalog, raidSize, version }: Props) {
   const { pending, submit, isActive } = useSubmission()
   const [kills, setKills] = useState<BossKill[] | null>(null)
   const [error, setError] = useState('')
@@ -36,7 +38,7 @@ export function RaidKills({ raidID, canWrite, needsReason, bosses, catalog, raid
   useEffect(() => {
     void load().catch(() => { if (isActive()) setError('Bosskills konnten nicht geladen werden.') })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raidID])
+  }, [raidID, version])
 
   const write = (action: () => Promise<unknown>, failure: string) => submit(async () => {
     setError('')

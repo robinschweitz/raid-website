@@ -2000,8 +2000,6 @@ input[type='checkbox'] {
 .boss-order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px; border: 1px solid var(--card-border); border-radius: 4px; }
 .boss-order-list .actions { margin: 0; }
 .unclaimed-loot { margin-top: 14px; }
-.unclaimed-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; margin-top: 10px; }
-.unclaimed-form .actions { margin: 0; }
 .badge.unclaimed-disenchanted { color: #d6b4ff; border-color: #8c5bd1; }
 .badge.unclaimed-bank { color: #f2dc8c; border-color: #b39a3d; }
 .badge.unclaimed-nobody { color: #a9b6c2; border-color: #5d6b78; }

@@ -9,6 +9,7 @@ import (
 	"raid-website/internal/bosskill"
 	"raid-website/internal/loot"
 	"raid-website/internal/lootcatalog"
+	"raid-website/internal/unclaimedloot"
 )
 
 // RecordKill stores a killed boss of a raid with one catalog difficulty
@@ -39,6 +40,33 @@ func (s *Service) RecordKill(ctx context.Context, raidID, actor int64, catalogBo
 		return r.audit.Record(ctx, actor, "raid_boss_kill", kill.ID, "create", nil, kill, reason)
 	})
 	return kill, err
+}
+
+// RecordUnclaimed stores an item that went to nobody (FR-15.1). The boss and
+// item must be a catalog pair of the raid, and a missing kill joins the same
+// transaction (FR-29.7), so a failure stores neither.
+func (s *Service) RecordUnclaimed(ctx context.Context, raidID, actor int64, input unclaimedloot.Input, difficulty bosskill.Difficulty) (*unclaimedloot.Entry, error) {
+	var entry *unclaimedloot.Entry
+	err := s.repo.InTransaction(ctx, func(r *Repo) error {
+		if _, err := s.check(ctx, r, raidID, actor, input.Reason); err != nil {
+			return err
+		}
+		if !input.Outcome.Valid() {
+			return unclaimedloot.ErrInvalid
+		}
+		bossID := strings.TrimSpace(input.CatalogBossID)
+		drop := &loot.Award{RaidID: raidID, CatalogBossID: &bossID, ItemID: strings.TrimSpace(input.ItemID), AwardedByPlayerID: actor, Difficulty: difficulty}
+		if err := loot.EnsureBossKill(ctx, r.loot, drop, input.Reason); err != nil {
+			return err
+		}
+		created, err := r.unclaimed.Create(ctx, actor, raidID, input)
+		entry = created
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return entry, nil
 }
 
 // ChangeKillDifficulty corrects the difficulty of a kill (FR-29.14). It is

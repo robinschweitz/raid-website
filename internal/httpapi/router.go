@@ -138,7 +138,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	unclaimed := unclaimedloot.NewService(unclaimedloot.NewRepo(db), raids, catalog)
 	v1.UnclaimedHandlers{Unclaimed: unclaimed}.Register(mux)
 	v1.BossKillHandlers{Kills: bosskill.NewService(bosskill.NewRepo(db)), Corrections: corrections}.Register(mux)
-	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed), Roster: api}.Register(mux)
+	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(addonsync.NewRepo(db), raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed), Roster: api}.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)
 	if spa, err := webui.Handler(); err == nil {
 		mux.Handle("/", spa)

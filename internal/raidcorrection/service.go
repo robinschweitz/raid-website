@@ -329,23 +329,17 @@ func (s *Service) RemoveAttendance(ctx context.Context, raidID, id, actor int64)
 
 // SaveLoot applies ordinary active-raid additions or explicit audited corrections.
 func (s *Service) SaveLoot(ctx context.Context, row *loot.Award, actor int64, reason string) error {
-	return s.saveLoot(ctx, row, actor, reason, nil, false)
-}
-
-// SaveImportedLoot retains the existing addon import behavior until its
-// transactional per-boss difficulty flow is introduced in #96.
-func (s *Service) SaveImportedLoot(ctx context.Context, row *loot.Award, actor int64, reason string) error {
-	return s.saveLoot(ctx, row, actor, reason, nil, true)
+	return s.saveLoot(ctx, row, actor, reason, nil)
 }
 
 // CorrectLoot loads and patches the award within the correction transaction.
 func (s *Service) CorrectLoot(ctx context.Context, raidID, id, actor int64, reason string, patch func(*loot.Award)) (*loot.Award, error) {
 	row := &loot.Award{ID: id, RaidID: raidID}
-	err := s.saveLoot(ctx, row, actor, reason, patch, false)
+	err := s.saveLoot(ctx, row, actor, reason, patch)
 	return row, err
 }
 
-func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, reason string, patch func(*loot.Award), imported bool) error {
+func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, reason string, patch func(*loot.Award)) error {
 	return s.repo.InTransaction(ctx, func(r *Repo) error {
 		if row.ID == 0 {
 			row.AwardedByPlayerID = actor
@@ -387,7 +381,7 @@ func (s *Service) saveLoot(ctx context.Context, row *loot.Award, actor int64, re
 		if err != nil {
 			return err
 		}
-		if row.ID == 0 && !imported {
+		if row.ID == 0 {
 			if err := loot.EnsureBossKill(ctx, r.loot, row, reason); err != nil {
 				return err
 			}

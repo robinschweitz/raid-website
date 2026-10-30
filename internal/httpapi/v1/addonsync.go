@@ -153,6 +153,18 @@ func (h AddonSyncHandlers) applyRosterImport(w http.ResponseWriter, r *http.Requ
 }
 
 func writeAddonSyncError(w http.ResponseWriter, err error) {
+	var failure *addonsync.ImportFailure
+	if errors.As(err, &failure) {
+		status := http.StatusUnprocessableEntity
+		if failure.Code == "kill_difficulty_conflict" {
+			status = http.StatusConflict
+		}
+		if failure.Code == "save_failed" {
+			status = http.StatusInternalServerError
+		}
+		WriteJSON(w, status, map[string]any{"error": ErrorBody{Code: failure.Code, Message: failure.Message}, "data": failure.Results})
+		return
+	}
 	switch {
 	case errors.Is(err, addonsync.ErrRaidNotFound):
 		WriteError(w, http.StatusNotFound, "not_found", "Raid nicht gefunden")

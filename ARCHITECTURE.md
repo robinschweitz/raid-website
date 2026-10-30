@@ -168,7 +168,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `push` | Push subscriptions, RFC 8291/8292, delivery after commit | Endpoint allowlist, MEMBER recipients, neutral payload, 404/410 clean-up | push subscriptions | FR-32 | SUPPORTED |
 | `audit` | Audit writer and Admin reader | Append-only, no secrets in snapshots | audit log | FR-26 | SUPPORTED |
 | Statistics (`GET /api/v1/statistics`, `internal/statistics`) | Public aggregates computed on the server | Public field subset (FR-27.2) | none (derived, read-only) | FR-27 | SUPPORTED |
-| `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (manual loot integration built in #95; addon import tracked in #96) |
+| `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (manual and addon loot integration built in #95 / #96) |
 | Privacy page | Static page with contact from configuration | None | none | FR-30.1 | SUPPORTED |
 | Infrastructure (`config`, `db`, `migrations`, `validation`, `webui`) | Environment config, DB open, schema, enums, embedded SPA | Production config rules, foreign keys, SPA present in production | schema | NFR-1 | SUPPORTED |
 | Rising-Gods Worker (`workers/`) | Authenticated fixed-origin GET proxy to `db.rising-gods.de` | Fixed origin and shared token (SC-029) | none | FR-7, ADR 048, ADR 053 | SUPPORTED |
@@ -320,6 +320,7 @@ None open. The owner resolved AQ-1 to AQ-8 on 2026-10-22; the answers are in the
 - **AQ-7** Visitor search counter in memory.
 - **AQ-8** `go mod tidy`, delete `internal/logger` (DR-11, DR-12).
 
+Addon loot imports (#96) reserve the SQLite writer before a fresh preview/kill read. The addon coordinator binds every repository and both loot services to the same transaction, so selected awards, unclaimed entries, kills, lock changes, EP and audit writes commit together or roll back together.
 
 ### Raid-News (#202)
 - `raid_news` stores publication status and text; `raid_news_acknowledgements` stores per-player confirmation.

@@ -340,6 +340,7 @@ export function GuidePage() {
 
     <Section id="loot" audience="raidleitung" title="Loot eintragen und archivieren">
       <h3>Loot eintragen</h3>
+      <p>Beim Addon-Import wählst du einmal je Boss ohne Kill die Schwierigkeit. Alle ausgewählten Zeilen und neuen Kills werden gemeinsam gespeichert; bei einem Fehler wird nichts davon übernommen.</p>
       <p>Für einen Boss ohne Kill wird der Kill mit der gewählten Schwierigkeit zusammen mit der Beute gespeichert. Bei einer widersprüchlichen Schwierigkeit wird nichts gespeichert; lade dann den Raid neu.</p>
       <p>Gewürfelt wird im Spiel. Hier wird nur eingetragen, wer was bekommen hat: Reiter <strong>Loot</strong>, <strong>Loot erfassen</strong>, bei <strong>Art der Erfassung</strong> <em>An Spieler vergeben</em> lassen, Boss und Modus wählen, Item suchen, Empfänger und Vergabeart wählen.</p>
 
@@ -356,6 +357,7 @@ export function GuidePage() {
       </div>
       <Shot name="37-loot" caption="Loot erfassen" />
       <p><strong>Schneller mit dem Addon:</strong> In RaidLedger auf <strong>EXPORT</strong> klicken, den Text unter <em>Loot aus Addon importieren</em> einfügen, <strong>Vorschau</strong>, jede Zeile prüfen und übernehmen. Download und alle Funktionen stehen unter <Link to="/addons/raidledger">Addons → RaidLedger</Link>.</p>
+      <Shot name="37b-addon-loot" caption="Addon-Loot: Schwierigkeit einmal pro Boss wählen und gemeinsam übernehmen" />
       <h3>Bosskills</h3>
       <p>Im Reiter <strong>Loot</strong> steht über der Beute ohne Empfänger der Kasten <strong>Bosskills</strong> mit jedem getöteten Boss und seiner Schwierigkeit. Alle Angemeldeten sehen ihn. Wurde nichts erfasst, steht dort, dass keine Kills erfasst sind. Die Raidleitung öffnet <strong>Kill eintragen</strong>, wählt Boss und Schwierigkeit, ändert die Schwierigkeit in der Liste oder entfernt einen Kill; solange es für den Boss noch Beute gibt, geht das nicht. Im archivierten Raid ist ein Grund nötig. Auf der Übersicht sind die getöteten Bosse des nächsten Raids hervorgehoben.</p>
       <h3>Beute ohne Empfänger</h3>

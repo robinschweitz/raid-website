@@ -550,6 +550,7 @@ export interface AddonLootPreviewRow {
 }
 
 export interface AddonLootPreview {
+  missing_kills?: { boss_id: string; boss_name: string; difficulties: string[] }[]
   raid_id: number
   header_raid_id: number
   recorder: string

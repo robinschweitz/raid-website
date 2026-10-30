@@ -250,7 +250,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** For the requests that FR-7.6 limits, one client address (SC-006) MUST NOT start more than 10 in 10 minutes. Answers served from the cache MUST NOT count. Further requests get HTTP 429 with a stable code. The counter is in memory (DR-9).
 - **Enforcement:** `GET /api/v1/external/rising-gods/characters`, `POST /api/v1/auth/registration-requests`; counter in `registration` or the HTTP layer.
-- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: none. Threats: T-016, T-035.
+- **Evidence:** FR-7.6, AQ-7, OD-004 (owner, 2026-10-22). Code: compliant since #79: the registration service shares a mutex-protected in-memory ten-request budget across visitor searches and registration requests; cached answers bypass it, authenticated callers are exempt, and expired address counters are removed. Threats: T-016, T-035.
 - **Verification:** The eleventh uncached visitor search within 10 minutes returns 429 without an upstream request; a logged-in user is not limited.
 
 **SC-029 - Worker access**

@@ -155,3 +155,64 @@ func TestSyncCopiesTocFilesAndRemovesStaleOnes(t *testing.T) {
 		t.Fatalf("broken sync changed the bundle to %s", ledger.Version)
 	}
 }
+
+// ADR 108: an addon's LICENSE is the one file outside its .toc that ships,
+// in the bundle and in the download zip; any other unlisted file still fails.
+func TestLicenseShipsInBundleAndZip(t *testing.T) {
+	source, bundle := t.TempDir(), t.TempDir()
+	write := func(root, file, content string) {
+		t.Helper()
+		target := filepath.Join(root, filepath.FromSlash(file))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(source, "RaidLedger/RaidLedger.toc", "## Interface: 30300\n## Version: 2.5.1\nRaidLedger.lua\n")
+	write(source, "RaidLedger/RaidLedger.lua", "-- ledger")
+	write(source, "RaidWishlist/RaidWishlist.toc", "## Interface: 30300\n## Version: 2.3.0\nRaidWishlist.lua\n")
+	write(source, "RaidWishlist/RaidWishlist.lua", "-- wish")
+	write(source, "RaidWishlist/LICENSE", "GNU GENERAL PUBLIC LICENSE Version 2")
+	write(bundle, "RaidLedger/LICENSE", "a license the source no longer has")
+
+	if _, err := Sync(source, bundle); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(bundle, "RaidLedger", "LICENSE")); !os.IsNotExist(err) {
+		t.Fatalf("a LICENSE the source dropped must be removed: %v", err)
+	}
+	catalog, err := LoadFS(os.DirFS(bundle))
+	if err != nil {
+		t.Fatalf("bundle with LICENSE does not load: %v", err)
+	}
+	wish, _ := catalog.Get("RaidWishlist")
+	reader, err := zip.NewReader(bytes.NewReader(wish.Zip()), int64(len(wish.Zip())))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, file := range reader.File {
+		if file.Name == "RaidWishlist/LICENSE" {
+			content, _ := file.Open()
+			data, _ := io.ReadAll(content)
+			found = string(data) == "GNU GENERAL PUBLIC LICENSE Version 2"
+		}
+	}
+	if !found {
+		t.Fatal("the download zip has no RaidWishlist/LICENSE")
+	}
+	ledger, _ := catalog.Get("RaidLedger")
+	reader, _ = zip.NewReader(bytes.NewReader(ledger.Zip()), int64(len(ledger.Zip())))
+	for _, file := range reader.File {
+		if file.Name == "RaidLedger/LICENSE" {
+			t.Fatal("an addon without LICENSE must not get one")
+		}
+	}
+
+	write(bundle, "RaidWishlist/README.md", "still not shipped")
+	if _, err := LoadFS(os.DirFS(bundle)); !errors.Is(err, ErrInvalidBundle) {
+		t.Fatalf("an unlisted README must still fail: %v", err)
+	}
+}

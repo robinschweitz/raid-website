@@ -272,7 +272,7 @@ implemented yet when it differs from the code.
 ### 21. Addon downloads
 
 - **FR-21.1** The system MUST list the bundled addons RaidLedger and RaidWishlist with name, version, file name, size, and download URL. (ADR 085)
-- **FR-21.2** A download MUST return a zip with one top-level folder named after the addon. An unknown name MUST give HTTP 404 `addon_not_found`. (ADR 085)
+- **FR-21.2** A download MUST return a zip with one top-level folder named after the addon. The zip MUST contain the addon's `LICENSE` file when its bundle has one. An unknown name MUST give HTTP 404 `addon_not_found`. (ADR 085, 108)
 - **FR-21.3** The system MUST provide German pages `/addons`, `/addons/raidledger`, and `/addons/raidwishlist`. (ADR 085)
 
 ### 22. Shadowmourne

@@ -166,6 +166,9 @@ func loadAddon(root fs.FS, name string) (Addon, error) {
 		return Addon{}, fmt.Errorf("%s: %w", name, err)
 	}
 	files := append([]string{tocName}, toc.Files...)
+	if _, err := fs.Stat(root, path.Join(name, LicenseFile)); err == nil {
+		files = append(files, LicenseFile)
+	}
 	if err := requireExactFiles(root, name, files); err != nil {
 		return Addon{}, err
 	}
@@ -192,8 +195,12 @@ func loadAddon(root fs.FS, name string) (Addon, error) {
 	}, nil
 }
 
-// requireExactFiles makes sure the bundle folder holds the .toc's files and
-// nothing else, so a stale file from an older version never ships.
+// LicenseFile is the one file outside the .toc that a bundle may hold and its
+// zip ships, so the license text travels with a GPL addon (ADR 108).
+const LicenseFile = "LICENSE"
+
+// requireExactFiles makes sure the bundle folder holds the .toc's files (and
+// LICENSE) and nothing else, so a stale file from an older version never ships.
 func requireExactFiles(root fs.FS, name string, files []string) error {
 	listed := map[string]bool{}
 	for _, file := range files {

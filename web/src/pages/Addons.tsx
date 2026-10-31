@@ -209,7 +209,7 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
 
       <Feature title="2. Kalender-Termin anlegen" shot={<>
         <Shot name="raidledger-termin-erstellen" caption="Nach KALENDER-TERMIN: TERMIN ERSTELLEN legt den Termin an" width={709} height={448} />
-        <Shot name="raidledger-termin-chat" caption="Der Chat meldet, dass der Server den Termin bestätigt hat" width={410} height={68} />
+        <Shot name="raidledger-termin-chat" caption="Der Chat meldet, dass der Server den Termin bestätigt hat" width={414} height={51} />
       </>}>
         <p>Die Einladungsliste enthält <strong>Datum und Startzeit</strong> des Raids. Daraus legt RaidLedger einen Raid-Termin im Spielkalender an und lädt alle ein, auch die Ersatzbank.</p>
         <ol>
@@ -220,7 +220,7 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
         <Tip><strong>Gut zu wissen:</strong> Datum und Uhrzeit stehen nur bei Raids aus einer <strong>Raidserie</strong> in der Liste, in der Zeitzone der Serie (Serverzeit). Der Spielkalender nimmt nur Termine in der Zukunft und Titel bis 100 Zeichen.</Tip>
       </Feature>
 
-      <Feature title="3. Würfeln nach unseren Regeln" shot={<Shot name="raidledger-wurf-chat" caption="Ansagen im Gruppenchat: Wurfstart, Countdown, Gewinner mit bisherigen Items" width={380} height={116} />}>
+      <Feature title="3. Würfeln nach unseren Regeln" shot={<Shot name="raidledger-wurf-chat" caption="Ansagen im Gruppenchat: Wurfstart, Countdown, Gewinner mit bisherigen Items" width={414} height={118} />}>
         <p>Im Reiter <strong>BEUTE</strong> das Item auswählen und <strong>WÜRFELN</strong> klicken (oder <code>/ledger start</code>): Der Raid hat 30 Sekunden, einstellbar unter <strong>EINSTELLUNGEN</strong>. Zur Hälfte und zu einem Viertel der Zeit erinnert das Addon.</p>
         <ul>
           <li><code>/rnd 100</code> ist <strong>Main-Spec</strong>, <code>/rnd 99</code> ist <strong>Second-Spec</strong>.</li>
@@ -232,7 +232,10 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
         <p>Neben der Beute steht die Wurfliste in Gewinner-Reihenfolge, mit <strong>BISHER</strong>: wie viele Items der Würfler in diesem Spec schon hat. <strong>Rechtsklick</strong> auf einen Wurf: <strong>PASST</strong> (der Nächste gewinnt), als <strong>MAIN-SPEC</strong>, <strong>SECOND-SPEC</strong>, <strong>ZÄHLT NICHT</strong> oder mit korrigierten Enhanced-Punkten werten. Jede Änderung wird im Raid angesagt.</p>
       </Feature>
 
-      <Feature title="4. Vergeben und nachhalten" shot={<Shot name="raidledger-vergaben" caption="VERGABEN: die ausgewählte Vergabe mit Spec, Empfänger und Würfen" width={709} height={448} />}>
+      <Feature title="4. Vergeben und nachhalten" shot={<>
+        <Shot name="raidledger-pluendern" caption="Das kleine Fenster beim Plündern: WÜRFELN, ZUWEISEN oder SPÄTER WÜRFELN" width={424} height={82} />
+        <Shot name="raidledger-vergaben" caption="VERGABEN: alle Vergaben des Raids, rechts wird die ausgewählte korrigiert" width={709} height={448} />
+      </>}>
         <ul>
           <li>Öffnest du als Plündermeister eine Leiche, erscheint ein <strong>kleines Fenster</strong> mit ihren Items, auch wenn RaidLedger selbst geschlossen ist. Item anklicken, dann <strong>WÜRFELN</strong>, <strong>ZUWEISEN</strong> (direkt an einen Spieler aus der Raidliste) oder <strong>SPÄTER WÜRFELN</strong>.</li>
           <li>Nach dem Wurf steht der Gewinner im Reiter <strong>BEUTE</strong> als Empfänger bereit. Klick auf einen Wurf macht diesen Spieler zum Empfänger, <strong>ALLE (n)</strong> zeigt den ganzen Raid nach Gruppen.</li>
@@ -253,7 +256,10 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
         </ul>
       </Feature>
 
-      <Feature title="6. Später würfeln: Taschen, offene Items" shot={<Shot name="raidledger-offene-items" caption="Ein offenes Item bleibt in der Beute unter OFFENE ITEMS, bei Test" width={709} height={448} />}>
+      <Feature title="6. Später würfeln: Taschen, offene Items" shot={<>
+        <Shot name="raidledger-empfaenger" caption="SPÄTER WÜRFELN fragt, wer das Item bis zum Wurf behält" width={424} height={138} />
+        <Shot name="raidledger-offene-items" caption="Ein offenes Item bleibt in der Beute unter OFFENE ITEMS, bei Test" width={709} height={448} />
+      </>}>
         <ul>
           <li><strong>SPÄTER WÜRFELN</strong> im kleinen Plündern-Fenster fragt, wer das Item bis zum Wurf behält, und gibt es direkt von der Leiche an ihn, z. B. bei einzigartigen Items.</li>
           <li><strong>Items aus deinen Taschen</strong> würfelst du mit <kbd>Alt</kbd>+Klick auf das Item aus (oder <code>/ledger roll</code>). Der Gewinner bekommt es per Handel.</li>

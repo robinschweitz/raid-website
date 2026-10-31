@@ -1,8 +1,13 @@
-export const appVersion = '1.0.77'
+export const appVersion = '1.0.78'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Neue RaidLedger-Bilder',
+    changes: ['Die Addon-Seite zeigt RaidLedger jetzt mit Bildern aus Version 2.7.0, auch vom kleinen Fenster beim Plündern.'],
+  },
+  {
+    version: '1.0.77',
     title: 'RaidLedger 2.7.0',
     changes: ['Beim Plündern erscheint als Plündermeister ein kleines Fenster mit Würfeln, Zuweisen und Später würfeln. Der Reiter Beute führt in zwei Schritten durch die Vergabe, und Rollstarts kommen als Schlachtzugswarnung.', 'Handel und Plündern als Gruppe werden nicht mehr verfolgt. Das Fenster lässt sich jetzt vergrößern und skalieren.'],
   },

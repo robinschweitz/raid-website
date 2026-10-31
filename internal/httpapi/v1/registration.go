@@ -3,6 +3,7 @@ package v1
 import (
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -82,6 +83,7 @@ func (a *API) searchRisingGodsCharacters(w http.ResponseWriter, r *http.Request)
 	_, authenticated := CurrentPlayer(r)
 	rows, err := a.Registration.SearchForVisitor(r.Context(), query, clientAddress(r, a.TrustProxyHeaders), authenticated)
 	if err != nil {
+		a.rateLimitEvent(w, r, err)
 		registrationError(w, err)
 		return
 	}
@@ -97,6 +99,7 @@ func (a *API) createRegistrationRequest(w http.ResponseWriter, r *http.Request) 
 	_, authenticated := CurrentPlayer(r)
 	created, err := a.Registration.CreateVisitorRequest(r.Context(), req.ProfileID, clientAddress(r, a.TrustProxyHeaders), authenticated)
 	if err != nil {
+		a.rateLimitEvent(w, r, err)
 		registrationError(w, err)
 		return
 	}
@@ -244,6 +247,7 @@ func (a *API) registerWithCode(w http.ResponseWriter, r *http.Request) {
 	}
 	token, p, err := a.Registration.RedeemNewAccountFromAddress(r.Context(), req.Code, req.Username, req.Password, clientAddress(r, a.TrustProxyHeaders))
 	if err != nil {
+		a.rateLimitEvent(w, r, err, slog.String("username", normalisedUsername(req.Username)))
 		registrationError(w, err)
 		return
 	}

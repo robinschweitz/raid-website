@@ -42,7 +42,7 @@ jobs:
         run: shellcheck -s sh deploy/bin/*
       - name: Test backup restore environment
         run: python3 -m unittest discover -s deploy -p 'test_*.py'
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: 1.26.x
           cache: true
@@ -96,7 +96,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
       # No Go cache here: this job only builds the server, and restoring the ~400 MB
       # cache counts against the account's Actions cache download limit.
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: 1.26.x
           cache: false

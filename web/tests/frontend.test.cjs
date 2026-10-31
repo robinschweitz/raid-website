@@ -2237,7 +2237,7 @@ for (const method of ['MAIN', 'SECOND', 'ENHANCED', 'BOE']) {
     const write = writes(s)[0]
     assert.equal(write.url, '/api/v1/raids/1/loot')
     assert.deepEqual(JSON.parse(JSON.stringify(write.body)), {
-      catalog_boss_id: 'boss:1', item_id: '12345', award_method: method,
+      difficulty: 'NORMAL', catalog_boss_id: 'boss:1', item_id: '12345', award_method: method,
       awarded_to_player_id: 2, awarded_to_character_id: 20, notes: '', request_id: write.body.request_id,
     })
     assert.match(write.body.request_id, /^[0-9a-f-]{36}$/)
@@ -2411,7 +2411,8 @@ test('associated loot filters by persisted instance and size, preserves mixed so
   assert.equal(write.body.award_method, 'ENHANCED')
   assert.match(write.body.request_id, /^[0-9a-f-]{36}$/)
   assert.equal(write.body.item_id, '12345')
-  for (const key of ['boss', 'item_name', 'boss_id', 'instance_id', 'raid_size', 'difficulty', 'loot_mode']) assert.equal(key in write.body, false)
+  assert.equal(write.body.difficulty, 'HEROIC')
+  for (const key of ['boss', 'item_name', 'boss_id', 'instance_id', 'raid_size', 'loot_mode']) assert.equal(key in write.body, false)
   write.reject(new Error('offline'))
   await first
   view.render()
@@ -3745,43 +3746,93 @@ test('loot that went to nobody: listed for everyone, staff remove entries (ADR 0
   assert.doesNotMatch(text(empty.tree) || '', /Beute ohne Empfänger/)
 })
 
-test('the unclaimed-loot form records an item without loading the list and reports the add', async () => {
-  const s = setup()
-  let added = 0
-  const bosses = [{ id: '36612', instance_id: '631', name: 'Lord Mark’gar' }]
-  const view = s.mount(s.load('components/UnclaimedLoot.tsx').UnclaimedLootForm, { raidID: 1, needsReason: true, bosses, onAdded: () => { added++ } })
-  assert.equal(s.requests.filter((r) => r.method === 'get').length, 0)
-  input(view, 'Name des Gegenstands').props.onChange(change('Bryntroll'))
-  view.render()
-  const submit = () => nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit')[0]
-  assert.equal(submit().props.disabled, true)
-  const reasonField = nodes(view.tree, (n) => n.type === 'label' && text(n).startsWith('Grund'))[0]
-  nodes(reasonField, (n) => n.type === 'input')[0].props.onChange(change('Nachgetragen'))
-  view.render()
-  assert.equal(submit().props.disabled, false)
-  nodes(view.tree, (n) => n.type === 'form')[0].props.onSubmit({ preventDefault() {} })
-  assert.equal(writes(s)[0].url, '/api/v1/raids/1/unclaimed-loot')
-  assert.deepEqual(writes(s)[0].body, { catalog_boss_id: '', item_name: 'Bryntroll', outcome: 'NOBODY', holder_name: '', notes: '', reason: 'Nachgetragen' })
-  writes(s)[0].resolve({ id: 7 })
-  await flush(view)
-  assert.equal(added, 1)
-})
-
-test('loot entry switches between a player award and loot that went to nobody', async () => {
+test('loot entry uses the same form for player awards and unclaimed outcomes', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
   resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
   await flush(view)
-  const kind = () => nodes(nodes(view.tree, (n) => n.type === 'label' && text(n).startsWith('Art der Erfassung'))[0], (n) => n.type === 'select')[0]
-  const unclaimedForm = () => nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'UnclaimedLootForm')[0]
-  assert.equal(kind().props.value, 'award')
+  const method = () => select(view, 'Loot-Vergabemethode')
+  const recipient = () => nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Loot-Empfänger')[0]
+  const holder = () => nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Loot-Verbleib bei')[0]
+  assert.equal(method().props.value, 'MAIN')
   assert.ok(select(view, 'Loot-Boss'))
-  assert.equal(unclaimedForm(), undefined)
-  kind().props.onChange(change('unclaimed'))
+  assert.ok(recipient())
+  assert.equal(holder(), undefined)
+  for (const outcome of ['BANK', 'NOBODY']) {
+    method().props.onChange(change(outcome))
+    view.render()
+    assert.equal(method().props.value, outcome)
+    assert.ok(select(view, 'Loot-Boss'), 'boss selector remains in the same form')
+    assert.equal(recipient(), undefined, 'this outcome has no player')
+    assert.ok(holder())
+  }
+  method().props.onChange(change('DISENCHANTED'))
   view.render()
-  assert.equal(select(view, 'Loot-Boss'), undefined)
-  assert.equal(unclaimedForm().props.raidID, 1)
+  assert.ok(recipient(), 'disenchanting names the roster character')
+  assert.equal(holder(), undefined)
+  assert.match(text(view.tree), /Entzaubert von/)
+  method().props.onChange(change('MAIN'))
+  view.render()
+  assert.ok(recipient())
   assert.ok(nodes(view.tree, (n) => typeof n.type === 'function' && n.type.name === 'UnclaimedLootList')[0])
+})
+
+test('disenchanting needs a roster character and sends it instead of a holder name', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, sourceLoot({ attendance: [recipientRow] }))
+  await flush(view)
+  select(view, 'Loot-Vergabemethode').props.onChange(change('DISENCHANTED'))
+  view.render()
+  await chooseSourceDrop(s, view)
+  const submit = () => nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit' && n.props.className === 'primary-action').at(-1)
+  assert.equal(submit().props.disabled, true)
+  assert.match(text(view.tree), /Charakter wählen, der entzaubert hat/)
+  const recipient = nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Loot-Empfänger')[0]
+  recipient.props.onChange(change('20'))
+  view.render()
+  assert.equal(submit().props.disabled, false)
+  const lootForm = nodes(view.tree, (n) => n.type === 'form' && nodes(n, (child) => child.props?.['aria-label'] === 'Loot-Boss').length > 0)[0]
+  void lootForm.props.onSubmit({ preventDefault() {} })
+  await flush(view)
+  const write = writes(s).at(-1)
+  assert.equal(write.url, '/api/v1/raids/1/unclaimed-loot')
+  assert.equal(write.body.disenchanter_character_id, 20)
+  assert.equal('holder_name' in write.body, false)
+})
+
+test('an unclaimed outcome saves the catalog drop with its difficulty and needs no roster', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, sourceLoot({ attendance: [] }))
+  await flush(view)
+  assert.match(text(view.tree), /Keine Empfänger verfügbar/)
+  const submit = () => nodes(view.tree, (n) => n.type === 'button' && n.props.type === 'submit' && n.props.className === 'primary-action').at(-1)
+  select(view, 'Loot-Vergabemethode').props.onChange(change('BANK'))
+  view.render()
+  assert.doesNotMatch(text(view.tree), /Keine Empfänger verfügbar/)
+  assert.equal(submit().props.disabled, true, 'an item from the catalog stays required')
+  await chooseSourceDrop(s, view)
+  assert.equal(submit().props.disabled, false)
+  assert.match(text(submit()), /Eintragen/)
+  const holder = nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === 'Loot-Verbleib bei')[0]
+  holder.props.onChange(change('Bankchar'))
+  view.render()
+  const lootForm = nodes(view.tree, (n) => n.type === 'form' && nodes(n, (child) => child.props?.['aria-label'] === 'Loot-Boss').length > 0)[0]
+  void lootForm.props.onSubmit({ preventDefault() {} })
+  await flush(view)
+  const write = writes(s).at(-1)
+  assert.equal(write.url, '/api/v1/raids/1/unclaimed-loot')
+  assert.deepEqual(Object.keys(write.body).sort(), ['catalog_boss_id', 'difficulty', 'holder_name', 'item_id', 'notes', 'outcome', 'reason'])
+  assert.equal(write.body.catalog_boss_id, 'boss:1')
+  assert.equal(write.body.outcome, 'BANK')
+  assert.equal(write.body.holder_name, 'Bankchar')
+  assert.ok(write.body.difficulty)
+  write.resolve({ id: 7 })
+  await flush(view)
+  assert.match(text(view.tree), /Loot ohne Empfänger gespeichert/)
+  assert.equal(select(view, 'Loot-Vergabemethode').props.value, 'MAIN')
+  assert.equal(select(view, 'Loot-Boss').props.value, 'boss:1', 'the boss stays for the next item')
 })
 
 test('staff see the signup list with class emblems first and their own signup folded away', async () => {
@@ -4214,4 +4265,96 @@ test('the own profile offers no anonymise action', async () => {
   resolvePlayer(s, 1)
   await flush(view)
   assert.equal(button(view, 'Spieler anonymisieren'), undefined)
+})
+
+test('TestReqRaid017_AC01 addon import asks once per missing boss and requires both choices', async () => {
+  const s = setup()
+  const view = s.mount(s.load('components/AddonLootImport.tsx').AddonLootImport, { raidID: 1, onImported: async () => {} })
+  nodes(view.tree, (n) => n.type === 'textarea')[0].props.onChange(change('RS1|LOOT|1|Recorder|1'))
+  view.render()
+  button(view, 'Vorschau').props.onClick()
+  const row = (key, boss) => ({ line_key: key, line_number: Number(key), state: 'given', item_id: 'item', item_name: 'Item', character_id: 10, character_name: 'Mage', recipient_name: 'Mage', catalog_boss_id: boss, boss_options: [{ id: boss, name: boss }], award_method: 'MAIN', is_importable: true, is_already_imported: false, is_unclaimed: false, warnings: [], errors: [] })
+  writes(s)[0].resolve({ raid_id: 1, recorder: 'Recorder', warnings: [], recipient_options: [{ character_id: 10, character_name: 'Mage' }], rows: [row('1', 'Boss A'), row('2', 'Boss A'), row('3', 'Boss B')], missing_kills: [{ boss_id: 'Boss A', boss_name: 'Boss A', difficulties: ['NORMAL', 'HEROIC'] }, { boss_id: 'Boss B', boss_name: 'Boss B', difficulties: ['NORMAL'] }] })
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.type === 'select' && n.props['aria-label']?.startsWith('Schwierigkeit für ')).length, 2)
+  assert.equal(button(view, '3 Gegenstände übernehmen').props.disabled, true)
+  select(view, 'Schwierigkeit für Boss A').props.onChange(change('HEROIC'))
+  view.render()
+  assert.equal(button(view, '3 Gegenstände übernehmen').props.disabled, true)
+  select(view, 'Schwierigkeit für Boss B').props.onChange(change('NORMAL'))
+  view.render()
+  assert.equal(button(view, '3 Gegenstände übernehmen').props.disabled, false)
+  button(view, '3 Gegenstände übernehmen').props.onClick()
+  assert.deepEqual(writes(s)[1].body.selections.map((row) => row.difficulty), ['HEROIC', 'HEROIC', 'NORMAL'])
+  writes(s)[1].reject(new Error('offline'))
+  await flush(view)
+})
+
+test('Admin reset codes appear once and replace direct password entry (REQ-ACCOUNT-017)', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(s, 2)
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Passwort (leer = unverändert)').length, 0)
+  button(view, 'Reset-Code erstellen').props.onClick()
+  const request = s.requests.find((r) => r.url.endsWith('/2/reset-code'))
+  request.resolve({ code: 'BD-ONCE-ONLY-CODE' })
+  await flush(view)
+  assert.match(text(view.tree), /nur jetzt angezeigt/)
+  assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Reset-Code')[0].props.value, 'BD-ONCE-ONLY-CODE')
+  view.render({ playerID: 3 })
+  resolvePlayer(s, 3)
+  await flush(view)
+  assert.equal(nodes(view.tree, (n) => n.props['aria-label'] === 'Reset-Code').length, 0)
+})
+
+test('reset password page submits once and clears the secret after success (REQ-ACCOUNT-018)', async () => {
+  const s = setup(null)
+  const view = s.mount(s.load('pages/ResetPassword.tsx').ResetPasswordPage)
+  nodes(view.tree, (n) => n.props['aria-label'] === 'Reset-Code')[0].props.onChange(change('BD-CODE-ONLY-ONCE'))
+  nodes(view.tree, (n) => n.props['aria-label'] === 'Neues Passwort')[0].props.onChange(change('new-password-123'))
+  view.render()
+  const handler = form(view).props.onSubmit
+  const first = handler(event)
+  await handler(event)
+  assert.equal(writes(s).length, 1)
+  assert.deepEqual(writes(s)[0].body, { code: 'BD-CODE-ONLY-ONCE', password: 'new-password-123' })
+  writes(s)[0].resolve(undefined)
+  await first
+  await flush(view)
+  assert.match(text(view.tree), /Dein Passwort wurde geändert/)
+  assert.equal(nodes(view.tree, (n) => n.type === 'input').length, 0)
+})
+
+test('only Admins can start the personal-data download (REQ-PRIVACY-012)', async () => {
+  const s = setup()
+  const downloads = []
+  s.api.downloadJSON = async (...args) => downloads.push(args)
+  const view = s.mount(s.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(s, 2)
+  await flush(view)
+  button(view, 'Daten als JSON herunterladen').props.onClick()
+  await flush(view)
+  assert.deepEqual(downloads, [['/api/v1/players/2/export', 'spieler-2.json']])
+  const member = setup({ id: 2, role: 'MEMBER' })
+  const own = member.mount(member.load('pages/PlayerDetail.tsx').PlayerDetailPage, { playerID: 2 })
+  resolvePlayer(member, 2)
+  await flush(own)
+  assert.equal(button(own, 'Daten als JSON herunterladen'), undefined)
+})
+
+test('visitor search limit is shown in German on registration (REQ-ACCOUNT-014)', async () => {
+  const s = setup(null)
+  const { ApiError } = s.load('api.ts')
+  const view = s.mount(s.load('pages/Login.tsx').LoginPage)
+  button(view, 'Code anfordern').props.onClick()
+  view.render()
+  input(view, 'Mindestens 3 Zeichen').props.onChange(change('Mage'))
+  view.render()
+  const pending = button(view, 'Suchen').props.onClick()
+  const request = s.requests.find((r) => r.url.includes('/external/rising-gods/characters'))
+  request.reject(new ApiError(429, 'search_limit', 'Zu viele Anfragen. Bitte in zehn Minuten erneut versuchen.'))
+  await pending
+  await flush(view)
+  assert.match(text(view.tree), /Zu viele Anfragen.*zehn Minuten/)
 })

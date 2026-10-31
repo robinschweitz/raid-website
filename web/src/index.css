@@ -1422,6 +1422,18 @@ input[type='checkbox'] {
   box-shadow: 0 0 8px rgba(134, 217, 242, 0.2);
 }
 
+.boss-icon.killed img {
+  filter: grayscale(1) brightness(0.65);
+}
+
+.boss-icon.killed::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to top right, transparent calc(50% - 1px), var(--accent) calc(50% - 1px), var(--accent) calc(50% + 1px), transparent calc(50% + 1px));
+}
+
 .boss-icon.current {
   background: rgba(134, 217, 242, 0.25);
   border-color: var(--accent);
@@ -2000,8 +2012,55 @@ input[type='checkbox'] {
 .boss-order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px; border: 1px solid var(--card-border); border-radius: 4px; }
 .boss-order-list .actions { margin: 0; }
 .unclaimed-loot { margin-top: 14px; }
-.unclaimed-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; margin-top: 10px; }
-.unclaimed-form .actions { margin: 0; }
 .badge.unclaimed-disenchanted { color: #d6b4ff; border-color: #8c5bd1; }
 .badge.unclaimed-bank { color: #f2dc8c; border-color: #b39a3d; }
 .badge.unclaimed-nobody { color: #a9b6c2; border-color: #5d6b78; }
+
+/* Raid-News editor: keep the message fields together, with clear checkbox labels. */
+.raid-news-management { margin-top: 1rem; }
+.raid-news-management > summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.raid-news-form {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--frost);
+}
+.raid-news-form > label:not(.raid-news-check) {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: .4rem;
+  min-width: 0;
+}
+.raid-news-form input:not([type="checkbox"]),
+.raid-news-form textarea { width: 100%; min-width: 0; }
+.raid-news-form textarea { resize: vertical; min-height: 120px; }
+.raid-news-form .raid-news-check {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: .55rem;
+  align-self: center;
+  cursor: pointer;
+}
+.raid-news-form .raid-news-check input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.raid-news-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: .65rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+@media (max-width: 680px) {
+  .raid-news-form { grid-template-columns: minmax(0, 1fr); padding: .8rem; }
+  .raid-news-actions { grid-column: 1; justify-content: stretch; }
+  .raid-news-actions button { width: 100%; }
+}

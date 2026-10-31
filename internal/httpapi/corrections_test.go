@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,6 +95,9 @@ func bundledICCDrops(t *testing.T, db *bun.DB) (tokenBoss, tokenItem, ordinaryBo
 }
 
 func (f *correctionFixture) selection(body map[string]any, token bool) map[string]any {
+	if _, ok := body["difficulty"]; !ok {
+		body["difficulty"] = "NORMAL"
+	}
 	body["catalog_boss_id"], body["item_id"] = f.ordinaryBoss, f.ordinaryItem
 	if token {
 		body["catalog_boss_id"], body["item_id"] = f.tokenBoss, f.tokenItem
@@ -103,6 +107,11 @@ func (f *correctionFixture) selection(body map[string]any, token bool) map[strin
 
 func (f *correctionFixture) request(method, suffix string, body any, want int) []byte {
 	f.t.Helper()
+	if method == http.MethodPatch && strings.HasPrefix(suffix, "/loot/") {
+		if values, ok := body.(map[string]any); ok {
+			delete(values, "difficulty")
+		}
+	}
 	status, result := do(f.t, f.srv.Client(), method, fmt.Sprintf("%s/api/v1/raids/%d%s", f.srv.URL, f.raidID, suffix), f.token, body)
 	if status != want {
 		f.t.Fatalf("%s %s: want %d got %d: %s", method, suffix, want, status, result)
@@ -203,8 +212,8 @@ func TestLegacyCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
 	suffix := fmt.Sprintf("/loot/%d", awardID)
 	for i := 0; i < 3; i++ {
 		f.request(http.MethodPatch, suffix, map[string]any{"awarded_to_player_id": f.second, "awarded_to_character_id": f.secondChar, "reason": "recipient correction"}, http.StatusOK)
-		f.points(f.first, 10)
-		f.points(f.second, 0)
+		f.points(f.first, 0)
+		f.points(f.second, 10)
 		f.tokenBalance(f.first, 0)
 		f.tokenBalance(f.second, 1)
 		f.request(http.MethodPatch, suffix, map[string]any{"awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "reason": "undo recipient correction"}, http.StatusOK)
@@ -214,7 +223,7 @@ func TestLegacyCorrectionsRepeatedEPAndTokenCompensation(t *testing.T) {
 		f.tokenBalance(f.second, 0)
 	}
 	f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "SECOND", "reason": "item correction"}, false), http.StatusOK)
-	f.points(f.first, 10)
+	f.points(f.first, 0)
 	f.tokenBalance(f.first, 0)
 	f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "MAIN", "reason": "restore"}, true), http.StatusOK)
 	f.points(f.first, 0)

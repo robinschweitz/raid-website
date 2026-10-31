@@ -24,7 +24,7 @@ implemented yet when it differs from the code.
 - **FR-1.1** Every permission in this file MUST be enforced by the server (SC-001). (ADR 010)
 - **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the statistics, the privacy contact, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044; Owner 2026-10-22, OQ-6)
 - **FR-1.3** The public player list MUST show only ID, name, guild rank, and active state. It MUST NOT show login names. (ADR 067, 084)
-- **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/kontosicherheit`, `/statistics`, and the privacy page without a session. (ADR 083, 085, 092; Owner 2026-10-22, OQ-6 and OQ-9)
+- **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/kontosicherheit`, `/statistics`, and the privacy page `/datenschutz` without a session. (ADR 083, 085, 092; Owner 2026-10-22, OQ-6 and OQ-9)
 - **FR-1.5** The system MUST require a session for all other reads. (ADR 067)
 - **FR-1.6** The system MUST reject a request with a role that is too low with HTTP 403. It MUST reject a request without a session on a protected endpoint with HTTP 401. (ADR 010)
 - **FR-1.7** These reads MUST require RAIDASSISTENT or higher: the archive preview, the recruitment template, and the wishlist interests of a raid. (ADR 068, 069)
@@ -75,6 +75,8 @@ implemented yet when it differs from the code.
 - **FR-4.8** The first Rising-Gods talent build MUST become the main spec. The second build MUST become the second spec when it exists. (ADR 040)
 - **FR-4.9** The admin request list MUST show the linked player, login, and date after a code is redeemed. (ADR 084)
 - **FR-4.10** The system MUST NOT change the role of existing GUEST accounts (players who already have a login) automatically. An ADMIN promotes them (FR-1.9). A player without a login who gets one from a registration code follows FR-4.5. (Owner 2026-10-22, OQ-3; Owner 2026-10-25, ADR 103)
+
+- **FR-4.11** The Admin registration UI MUST show existing code status and validity, explain why plaintext is not recoverable, and offer replacement issuance and revocation using the existing authorized actions. (ADR 106; Owner 2026-10-23)
 
 ### 5. Players and accounts
 
@@ -206,10 +208,11 @@ implemented yet when it differs from the code.
 - **FR-14.9** Staff MUST be able to withdraw a manual loot award. A reason MUST be required only for an archived raid (FR-26.5). The award MUST stay stored as withdrawn. (ADR 032; Owner 2026-10-22, OQ-1)
 - **FR-14.10** Cancelled raids MUST reject loot writes. (ADR 032)
 - **FR-14.11** The UI MUST mark an item that was already awarded in the raid. It MUST allow a second award of the same item. (ADR 069)
+- **FR-14.12** Loot lists MUST show the recipient character's name. An award without a stored name MUST show the current name of its linked character; a stored name stays as it is. (Owner 2026-10-30)
 
 ### 15. Unclaimed loot
 
-- **FR-15.1** Staff MUST be able to record an item that went to nobody, with outcome DISENCHANTED, BANK, or NOBODY, holder name, optional boss of the raid instance, and notes. (ADR 089)
+- **FR-15.1** Staff MUST be able to record an item that went to nobody, with outcome DISENCHANTED, BANK, or NOBODY, and notes. DISENCHANTED MUST name the roster character who disenchanted the item, stored as its holder; BANK and NOBODY take an optional holder name. The boss and item MUST be a pair of the bundled catalog for the instance and size of the raid, with the errors of FR-14.2. Entries that exist already and addon imports (FR-20.10) keep their own rules. (ADR 089, 107)
 - **FR-15.2** Unclaimed loot MUST NOT affect EP, loot counts, tokens, or item locks. (ADR 089)
 - **FR-15.3** Staff MUST be able to remove an entry. Removal MUST archive the entry. (ADR 089)
 - **FR-15.4** Cancelled raids MUST reject unclaimed loot. Archived raids MUST require a reason for add and remove. (ADR 089)
@@ -342,7 +345,7 @@ implemented yet when it differs from the code.
 - **FR-29.4** The dashboard MAY show progress from recorded kills. It MUST NOT show kills that were not recorded. (Owner 2026-10-22, OQ-7)
 - **FR-29.5** Staff MUST be able to record and remove a kill. These writes MUST follow the raid-state rules of FR-13.11, the reason rule of FR-26.5, and MUST be audited. (Owner 2026-10-22, OQ-11)
 - **FR-29.6** A kill MUST have one difficulty: NORMAL, HEROIC, or HARDMODE. The system MUST offer only the difficulties that the catalog has for that boss and raid size. A raid MUST have at most one kill per boss. (Owner 2026-10-22, OQ-11)
-- **FR-29.7** When staff record loot of a boss that has no kill in the raid, the system MUST ask for the difficulty and MUST create the kill in the same transaction as the loot. (Owner 2026-10-22, OQ-11)
+- **FR-29.7** When staff record loot of a boss that has no kill in the raid, an award or an item that went to nobody (FR-15.1), the system MUST ask for the difficulty and MUST create the kill in the same transaction as the loot. An item that went to nobody does not block FR-29.9 or FR-29.14. (Owner 2026-10-22, OQ-11; ADR 107)
 - **FR-29.8** The addon loot import MUST ask for the difficulty once per boss without a kill, and MUST create the kill as in FR-29.7. (Owner 2026-10-22, OQ-11)
 - **FR-29.9** Removal of a kill MUST be rejected while the raid has loot of that boss that is not withdrawn. (Owner 2026-10-22, OQ-11)
 - **FR-29.10** The system MUST NOT create kills for loot recorded before this feature. Such raids MUST show that no kills are recorded. (Owner 2026-10-22, OQ-11)
@@ -421,3 +424,8 @@ None open.
 - **OQ-15** Access to one's own data: on request, Admin download → FR-30.7 (2026-10-23).
 - **OQ-14** Off-server backup: Hetzner Storage Box, passphrase on the server and with the owner, add-only uploads → NFR-2.3, ADR 099 (2026-10-24).
 - Owner review: EP stops at zero with a warning → FR-16.6, FR-16.8; visitor search limit → FR-7.6; pre-066 backup deleted (former NFR-2.4).
+
+### Raid-News (Owner 2026-10-28; #202)
+- **FR-NEWS-1** Visitors and players MUST be able to read published raid news; drafts MUST NOT be exposed to non-staff.
+- **FR-NEWS-2** RAIDASSISTENT and higher MUST be able to create, edit, publish and unpublish raid news.
+- **FR-NEWS-3** Important news MUST display as a modal for signed-in players until individually acknowledged. Confirmed news MUST remain in the list.

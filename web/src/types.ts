@@ -313,6 +313,7 @@ export interface ArchiveResponse {
 }
 
 export interface LootAward {
+  difficulty?: string
   id: number
   raid_id: number
   boss: string
@@ -549,6 +550,7 @@ export interface AddonLootPreviewRow {
 }
 
 export interface AddonLootPreview {
+  missing_kills?: { boss_id: string; boss_name: string; difficulties: string[] }[]
   raid_id: number
   header_raid_id: number
   recorder: string

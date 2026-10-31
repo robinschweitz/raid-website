@@ -39,12 +39,15 @@ import (
 
 // Options controls optional runtime behaviour of the HTTP layer.
 type Options struct {
-	CookieSecure      bool
-	TrustProxyHeaders bool
-	PublicOrigin      string
-	AdminUsername     string
-	AdminPassword     string
-	RegistrationFeed  registration.ExternalClient
+	TOTPEncryption        *auth.TOTPEncryption
+	PrivacyContactName    string
+	PrivacyContactAddress string
+	CookieSecure          bool
+	TrustProxyHeaders     bool
+	PublicOrigin          string
+	AdminUsername         string
+	AdminPassword         string
+	RegistrationFeed      registration.ExternalClient
 	// VAPIDKey switches Web Push on (FR-32); nil leaves it off.
 	VAPIDKey *push.VAPIDKey
 	// PushSender replaces the HTTP push sender, for tests.
@@ -76,7 +79,14 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	polls := poll.NewRepo(db)
 	audits := audit.NewRepo(db)
 
-	authSvc := auth.NewService(players, auth.NewRepo(db))
+	authRepo := auth.NewRepo(db)
+	if opts.TOTPEncryption != nil {
+		authRepo = authRepo.WithTOTPEncryption(opts.TOTPEncryption)
+		if err := authRepo.MigrateTOTPSecrets(context.Background()); err != nil {
+			return nil, err
+		}
+	}
+	authSvc := auth.NewService(players, authRepo)
 	registrationFeed := opts.RegistrationFeed
 	if registrationFeed == nil {
 		registrationFeed = registration.RisingGodsClient{}
@@ -124,10 +134,11 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 	v1.CatalogHandlers{Catalog: catalog}.Register(mux)
 	v1.AddonHandlers{Addons: bundledAddons}.Register(mux)
 	v1.StatisticsHandlers{Statistics: statistics.NewService(statistics.NewRepo(db))}.Register(mux)
+	v1.PrivacyHandlers{Contact: v1.PrivacyContact{Name: opts.PrivacyContactName, Address: opts.PrivacyContactAddress}}.Register(mux)
 	unclaimed := unclaimedloot.NewService(unclaimedloot.NewRepo(db), raids, catalog)
-	v1.UnclaimedHandlers{Unclaimed: unclaimed}.Register(mux)
+	v1.UnclaimedHandlers{Unclaimed: unclaimed, Corrections: corrections}.Register(mux)
 	v1.BossKillHandlers{Kills: bosskill.NewService(bosskill.NewRepo(db)), Corrections: corrections}.Register(mux)
-	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed), Roster: api}.Register(mux)
+	v1.AddonSyncHandlers{AddonSync: addonsync.NewService(addonsync.NewRepo(db), raids, raidseries.NewRepo(db), att, chars, players, catalog, lootRepo, points, corrections, unclaimed), Roster: api}.Register(mux)
 	mux.HandleFunc("GET /health", v1.Health)
 	if spa, err := webui.Handler(); err == nil {
 		mux.Handle("/", spa)

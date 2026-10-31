@@ -43,6 +43,7 @@ var (
 )
 
 type Service struct {
+	visitors   visitorLimiter
 	db         *bun.DB
 	repo       *Repo
 	players    *player.Repo
@@ -248,6 +249,11 @@ func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterI
 		}
 		before := mustJSON(c)
 		now := time.Now().UTC()
+		oldName := c.Name
+		if c.Name != profile.Name {
+			c.Name = profile.Name
+			c.NameChangedAt = &now
+		}
 		c.MainSpec = profile.MainSpec
 		c.SecondSpec = profile.SecondSpec
 		c.GearScore = profile.GearScore
@@ -256,6 +262,11 @@ func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterI
 		c.UpdatedAt = now
 		if err := chars.Update(ctx, c); err != nil {
 			return fmt.Errorf("update reloaded character: %w", err)
+		}
+		if c.Name != oldName {
+			if err := chars.InsertNameHistory(ctx, &character.NameHistory{CharacterID: c.ID, OldName: oldName, NewName: c.Name, ActorID: actorID, Reason: "Rising-Gods-Profil neu geladen", CreatedAt: now}); err != nil {
+				return fmt.Errorf("record Rising-Gods rename: %w", err)
+			}
 		}
 		if err := audit.NewRepo(tx).Insert(ctx, &audit.Log{ActorID: &actorID, EntityType: "character", EntityID: fmt.Sprint(c.ID), Action: "reload_rising_gods_profile", BeforeJSON: before, AfterJSON: mustJSON(c), Reason: "Rising-Gods-Profil neu geladen", CreatedAt: now}); err != nil {
 			return fmt.Errorf("audit profile reload: %w", err)
@@ -270,14 +281,14 @@ func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterI
 }
 
 func (s *Service) loadUsableProfile(ctx context.Context, profileID string) (ExternalCharacter, string, error) {
-	profile, raw, err := s.external.LoadCharacter(ctx, profileID)
+	profile, _, err := s.external.LoadCharacter(ctx, profileID)
 	if err != nil {
 		return ExternalCharacter{}, "", fmt.Errorf("load rising-gods profile: %w: %w", ErrProfileUnusable, err)
 	}
 	if profile.ProfileID == "" || profile.Name == "" || profile.Class == "" || profile.MainSpec == "" {
 		return ExternalCharacter{}, "", ErrProfileRequired
 	}
-	return profile, raw, nil
+	return profile, "", nil
 }
 
 // requestAudit is the readable audit snapshot of a registration request; the
@@ -306,7 +317,7 @@ func (s *Service) CreateRequest(ctx context.Context, requesterID *int64, profile
 	} else if existing != nil {
 		return nil, ErrRequestExists
 	}
-	profile, raw, err := s.loadUsableProfile(ctx, profileID)
+	profile, _, err := s.loadUsableProfile(ctx, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +326,7 @@ func (s *Service) CreateRequest(ctx context.Context, requesterID *int64, profile
 		purpose = PurposeClaim
 	}
 	now := time.Now().UTC()
-	req := &Request{RequesterPlayerID: requesterID, Status: StatusPending, Purpose: purpose, ExternalSource: ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, CharacterName: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, GearScore: profile.GearScore, Level: profile.Level, Race: profile.Race, Faction: profile.Faction, RawProfileJSON: raw, CreatedAt: now, UpdatedAt: now}
+	req := &Request{RequesterPlayerID: requesterID, Status: StatusPending, Purpose: purpose, ExternalSource: ExternalSourceRisingGods, ExternalProfileID: profile.ProfileID, ExternalProfileURL: profile.ProfileURL, CharacterName: profile.Name, Class: profile.Class, MainSpec: profile.MainSpec, SecondSpec: profile.SecondSpec, GearScore: profile.GearScore, CreatedAt: now, UpdatedAt: now}
 	err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := NewRepo(tx).CreateRequest(ctx, req); err != nil {
 			return fmt.Errorf("create registration request: %w", err)

@@ -167,7 +167,7 @@ func TestDomainNewEnhancedAwardsRequireRequestID(t *testing.T) {
 					if completed && directLoot {
 						continue
 					}
-					award := &loot.Award{RaidID: f.raidID, CatalogBossID: &f.tokenBoss, ItemID: f.tokenItem, AwardMethod: loot.Enhanced, AwardedToPlayerID: f.first, AwardedToCharacterID: &f.firstChar, AwardedByPlayerID: f.actor, RequestID: key}
+					award := &loot.Award{Difficulty: "NORMAL", RaidID: f.raidID, CatalogBossID: &f.tokenBoss, ItemID: f.tokenItem, AwardMethod: loot.Enhanced, AwardedToPlayerID: f.first, AwardedToCharacterID: &f.firstChar, AwardedByPlayerID: f.actor, RequestID: key}
 					var err error
 					if directLoot {
 						err = loot.NewService(loot.NewRepo(f.db)).Award(context.Background(), award)
@@ -200,7 +200,7 @@ func TestEnteringEnhancedRequiresHistoricalRecipientInRoster(t *testing.T) {
 			f.seedPoints(f.first, 70)
 			f.legacyCompleted()
 			now := time.Now().UTC()
-			old := &loot.Award{RaidID: f.raidID, AwardedToPlayerID: f.first, AwardedByPlayerID: f.actor, Source: "legacy_import", ItemName: "Weiheabzeichen des Eroberers", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
+			old := &loot.Award{Difficulty: "NORMAL", RaidID: f.raidID, AwardedToPlayerID: f.first, AwardedByPlayerID: f.actor, Source: "legacy_import", ItemName: "Weiheabzeichen des Eroberers", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
 			if !nullable {
 				old.AwardedToCharacterID = &f.firstChar
 			}
@@ -404,12 +404,12 @@ func TestEnhancedCompletedCorrectionEligibilityDelta(t *testing.T) {
 	f.archiveHistory()
 	suffix := fmt.Sprintf("/loot/%d", id)
 	f.request(http.MethodPatch, suffix, map[string]any{"award_method": "ENHANCED", "reason": "enhanced winner"}, http.StatusOK)
-	f.points(f.first, 10) // 70 - 50 cost - 10 eligibility delta, no reconstructed reward.
+	f.points(f.first, 20) // 70 - 50 cost; tokens do not change EP eligibility.
 	f.request(http.MethodPatch, suffix, map[string]any{"award_method": "SECOND", "reason": "undo"}, http.StatusOK)
 	f.points(f.first, 70)
 	f.tokenBalance(f.first, 1)
 	entries, err := enhancepoints.NewRepo(f.db).ListByPlayer(context.Background(), f.first)
-	if err != nil || len(entries) != 5 || entries[0].Type != "legacy_open" || entries[0].Amount != 70 {
+	if err != nil || len(entries) != 3 || entries[0].Type != "legacy_open" || entries[0].Amount != 70 {
 		t.Fatalf("history: %v %v", entries, err)
 	}
 }
@@ -448,7 +448,7 @@ func TestHistoricalNullableRecipientPreservedUntilRecipientChange(t *testing.T) 
 	f := newCorrectionFixture(t)
 	f.legacyCompleted()
 	now := time.Now().UTC()
-	old := &loot.Award{RaidID: f.raidID, AwardedToPlayerID: f.first, AwardedByPlayerID: f.actor, Source: "legacy_import", ItemName: "historical", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
+	old := &loot.Award{Difficulty: "NORMAL", RaidID: f.raidID, AwardedToPlayerID: f.first, AwardedByPlayerID: f.actor, Source: "legacy_import", ItemName: "historical", AwardMethod: loot.Second, AwardedAt: now, CreatedAt: now, UpdatedAt: now}
 	if err := loot.NewRepo(f.db).CreateAward(context.Background(), old); err != nil {
 		t.Fatal(err)
 	}
@@ -522,7 +522,7 @@ func TestEnhancedLootCancelledRejectsAndArchiveRequiresReason(t *testing.T) {
 				f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"notes": "clarification", "reason": "archived note"}, http.StatusOK)
 				f.points(f.first, 20)
 				f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"award_method": "SECOND", "reason": "refund"}, http.StatusOK)
-				f.points(f.first, 80)
+				f.points(f.first, 70)
 			} else {
 				f.request(http.MethodPatch, fmt.Sprintf("/loot/%d", id), map[string]any{"award_method": "SECOND", "reason": "blocked refund"}, http.StatusConflict)
 			}

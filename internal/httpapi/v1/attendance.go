@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"raid-website/internal/attendance"
+	"raid-website/internal/bosskill"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/loot"
 	"raid-website/internal/lootcatalog"
@@ -202,6 +203,12 @@ func writeCorrectionError(w http.ResponseWriter, err error) {
 		return
 	}
 	switch {
+	case errors.Is(err, loot.ErrDifficultyRequired):
+		WriteError(w, http.StatusUnprocessableEntity, "difficulty_required", "Bitte die Schwierigkeit des Boss-Kills wählen.")
+	case errors.Is(err, loot.ErrKillDifficultyConflict):
+		WriteError(w, http.StatusConflict, "kill_difficulty_conflict", "Die gespeicherte Schwierigkeit dieses Boss-Kills hat sich geändert. Bitte neu laden.")
+	case errors.Is(err, bosskill.ErrInvalidDifficulty):
+		WriteError(w, http.StatusUnprocessableEntity, "invalid_difficulty", "Diese Schwierigkeit gibt es für diesen Boss und diese Raidgröße nicht.")
 	case errors.Is(err, loot.ErrCatalogContextRequired):
 		WriteError(w, http.StatusConflict, "catalog_context_required", "Raidinstanz und Raidgroesse muessen vor der Lootauswahl konfiguriert werden")
 	case errors.Is(err, lootcatalog.ErrInvalid):

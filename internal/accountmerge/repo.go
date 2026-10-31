@@ -82,6 +82,9 @@ func (r *Repo) InsertPointTransaction(ctx context.Context, row *enhancepoints.Tr
 }
 
 func (r *Repo) RevokeSourceAuth(ctx context.Context, playerID int64) (map[string]int64, error) {
+	if _, err := r.db.NewUpdate().Table("password_reset_codes").Set("revoked_at = ?", time.Now().UTC()).Where("player_id = ? AND used_at IS NULL AND revoked_at IS NULL", playerID).Exec(ctx); err != nil {
+		return nil, err
+	}
 	tables := []string{"sessions", "webauthn_sessions", "mfa_login_challenges", "mfa_recovery_codes", "webauthn_credentials", "player_mfa_settings", "push_subscriptions"}
 	counts := make(map[string]int64, len(tables))
 	for _, table := range tables {
@@ -118,6 +121,7 @@ func (r *Repo) MoveHistoricalReferences(ctx context.Context, sourceID, targetID 
 		{"enhance_point_transactions", "actor_id"}, {"item_locks", "actor_id"}, {"polls", "created_by"},
 		{"poll_votes", "player_id"}, {"audit_log", "actor_id"},
 		{"raid_quick_add_requests", "actor_id"}, {"registration_requests", "requester_player_id"},
+		{"password_reset_codes", "player_id"}, {"password_reset_codes", "created_by_player_id"},
 		{"registration_codes", "created_by_player_id"}, {"registration_codes", "used_by_player_id"},
 		{"raid_boss_kills", "created_by_player_id"}, {"raid_boss_kills", "removed_by_player_id"},
 	}
@@ -214,4 +218,42 @@ func (r *Repo) AnonymiseAccount(ctx context.Context, p *player.Player, newName s
 	_, err = r.db.NewUpdate().Table("players").Set("name = ?", newName).Set("username = NULL").Set("password_hash = ''").
 		Set("role = ?", validation.RoleGuest).Set("updated_at = ?", now).Where("id = ?", p.ID).Exec(ctx)
 	return counts, err
+}
+
+// ExportSections selects only explicitly allowed columns, never auth tables.
+func (r *Repo) ExportSections(ctx context.Context, playerID int64) (map[string][]map[string]any, error) {
+	sections := make(map[string][]map[string]any)
+	for _, section := range []struct{ name, table, columns, where string }{
+		{"characters", "characters", "id, player_id, name, class, main_spec, second_spec, gear_score, is_main, active, external_source, external_profile_id, external_profile_url, created_at, updated_at", "player_id = ?"},
+		{"signups", "raid_signups", "id, raid_id, player_id, character_id, spec, is_withdrawn, created_at, updated_at", "player_id = ?"},
+		{"absences", "raid_absences", "id, raid_id, player_id, reason, status, created_at", "player_id = ?"},
+		{"roster", "raid_attendance", "id, raid_id, player_id, character_id, character_name, class, spec, role, is_substitute, is_bench, late_join, early_leave, notes, created_at, updated_at", "player_id = ?"},
+		{"loot", "loot_awards", "id, raid_id, catalog_boss_id, boss, item_id, item_name, awarded_to_player_id, awarded_to_character_id, awarded_to_character_name, awarded_by_player_id, source, is_main_spec, award_method, enhanced_cost, item_lock_id, notes, awarded_at, withdrawn_at, withdrawn_by_player_id, withdrawn_reason, created_at, updated_at", "awarded_to_player_id = ?"},
+		{"ep_transactions", "enhance_point_transactions", "id, player_id, raid_id, loot_award_id, amount, type, reason, ref_type, ref_id, actor_id, created_at", "player_id = ?"},
+		{"item_locks", "item_locks", "id, player_id, raid_id, item_id, item_name, boss, status, locked_at, used_at, expired_at, cancelled_at, actor_id, notes, created_at, updated_at", "player_id = ?"},
+		{"wishlist", "character_wishlist", "id, player_id, character_id, item_id, item_name, priority, notes, spec, is_enhanced, created_at, updated_at", "player_id = ?"},
+		{"votes", "poll_votes", "id, poll_id, player_id, choice, voted_at", "player_id = ?"},
+	} {
+		rows := []map[string]any{}
+		if err := r.db.NewSelect().TableExpr(section.table).ColumnExpr(section.columns).Where(section.where, playerID).OrderExpr("id ASC").Scan(ctx, &rows); err != nil {
+			return nil, fmt.Errorf("export %s: %w", section.name, err)
+		}
+		sections[section.name] = rows
+	}
+	choices := []map[string]any{}
+	if err := r.db.NewSelect().TableExpr("poll_vote_choices").ColumnExpr("id, vote_id, option_id, label, sort_order").Where("vote_id IN (SELECT id FROM poll_votes WHERE player_id = ?)", playerID).OrderExpr("id ASC").Scan(ctx, &choices); err != nil {
+		return nil, err
+	}
+	sections["vote_choices"] = choices
+	logs := []map[string]any{}
+	if err := r.db.NewSelect().TableExpr("audit_log").ColumnExpr("id, actor_id, entity_type, entity_id, action, before_json, after_json, reason, created_at").Where(`actor_id = ? OR (entity_type = 'player' AND entity_id = ?) OR (entity_type = 'character' AND entity_id IN (SELECT CAST(id AS TEXT) FROM characters WHERE player_id = ?)) OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(before_json) THEN before_json ELSE '{}' END) WHERE key IN ('player_id','awarded_to_player_id','source_player_id','target_player_id') AND atom = ?) OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(after_json) THEN after_json ELSE '{}' END) WHERE key IN ('player_id','awarded_to_player_id','source_player_id','target_player_id') AND atom = ?)`, playerID, strconv.FormatInt(playerID, 10), playerID, playerID, playerID).OrderExpr("id ASC").Scan(ctx, &logs); err != nil {
+		return nil, err
+	}
+	sections["audit"] = logs
+	return sections, nil
+}
+
+// AuditExport records who requested the disclosure, without copying the file.
+func (r *Repo) AuditExport(ctx context.Context, actorID, playerID int64) error {
+	return audit.NewRepo(r.db).Record(ctx, actorID, "player", playerID, "export", nil, map[string]any{"player_id": playerID}, "")
 }

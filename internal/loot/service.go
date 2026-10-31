@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"raid-website/internal/audit"
+	"raid-website/internal/bosskill"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/validation"
 )
@@ -55,12 +56,23 @@ func (s *Service) Award(ctx context.Context, a *Award) error {
 
 // AwardInTransaction applies ordinary loot consequences using the caller's repository transaction.
 func AwardInTransaction(ctx context.Context, awards *Repo, a *Award, reason string) error {
+	return awardInTransaction(ctx, awards, a, reason, false)
+}
+
+// AwardPreparedInTransaction uses a fingerprint resolved before kill creation.
+func AwardPreparedInTransaction(ctx context.Context, awards *Repo, a *Award, reason string) error {
+	return awardInTransaction(ctx, awards, a, reason, true)
+}
+
+func awardInTransaction(ctx context.Context, awards *Repo, a *Award, reason string, requestResolved bool) error {
 	if err := awards.ReserveWriter(ctx); err != nil {
 		return err
 	}
-	retried, err := ResolveRequest(ctx, awards, a, reason)
-	if err != nil || retried {
-		return err
+	if !requestResolved {
+		retried, err := ResolveRequest(ctx, awards, a, reason)
+		if err != nil || retried {
+			return err
+		}
 	}
 	if err := a.DeriveMainSpec(); err != nil {
 		return err
@@ -242,7 +254,8 @@ func ResolveRequest(ctx context.Context, repo *Repo, a *Award, reason string) (b
 		Method                 Method
 		LockID                 *int64
 		Notes, Reason          string
-	}{a.RaidID, a.Boss, a.ItemID, a.ItemName, a.AwardedToPlayerID, a.AwardedToCharacterID, a.CatalogBossID, a.AwardMethod, a.ItemLockID, a.Notes, reason}
+		Difficulty             bosskill.Difficulty `json:"Difficulty,omitempty"`
+	}{a.RaidID, a.Boss, a.ItemID, a.ItemName, a.AwardedToPlayerID, a.AwardedToCharacterID, a.CatalogBossID, a.AwardMethod, a.ItemLockID, a.Notes, reason, a.Difficulty}
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return false, err

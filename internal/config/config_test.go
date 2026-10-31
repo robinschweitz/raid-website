@@ -20,6 +20,8 @@ func TestProductionCredentials(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("ENV", "production")
+			t.Setenv("PRIVACY_CONTACT_NAME", "Max Mustermann")
+			t.Setenv("PRIVACY_CONTACT_ADDRESS", "owner@example.org")
 			t.Setenv("PUBLIC_ORIGIN", "https://example.org")
 			t.Setenv("ADMIN_USERNAME", tc.username)
 			t.Setenv("ADMIN_PASSWORD", tc.password)
@@ -66,6 +68,8 @@ func TestProductionListenAddress(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("ENV", "production")
+			t.Setenv("PRIVACY_CONTACT_NAME", "Max Mustermann")
+			t.Setenv("PRIVACY_CONTACT_ADDRESS", "owner@example.org")
 			t.Setenv("PUBLIC_ORIGIN", "https://example.org")
 			t.Setenv("ADMIN_USERNAME", "owner")
 			t.Setenv("ADMIN_PASSWORD", "unique-password")
@@ -145,6 +149,8 @@ func TestProductionPublicOrigin(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("ENV", "production")
+			t.Setenv("PRIVACY_CONTACT_NAME", "Max Mustermann")
+			t.Setenv("PRIVACY_CONTACT_ADDRESS", "owner@example.org")
 			t.Setenv("ADMIN_USERNAME", "owner")
 			t.Setenv("ADMIN_PASSWORD", "unique-password")
 			t.Setenv("PUBLIC_ORIGIN", tc.origin)
@@ -168,5 +174,34 @@ func TestDevelopmentPublicOrigin(t *testing.T) {
 	t.Setenv("PUBLIC_ORIGIN", "ftp://localhost")
 	if _, err := Load(); err == nil {
 		t.Fatal("a non-http origin must fail")
+	}
+}
+
+func TestReqPrivacy010_AC03(t *testing.T) {
+	for _, tc := range []struct {
+		name, contactName, address string
+		valid                      bool
+	}{
+		{"both missing", "", "", false},
+		{"name missing", "", "owner@example.org", false},
+		{"address missing", "Max Mustermann", "", false},
+		{"blank values", " \t", " ", false},
+		{"both set", "Max Mustermann", "owner@example.org", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("ENV", "production")
+			t.Setenv("ADMIN_USERNAME", "owner")
+			t.Setenv("ADMIN_PASSWORD", "unique-password")
+			t.Setenv("PUBLIC_ORIGIN", "https://example.org")
+			t.Setenv("PRIVACY_CONTACT_NAME", tc.contactName)
+			t.Setenv("PRIVACY_CONTACT_ADDRESS", tc.address)
+			cfg, err := Load()
+			if (err == nil) != tc.valid {
+				t.Fatalf("Load error = %v, want valid %v", err, tc.valid)
+			}
+			if tc.valid && (cfg.PrivacyContactName != "Max Mustermann" || cfg.PrivacyContactAddress != "owner@example.org") {
+				t.Fatalf("contact = %q / %q", cfg.PrivacyContactName, cfg.PrivacyContactAddress)
+			}
+		})
 	}
 }

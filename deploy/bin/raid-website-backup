@@ -189,14 +189,50 @@ if players == 0 or raids == 0:
 print(f"restored database: {players} players, {raids} raids")
 PY
 
-    # The copy runs as the unprivileged service user on a loopback port in
-    # development mode, so it starts without the production secrets.
+    # Only archived TOTP keys accompany the isolated copy. Never source the
+    # environment as shell code or enable production integrations during a test.
     chown -R raidweb:raidweb "$restore_dir"
     chmod 0711 "$work"
-    (cd "$restore_dir" && exec setpriv --reuid=raidweb --regid=raidweb --clear-groups --no-new-privs \
-        env -i PATH=/usr/bin:/bin ENV=development LISTEN_ADDR=127.0.0.1:18080 \
-        "DATABASE_URL=file:$restore_dir/raid.db?_pragma=journal_mode(WAL)" \
-        "$SERVER_BINARY") >"$work/server.log" 2>&1 &
+    (cd "$restore_dir" && exec python3 - "$work/bundle/raid-website.env" "$restore_dir" "$SERVER_BINARY" <<'RESTORE_PY'
+import base64
+import os
+import shlex
+import sys
+
+
+def restore_environment(env_file, restore_dir):
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "ENV": "development",
+        "LISTEN_ADDR": "127.0.0.1:18080",
+        "DATABASE_URL": f"file:{restore_dir}/raid.db?_pragma=journal_mode(WAL)",
+    }
+    allowed = {"TOTP_ENCRYPTION_KEY", "TOTP_ENCRYPTION_KEYS_PREVIOUS"}
+    with open(env_file, encoding="utf-8") as source:
+        for line in source:
+            name, separator, raw = line.strip().partition("=")
+            if not separator or name not in allowed:
+                continue
+            try:
+                fields = shlex.split(raw, comments=False)
+                if len(fields) > 1:
+                    raise ValueError("multiple values")
+                value = fields[0] if fields else ""
+                keys = value.split(",") if name.endswith("_PREVIOUS") else [value]
+                if value and any(len(base64.b64decode(key.strip(), validate=True)) != 32 for key in keys):
+                    raise ValueError("invalid key length")
+            except ValueError:
+                raise SystemExit("invalid archived " + name) from None
+            environment[name] = value
+    return environment
+
+
+if __name__ == "__main__":
+    environment = restore_environment(sys.argv[1], sys.argv[2])
+    os.execve("/usr/bin/setpriv", ["setpriv", "--reuid=raidweb", "--regid=raidweb",
+              "--clear-groups", "--no-new-privs", sys.argv[3]], environment)
+RESTORE_PY
+    ) >"$work/server.log" 2>&1 &
     server_pid=$!
     healthy=false
     attempt=0

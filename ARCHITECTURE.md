@@ -95,15 +95,14 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   ordered by name and then ID.
 - **Operator reset command.** A new `cmd/reset-code` opens the database with the server's
   configuration and calls the `registration` reset-code service directly, like `cmd/sync-addons`
-  calls `internal/addons`; it has no HTTP surface (SC-051, OD-019). Not built.
+  calls `internal/addons`; it has no HTTP surface (SC-051, OD-019). Built in #83: `--player-id` or an unambiguous exact name/login; the command prints the code once and records the server operator in the audit and security journal.
 - **Privacy.** `accountmerge.Anonymise` (`POST /api/v1/players/{id}/anonymise`, Admin only) is built
   (FR-30.2–30.5, SC-032). It runs in one transaction, reuses the last-Admin check, and writes the
   audit entry `player_anonymise`; the audit reader (`audit.Repo.List`) uses that entry to hide the
   actor name and the name in the player's own snapshots. The privacy
-  page is a static frontend page; its contact name and address come from two new configuration
-  values, read by `internal/config`, and reach the page through a public read endpoint
-  `GET /api/v1/privacy-contact` (Owner 2026-10-22, AQ-6; endpoint confirmed 2026-10-23, backlog #49).
-  Not built.
+  page `/datenschutz` is a static frontend page; its contact name and address come from
+  `PRIVACY_CONTACT_NAME` and `PRIVACY_CONTACT_ADDRESS`, required in production and read by `internal/config`, and reach the page through a public read endpoint
+  `GET /api/v1/privacy-contact` (Owner 2026-10-22, AQ-6; endpoint confirmed 2026-10-23, backlog #49). Built in #84.
 - **Boss kills.** The `bosskill` domain package owns `raid_boss_kills` (raid, catalog boss,
   difficulty; at most one active kill per raid and boss, enforced by a partial unique index;
   a removed kill keeps its row with `removed_at`, FR-31.1). `raidcorrection` writes kills
@@ -118,8 +117,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   FR-29.8).
 - **Public interface.** Without a session, only these reads answer (FR-1.2): `GET /api/v1/raids`,
   `/players`, `/polls`, `/raids/{id}/attendance`, `/addons`, `/addons/{name}/download`,
-  `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/statistics`, and, not
-  built, `/privacy-contact`. Login, MFA, and registration writes are public too.
+  `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/statistics`, and `/privacy-contact`. Login, MFA, and registration writes are public too.
 - **API notes.** Catalog reads: `GET /api/v1/loot-catalog` and its `/instances`, `/bosses`,
   `/items`; there are no catalog write endpoints. Raid series: `weekdays` are 0 (Sunday) to 6
   (Saturday), `start_time` is `HH:MM`, `timezone` an IANA name. `PATCH /api/v1/raids/{id}` takes
@@ -128,8 +126,8 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   Loot DTOs carry `award_method`, never a client-set `is_main_spec`.
 - **Security events and account recovery.** Security events are written as structured lines to
   the systemd journal, which keeps them 30 days (SC-041). Password-reset codes reuse the
-  registration-code infrastructure in `registration` (owner 2026-10-23, backlog #48), and the personal-data export
-  (FR-30.7) lives in `accountmerge` next to anonymisation (owner 2026-10-23, backlog #50). (Owner 2026-10-23.) Not built.
+  registration-code infrastructure in `registration` (owner 2026-10-23, backlog #48; hash-only reset-code creation built in #81, redemption built in #82), and the personal-data export
+  (FR-30.7) is built in `accountmerge` next to anonymisation (#86). Admin-only `GET /api/v1/players/{id}/export` returns an audited, transaction-consistent JSON snapshot with explicitly selected fields and redacted audit snapshots. Player snapshots use the same identity hiding as the audit view (FR-30.4), checking anonymisation markers even outside the selected player's history. Reset codes remain tracked separately.
 - **No background jobs.** Deadlines (signup close, MFA expiry) are evaluated on each request.
   Planning ahead runs on series save and archive (FR-9.7). The only periodic work is on the host
   (backups, updates, reboots; see `deploy/`).
@@ -146,7 +144,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | Web client (`web/src`) | Pages, forms, hash routing, German UI, local drafts | None authoritative; convenience checks only | Browser drafts (`localStorage`) | FR-28, `DESIGN.md` | SUPPORTED |
 | HTTP layer (`httpapi`, `httpapi/v1`) | Middleware chain, route guards, DTOs, error mapping, SPA and health, server timeouts | Role matrix, session presence, CSRF, body size | None | FR-1, FR-2.8, NFR-4.1, NFR-4.2 | SUPPORTED |
 | `auth` | Login, sessions, passwords, TOTP, recovery codes, WebAuthn, bootstrap admin | Password length, login rate limit, MFA challenge expiry | sessions, login attempts, MFA secrets and credentials, password hash | FR-2, FR-3 | SUPPORTED |
-| `registration` | Rising-Gods client and cache; registration requests, codes, claims; visitor search counter | Alliance level-80 filter, request deduplication, code expiry, visitor search limit | registration requests, codes, external profiles | FR-4, FR-7 | SUPPORTED (search limit not built) |
+| `registration` | Rising-Gods client and cache; registration requests, codes, claims; visitor search counter | Alliance level-80 filter, request deduplication, code expiry, visitor search limit | registration requests, codes, external profiles | FR-4, FR-7 | SUPPORTED (visitor limit built in #79) |
 | `player` | Players, roles, public player view | Public field subset | players | FR-1.3, FR-1.9, FR-5.1–5.2 | SUPPORTED |
 | `character` | Characters, name history, merge aliases, transfer | Rising-Gods provenance uniqueness, merge conflicts | characters, name history, aliases | FR-6 | SUPPORTED |
 | `accountmerge` | Player merge; player anonymisation | Same-item lock conflict, credential retention; data deleted versus kept | (coordinator) | FR-5.3–5.7, FR-30.2–30.5 | SUPPORTED |
@@ -156,7 +154,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `raid` | Raids, schedule, cancel, current raid | Name from template, status transitions for cancel | raids | FR-10.1–10.5, FR-11.1 | SUPPORTED |
 | `raidsignup` | Signup availability, choices, acceptance, absences | Deadline, ownership, one accepted character | signups, absences | FR-12 | SUPPORTED |
 | `attendance` | Roster rows with per-raid snapshots | Snapshot completeness | raid attendance | FR-13.2–13.4 | SUPPORTED |
-| `raidcorrection` | Roster and loot writes, corrections, withdrawal, quick-add | Raid-state rules, archived reason, EP eligibility delta, retry receipts | quick-add receipts (coordinator otherwise) | FR-13, FR-14.8–14.10, FR-16.5–16.6, FR-29.5 | SUPPORTED |
+| `raidcorrection` | Roster and loot writes, corrections, withdrawal, quick-add, manual unclaimed loot with its kill | Raid-state rules, archived reason, EP eligibility delta, retry receipts | quick-add receipts (coordinator otherwise) | FR-13, FR-14.8–14.10, FR-16.5–16.6, FR-29.5 | SUPPORTED |
 | `loot` | Loot awards, methods, enhanced cost, lock auto-award, token derivation | Roster recipient, request-ID idempotency, cost formula | loot awards | FR-14, FR-18 | SUPPORTED |
 | `unclaimedloot` | Items that went to nobody | No player effect | unclaimed loot | FR-15 | SUPPORTED |
 | `enhancepoints` | EP ledger, balances, item locks | 150-EP lock threshold, competing locks, ownership | EP transactions, item locks | FR-16, FR-17 | SUPPORTED |
@@ -170,8 +168,8 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `push` | Push subscriptions, RFC 8291/8292, delivery after commit | Endpoint allowlist, MEMBER recipients, neutral payload, 404/410 clean-up | push subscriptions | FR-32 | SUPPORTED |
 | `audit` | Audit writer and Admin reader | Append-only, no secrets in snapshots | audit log | FR-26 | SUPPORTED |
 | Statistics (`GET /api/v1/statistics`, `internal/statistics`) | Public aggregates computed on the server | Public field subset (FR-27.2) | none (derived, read-only) | FR-27 | SUPPORTED |
-| `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (loot and import integration not built) |
-| Privacy page | Static page with contact from configuration | None | none | FR-30.1 | SUPPORTED (not built) |
+| `bosskill` | Kill list per raid, difficulty per boss | One kill per boss, catalog difficulties, loot blocks removal | raid boss kills | FR-29 | SUPPORTED (manual and addon loot integration built in #95 / #96) |
+| Privacy page | Static page with contact from configuration | None | none | FR-30.1 | SUPPORTED |
 | Infrastructure (`config`, `db`, `migrations`, `validation`, `webui`) | Environment config, DB open, schema, enums, embedded SPA | Production config rules, foreign keys, SPA present in production | schema | NFR-1 | SUPPORTED |
 | Rising-Gods Worker (`workers/`) | Authenticated fixed-origin GET proxy to `db.rising-gods.de` | Fixed origin and shared token (SC-029) | none | FR-7, ADR 048, ADR 053 | SUPPORTED |
 
@@ -321,3 +319,10 @@ None open. The owner resolved AQ-1 to AQ-8 on 2026-10-22; the answers are in the
 - **AQ-6** Anonymise in `accountmerge`; privacy contact from configuration.
 - **AQ-7** Visitor search counter in memory.
 - **AQ-8** `go mod tidy`, delete `internal/logger` (DR-11, DR-12).
+
+Addon loot imports (#96) reserve the SQLite writer before a fresh preview/kill read. The addon coordinator binds every repository and both loot services to the same transaction, so selected awards, unclaimed entries, kills, lock changes, EP and audit writes commit together or roll back together.
+
+### Raid-News (#202)
+- `raid_news` stores publication status and text; `raid_news_acknowledgements` stores per-player confirmation.
+- v1 endpoints read published posts and require raid-assistant role for management; signed-in actors acknowledge published important posts.
+- Dashboard loads news independently of raid data.

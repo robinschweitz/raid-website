@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/uptrace/bun"
+	"raid-website/internal/bosskill"
 	"sort"
 	"strings"
 	"time"
@@ -45,6 +47,7 @@ var encounterNPCs = map[string]string{
 
 // Service builds invite exports and imports recorded loot.
 type Service struct {
+	repo        *Repo
 	raids       *raid.Repo
 	series      *raidseries.Repo
 	attendance  *attendance.Repo
@@ -59,8 +62,8 @@ type Service struct {
 
 // NewService wires the repositories the addon exchange reads and the
 // correction service that performs the actual loot writes.
-func NewService(raids *raid.Repo, series *raidseries.Repo, attendanceRepo *attendance.Repo, characters *character.Repo, players *player.Repo, catalog *lootcatalog.Service, lootRepo *loot.Repo, points *enhancepoints.Repo, corrections *raidcorrection.Service, unclaimed *unclaimedloot.Service) *Service {
-	return &Service{raids: raids, series: series, attendance: attendanceRepo, characters: characters, players: players, catalog: catalog, loot: lootRepo, points: points, corrections: corrections, unclaimed: unclaimed}
+func NewService(repo *Repo, raids *raid.Repo, series *raidseries.Repo, attendanceRepo *attendance.Repo, characters *character.Repo, players *player.Repo, catalog *lootcatalog.Service, lootRepo *loot.Repo, points *enhancepoints.Repo, corrections *raidcorrection.Service, unclaimed *unclaimedloot.Service) *Service {
+	return &Service{repo: repo, raids: raids, series: series, attendance: attendanceRepo, characters: characters, players: players, catalog: catalog, loot: lootRepo, points: points, corrections: corrections, unclaimed: unclaimed}
 }
 
 // InviteExport renders the raid roster for the addon. Invites use the live
@@ -113,7 +116,15 @@ func (s *Service) realmStart(ctx context.Context, rd *raid.Raid) (*time.Time, er
 }
 
 // LootPreview is the dry run of a loot import. It never writes.
+// BossDifficulty describes one selectable boss without a recorded kill.
+type BossDifficulty struct {
+	BossID       string             `json:"boss_id"`
+	BossName     string             `json:"boss_name"`
+	Difficulties []lootcatalog.Mode `json:"difficulties"`
+}
+
 type LootPreview struct {
+	MissingKills     []BossDifficulty  `json:"missing_kills"`
 	RaidID           int64             `json:"raid_id"`
 	HeaderRaidID     int64             `json:"header_raid_id"`
 	Recorder         string            `json:"recorder"`
@@ -174,7 +185,7 @@ func (s *Service) PreviewLootImport(ctx context.Context, raidID int64, text stri
 	if err != nil {
 		return nil, err
 	}
-	preview := &LootPreview{RaidID: rd.ID, HeaderRaidID: export.RaidID, Recorder: export.Recorder, Rows: []LootPreviewRow{}, RecipientOptions: resolver.recipientOptions(), Warnings: []string{}}
+	preview := &LootPreview{MissingKills: []BossDifficulty{}, RaidID: rd.ID, HeaderRaidID: export.RaidID, Recorder: export.Recorder, Rows: []LootPreviewRow{}, RecipientOptions: resolver.recipientOptions(), Warnings: []string{}}
 	if export.RaidID != rd.ID {
 		preview.Warnings = append(preview.Warnings, fmt.Sprintf("Der Export wurde für Raid #%d aufgezeichnet, nicht für diesen Raid (#%d).", export.RaidID, rd.ID))
 	}
@@ -182,15 +193,40 @@ func (s *Service) PreviewLootImport(ctx context.Context, raidID int64, text stri
 	for i, line := range export.Lines {
 		preview.Rows = append(preview.Rows, resolver.resolve(ctx, keys[i], line))
 	}
+	kills, err := s.repo.Kills().ListByRaid(ctx, raidID)
+	if err != nil {
+		return nil, err
+	}
+	known := map[string]bool{}
+	for _, kill := range kills {
+		known[kill.CatalogBossID] = true
+	}
+	for _, row := range preview.Rows {
+		if !row.IsImportable || row.IsAlreadyImported {
+			continue
+		}
+		for _, boss := range row.BossOptions {
+			if known[boss.ID] {
+				continue
+			}
+			_, modes, err := s.catalog.BossModes(ctx, *rd.CatalogInstanceID, boss.ID, *rd.RaidSize)
+			if err != nil {
+				return nil, err
+			}
+			preview.MissingKills = append(preview.MissingKills, BossDifficulty{BossID: boss.ID, BossName: boss.Name, Difficulties: modes})
+			known[boss.ID] = true
+		}
+	}
 	return preview, nil
 }
 
 // LootSelection is the staff decision for one previewed line.
 type LootSelection struct {
-	LineKey       string      `json:"line_key"`
-	CatalogBossID string      `json:"catalog_boss_id"`
-	CharacterID   int64       `json:"character_id"`
-	AwardMethod   loot.Method `json:"award_method"`
+	Difficulty    bosskill.Difficulty `json:"difficulty"`
+	LineKey       string              `json:"line_key"`
+	CatalogBossID string              `json:"catalog_boss_id"`
+	CharacterID   int64               `json:"character_id"`
+	AwardMethod   loot.Method         `json:"award_method"`
 }
 
 // Import result statuses.
@@ -214,9 +250,26 @@ type LootImportResult struct {
 
 // ApplyLootImport records the selected lines through the ordinary loot path,
 // so catalog validation, roster checks, item locks and Enhanced costs apply
-// exactly as for a manual entry. Every line is its own idempotent write and
-// the result reports each one; nothing is overwritten.
+// exactly as for a manual entry. Every selected line and its kill share one
+// transaction; any failed line rolls the entire import back.
 func (s *Service) ApplyLootImport(ctx context.Context, raidID, actorID int64, text string, selections []LootSelection) ([]LootImportResult, error) {
+	var results []LootImportResult
+	err := s.repo.InTransaction(ctx, func(tx bun.Tx) error {
+		bound := s.withTx(tx)
+		var err error
+		results, err = bound.applyLootImport(ctx, raidID, actorID, text, selections)
+		return err
+	})
+	return results, err
+}
+
+func (s *Service) withTx(tx bun.Tx) *Service {
+	raids := s.raids.WithTx(tx)
+	catalog := lootcatalog.NewService(lootcatalog.NewRepo(tx))
+	return NewService(s.repo.WithTx(tx), raids, s.series.WithTx(tx), s.attendance.WithTx(tx), s.characters.WithTx(tx), s.players.WithTx(tx), catalog, s.loot.WithTx(tx), s.points.WithTx(tx), raidcorrection.NewService(raidcorrection.NewRepo(tx)), unclaimedloot.NewService(unclaimedloot.NewRepo(tx), raids, catalog))
+}
+
+func (s *Service) applyLootImport(ctx context.Context, raidID, actorID int64, text string, selections []LootSelection) ([]LootImportResult, error) {
 	rd, err := s.importableRaid(ctx, raidID)
 	if err != nil {
 		return nil, err
@@ -277,8 +330,31 @@ func (s *Service) ApplyLootImport(ctx context.Context, raidID, actorID int64, te
 		}
 		results = append(results, result)
 	}
+	for _, result := range results {
+		if result.Status != ResultFailed {
+			continue
+		}
+		for i := range results {
+			if results[i].Status == ResultCreated {
+				results[i].Status = ResultFailed
+				results[i].Code = "import_rolled_back"
+				results[i].Message = "Der gesamte Import wurde zurückgerollt."
+				results[i].AwardID = nil
+				results[i].UnclaimedID = nil
+			}
+		}
+		return results, &ImportFailure{Code: result.Code, Message: result.Message, Results: results}
+	}
 	return results, nil
 }
+
+// ImportFailure reports a rolled-back import without exposing storage errors.
+type ImportFailure struct {
+	Code, Message string
+	Results       []LootImportResult
+}
+
+func (e *ImportFailure) Error() string { return "addon loot import failed" }
 
 func (s *Service) importLine(ctx context.Context, rd *raid.Raid, actorID int64, selection LootSelection, line LootLine) (*loot.Award, error) {
 	if strings.TrimSpace(selection.CatalogBossID) == "" {
@@ -303,6 +379,7 @@ func (s *Service) importLine(ctx context.Context, rd *raid.Raid, actorID int64, 
 	requestID := selection.LineKey
 	now := time.Now().UTC()
 	award := &loot.Award{
+		Difficulty:           selection.Difficulty,
 		RaidID:               rd.ID,
 		CatalogBossID:        &bossID,
 		ItemID:               line.ItemID,
@@ -326,6 +403,20 @@ func (s *Service) importLine(ctx context.Context, rd *raid.Raid, actorID int64, 
 // importUnclaimed records a disenchanted or banked line as loot that went to
 // nobody (ADR 089). The boss is optional; the holder is who has the item.
 func (s *Service) importUnclaimed(ctx context.Context, rd *raid.Raid, actorID int64, selection LootSelection, line LootLine, result *LootImportResult) {
+	known, err := s.unclaimed.AddonLineKeys(ctx, rd.ID)
+	if err != nil {
+		result.Status, result.Code, result.Message = ResultFailed, "save_failed", "Beute konnte nicht geprüft werden"
+		return
+	}
+	if _, exists := known[selection.LineKey]; !exists {
+		bossID := selection.CatalogBossID
+		award := &loot.Award{RaidID: rd.ID, CatalogBossID: &bossID, ItemID: line.ItemID, AwardedByPlayerID: actorID, Difficulty: selection.Difficulty}
+		if err := loot.EnsureBossKill(ctx, s.loot, award, ""); err != nil {
+			result.Status = ResultFailed
+			result.Code, result.Message = importErrorMessage(err)
+			return
+		}
+	}
 	outcome := unclaimedloot.Disenchanted
 	if line.State == LootBank {
 		outcome = unclaimedloot.Bank
@@ -347,6 +438,12 @@ func (s *Service) importUnclaimed(ctx context.Context, rd *raid.Raid, actorID in
 // importErrorMessage turns a failed write into a stable code and a German message.
 func importErrorMessage(err error) (string, string) {
 	switch {
+	case errors.Is(err, loot.ErrDifficultyRequired):
+		return "difficulty_required", "Bitte für jeden Boss ohne Kill eine Schwierigkeit wählen"
+	case errors.Is(err, loot.ErrKillDifficultyConflict):
+		return "kill_difficulty_conflict", "Die Schwierigkeit eines Boss-Kills hat sich geändert"
+	case errors.Is(err, bosskill.ErrInvalidDifficulty):
+		return "invalid_difficulty", "Die Schwierigkeit passt nicht zum Boss und zur Raidgröße"
 	case errors.Is(err, lootcatalog.ErrInvalid):
 		return "catalog_item_invalid", "Boss und Gegenstand passen nicht zur Raidinstanz und Raidgröße"
 	case errors.Is(err, loot.ErrRoster):

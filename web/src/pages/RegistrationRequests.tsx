@@ -159,7 +159,7 @@ export function RegistrationRequestsPage() {
   return <div className="registration-requests">
     <p><Link to="/roster">← Gildenkonfiguration</Link></p>
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Registrierungsanfragen</h1></div></div>
-    <p className="muted">Codes werden nur einmal angezeigt. Die aktive Ansicht enthält nur offene Anfragen und aktive Codes.</p>
+    <p className="muted">Bereits erstellte Codes können nicht erneut angezeigt werden, weil nur ihr sicherer Hash gespeichert wird. Hat ein anderer Admin einen Code nicht weitergegeben, öffne „Details“: Du kannst einen neuen Code ausstellen und den alten widerrufen. Der neue Code wird einmalig angezeigt und kann direkt kopiert werden.</p>
     {error && <ErrorMessage>{error}</ErrorMessage>}
     {addonCodes && <section className="card">
       <h2>Addon-Export</h2>
@@ -186,7 +186,7 @@ export function RegistrationRequestsPage() {
           <td>{linkedPlayerCell(request)}</td>
           <td><button type="button" className="registration-details" aria-expanded={openRequestID === request.id} onClick={() => toggleDetails(request)}>{openRequestID === request.id ? 'Schließen' : 'Details'}</button></td>
           <td className="actions">
-            <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED' || !!request.name_match} title={request.name_match ? 'Bitte zuerst unten wählen, ob der Spieler zugeordnet wird.' : undefined} onClick={() => void createCode(request)}>Code erstellen</button>
+            <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED' || !!request.name_match} title={request.name_match ? 'Bitte zuerst unten wählen, ob der Spieler zugeordnet wird.' : undefined} onClick={() => void createCode(request)}>{request.status === 'APPROVED' ? 'Neuen Code ausstellen' : 'Code erstellen'}</button>
             <button disabled={pending || request.status === 'REJECTED' || request.status === 'CONSUMED'} onClick={() => void reject(request)}>Ablehnen</button>
           </td>
         </tr>

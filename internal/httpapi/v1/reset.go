@@ -36,7 +36,9 @@ func (a *API) redeemResetCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.Registration.RedeemResetCode(r.Context(), req.Code, req.Password, clientAddress(r, a.TrustProxyHeaders)); err != nil {
-		a.securityEvent(w, r, "password_reset_failed")
+		if !a.rateLimitEvent(w, r, err) {
+			a.securityEvent(w, r, "password_reset_failed")
+		}
 		registrationError(w, err)
 		return
 	}

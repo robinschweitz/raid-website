@@ -1,12 +1,14 @@
 package v1
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 
 	"raid-website/internal/auth"
+	"raid-website/internal/registration"
 )
 
 // securityLog writes one JSON line per security event to stderr, which systemd
@@ -35,6 +37,20 @@ func LogSecurityEvent(w http.ResponseWriter, r *http.Request, trustProxyHeaders 
 
 func (a *API) securityEvent(w http.ResponseWriter, r *http.Request, event string, attrs ...slog.Attr) {
 	LogSecurityEvent(w, r, a.TrustProxyHeaders, event, attrs...)
+}
+
+// rateLimitEvent logs a rejection by the visitor lookup limit (SC-028) or the
+// failed-redemption limit (SC-042) and reports whether err was one.
+func (a *API) rateLimitEvent(w http.ResponseWriter, r *http.Request, err error, attrs ...slog.Attr) bool {
+	switch {
+	case errors.Is(err, registration.ErrSearchLimit):
+		a.securityEvent(w, r, "lookup_blocked", attrs...)
+	case errors.Is(err, auth.ErrLoginRateLimited):
+		a.securityEvent(w, r, "code_redemption_blocked", attrs...)
+	default:
+		return false
+	}
+	return true
 }
 
 // playerAttrs names the player of a failed MFA step when the challenge knew one.

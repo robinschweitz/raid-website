@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"raid-website/internal/httpapi"
 	v1 "raid-website/internal/httpapi/v1"
 	"raid-website/internal/validation"
 )
@@ -176,5 +177,55 @@ func TestReqAuth024_WrongMFACodeNamesThePlayer(t *testing.T) {
 	raw, _ := json.Marshal(events)
 	if strings.Contains(string(raw), wrongCode) || strings.Contains(string(raw), started.Data.Challenge) {
 		t.Fatal("journal lines contain the MFA code or the challenge")
+	}
+}
+
+// TestReqAuth024_RateLimitRejectionsAreLogged covers the SC-041 rejections of
+// SC-028 and SC-042: each one writes a single line, and no code or username
+// beyond the normalised one reaches the journal.
+func TestReqAuth024_RateLimitRejectionsAreLogged(t *testing.T) {
+	buf := captureSecurityLog(t)
+	srv, _ := setupServerWithOptions(t, httpapi.Options{RegistrationFeed: &visitorFeed{}})
+	client := srv.Client()
+
+	for i := 0; i < 10; i++ {
+		do(t, client, http.MethodGet, srv.URL+"/api/v1/external/rising-gods/characters?q=Mage", "", nil)
+	}
+	if status, _ := do(t, client, http.MethodGet, srv.URL+"/api/v1/external/rising-gods/characters?q=Mage", "", nil); status != http.StatusTooManyRequests {
+		t.Fatalf("eleventh search = %d, want 429", status)
+	}
+	if status, _ := do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/registration-requests", "", map[string]any{"profile_id": "1"}); status != http.StatusTooManyRequests {
+		t.Fatalf("registration request over the limit = %d, want 429", status)
+	}
+	if got := eventNames(buf.events(t)); strings.Join(got, ",") != "lookup_blocked,lookup_blocked" {
+		t.Fatalf("lookup events = %v", got)
+	}
+
+	const wrongCode = "WRONG-CODE-123"
+	for i := 0; i < 30; i++ {
+		do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": wrongCode, "username": "newcomer", "password": "newcomer-password-1"})
+	}
+	if status, _ := do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/register-with-code", "", map[string]any{"code": wrongCode, "username": " NewComer ", "password": "newcomer-password-1"}); status != http.StatusTooManyRequests {
+		t.Fatalf("registration over the limit = %d, want 429", status)
+	}
+	if status, _ := do(t, client, http.MethodPost, srv.URL+"/api/v1/auth/reset-password", "", map[string]any{"code": wrongCode, "password": "newcomer-password-1"}); status != http.StatusTooManyRequests {
+		t.Fatalf("reset over the limit = %d, want 429", status)
+	}
+	events := buf.events(t)
+	got := eventNames(events)
+	if strings.Join(got[2:], ",") != "code_redemption_blocked,code_redemption_blocked" {
+		t.Fatalf("redemption events = %v", got)
+	}
+	if events[2]["username"] != "newcomer" {
+		t.Fatalf("blocked registration names %v, want the normalised username", events[2]["username"])
+	}
+	for _, e := range events {
+		if e["client_address"] == "" || e["request_id"] == "" {
+			t.Fatalf("event without address or request ID: %v", e)
+		}
+	}
+	raw, _ := json.Marshal(events)
+	if strings.Contains(string(raw), wrongCode) || strings.Contains(string(raw), "newcomer-password-1") {
+		t.Fatal("journal lines contain a code or a password")
 	}
 }

@@ -196,7 +196,7 @@ func loadAddon(root fs.FS, name string) (Addon, error) {
 }
 
 // LicenseFile is the one file outside the .toc that a bundle may hold and its
-// zip ships, so the license text travels with a GPL addon (ADR 105).
+// zip ships, so the license text travels with a GPL addon (ADR 108).
 const LicenseFile = "LICENSE"
 
 // requireExactFiles makes sure the bundle folder holds the .toc's files (and

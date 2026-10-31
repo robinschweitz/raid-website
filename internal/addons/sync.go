@@ -16,7 +16,7 @@ type SyncResult struct {
 
 // Sync copies every bundled addon from a wow-addons checkout (source/<Name>/)
 // into the bundle directory: the .toc, the files it lists and, if present, its
-// LICENSE (ADR 105), nothing else.
+// LICENSE (ADR 108), nothing else.
 // Files of the old version that the new .toc no longer lists are removed, so
 // the bundle always matches its .toc. The source is checked completely before
 // anything is written.

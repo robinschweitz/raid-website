@@ -156,7 +156,7 @@ func TestSyncCopiesTocFilesAndRemovesStaleOnes(t *testing.T) {
 	}
 }
 
-// ADR 105: an addon's LICENSE is the one file outside its .toc that ships,
+// ADR 108: an addon's LICENSE is the one file outside its .toc that ships,
 // in the bundle and in the download zip; any other unlisted file still fails.
 func TestLicenseShipsInBundleAndZip(t *testing.T) {
 	source, bundle := t.TempDir(), t.TempDir()

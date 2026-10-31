@@ -1,4 +1,4 @@
-# ADR 105: An addon's LICENSE ships in its bundle and download
+# ADR 108: An addon's LICENSE ships in its bundle and download
 
 Status: Accepted. Amends ADR 085 (Bundle, Updating).
 

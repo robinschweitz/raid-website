@@ -1,8 +1,13 @@
-export const appVersion = '1.0.78'
+export const appVersion = '1.0.79'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'RaidLedger 2.8.0',
+    changes: ['Neue RaidLedger-Version zum Herunterladen unter „Addons“. Ein kleiner Knopf erinnert die Gruppenleitung in Instanzen, wenn die Beuteart nicht zum Bosskampf passt, und stellt sie mit einem Klick um. In den Einstellungen lässt er sich abschalten.', 'Spieler von der Einladungsliste können sich per Flüstern einladen lassen. Das Wort ist frei wählbar, Standard ist inv.'],
+  },
+  {
+    version: '1.0.78',
     title: 'Neue RaidLedger-Bilder',
     changes: ['Die Addon-Seite zeigt RaidLedger jetzt mit Bildern aus Version 2.7.0, auch vom kleinen Fenster beim Plündern.'],
   },

@@ -192,12 +192,12 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
             <tr><td><strong>VERGABEN</strong></td><td>Jede Vergabe dieses Raids korrigieren: Empfänger, Main-/Second-Spec, zurück in die Beute, entfernen, Würfe; Export und neuer Raid</td></tr>
             <tr><td><strong>SPIELER</strong></td><td>Items und Tokens pro Spieler und Spec, mit Korrekturen per − / +</td></tr>
             <tr><td><strong>RAID</strong></td><td>Einladen, Gruppen, Teilnahme, Kalender-Termin</td></tr>
-            <tr><td><strong>EINSTELLUNGEN</strong></td><td>Wer ändern darf, wer welches Addon hat, Wurfzeiten, Minimap-Knopf, Skalierung, Abgleich</td></tr>
+            <tr><td><strong>EINSTELLUNGEN</strong></td><td>Wer ändern darf, wer welches Addon hat, Wurfzeiten, Minimap-Knopf, Beute-Knopf, Skalierung, Abgleich</td></tr>
           </tbody>
         </table>
       </div>
 
-      <Feature title="1. Raid aufstellen" shot={<Shot name="raidledger-aufstellung" caption="RAID: Einladungsliste mit Datum und Uhrzeit eingelesen" width={709} height={448} />}>
+      <Feature title="1. Raid aufstellen" shot={<Shot name="raidledger-aufstellung" caption="RAID: Einladungsliste eingelesen, Flüster-Einladung an, Wort inv" width={709} height={448} />}>
         <ol>
           <li>Auf der Website im Raid unter <strong>Aufstellung</strong> bei <em>Einladungen für Addon</em> auf <strong>Für Addon kopieren</strong> klicken.</li>
           <li>Im Spiel den Reiter <strong>RAID</strong> öffnen (oder <code>/ledger setup</code>), mit <kbd>Strg</kbd>+<kbd>V</kbd> einfügen und <strong>EINLESEN</strong>.</li>
@@ -205,6 +205,7 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
           <li><strong>FEHLENDE ERNEUT</strong> lädt nach, wer noch fehlt. <strong>GRUPPEN SORTIEREN</strong> stellt Tanks, Heiler und den Rest in Fünfergruppen.</li>
         </ol>
         <p>Jeder Charakter steht mit Rolle und Status in der Liste: offen, eingeladen, im Raid, abgelehnt, offline, keine Antwort.</p>
+        <p><strong>Flüster-Einladung:</strong> Ist <strong>FLÜSTER-EINLADUNG: AN</strong> gesetzt, reicht Spielern von der Liste ein Flüstern mit dem Wort aus dem Feld daneben, zum Beispiel nach einem Disconnect. Das Wort ist <code>inv</code>, du kannst aber ein eigenes eintragen. Andere Spieler und andere Nachrichten werden ohne Antwort ignoriert, die Ersatzbank zählt nur mit <strong>ERSATZBANK: JA</strong>. Standard ist aus.</p>
       </Feature>
 
       <Feature title="2. Kalender-Termin anlegen" shot={<>
@@ -235,6 +236,7 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
       <Feature title="4. Vergeben und nachhalten" shot={<>
         <Shot name="raidledger-pluendern" caption="Das kleine Fenster beim Plündern: WÜRFELN, ZUWEISEN oder SPÄTER WÜRFELN" width={424} height={82} />
         <Shot name="raidledger-vergaben" caption="VERGABEN: alle Vergaben des Raids, rechts wird die ausgewählte korrigiert" width={709} height={448} />
+        <Shot name="raidledger-beute-knopf" caption="Der Beute-Knopf nennt die Beuteart; als Erinnerung ist er rot, mit ! und Pfeil" width={234} height={28} />
       </>}>
         <ul>
           <li>Öffnest du als Plündermeister eine Leiche, erscheint ein <strong>kleines Fenster</strong> mit ihren Items, auch wenn RaidLedger selbst geschlossen ist. Item anklicken, dann <strong>WÜRFELN</strong>, <strong>ZUWEISEN</strong> (direkt an einen Spieler aus der Raidliste) oder <strong>SPÄTER WÜRFELN</strong>.</li>
@@ -243,6 +245,7 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
           <li>Behältst du ein Item für den Gewinner, zählt es sofort für ihn, und die Ansage nennt beide: „geht an Alice - Main-Spec (bei Bob abholen)“. Handel verfolgt das Addon nicht mehr.</li>
           <li>Im Reiter <strong>VERGABEN</strong> eine Vergabe auswählen: <strong>ZÄHLT ALS</strong> Main-Spec, Second-Spec oder nichts, <strong>EMPFÄNGER ÄNDERN</strong>, <strong>ZURÜCK IN BEUTE</strong> oder <strong>ENTFERNEN</strong>. Darunter stehen ihre Würfe.</li>
           <li>Beute aus <strong>Plündern als Gruppe</strong> (Bedarf/Gier) wird nicht mehr eingetragen.</li>
+          <li><strong>Beute-Knopf:</strong> Als Gruppenleitung siehst du in Instanzen einen kleinen roten Knopf, wenn die Beuteart nicht passt: im Bosskampf ohne Plündermeister und außerhalb eines Bosskampfs mit Plündermeister. Ein Klick stellt um, danach verschwindet er. Direkt nach einem Boss erinnert er dich auch ans Umstellen: Erst die Leiche fertig plündern. RaidLedger stellt die Beuteart nie von selbst um.</li>
         </ul>
         <p>Alle RaidLedger-Nutzer in der Gruppe sehen dieselbe Liste; angesagt wird jede Vergabe nur von dem Ledger, der sie eingetragen hat. Nach einem Absturz holt <strong>VERGABEN ABGLEICHEN</strong> (oder <code>/ledger sync</code>) die Vergaben aus der Gruppe zurück.</p>
       </Feature>
@@ -267,11 +270,12 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
         </ul>
       </Feature>
 
-      <Feature title="7. Wer darf ändern? EINSTELLUNGEN">
+      <Feature title="7. Wer darf ändern? EINSTELLUNGEN" shot={<Shot name="raidledger-einstellungen" caption="EINSTELLUNGEN: Bearbeiter, Addons in der Gruppe, Wurfzeiten und Beute-Knopf" width={709} height={448} />}>
         <ul>
           <li><strong>Bearbeiter:</strong> Nur der Plündermeister und die Namen auf dieser Liste ändern Würfe und Vergaben. Alle anderen RaidLedger schauen nur zu. Die Liste geht an die ganze Gruppe (auch <code>/ledger allow</code> / <code>/ledger deny</code>).</li>
           <li><strong>Wer hat welches Addon:</strong> PRÜFEN fragt die Gruppe, wer RaidLedger oder RaidWishlist in welcher Version hat.</li>
           <li>Dazu Wurfzeit und Stechen, Minimap-Knopf, <strong>Skalierung</strong> (60–150 %), <strong>FENSTER ZURÜCKSETZEN</strong> und <strong>VERGABEN ABGLEICHEN</strong>.</li>
+          <li><strong>BEUTE-KNOPF</strong> schaltet den Beute-Knopf an oder aus (oder <code>/ledger lootbutton on</code> und <code>off</code>). <code>/ledger lootbutton show</code> zeigt ihn von Hand.</li>
         </ul>
       </Feature>
 

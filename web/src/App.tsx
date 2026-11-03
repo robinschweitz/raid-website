@@ -42,6 +42,7 @@ function RedirectHome() {
 
 function Routes() {
   const path = useRoute()
+  const { player } = useAuth()
   const parts = path.split('/').filter(Boolean)
   if (parts.length === 0) {
     return <DashboardPage />
@@ -57,6 +58,8 @@ function Routes() {
     return <PlayerDetailPage playerID={Number(parts[1])} initialView={parts[2] === 'konto' ? 'account' : undefined} />
   }
   if (parts[0] === 'players') {
+    // The list is a staff page (FR-1.10); profiles stay open to everyone signed in.
+    if (!player || !atLeast(player.role, 'RAIDASSISTENT')) return <p className="muted">Die Spielerliste ist der Raidleitung vorbehalten. Alle aktiven Spieler stehen unter <Link to="/punkte">EP-Stand</Link>; dort kommst du über die Namen zu den Profilen.</p>
     return <PlayersPage />
   }
   if (parts[0] === 'characters' && parts[1]) {
@@ -110,7 +113,6 @@ function Layout() {
           <Link className={path === '/' ? 'nav-link active' : 'nav-link'} to="/"><NavIcon name="home" />&Uuml;bersicht</Link>
           <Link className={path.startsWith('/raids') && path !== '/raids/current' ? 'nav-link active' : 'nav-link'} to="/raids"><NavIcon name="raids" />Raids</Link>
           <Link className={path === '/raids/current' ? 'nav-link active' : 'nav-link'} to="/raids/current"><NavIcon name="zap" />Aktueller Raid</Link>
-          <Link className={path.startsWith('/players') ? 'nav-link active' : 'nav-link'} to="/players"><NavIcon name="players" />Spieler</Link>
           <Link className={path === '/statistics' ? 'nav-link active' : 'nav-link'} to="/statistics"><NavIcon name="chart" />Statistiken</Link>
           <Link className={path === '/punkte' ? 'nav-link active' : 'nav-link'} to="/punkte"><NavIcon name="award" />EP-Stand</Link>
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
@@ -119,8 +121,11 @@ function Layout() {
           {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'nav-link active' : 'nav-link'} to="/wishlist"><NavIcon name="heart" />Meine Wunschliste</Link>}
           <Link className={path.startsWith('/addons') ? 'nav-link active' : 'nav-link'} to="/addons"><NavIcon name="download" />Addons</Link>
           <Link className={path === '/anleitung' ? 'nav-link active' : 'nav-link'} to="/anleitung"><NavIcon name="info" />Anleitung</Link>
-          {player && atLeast(player.role, 'ADMIN') && <>
+          {player && atLeast(player.role, 'RAIDASSISTENT') && <>
             <p className="sidebar-caption">Administration</p>
+            <Link className={path.startsWith('/players') ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/players"><NavIcon name="players" />Spieler</Link>
+          </>}
+          {player && atLeast(player.role, 'ADMIN') && <>
             <Link className={path === '/roster' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/roster"><NavIcon name="settings" />Gildenkonfiguration</Link>
             <Link className={path === '/raid-series' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/raid-series"><NavIcon name="series" />Raidserien</Link>
             <Link className={path === '/registration-requests' ? 'nav-link admin-nav active' : 'nav-link admin-nav'} to="/registration-requests"><NavIcon name="players" />Registrierung</Link>
@@ -149,13 +154,13 @@ function Layout() {
         <Link className={path === '/' ? 'active' : ''} to="/"><NavIcon name="home" />&Uuml;bersicht</Link>
         <Link className={path.startsWith('/raids') && path !== '/raids/current' ? 'active' : ''} to="/raids"><NavIcon name="raids" />Raids</Link>
         <Link className={path === '/raids/current' ? 'active' : ''} to="/raids/current"><NavIcon name="zap" />Aktuell</Link>
-        <Link className={path.startsWith('/players') ? 'active' : ''} to="/players"><NavIcon name="players" />Spieler</Link>
         <Link className={path === '/statistics' ? 'active' : ''} to="/statistics"><NavIcon name="chart" />Statistik</Link>
         <Link className={path === '/punkte' ? 'active' : ''} to="/punkte"><NavIcon name="award" />EP</Link>
         <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>
         <Link className={path === '/loot-catalog' ? 'active' : ''} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
         <Link className={path === '/schattengram' ? 'active' : ''} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>
         {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'active' : ''} to="/wishlist"><NavIcon name="heart" />Wunschliste</Link>}
+        {player && atLeast(player.role, 'RAIDASSISTENT') && <Link className={path.startsWith('/players') ? 'active' : ''} to="/players"><NavIcon name="players" />Spieler</Link>}
         <Link className={path === '/anleitung' ? 'active' : ''} to="/anleitung"><NavIcon name="info" />Hilfe</Link>
       </nav>
     </div>

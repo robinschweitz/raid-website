@@ -119,6 +119,8 @@ function PlayerDetail({ playerID, initialView }: Props) {
   const [copyStatus, setCopyStatus] = useState('')
 
   const isAdmin = me ? atLeast(me.role, 'ADMIN') : false
+  // Only staff have the player list (FR-1.10); everyone else goes back to the EP standing.
+  const backLink = me && atLeast(me.role, 'RAIDASSISTENT') ? <Link to="/players">← Spieler</Link> : <Link to="/punkte">← EP-Stand</Link>
   const isOwnProfile = me ? me.id === playerID : false
   const isOwnMember = me ? isOwnProfile && atLeast(me.role, 'MEMBER') : false
 
@@ -627,7 +629,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
     return (
       <div>
         <p>
-          <Link to="/players">← Spieler</Link>
+          {backLink}
         </p>
         {error ? <ErrorMessage>{error}</ErrorMessage> : <p className="muted">Lade…</p>}
       </div>
@@ -637,7 +639,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
   return (
     <div>
       <p>
-        <Link to="/players">← Spieler</Link>
+        {backLink}
       </p>
       <header className={`card profile-header ${characterClassName(preferredCharacter?.class ?? '')}`}>
         <div className="profile-sigil" aria-hidden="true">{preferredCharacter?.name.slice(0, 1) ?? player.name.slice(0, 1)}</div>

@@ -111,7 +111,7 @@ for (const [balance, range] of [[30, '31–130'], [70, '51–150'], [1, '2–101
   })
 }
 
-test('EP ledger preserves reasons, signed amounts, actor and actual raid links', () => {
+test('EP ledger preserves reasons, signed amounts and actual raid links without booking IDs', () => {
   const s = setup()
   const tree = s.load('components/EnhancePointsCard.tsx').EnhancePointsCard({ showHistory: true, points: { balance: 10, transactions: [
     { id: 1, amount: 10, type: 'award_no_mainspec_loot', reason: 'Archivierung', raid_id: 42, actor_id: 2, created_at: '2026-10-01T18:00:00Z' },
@@ -119,7 +119,7 @@ test('EP ledger preserves reasons, signed amounts, actor and actual raid links',
   ] } })
   assert.match(text(tree), /Raidbonus ohne Main-Spec-Loot/)
   assert.match(text(tree), /Recorded winner/)
-  assert.match(text(tree), /Akteur # 3/)
+  assert.doesNotMatch(text(tree), /Akteur|Buchung #/)
   assert.equal(nodes(tree, (n) => n.props.className === 'positive').length, 1)
   assert.equal(nodes(tree, (n) => n.props.className === 'negative').length, 1)
   assert.deepEqual(nodes(tree, (n) => n.type === 'a').map((n) => n.props.to), ['/raids/42', '/raids/43'])

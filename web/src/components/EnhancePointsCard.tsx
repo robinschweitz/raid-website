@@ -22,7 +22,7 @@ export function EnhancePointsCard({ points, showHistory = false }: { points: Poi
       <thead><tr><th>EP</th><th>Buchung / Begründung</th><th>Raid</th><th>Datum</th></tr></thead>
       <tbody>{points?.transactions.map((t) => <tr key={t.id}>
         <td className={t.amount > 0 ? 'positive' : t.amount < 0 ? 'negative' : 'muted'}>{t.amount > 0 ? `+${t.amount}` : t.amount}</td>
-        <td><strong>{transactionLabels[t.type] ?? 'EP-Buchung'}</strong>{t.reason && <div className="muted">{t.reason}</div>}<small className="muted">Akteur #{t.actor_id} · Buchung #{t.id}</small></td>
+        <td><strong>{transactionLabels[t.type] ?? 'EP-Buchung'}</strong>{t.reason && <div className="muted">{t.reason}</div>}</td>
         <td>{t.raid_id ? <Link to={`/raids/${t.raid_id}`}>Raid #{t.raid_id}</Link> : '—'}</td>
         <td>{new Date(t.created_at).toLocaleString('de-DE')}</td>
       </tr>)}{points && points.transactions.length === 0 && <tr><td colSpan={4} className="muted">Noch keine EP-Buchungen.</td></tr>}</tbody>

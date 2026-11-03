@@ -49,7 +49,7 @@ export function PrivacyPage() {
         <li><strong>Änderungsprotokoll:</strong> Wer wann welche Daten geändert hat (siehe unten).</li>
         <li><strong>Technisch nötig:</strong> Ein Sitzungs-Cookie nach der Anmeldung und ein Schutz-Cookie gegen gefälschte Anfragen. Es gibt keine Werbung und keine Analyse. Item-Symbole im Beutekatalog werden von wow.zamimg.com geladen; dabei wird deine IP-Adresse an diesen Anbieter übertragen. Andere Bilder kommen von dieser Seite. Anmeldeversuche und abgelaufene Sitzungen werden gelöscht, sobald sie nicht mehr gebraucht werden.</li>
       </ul>
-      <p>Ohne Anmeldung sichtbar sind der Raidkalender, die Spielerliste mit Gildenrang, Umfragen, Raidaufstellungen, die Statistiken (Zählungen, keine Items und keine Enhance Points) und die Hilfeseiten.</p>
+      <p>Ohne Anmeldung sichtbar sind der Raidkalender, die Spielerliste mit Gildenrang, Umfragen, Raidaufstellungen, die Raidleitung, die Statistiken (Zählungen, keine Items und keine Enhance Points), der aktuelle Enhance-Points-Stand jedes aktiven Spielers (ohne einzelne Buchungen) und die Hilfeseiten.</p>
     </section>
 
     <section className="card guide-section" aria-labelledby="grundlage-title">

@@ -53,8 +53,8 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-002 - Self-service actions bound to the session actor**
 - **Status:** ACTIVE
-- **Rule:** The domain service of every self-service write (own locks FR-17.1, own wishlist FR-19.1, own signups and absences FR-12, own vote FR-24.3, own password and MFA FR-2.7, FR-3) MUST compare the target player with the session's player and reject a mismatch, unless a staff or Admin requirement allows it.
-- **Enforcement:** `enhancepoints`, `wishlist`, `raidsignup`, `poll`, `auth` services.
+- **Rule:** The domain service of every self-service write (own locks FR-17.1, own wishlist FR-19.1, own signups and absences FR-12, own vote FR-24.3, own password and MFA FR-2.7, FR-3, own character specs and profile reload FR-6.15, FR-6.16) MUST compare the target player with the session's player and reject a mismatch, unless a staff or Admin requirement allows it.
+- **Enforcement:** `enhancepoints`, `wishlist`, `raidsignup`, `poll`, `auth`, `character` (`SetOwnSpecs`), `registration` (`ReloadLinkedCharacter`) services.
 - **Evidence:** FR-17.1, FR-19.1, ADR 020. Code: compliant.
 - **Verification:** A MEMBER request for another player's lock, wishlist, or absence returns 403 and changes nothing.
 
@@ -67,7 +67,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-004 - Public data stays minimal**
 - **Status:** ACTIVE
-- **Rule:** Only the reads in FR-1.2 may be served without a session (paths: `ARCHITECTURE.md` "Public interface"). Unauthenticated responses MUST be built from dedicated public DTOs that contain only the fields FR-1.3, FR-27.2, and FR-30.1 allow, never from the authenticated DTOs.
+- **Rule:** Only the reads in FR-1.2 may be served without a session (paths: `ARCHITECTURE.md` "Public interface"). Unauthenticated responses MUST be built from dedicated public DTOs that contain only the fields FR-1.3, FR-16.9, FR-27.2, and FR-30.1 allow, never from the authenticated DTOs.
 - **Enforcement:** DTOs of the public endpoints; `GET /api/v1/statistics`.
 - **Evidence:** FR-1.2, FR-1.3, FR-27.2, ADR 067. Code: compliant for existing endpoints. Threats: T-023.
 - **Verification:** HTTP tests compare the exact field set of each public response.

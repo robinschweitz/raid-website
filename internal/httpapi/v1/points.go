@@ -4,6 +4,16 @@ import (
 	"net/http"
 )
 
+// listPublicPoints serves the public EP standing: balances only, no transactions (FR-16.9).
+func (a *API) listPublicPoints(w http.ResponseWriter, r *http.Request) {
+	rows, err := a.Points.ActiveBalances(r.Context())
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "could not load balances")
+		return
+	}
+	writeListJSON(w, rows)
+}
+
 func (a *API) getPoints(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r, "id")
 	if !ok {

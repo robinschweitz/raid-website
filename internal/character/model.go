@@ -23,6 +23,8 @@ type Character struct {
 	ExternalProfileID   string     `bun:"external_profile_id,notnull" json:"external_profile_id"`
 	ExternalProfileURL  string     `bun:"external_profile_url,notnull" json:"external_profile_url"`
 	ExternalProfileJSON string     `bun:"external_profile_json,notnull" json:"-"`
+	ProfileReloadedAt   *time.Time `bun:"profile_reloaded_at,nullzero" json:"profile_reloaded_at"`
+	SpecsChosenAt       *time.Time `bun:"specs_chosen_at,nullzero" json:"specs_chosen_at"`
 	CreatedAt           time.Time  `bun:"created_at,notnull" json:"created_at"`
 	UpdatedAt           time.Time  `bun:"updated_at,notnull" json:"updated_at"`
 }

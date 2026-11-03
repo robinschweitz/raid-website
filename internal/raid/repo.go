@@ -126,6 +126,31 @@ func (r *Repo) Create(ctx context.Context, rd *Raid) error {
 
 // MaxID returns the highest raid ID, or 0 without raids. Comparing it before
 // and after a write tells whether the write created raids (FR-32.2).
+// ExtraLeaders lists the raid leaders after raids.raid_leader_id, in order (ADR 109).
+func (r *Repo) ExtraLeaders(ctx context.Context, raidID int64) ([]int64, error) {
+	ids := []int64{}
+	err := r.db.NewSelect().Table("raid_leaders").Column("player_id").Where("raid_id = ?", raidID).Order("position ASC").Scan(ctx, &ids)
+	return ids, err
+}
+
+// ReplaceExtraLeaders stores the raid leaders after the first one.
+func (r *Repo) ReplaceExtraLeaders(ctx context.Context, raidID int64, playerIDs []int64) error {
+	if _, err := r.db.NewDelete().Table("raid_leaders").Where("raid_id = ?", raidID).Exec(ctx); err != nil {
+		return err
+	}
+	for position, playerID := range playerIDs {
+		if _, err := r.db.ExecContext(ctx, "INSERT INTO raid_leaders (raid_id, player_id, position) VALUES (?, ?, ?)", raidID, playerID, position+1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ActivePlayerExists reports whether a raid leader candidate is an active player.
+func (r *Repo) ActivePlayerExists(ctx context.Context, playerID int64) (bool, error) {
+	return r.db.NewSelect().Table("players").Where("id = ? AND active = TRUE", playerID).Exists(ctx)
+}
+
 func (r *Repo) MaxID(ctx context.Context) (int64, error) {
 	var id int64
 	err := r.db.NewSelect().Model((*Raid)(nil)).ColumnExpr("COALESCE(MAX(id), 0)").Scan(ctx, &id)

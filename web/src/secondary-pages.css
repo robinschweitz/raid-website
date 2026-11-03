@@ -628,6 +628,8 @@
 
 /* Signup list: one compact row per player, grouped by state (pending first). */
 .raid-signups .signup-toolbar { align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.raid-signups .signup-specs { border: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 0; padding: 0; }
+.raid-signups .signup-specs legend { color: var(--muted); margin-bottom: 4px; padding: 0; }
 .signup-board { margin-top: 1rem; }
 .signup-counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
 .signup-list, .signup-characters { list-style: none; margin: 0; padding: 0; }

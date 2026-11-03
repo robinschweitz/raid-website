@@ -1,8 +1,20 @@
-export const appVersion = '1.0.79'
+export const appVersion = '1.0.80'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Mehrere Specs, eigene Specs und mehrere Raidleiter',
+    changes: [
+      'Bei der Raidanmeldung kannst du pro Charakter mehrere Specs ankreuzen, Main und Second. Die Raidleitung wählt beim Übernehmen in die Aufstellung einen davon.',
+      'Auf der Seite deines Charakters kannst du Main- und Second-Spec selbst einstellen. Deine Wahl bleibt, auch wenn das Rising-Gods-Profil neu geladen wird.',
+      'Du kannst das Rising-Gods-Profil deines Charakters einmal pro Woche selbst neu laden, zum Beispiel nach neuer Ausrüstung.',
+      'Der GearScore zählt nur noch die getragene Ausrüstung. Bisher wurden Transmog-Items mitgezählt, dadurch standen manche Charaktere bei rund 9000. Nach dem nächsten Neuladen stimmt der Wert.',
+      'Ein Raid kann jetzt mehrere Raidleiter haben. Die Raidleitung trägt sie unter „Planung & Details“ ein, auch bei alten archivierten Raids (dort mit Begründung). Die Übersicht zeigt alle Raidleiter, auch ohne Anmeldung.',
+      'Neu im Menü: „EP-Stand“. Dort sieht jeder, auch ohne Anmeldung, den aktuellen EP-Stand aller aktiven Spieler. Die einzelnen Buchungen bleiben im Spielerprofil nach der Anmeldung.',
+    ],
+  },
+  {
+    version: '1.0.79',
     title: 'RaidLedger 2.8.0',
     changes: ['Neue RaidLedger-Version zum Herunterladen unter „Addons“. Ein kleiner Knopf erinnert die Gruppenleitung in Instanzen, wenn die Beuteart nicht zum Bosskampf passt, und stellt sie mit einem Klick um. In den Einstellungen lässt er sich abschalten.', 'Spieler von der Einladungsliste können sich per Flüstern einladen lassen. Das Wort ist frei wählbar, Standard ist inv.'],
   },

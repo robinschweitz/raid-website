@@ -77,6 +77,17 @@ export function DashboardPage() {
 
   // Kills are readable only when signed in; without them the progress shows no status.
   const nextRaidID = nextRaid?.id
+
+  // All raid leaders are public (FR-10.17, ADR 110).
+  const [leaderIDs, setLeaderIDs] = useState<number[]>([])
+  useEffect(() => {
+    let active = true
+    setLeaderIDs([])
+    if (nextRaidID !== undefined) api.get<number[]>(`/api/v1/raids/${nextRaidID}/leaders`)
+      .then((rows) => { if (active) setLeaderIDs(rows) })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [nextRaidID])
   useEffect(() => {
     let active = true
     setKills(null)
@@ -123,7 +134,7 @@ export function DashboardPage() {
             <span className="muted">{new Date(nextRaid.scheduled_start!).toLocaleString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}</span>
           </div>
           <h2>{nextRaid.name}</h2>
-          <p className="muted">Raidleitung: {players.find((p) => p.id === nextRaid.raid_leader_id)?.name ?? `Spieler #${nextRaid.raid_leader_id}`}</p>
+          <p className="muted">Raidleitung: {(leaderIDs.length ? leaderIDs : [nextRaid.raid_leader_id]).map((id) => players.find((p) => p.id === id)?.name ?? `Spieler #${id}`).join(', ')}</p>
           {attendanceError ? <ErrorMessage>{attendanceError}</ErrorMessage> : attendance ? <>
             <div className="composition" aria-label="Gespeicherte Raidaufstellung">
               <span><strong>{attendance.length}</strong> Aufgestellt</span>

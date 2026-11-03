@@ -128,7 +128,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/characters/{id}/transfer", RequireRole(validation.RoleAdmin, a.transferCharacter))
 	mux.HandleFunc("POST /api/v1/characters/{id}/merge", RequireRole(validation.RoleAdmin, a.mergeCharacter))
 	mux.HandleFunc("POST /api/v1/characters/{id}/retry-link", RequireRole(validation.RoleAdmin, a.retryCharacterLink))
-	mux.HandleFunc("POST /api/v1/characters/{id}/reload-profile", RequireRole(validation.RoleAdmin, a.reloadCharacterProfile))
+	mux.HandleFunc("POST /api/v1/characters/{id}/reload-profile", RequireRole(validation.RoleMember, a.reloadCharacterProfile))
+	mux.HandleFunc("PUT /api/v1/characters/{id}/specs", RequireRole(validation.RoleMember, a.setOwnCharacterSpecs))
 	mux.HandleFunc("GET /api/v1/characters/{id}/name-history", RequireAuth(a.listCharacterNameHistory))
 
 	mux.HandleFunc("GET /api/v1/raids", a.listRaids)
@@ -136,6 +137,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/raids/current", RequireAuth(a.currentRaid))
 	mux.HandleFunc("GET /api/v1/raids/{id}", RequireAuth(a.getRaid))
 	mux.HandleFunc("PATCH /api/v1/raids/{id}", RequireRole(validation.RoleRaidassistent, a.configureRaidSchedule))
+	mux.HandleFunc("GET /api/v1/raids/{id}/leaders", a.getRaidLeaders)
+	mux.HandleFunc("PUT /api/v1/raids/{id}/leaders", RequireRole(validation.RoleRaidassistent, a.setRaidLeaders))
 	mux.HandleFunc("POST /api/v1/raids/{id}/cancel", RequireRole(validation.RoleRaidassistent, a.cancelRaid))
 	mux.HandleFunc("GET /api/v1/raids/{id}/archive-preview", RequireRole(validation.RoleRaidassistent, a.archivePreview))
 	mux.HandleFunc("POST /api/v1/raids/{id}/archive", RequireRole(validation.RoleRaidassistent, a.archiveRaid))
@@ -164,6 +167,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/raids/{id}/loot/{recordID}/withdraw", RequireRole(validation.RoleRaidassistent, a.withdrawLoot))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/points", RequireAuth(a.getPoints))
+	mux.HandleFunc("GET /api/v1/points", a.listPublicPoints)
 	mux.HandleFunc("GET /api/v1/players/{id}/loot", RequireAuth(a.listPlayerLoot))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/locks", RequireAuth(a.listLocks))

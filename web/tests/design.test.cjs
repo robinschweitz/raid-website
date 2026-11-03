@@ -99,7 +99,7 @@ function resolveOverview(s, raids = [], polls = []) {
   }
 }
 
-for (const [balance, range] of [[30, '31–130'], [70, '51–150'], [1, '2–101'], [0, 'Keine Verstärkung'], [-15, 'Keine Verstärkung']]) {
+for (const [balance, range] of [[30, '31–130'], [70, '51–150'], [1, '2–101'], [0, 'Nicht möglich'], [-15, 'Nicht möglich']]) {
   test(`EP card previews real balance ${balance}, never offers a spend control`, () => {
     const s = setup()
     const tree = s.load('components/EnhancePointsCard.tsx').EnhancePointsCard({ points: { balance, transactions: [] } })

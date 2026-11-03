@@ -17,6 +17,7 @@ import (
 
 func TestSignupWorkflow(t *testing.T) {
 	ctx := context.Background()
+
 	database, err := db.Open(ctx, "file:"+filepath.Join(t.TempDir(), "signup.db")+"?_pragma=foreign_keys(1)")
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +71,7 @@ func TestSignupWorkflow(t *testing.T) {
 		}
 	}
 	overview := func() *Overview { t.Helper(); v, err := s.Overview(ctx, rd.ID); require(err); return v }
-	choices := []Choice{{chars[0].ID, "Schutz (Tank)"}, {chars[1].ID, "Heilig"}, {chars[2].ID, "Vergeltung"}}
+	choices := []Choice{{CharacterID: chars[0].ID, Spec: "Schutz (Tank)"}, {CharacterID: chars[1].ID, Spec: "Heilig"}, {CharacterID: chars[2].ID, Spec: "Vergeltung"}}
 
 	if v := overview(); v.IsOpen || v.Entries == nil || len(v.Entries) != 0 {
 		t.Fatalf("initial overview: %+v", v)
@@ -78,11 +79,11 @@ func TestSignupWorkflow(t *testing.T) {
 	wantError(s.Save(ctx, rd.ID, member.ID, choices), ErrClosed)
 	wantError(s.SetEnabled(ctx, rd.ID, member.ID, true), ErrForbidden)
 	require(s.SetEnabled(ctx, rd.ID, staff.ID, true))
-	wantError(s.Save(ctx, rd.ID, member.ID, []Choice{choices[0], {foreign.ID, "Frost"}}), ErrForbidden)
+	wantError(s.Save(ctx, rd.ID, member.ID, []Choice{choices[0], {CharacterID: foreign.ID, Spec: "Frost"}}), ErrForbidden)
 	if len(overview().Entries) != 0 {
 		t.Fatal("partial bulk submission persisted")
 	}
-	wantError(s.Save(ctx, rd.ID, member.ID, []Choice{{chars[0].ID, "Frost"}}), ErrInvalid)
+	wantError(s.Save(ctx, rd.ID, member.ID, []Choice{{CharacterID: chars[0].ID, Spec: "Frost"}}), ErrInvalid)
 	wantError(s.Save(ctx, rd.ID, member.ID, []Choice{choices[0], choices[0]}), ErrInvalid)
 	require(s.Save(ctx, rd.ID, member.ID, choices))
 	entries := overview().Entries
@@ -95,20 +96,20 @@ func TestSignupWorkflow(t *testing.T) {
 		t.Fatal("saved main spec changed")
 	}
 
-	wantError(s.Accept(ctx, rd.ID, entries[0].ID, member.ID, 0, 0), ErrForbidden)
-	require(s.Accept(ctx, rd.ID, entries[0].ID, staff.ID, 0, 0))
-	require(s.Accept(ctx, rd.ID, entries[0].ID, staff.ID, 0, 0))
+	wantError(s.Accept(ctx, rd.ID, entries[0].ID, member.ID, 0, 0, ""), ErrForbidden)
+	require(s.Accept(ctx, rd.ID, entries[0].ID, staff.ID, 0, 0, ""))
+	require(s.Accept(ctx, rd.ID, entries[0].ID, staff.ID, 0, 0, ""))
 	roster, err := r.attendance.ListByRaid(ctx, rd.ID)
 	require(err)
 	if len(roster) != 1 || roster[0].Spec != "Schutz (Tank)" || roster[0].Role != validation.RoleTank || roster[0].CharacterName != "First" {
 		t.Fatalf("roster: %+v", roster)
 	}
-	wantError(s.Save(ctx, rd.ID, member.ID, []Choice{{chars[0].ID, "Heilig"}}), ErrConflict)
+	wantError(s.Save(ctx, rd.ID, member.ID, []Choice{{CharacterID: chars[0].ID, Spec: "Heilig"}}), ErrConflict)
 	wantError(s.Withdraw(ctx, rd.ID, entries[0].ID, member.ID), ErrConflict)
 	wantError(s.Withdraw(ctx, rd.ID, entries[1].ID, staff.ID), ErrForbidden)
-	wantError(s.Accept(ctx, rd.ID, entries[1].ID, staff.ID, 0, 0), ErrConflict)
-	require(s.Accept(ctx, rd.ID, entries[1].ID, staff.ID, roster[0].ID, chars[0].ID))
-	wantError(s.Accept(ctx, rd.ID, entries[2].ID, staff.ID, roster[0].ID, chars[0].ID), ErrConflict)
+	wantError(s.Accept(ctx, rd.ID, entries[1].ID, staff.ID, 0, 0, ""), ErrConflict)
+	require(s.Accept(ctx, rd.ID, entries[1].ID, staff.ID, roster[0].ID, chars[0].ID, ""))
+	wantError(s.Accept(ctx, rd.ID, entries[2].ID, staff.ID, roster[0].ID, chars[0].ID, ""), ErrConflict)
 	roster, err = r.attendance.ListByRaid(ctx, rd.ID)
 	require(err)
 	if len(roster) != 1 || roster[0].CharacterID != chars[1].ID || roster[0].Role != validation.RoleHeal {
@@ -118,7 +119,7 @@ func TestSignupWorkflow(t *testing.T) {
 		t.Fatalf("acceptance: %+v", v)
 	}
 	require(s.Withdraw(ctx, rd.ID, entries[0].ID, member.ID))
-	wantError(s.Accept(ctx, rd.ID, entries[0].ID, staff.ID, roster[0].ID, chars[1].ID), ErrConflict)
+	wantError(s.Accept(ctx, rd.ID, entries[0].ID, staff.ID, roster[0].ID, chars[1].ID, ""), ErrConflict)
 	require(s.Save(ctx, rd.ID, member.ID, []Choice{choices[0]}))
 	if len(overview().Entries) != 3 {
 		t.Fatal("resubmission duplicated a row")
@@ -134,12 +135,12 @@ func TestSignupWorkflow(t *testing.T) {
 	wantError(s.Save(ctx, rd.ID, member.ID, []Choice{choices[0]}), ErrClosed)
 	wantError(s.Withdraw(ctx, rd.ID, entries[0].ID, member.ID), ErrClosed)
 	wantError(s.SetEnabled(ctx, rd.ID, staff.ID, true), ErrClosed)
-	require(s.Accept(ctx, rd.ID, entries[0].ID, staff.ID, roster[0].ID, chars[1].ID))
+	require(s.Accept(ctx, rd.ID, entries[0].ID, staff.ID, roster[0].ID, chars[1].ID, ""))
 
 	// Audit failure must roll back the roster switch as well.
 	_, err = database.DB.ExecContext(ctx, "CREATE TRIGGER fail_signup_audit BEFORE INSERT ON audit_log WHEN NEW.entity_type = 'raid_signup' BEGIN SELECT RAISE(ABORT, 'audit failure'); END")
 	require(err)
-	if err := s.Accept(ctx, rd.ID, entries[2].ID, staff.ID, roster[0].ID, chars[0].ID); err == nil {
+	if err := s.Accept(ctx, rd.ID, entries[2].ID, staff.ID, roster[0].ID, chars[0].ID, ""); err == nil {
 		t.Fatal("expected audit failure")
 	}
 	roster, err = r.attendance.ListByRaid(ctx, rd.ID)
@@ -152,7 +153,86 @@ func TestSignupWorkflow(t *testing.T) {
 	for _, status := range []validation.RaidStatus{validation.RaidStatusCancelled, validation.RaidStatusCompleted} {
 		rd.Status = status
 		require(r.raids.Update(ctx, rd))
-		wantError(s.Accept(ctx, rd.ID, entries[2].ID, staff.ID, roster[0].ID, chars[0].ID), ErrRaidState)
+		wantError(s.Accept(ctx, rd.ID, entries[2].ID, staff.ID, roster[0].ID, chars[0].ID, ""), ErrRaidState)
 		wantError(s.SetEnabled(ctx, rd.ID, staff.ID, false), ErrRaidState)
+	}
+}
+
+func TestSignupWithSeveralSpecs(t *testing.T) {
+	ctx := context.Background()
+	database, err := db.Open(ctx, "file:"+filepath.Join(t.TempDir(), "specs.db")+"?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	migrator, err := migrations.NewMigrator(database.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := migrator.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r := NewRepo(database.DB)
+	s := NewService(r)
+	now := time.Date(2030, 1, 1, 18, 0, 0, 0, time.UTC)
+	s.now = func() time.Time { return now }
+	staff := &player.Player{Name: "Staff", Role: validation.RoleRaidassistent, Active: true, CreatedAt: now, UpdatedAt: now}
+	member := &player.Player{Name: "Member", Role: validation.RoleMember, Active: true, CreatedAt: now, UpdatedAt: now}
+	for _, p := range []*player.Player{staff, member} {
+		if err := r.players.Create(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := &character.Character{PlayerID: member.ID, Name: "Holy", Class: "Paladin", MainSpec: "Vergeltung", SecondSpec: "Heilig", Active: true, CreatedAt: now, UpdatedAt: now}
+	if err := r.characters.Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	start := now.Add(time.Hour)
+	rd := &raid.Raid{Name: "Future", RaidLeaderID: staff.ID, Status: validation.RaidStatusPlanned, ScheduledStart: &start, CreatedAt: now, UpdatedAt: now}
+	if err := r.raids.Create(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetEnabled(ctx, rd.ID, staff.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	for _, specs := range [][]string{{"Vergeltung", "Frost"}, {"Heilig", "Heilig"}} {
+		if err := s.Save(ctx, rd.ID, member.ID, []Choice{{CharacterID: c.ID, Specs: specs}}); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("specs %v: got %v, want ErrInvalid", specs, err)
+		}
+	}
+	if err := s.Save(ctx, rd.ID, member.ID, []Choice{{CharacterID: c.ID, Specs: []string{"Heilig", "Vergeltung"}}}); err != nil {
+		t.Fatal(err)
+	}
+	overview, err := s.Overview(ctx, rd.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := overview.Entries[0]
+	if entry.Spec != "Heilig" || len(entry.Specs) != 2 || entry.Specs[1] != "Vergeltung" {
+		t.Fatalf("entry specs: %+v", entry)
+	}
+	if err := s.Accept(ctx, rd.ID, entry.ID, staff.ID, 0, 0, "Schutz (Tank)"); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("spec not signed up: got %v, want ErrInvalid", err)
+	}
+	if err := s.Accept(ctx, rd.ID, entry.ID, staff.ID, 0, 0, "Vergeltung"); err != nil {
+		t.Fatal(err)
+	}
+	roster, err := r.attendance.ListByRaid(ctx, rd.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roster) != 1 || roster[0].Spec != "Vergeltung" || roster[0].Role != validation.RoleDD {
+		t.Fatalf("roster: %+v", roster)
+	}
+	// A legacy single-spec choice still works and reports its one spec.
+	if _, err := database.DB.ExecContext(ctx, "UPDATE raid_signups SET specs = ''"); err != nil {
+		t.Fatal(err)
+	}
+	overview, err = s.Overview(ctx, rd.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := overview.Entries[0].Specs; len(got) != 1 || got[0] != "Heilig" {
+		t.Fatalf("legacy specs: %v", got)
 	}
 }

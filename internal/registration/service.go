@@ -24,6 +24,9 @@ import (
 
 const codeTTL = 14 * 24 * time.Hour
 
+// OwnProfileReloadInterval is how often an owner may reload a character's Rising-Gods profile (FR-6.15).
+const OwnProfileReloadInterval = 7 * 24 * time.Hour
+
 var (
 	ErrInvalid          = errors.New("registration request invalid")
 	ErrInvalidCode      = errors.New("registration code invalid or expired")
@@ -36,7 +39,9 @@ var (
 	ErrProfileLinked    = errors.New("rising-gods profile already linked")
 	ErrProfileAmbiguous = errors.New("multiple rising-gods profiles match character name")
 	ErrProfileMissing   = errors.New("character has no rising-gods profile")
-	ErrRequestExists    = errors.New("registration request already exists for profile")
+	// ErrProfileReloadTooSoon rejects an owner's reload within OwnProfileReloadInterval.
+	ErrProfileReloadTooSoon = errors.New("profile was reloaded within the last 7 days")
+	ErrRequestExists        = errors.New("registration request already exists for profile")
 
 	ErrMatchChoiceRequired = errors.New("name match needs an admin choice")
 	ErrMatchChoiceInvalid  = errors.New("name match choice invalid")
@@ -230,9 +235,6 @@ func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterI
 		if err != nil {
 			return fmt.Errorf("load reload actor: %w", err)
 		}
-		if !actor.Role.AtLeast(validation.RoleAdmin) {
-			return character.ErrForbidden
-		}
 		c, err := chars.Get(ctx, characterID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return character.ErrNotFound
@@ -240,23 +242,34 @@ func (s *Service) ReloadLinkedCharacter(ctx context.Context, actorID, characterI
 		if err != nil {
 			return fmt.Errorf("load character for profile reload: %w", err)
 		}
+		now := time.Now().UTC()
+		isAdmin := actor.Role.AtLeast(validation.RoleAdmin)
+		if !isAdmin && (!actor.Active || !actor.Role.AtLeast(validation.RoleMember) || c.PlayerID != actorID) {
+			return character.ErrForbidden
+		}
 		if c.ExternalSource != ExternalSourceRisingGods || strings.TrimSpace(c.ExternalProfileID) == "" {
 			return ErrProfileMissing
+		}
+		// Owners may reload once per week; Admins stay unlimited (FR-6.14, FR-6.15).
+		if !isAdmin && c.ProfileReloadedAt != nil && now.Sub(*c.ProfileReloadedAt) < OwnProfileReloadInterval {
+			return ErrProfileReloadTooSoon
 		}
 		profile, raw, err := s.loadUsableProfile(ctx, c.ExternalProfileID)
 		if err != nil {
 			return err
 		}
 		before := mustJSON(c)
-		now := time.Now().UTC()
 		oldName := c.Name
 		if c.Name != profile.Name {
 			c.Name = profile.Name
 			c.NameChangedAt = &now
 		}
-		c.MainSpec = profile.MainSpec
-		c.SecondSpec = profile.SecondSpec
+		if c.SpecsChosenAt == nil {
+			c.MainSpec = profile.MainSpec
+			c.SecondSpec = profile.SecondSpec
+		}
 		c.GearScore = profile.GearScore
+		c.ProfileReloadedAt = &now
 		c.ExternalProfileURL = profile.ProfileURL
 		c.ExternalProfileJSON = raw
 		c.UpdatedAt = now

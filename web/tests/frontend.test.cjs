@@ -227,17 +227,24 @@ test('raid signups submit several own characters and guard duplicate submissions
   const { RaidSignups } = s.load('components/RaidSignups.tsx')
   const view = s.mount(RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [], onRosterChange: async () => {} })
   resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, entries: [], class_specs: { Magier: ['Arkan', 'Feuer', 'Frost'] } })
-  resolveIf(s, '/api/v1/players/1/characters', [1, 2].map((id) => ({ id, player_id: 1, name: `Magier ${id}`, class: 'Magier', main_spec: 'Feuer' })))
+  resolveIf(s, '/api/v1/players/1/characters', [
+    { id: 1, player_id: 1, name: 'Magier 1', class: 'Magier', main_spec: 'Feuer', second_spec: '' },
+    { id: 2, player_id: 1, name: 'Magier 2', class: 'Magier', main_spec: 'Feuer', second_spec: 'Arkan' },
+  ])
   await flush(view)
-  for (const node of nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')) node.props.onChange({ target: { checked: true } })
+  const checkboxes = () => nodes(view.tree, (n) => n.type === 'input' && n.props.type === 'checkbox')
+  // Per character: its own checkbox, then one per offered spec (main and second only, ADR 109).
+  assert.equal(checkboxes().length, 5)
+  checkboxes()[0].props.onChange({ target: { checked: true } })
   view.render()
-  const selects = nodes(view.tree, (n) => n.type === 'select')
-  selects[1].props.onChange(change('Arkan'))
+  checkboxes()[2].props.onChange({ target: { checked: true } })
+  view.render()
+  checkboxes()[4].props.onChange({ target: { checked: true } })
   view.render()
   form(view).props.onSubmit(event)
   form(view).props.onSubmit(event)
   assert.equal(writes(s).length, 1)
-  assert.deepEqual(writes(s)[0].body, { choices: [{ character_id: 1, spec: 'Feuer' }, { character_id: 2, spec: 'Arkan' }] })
+  assert.deepEqual(writes(s)[0].body, { choices: [{ character_id: 1, specs: ['Feuer'] }, { character_id: 2, specs: ['Feuer', 'Arkan'] }] })
   assert.equal(button(view, 'Anmeldungen öffnen'), undefined)
   view.unmount()
 })
@@ -311,7 +318,7 @@ test('staff can switch the roster slot to an alternative and the unchanged chara
   view.render()
   assert.match(text(view.tree), /ersetzen\?/)
   button(view, 'Charakterwechsel bestätigen').props.onClick()
-  assert.deepEqual(writes(s)[0].body, { replace_attendance_id: 44, expected_character_id: 11 })
+  assert.deepEqual(writes(s)[0].body, { replace_attendance_id: 44, expected_character_id: 11, spec: 'Frost' })
 })
 
 test('signup form hints at the missing choice and hides the button without own characters', async () => {
@@ -361,7 +368,7 @@ test('raid assistants explicitly confirm alternative switches after signup closu
   button(view, 'Charakterwechsel bestätigen').props.onClick()
   assert.equal(writes(s).length, 1)
   assert.equal(writes(s)[0].url, '/api/v1/raids/8/signups/5/accept')
-  assert.deepEqual(writes(s)[0].body, { replace_attendance_id: 44, expected_character_id: 11 })
+  assert.deepEqual(writes(s)[0].body, { replace_attendance_id: 44, expected_character_id: 11, spec: 'Frost' })
   view.unmount()
 })
 const player = (id, role = 'MEMBER') => ({ id, name: `Spieler ${id}`, role, username: `user${id}` })

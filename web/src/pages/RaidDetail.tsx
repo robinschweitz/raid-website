@@ -8,6 +8,7 @@ import { RaidLootList } from '../components/RaidLootList'
 import { RaidBanner } from '../components/RaidBanner'
 import { RaidRosterBoard } from '../components/RaidRosterBoard'
 import { RaidSignups } from '../components/RaidSignups'
+import { RaidLeadersEditor } from '../components/RaidLeadersEditor'
 import { atLeast, catalogModeLabels, catalogRaidSizes, type ArchiveResponse, type Absence, type Attendance, type AttendanceRole, type SignupOverview, type CatalogBoss, type CatalogItemDrop, type Character, type LootAward, type LootCatalog, type Player, type Raid, type RaidSeries, isDeclined } from '../types'
 import { matchesCatalogItem } from '../catalog'
 import { canonicalClass, useCharacterOptions } from '../characterOptions'
@@ -128,6 +129,7 @@ function RaidDetail({ raidID, initialView }: Props) {
   const [attendance, setAttendance] = useState<Attendance[]>([])
   const [loot, setLoot] = useState<RecordedLoot[]>([])
   const [players, setPlayers] = useState<Player[]>([])
+  const [leaderIDs, setLeaderIDs] = useState<number[]>([])
   const [error, setError] = useState('')
   const [epWarning, setEpWarning] = useState<{ shortfalls: EpShortfall[]; retry: () => void } | null>(null)
   const [message, setMessage] = useState('')
@@ -234,7 +236,7 @@ function RaidDetail({ raidID, initialView }: Props) {
     const version = ++loadVersion.current
     setError('')
     try {
-      const [r, a, l, p, s, cs, ab] = await Promise.all([
+      const [r, a, l, p, s, cs, ab, leaders] = await Promise.all([
         api.get<Raid>(`/api/v1/raids/${raidID}`),
         api.get<Attendance[]>(`/api/v1/raids/${raidID}/attendance`),
         api.get<RecordedLoot[]>(`/api/v1/raids/${raidID}/loot`),
@@ -242,6 +244,7 @@ function RaidDetail({ raidID, initialView }: Props) {
         api.get<RaidSeries[]>('/api/v1/raid-series'),
         api.get<Character[]>('/api/v1/characters'),
         api.get<SignupOverview>(`/api/v1/raids/${raidID}/signups`).then((o) => o.absences ?? []).catch((): Absence[] => []),
+        api.get<number[]>(`/api/v1/raids/${raidID}/leaders`).catch((): number[] => []),
       ])
       if (isActive() && version === loadVersion.current) {
         const context = JSON.stringify([r.catalog_instance_id ?? '', r.raid_size ?? null])
@@ -252,6 +255,7 @@ function RaidDetail({ raidID, initialView }: Props) {
           ++lootEditorVersion.current
         }
         setRaid(r)
+        setLeaderIDs(leaders.length ? leaders : [r.raid_leader_id])
         ++associationVersion.current
         setAssociationInstance(r.catalog_instance_id ?? '')
         setAssociationSize(r.raid_size == null ? '' : String(r.raid_size))
@@ -839,7 +843,7 @@ function RaidDetail({ raidID, initialView }: Props) {
         <div className="actions setup-meta">
           <span className="badge info">{raid.archived_at ? 'Archiviert' : ({ PLANNED: 'Geplant', OPEN: 'Offen', COMPLETED: 'Abgeschlossen', CANCELLED: 'Abgesagt' })[raid.status]}</span>
           {raid.raid_size != null && <span className="badge">{raid.raid_size} Spieler</span>}
-          <span className="badge">Raidleitung: {playerName(raid.raid_leader_id)}</span>
+          <span className="badge">Raidleitung: {(leaderIDs.length ? leaderIDs : [raid.raid_leader_id]).map(playerName).join(', ')}</span>
           <span className="badge">{attendance.length} Teilnehmer · {loot.length} Loot-Vergaben</span>
         </div>
         {raid.notes && <p className="setup-note">{raid.notes}</p>}
@@ -860,6 +864,7 @@ function RaidDetail({ raidID, initialView }: Props) {
       {isActiveRaid && canManage && <section id="raid-recruitment" hidden={view !== 'recruitment'} className="raid-recruitment" aria-label="Raidgesuchtext">{view === 'recruitment' && <RaidRecruitment raidID={raidID} seriesID={raid.series_id} attendance={attendance} />}</section>}
       <section id="raid-planning" hidden={view !== 'planning'} className="card raid-summary" aria-label="Raidübersicht">
       <h2>Planung & Details</h2>
+      {canManage && raid.status !== 'CANCELLED' && (!raid.archived_at || raid.status === 'COMPLETED') && leaderIDs.length > 0 && <RaidLeadersEditor key={leaderIDs.join(',')} raidID={raidID} leaderIDs={leaderIDs} players={players} requiresReason={!!raid.archived_at} onSaved={(saved) => { setLeaderIDs(saved); setMessage('Raidleitung gespeichert.') }} />}
       {raid.archived_at && <p className="muted">Archivierte Historie: Änderungen erfordern eine Begründung und werden protokolliert.</p>}
       {raid.previous_raid_id && <p><Link to={`/raids/${raid.previous_raid_id}`}>Vorheriger Raid</Link></p>}
       {archiveResult && <p role="status">Raid archiviert und weiterhin in der Historie sichtbar. {archiveResult.next_raid

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ var (
 	ErrReasonRequired     = errors.New("reason is required")
 	ErrInvalidName        = errors.New("name cannot be empty")
 	ErrInvalidClass       = errors.New("unknown class")
+	ErrInvalidSpec        = errors.New("spec does not belong to the class")
 	ErrPlayerNotFound     = errors.New("target player not found")
 	ErrSameOwner          = errors.New("character already belongs to this player")
 	ErrAttendanceConflict = errors.New("target player already has this character in a raid roster")
@@ -143,6 +145,62 @@ func (s *Service) Correct(ctx context.Context, actorID, characterID int64, patch
 		return nil, fmt.Errorf("correct character %d: %w", characterID, err)
 	}
 	return corrected, nil
+}
+
+// SetOwnSpecs lets the owner (MEMBER and higher) choose main and second spec of
+// an own character (FR-6.16). Later profile reloads keep the choice.
+func (s *Service) SetOwnSpecs(ctx context.Context, actorID, characterID int64, mainSpec, secondSpec string) (*Character, error) {
+	mainSpec = strings.TrimSpace(mainSpec)
+	secondSpec = strings.TrimSpace(secondSpec)
+	var updated *Character
+	err := s.repo.correctInTransaction(ctx, func(chars *Repo, players *player.Repo, _ *attendance.Repo, audits *audit.Repo) error {
+		actor, err := players.Get(ctx, actorID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrInvalidActor
+		}
+		if err != nil {
+			return fmt.Errorf("load spec actor: %w", err)
+		}
+		c, err := chars.Get(ctx, characterID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("load character for specs: %w", err)
+		}
+		if !actor.Active || !actor.Role.AtLeast(validation.RoleMember) || c.PlayerID != actorID {
+			return ErrForbidden
+		}
+		classSpecs := validation.ClassSpecs[validation.NormalizeClassName(c.Class)]
+		if !slices.Contains(classSpecs, mainSpec) || (secondSpec != "" && (secondSpec == mainSpec || !slices.Contains(classSpecs, secondSpec))) {
+			return ErrInvalidSpec
+		}
+		before, err := json.Marshal(c)
+		if err != nil {
+			return fmt.Errorf("encode character before spec change: %w", err)
+		}
+		now := time.Now().UTC()
+		c.MainSpec = mainSpec
+		c.SecondSpec = secondSpec
+		c.SpecsChosenAt = &now
+		c.UpdatedAt = now
+		after, err := json.Marshal(c)
+		if err != nil {
+			return fmt.Errorf("encode character after spec change: %w", err)
+		}
+		if err := chars.Update(ctx, c); err != nil {
+			return fmt.Errorf("update character specs: %w", err)
+		}
+		if err := audits.Insert(ctx, &audit.Log{ActorID: &actorID, EntityType: "character", EntityID: strconv.FormatInt(c.ID, 10), Action: "set_own_specs", BeforeJSON: string(before), AfterJSON: string(after), CreatedAt: now}); err != nil {
+			return fmt.Errorf("audit character specs: %w", err)
+		}
+		updated = c
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("set specs of character %d: %w", characterID, err)
+	}
+	return updated, nil
 }
 
 // Transfer moves a character to another player, correcting all matching roster

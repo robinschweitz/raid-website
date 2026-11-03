@@ -106,7 +106,7 @@ for (const [balance, range] of [[30, '31–130'], [70, '51–150'], [1, '2–101
     assert.match(text(tree), new RegExp(range))
     assert.match(text(tree), /Verlorene Würfe kosten keine EP/)
     assert.equal(nodes(tree, (n) => ['button', 'input', 'select', 'form'].includes(n.type)).length, 0)
-    if (balance < 1) assert.match(text(tree), /Kosten 0 EP/)
+    if (balance < 1) assert.match(text(tree), /Ohne EP ist kein Enhanced-Wurf möglich/)
     if (balance < 0) assert.match(text(tree), /-15/)
   })
 }

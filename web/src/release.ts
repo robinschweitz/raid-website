@@ -11,6 +11,7 @@ export const changelog = [
       'Der GearScore zählt nur noch die getragene Ausrüstung. Bisher wurden Transmog-Items mitgezählt, dadurch standen manche Charaktere bei rund 9000. Nach dem nächsten Neuladen stimmt der Wert.',
       'Ein Raid kann jetzt mehrere Raidleiter haben. Die Raidleitung trägt sie unter „Planung & Details“ ein, auch bei alten archivierten Raids (dort mit Begründung). Die Übersicht zeigt alle Raidleiter, auch ohne Anmeldung.',
       'Neu im Menü: „EP-Stand“. Dort sieht jeder, auch ohne Anmeldung, den aktuellen EP-Stand aller aktiven Spieler. Die einzelnen Buchungen bleiben im Spielerprofil nach der Anmeldung.',
+      'Einige Texte sind verständlicher, etwa im EP-Kasten des Profils und bei alten Loot- und Aufstellungseinträgen. Beim Zusammenführen von Konten steht jetzt richtig, dass der andere Spieler danach gelöscht wird.',
     ],
   },
   {

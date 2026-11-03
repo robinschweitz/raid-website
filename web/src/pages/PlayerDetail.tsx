@@ -878,7 +878,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
            </section>}
            {isAdmin && <section className="subcard">
              <h3>Konto zusammenführen</h3>
-             <p className="muted">Der Quellaccount wird deaktiviert. Seine Charaktere, Locks und sein EP-Guthaben werden diesem Konto zugeordnet; Quell-Sitzungen und MFA werden widerrufen.</p>
+             <p className="muted">Alles vom gewählten Spieler (Charaktere, Item-Locks, EP-Buchungen und alle anderen Einträge) wird in dieses Konto übernommen. Danach wird der gewählte Spieler endgültig gelöscht; seine Anmeldungen und sein zweiter Faktor werden entfernt.</p>
              <form className="inline-form" onSubmit={mergeAccount}>
                <label>Quellspieler<select aria-label="Quellspieler" value={mergeSourceID} onChange={(event) => setMergeSourceID(event.target.value)} required>
                  <option value="">Bitte wählen</option>

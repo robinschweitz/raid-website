@@ -16,7 +16,7 @@ export function EnhancePointsCard({ points, showHistory = false }: { points: Poi
     <div className="section-heading"><h2>Enhance Points</h2><span className="badge info">EP</span></div>
     <p className="stat">{points?.balance ?? '—'} <span>EP</span></p>
     <div className="ep-preview"><span>Enhanced-Wurf</span><strong>{enhancement === null ? '—' : enhancement > 0 ? `${1 + enhancement}–${100 + enhancement}` : 'Nicht möglich'}</strong></div>
-    <p className="muted">{enhancement === null ? 'Saldo wird geladen.' : enhancement > 0 ? `Vorschau mit ${enhancement} EP (maximal 50).` : 'Kein positiver EP-Saldo. Kein Enhance-Einsatz möglich; Kosten 0 EP.'} Verlorene Würfe kosten keine EP. Nur der Gewinner zahlt; die Raidleitung erfasst das gewonnene Loot.</p>
+    <p className="muted">{enhancement === null ? 'EP-Stand wird geladen.' : enhancement > 0 ? `Es zählen ${enhancement} EP (höchstens 50).` : 'Ohne EP ist kein Enhanced-Wurf möglich.'} Verlorene Würfe kosten keine EP. Nur der Gewinner zahlt; die Raidleitung erfasst das gewonnene Loot.</p>
     <p className="ep-rule">+10 EP bei der Archivierung ohne Main-Spec-Loot.</p>
     {showHistory && <div className="ledger"><h3>EP-Historie</h3><div className="table-scroll"><table className="table small">
       <thead><tr><th>EP</th><th>Buchung / Begründung</th><th>Raid</th><th>Datum</th></tr></thead>

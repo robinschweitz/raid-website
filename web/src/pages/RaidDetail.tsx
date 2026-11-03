@@ -324,7 +324,7 @@ function RaidDetail({ raidID, initialView }: Props) {
 
   const playerName = (id: number) => players.find((p) => p.id === id)?.name ?? `#${id}`
   const raidRecipients = attendance.filter((a) => a.raid_id === raidID)
-  const recipientCore = (a: Attendance) => `${a.character_name?.trim() || 'Name historisch nicht gespeichert'} · ${a.role} · ${playerName(a.player_id)}`
+  const recipientCore = (a: Attendance) => `${a.character_name?.trim() || 'Name nicht gespeichert (alter Eintrag)'} · ${a.role} · ${playerName(a.player_id)}`
   const recipientLabel = (a: Attendance) => raidRecipients.filter((other) => recipientCore(other) === recipientCore(a)).length > 1 ? `${recipientCore(a)} · #${a.character_id}` : recipientCore(a)
   const selectedRecipient = raidRecipients.find((a) => String(a.character_id) === lootCharacter && String(a.player_id) === lootPlayer)
   const isUnclaimedMethod = !lootEditing && lootMethod in unclaimedMethods

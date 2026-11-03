@@ -28,7 +28,7 @@ export function RaidLootList({ loot, attendance, playerName, canWrite, pending, 
     {canWrite && editingID == null && <details className="editor-disclosure"><summary>Loot erfassen</summary>{children}</details>}
     {loot.length === 0 && <p className="muted">{canWrite ? 'Noch kein Loot vergeben. Mit „Loot erfassen“ den ersten Gewinner eintragen.' : 'Kein Loot.'}</p>}
     {bossGroups.map(({ boss, rows }) => <div key={boss} className="subcard loot-boss-group">
-      <div className="loot-boss-heading"><h3>{boss || 'Boss nicht gespeichert (historisch)'}</h3><span>{rows.length} Vergabe{rows.length === 1 ? '' : 'n'}</span></div>
+      <div className="loot-boss-heading"><h3>{boss || 'Ohne Boss (alter Eintrag)'}</h3><span>{rows.length} Vergabe{rows.length === 1 ? '' : 'n'}</span></div>
       <div className="table-scroll"><table className="table loot-table">
         <thead><tr><th>Item</th><th>Boss</th><th>Empfänger</th><th>Vergabemethode</th><th>EP-Kosten</th><th>Notizen</th>{canWrite && <th></th>}</tr></thead>
         <tbody>{rows.map((row) => {

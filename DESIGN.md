@@ -331,7 +331,9 @@ One dark theme only (`color-scheme: dark`); there is no light mode.
 ## Layout
 
 - **Desktop (above 850px):** a fixed 244px sidebar on the left (crest, guild name, navigation
-  grouped under captions, version link at the bottom) and the content to its right.
+  grouped under captions, version link at the bottom) and the content to its right. The
+  "Administration" caption groups staff pages: "Spieler" for RAIDASSISTENT and higher, the
+  configuration pages for ADMIN only (FR-1.10). "EP-Stand" is in the main group for everyone.
 - **Mobile (850px and below):** the sidebar becomes a top bar, and a fixed bottom companion
   navigation shows the main destinations with short labels (for example "Aktuell", "Hilfe").
   Safe-area insets are respected.

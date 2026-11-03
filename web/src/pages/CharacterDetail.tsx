@@ -70,7 +70,7 @@ function CharacterDetail({ characterID }: Props) {
   }, [characterID])
 
   if (!character) {
-    return <div><p><Link to="/players">← Spieler</Link></p>{error ? <ErrorMessage>{error}</ErrorMessage> : <p className="muted">Lade Charakter…</p>}</div>
+    return <div><p><Link to="/punkte">← EP-Stand</Link></p>{error ? <ErrorMessage>{error}</ErrorMessage> : <p className="muted">Lade Charakter…</p>}</div>
   }
 
   const exactLoot = loot.filter((row) => row.awarded_to_character_id === character.id)

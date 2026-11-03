@@ -30,6 +30,7 @@ implemented yet when it differs from the code.
 - **FR-1.7** These reads MUST require RAIDASSISTENT or higher: the archive preview, the recruitment template, and the wishlist interests of a raid. (ADR 068, 069)
 - **FR-1.8** These reads MUST require ADMIN: the audit log, the registration requests and codes, the player-account overview, and the personal-data export (FR-30.7). (ADR 074, 084)
 - **FR-1.9** The system MUST store the role of each player. Only an ADMIN can change a role. (ADR 010)
+- **FR-1.10** The player list page `/players` MUST be offered only to RAIDASSISTENT and higher, in the Administration section of the navigation; other roles get a note instead of the list. Player profiles MUST stay readable for every signed-in user, reached through `/punkte` and the own name. The API player list stays public (FR-1.2). (Owner 2026-11-03, ADR 111)
 
 ### 2. Authentication and sessions
 

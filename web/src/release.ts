@@ -1,8 +1,13 @@
-export const appVersion = '1.0.80'
+export const appVersion = '1.0.81'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Spielerliste für die Raidleitung',
+    changes: ['Die Spielerliste steht jetzt unter „Administration“ und ist nur für die Raidleitung. Profile erreichst du wie bisher über die Namen im EP-Stand und über deinen Namen oben rechts.'],
+  },
+  {
+    version: '1.0.80',
     title: 'Mehrere Specs, eigene Specs und mehrere Raidleiter',
     changes: [
       'Bei der Raidanmeldung kannst du pro Charakter mehrere Specs ankreuzen, Main und Second. Die Raidleitung wählt beim Übernehmen in die Aufstellung einen davon.',

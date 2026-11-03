@@ -1,8 +1,13 @@
-export const appVersion = '1.0.81'
+export const appVersion = '1.0.82'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Mehrere Raidleiter pro Raidserie',
+    changes: ['In einer Raidserie lassen sich jetzt mehrere Raidleiter eintragen. Jeder neue Raid der Serie bekommt sie automatisch, auch beim Vorausplanen und beim Archivieren. Bestehende Raids ändern sich dadurch nicht.'],
+  },
+  {
+    version: '1.0.81',
     title: 'Spielerliste für die Raidleitung',
     changes: ['Die Spielerliste steht jetzt unter „Administration“ und ist nur für die Raidleitung. Profile erreichst du wie bisher über die Namen im EP-Stand und über deinen Namen oben rechts.'],
   },

@@ -1925,6 +1925,24 @@ test('raid creation without a series requires an explicit name', async () => {
   assert.deepEqual(s.navigations, ['/raids/3'])
 })
 
+test('admin series form keeps further raid leaders after the first one (ADR 112)', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidSeries.tsx').RaidSeriesPage)
+  s.requests.forEach((r) => r.resolve(r.url === '/api/v1/loot-catalog' ? catalogFixture() : r.url === '/api/v1/raid-series' ? [{ ...seriesRow, leader_ids: [2] }] : [{ ...player(1), active: true }, { ...player(2), active: true }]))
+  await flush(view)
+  assert.match(text(view.tree), /Raidleitung: /)
+  button(view, 'Serie bearbeiten').props.onClick(); view.render()
+  select(view, 'Weiteren Serien-Raidleiter hinzufügen').props.onChange(change('1')); view.render()
+  assert.ok(button(view, 'Entfernen'), 'the added leader can be removed again')
+  const saving = form(view).props.onSubmit(event)
+  assert.equal(writes(s).length, 1)
+  assert.equal(writes(s)[0].url, '/api/v1/raid-series/3')
+  assert.deepEqual(writes(s)[0].body.leader_ids, [2, 1])
+  assert.equal(writes(s)[0].body.raid_leader_id, undefined)
+  writes(s)[0].resolve({ ...seriesRow, leader_ids: [2, 1] })
+  await saving
+})
+
 test('admin series form starts empty, validates weekdays, creates and edits full explicit schedule', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidSeries.tsx').RaidSeriesPage)
@@ -1946,7 +1964,7 @@ test('admin series form starts empty, validates weekdays, creates and edits full
   await form(view).props.onSubmit(event)
   assert.equal(writes(s).length, 1)
   assert.equal(writes(s)[0].url, '/api/v1/raid-series')
-  assert.deepEqual(JSON.parse(JSON.stringify(writes(s)[0].body)), { name: 'Explicit name', raid_leader_id: 2, weekdays: [0], interval_weeks: 3, start_time: '19:45', timezone: 'Europe/Berlin', plan_weeks_ahead: 0, catalog_instance_id: 'map:631', raid_size: 25 })
+  assert.deepEqual(JSON.parse(JSON.stringify(writes(s)[0].body)), { name: 'Explicit name', leader_ids: [2], weekdays: [0], interval_weeks: 3, start_time: '19:45', timezone: 'Europe/Berlin', plan_weeks_ahead: 0, catalog_instance_id: 'map:631', raid_size: 25 })
   writes(s)[0].resolve({ ...seriesRow, id: 4 })
   await first
   view.render()

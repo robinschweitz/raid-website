@@ -326,6 +326,7 @@ Addon loot imports (#96) reserve the SQLite writer before a fresh preview/kill r
 - `raid_signups.specs` holds the signed-up specs as a JSON array; empty means a legacy single-spec signup (`spec`). `POST /api/v1/raids/{id}/signups/{signupID}/accept` takes an optional `spec`.
 - `characters.profile_reloaded_at` gates the owner's weekly `POST /api/v1/characters/{id}/reload-profile` (MEMBER, owner or Admin); `characters.specs_chosen_at` marks specs set through `PUT /api/v1/characters/{id}/specs` (MEMBER, owner only), which reloads then keep.
 - The `raid` package owns `raid_leaders` (leaders after `raids.raid_leader_id`, which stays the first). `GET /api/v1/raids/{id}/leaders` (public, ADR 110) and `PUT` (RAIDASSISTENT and higher, body `player_ids` and `reason`, required for archived raids) read and replace the list; it grants no permissions.
+- The `raidseries` package owns `raid_series_leaders` (leaders after `raid_series.raid_leader_id`, ADR 112). The series API carries the whole list as `leader_ids`; `raid.Repo.CopySeriesLeaders` copies it into `raid_leaders` wherever a raid is created from a series (create, plan ahead, successor).
 - The gear score counts only the worn item of each slot (first field of the profile's `inventory` entry), never the transmog appearance listed beside it.
 
 ### Raid-News (#202)

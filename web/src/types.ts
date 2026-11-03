@@ -232,6 +232,8 @@ export interface RaidSeries {
   name_template: string
   next_raid_number: number
   raid_leader_id: number
+  /** All raid leaders in order; the first is raid_leader_id (ADR 112). */
+  leader_ids?: number[]
   weekdays: number[]
   interval_weeks: number
   start_time: string

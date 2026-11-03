@@ -148,12 +148,14 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 // counter (incremented in the same transaction), or the series name when the template is empty.
 func (s *Service) CreateRaid(ctx context.Context, rd *Raid, actorID int64) error {
 	return s.repo.InTransaction(ctx, func(repo *Repo) error {
+		var seriesLeaderIDs []int64
 		if rd.SeriesID != nil {
 			seriesRepo := raidseries.NewRepo(repo.db)
 			series, err := seriesRepo.Get(ctx, *rd.SeriesID)
 			if err != nil {
 				return err
 			}
+			seriesLeaderIDs = series.LeaderIDs
 			if err := raidseries.Validate(series); err != nil {
 				return err
 			}
@@ -187,6 +189,9 @@ func (s *Service) CreateRaid(ctx context.Context, rd *Raid, actorID int64) error
 			return err
 		}
 		if err := repo.Create(ctx, rd); err != nil {
+			return err
+		}
+		if err := repo.CopySeriesLeaders(ctx, rd, seriesLeaderIDs); err != nil {
 			return err
 		}
 		return repo.Audit(ctx, actorID, rd.ID, "create", nil, rd)

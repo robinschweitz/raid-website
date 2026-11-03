@@ -98,6 +98,8 @@ func stableErrorMessage(code string) string {
 		return "Die Angaben zur Raidserie sind ungültig."
 	case "leader_not_found":
 		return "Der Raidleiter wurde nicht gefunden."
+	case "series_leaders_invalid":
+		return "Bitte mindestens eine Raidleitung wählen, jede nur einmal."
 	case "series_required":
 		return "Für diese Aktion ist eine Raidserie erforderlich."
 	case "scheduled_start_required":

@@ -1167,6 +1167,19 @@ test('auth gate shows retry when session lookup fails and dashboard for anonymou
   assert.equal(gate.tree.type.name, 'Layout')
 })
 
+test('the player list is a staff menu entry while the EP standing is for everyone (FR-1.10)', () => {
+  for (const [role, staff] of [['MEMBER', false], ['RAIDASSISTENT', true]]) {
+    const s = setup({ id: 1, role })
+    const app = s.load('App.tsx').default()
+    const gate = s.mount(app.props.children.type)
+    const layout = s.mount(gate.tree.type)
+    const links = (to) => nodes(layout.tree, (n) => n.props && n.props.to === to)
+    assert.equal(links('/players').length > 0, staff, `${role} sees the player list: ${staff}`)
+    assert.ok(links('/punkte').length > 0, `${role} sees the EP standing`)
+    assert.ok(links('/players/1').length > 0, `${role} reaches the own profile`)
+  }
+})
+
 test('logout UI guards duplicates and handles network rejection without losing identity', async () => {
   const s = setup()
   s.auth.logout = () => s.api.post('/logout')

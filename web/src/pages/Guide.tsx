@@ -149,7 +149,7 @@ export function GuidePage() {
             <tr><td><strong>Übersicht</strong></td><td>Deine nächsten Raids mit Anmelde-Knöpfen, der nächste Raid, Umfrage, Neuigkeiten</td></tr>
             <tr><td><strong>Raids</strong></td><td>Alle geplanten und vergangenen Raids. Hier öffnest du einen Raid im Detail.</td></tr>
             <tr><td><strong>Aktueller Raid</strong></td><td>Direkt zum Raid von heute Abend: der neueste Raid, der schon begonnen hat (sonst der nächste). Auf dem Handy heißt er <strong>Aktuell</strong>.</td></tr>
-            <tr><td><strong>Spieler</strong></td><td>Alle Spieler. Über deinen Namen (auch oben rechts) kommst du zu deinem Profil.</td></tr>
+            <tr><td><strong>Spieler</strong></td><td>Unter „Administration“, nur für die Raidleitung: alle Spieler. Alle anderen kommen über den EP-Stand oder ihren Namen oben rechts zu den Profilen.</td></tr>
             <tr><td><strong>Statistiken</strong></td><td>Auswertungen über Raids und Loot (ohne Anmeldung sichtbar, ohne Items und Enhance Points)</td></tr>
             <tr><td><strong>EP-Stand</strong></td><td>Aktueller EP-Stand aller aktiven Spieler (ohne Anmeldung sichtbar, ohne einzelne Buchungen)</td></tr>
             <tr><td><strong>Umfragen</strong></td><td>Abstimmen, z. B. über einen neuen Raidtag</td></tr>

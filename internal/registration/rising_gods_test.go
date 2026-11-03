@@ -233,6 +233,21 @@ func TestRisingGodsLoadCharacterCalculatesAddonGearScore(t *testing.T) {
 	}
 }
 
+// Rising-Gods lists the transmog appearance of each slot (the ninth inventory
+// field) as its own g_items entry; only the equipped item may count.
+func TestGearScoreIgnoresTransmogItems(t *testing.T) {
+	body := `g_items.add(51133, {"quality":4,"jsonequip":{"id":51133,"slot":1,"level":264}});` +
+		`g_items.add(51913, {"quality":4,"jsonequip":{"id":51913,"slot":11,"level":264}});` +
+		`g_items.add(27790, {"quality":3,"jsonequip":{"id":27790,"slot":1,"level":112}});` +
+		`g_items.add(47176, {"quality":4,"jsonequip":{"id":47176,"slot":5,"level":200}});` +
+		`var profile = {"inventory":{"1":[51133,0,3818,0,41380,40138,0,0,27790],"11":[51913,0,0,0,36767,0,0,0,0],"12":[51913,0,0,0,0,0,0,0,0]}};`
+	gearScore := calculateGearScoreFromProfileBody(body, "Krieger")
+	expected := gearScoreItemScore(264, 4, "INVTYPE_HEAD") + 2*gearScoreItemScore(264, 4, "INVTYPE_FINGER")
+	if gearScore == nil || *gearScore != expected {
+		t.Fatalf("expected gearscore %d without transmog items, got %#v", expected, gearScore)
+	}
+}
+
 func TestGearScoreCalculationAppliesHunterWeaponWeights(t *testing.T) {
 	body := `g_items.add(51406, {"quality":4,"jsonequip":{"id":51406,"classs":2,"subclass":15,"slot":21,"level":264}});` +
 		`g_items.add(51531, {"quality":4,"jsonequip":{"id":51531,"classs":2,"subclass":19,"slot":15,"level":264}});`

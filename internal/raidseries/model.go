@@ -11,10 +11,12 @@ type Series struct {
 	NameTemplate      string  `json:"name_template"`
 	NextRaidNumber    int     `json:"next_raid_number"`
 	RaidLeaderID      int64   `json:"raid_leader_id"`
-	Weekdays          []int   `json:"weekdays"`
-	IntervalWeeks     int64   `json:"interval_weeks"`
-	StartTime         string  `json:"start_time"`
-	Timezone          string  `json:"timezone"`
+	// LeaderIDs lists all raid leaders in order; the first is RaidLeaderID (ADR 112).
+	LeaderIDs     []int64 `json:"leader_ids"`
+	Weekdays      []int   `json:"weekdays"`
+	IntervalWeeks int64   `json:"interval_weeks"`
+	StartTime     string  `json:"start_time"`
+	Timezone      string  `json:"timezone"`
 	// PlanWeeksAhead keeps this many weeks of future raids created; 0 is off (ADR 078).
 	PlanWeeksAhead int       `json:"plan_weeks_ahead"`
 	CreatedAt      time.Time `json:"created_at"`

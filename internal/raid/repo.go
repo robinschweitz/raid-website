@@ -146,6 +146,18 @@ func (r *Repo) ReplaceExtraLeaders(ctx context.Context, raidID int64, playerIDs 
 	return nil
 }
 
+// CopySeriesLeaders gives a raid created from a series the series' leaders. The
+// raid's own first leader stays first; the others follow in series order (ADR 112).
+func (r *Repo) CopySeriesLeaders(ctx context.Context, rd *Raid, seriesLeaderIDs []int64) error {
+	extra := []int64{}
+	for _, id := range seriesLeaderIDs {
+		if id != rd.RaidLeaderID {
+			extra = append(extra, id)
+		}
+	}
+	return r.ReplaceExtraLeaders(ctx, rd.ID, extra)
+}
+
 // ActivePlayerExists reports whether a raid leader candidate is an active player.
 func (r *Repo) ActivePlayerExists(ctx context.Context, playerID int64) (bool, error) {
 	return r.db.NewSelect().Table("players").Where("id = ? AND active = TRUE", playerID).Exists(ctx)

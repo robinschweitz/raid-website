@@ -14,6 +14,7 @@ var (
 	ErrNotFound               = errors.New("raid series not found")
 	ErrInvalid                = errors.New("invalid raid series")
 	ErrLeaderNotFound         = errors.New("raid series leader not found")
+	ErrLeadersInvalid         = errors.New("raid series leaders must be listed once each, at least one")
 	ErrSeriesRequired         = errors.New("raid series required")
 	ErrScheduledStartRequired = errors.New("scheduled start required")
 	ErrLocalTimeNonexistent   = errors.New("local occurrence does not exist")
@@ -77,11 +78,13 @@ type Changes struct {
 	NameTemplate      *string
 	NextRaidNumber    *int
 	RaidLeaderID      *int64
-	Weekdays          *[]int
-	IntervalWeeks     *int64
-	StartTime         *string
-	Timezone          *string
-	PlanWeeksAhead    *int
+	// LeaderIDs replaces all raid leaders in order; it wins over RaidLeaderID (ADR 112).
+	LeaderIDs      *[]int64
+	Weekdays       *[]int
+	IntervalWeeks  *int64
+	StartTime      *string
+	Timezone       *string
+	PlanWeeksAhead *int
 }
 
 // Configure creates or patches configuration under the same writer reservation as archival.
@@ -108,9 +111,12 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		if changes.NextRaidNumber != nil {
 			series.NextRaidNumber = *changes.NextRaidNumber
 		}
-		if changes.RaidLeaderID != nil {
-			series.RaidLeaderID = *changes.RaidLeaderID
+		leaders, err := nextLeaders(series, changes)
+		if err != nil {
+			return err
 		}
+		series.RaidLeaderID = leaders[0]
+		series.LeaderIDs = leaders
 		if changes.Weekdays != nil {
 			series.Weekdays = *changes.Weekdays
 		}
@@ -138,8 +144,10 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		if err := repo.Catalog().ValidateAssociation(ctx, series.CatalogInstanceID, series.RaidSize); err != nil {
 			return err
 		}
-		if err := repo.RequireLeader(ctx, series.RaidLeaderID); err != nil {
-			return err
+		for _, leaderID := range series.LeaderIDs {
+			if err := repo.RequireLeader(ctx, leaderID); err != nil {
+				return err
+			}
 		}
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		if id == 0 {
@@ -147,6 +155,9 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		}
 		series.UpdatedAt = now
 		if err := repo.Save(ctx, series); err != nil {
+			return err
+		}
+		if err := repo.ReplaceExtraLeaders(ctx, series.ID, series.LeaderIDs[1:]); err != nil {
 			return err
 		}
 		action := "update"
@@ -160,6 +171,38 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		return nil
 	})
 	return result, err
+}
+
+// nextLeaders resolves the leader list after a change. A full list must hold
+// each player once; changing only the first leader keeps the others.
+func nextLeaders(series *Series, changes Changes) ([]int64, error) {
+	if changes.LeaderIDs != nil {
+		requested := *changes.LeaderIDs
+		if len(requested) == 0 {
+			return nil, ErrLeadersInvalid
+		}
+		seen := map[int64]bool{}
+		for _, id := range requested {
+			if id <= 0 || seen[id] {
+				return nil, ErrLeadersInvalid
+			}
+			seen[id] = true
+		}
+		return append([]int64(nil), requested...), nil
+	}
+	first := series.RaidLeaderID
+	if changes.RaidLeaderID != nil {
+		first = *changes.RaidLeaderID
+	}
+	leaders := []int64{first}
+	if len(series.LeaderIDs) > 1 {
+		for _, id := range series.LeaderIDs[1:] {
+			if id != first {
+				leaders = append(leaders, id)
+			}
+		}
+	}
+	return leaders, nil
 }
 
 // NextOccurrence anchors eligible weeks to the current raid's local Monday.

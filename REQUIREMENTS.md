@@ -126,7 +126,7 @@ implemented yet when it differs from the code.
 
 ### 9. Raid series and planning
 
-- **FR-9.1** An ADMIN MUST be able to create and edit a raid series with name, leader, weekdays, week interval, local start time, IANA timezone, name template, next number, instance, size, and planning window. (ADR 021, 034, 078)
+- **FR-9.1** An ADMIN MUST be able to create and edit a raid series with name, one or more raid leaders (existing players, each once, in order), weekdays, week interval, local start time, IANA timezone, name template, next number, instance, size, and planning window. (ADR 021, 034, 078, 112)
 - **FR-9.2** The system MUST NOT create a default series or schedule. (ADR 021)
 - **FR-9.3** A name template MUST support `{number}`, `{name}`, `{date}`, and `{week}`. An empty template MUST give the series name. (ADR 034)
 - **FR-9.4** Recurrence weeks MUST count from the local Monday week of the current raid. (ADR 021)
@@ -155,7 +155,7 @@ implemented yet when it differs from the code.
 - **FR-10.14** Archived raids MUST stay visible as history. (ADR 021)
 - **FR-10.15** Archiving a raid that was COMPLETED before this rule MUST only set the archive time. It MUST NOT award EP or start a series chain. (ADR 021)
 - **FR-10.16** Cancelling and archiving a raid MUST need a confirmation (which actions: `DESIGN.md` "Interaction & Rendering Safety"). (ADR 069)
-- **FR-10.17** A raid MUST have one or more raid leaders (Raidleitung). The first comes from the series or the create form. Staff MUST be able to set the list under the raid-state rules of FR-13.11, also for archived raids, and with the reason rule of FR-26.5: active players, each once, at least one. Raid leaders MUST NOT grant permissions. The change MUST be audited. Everyone, also without a session, sees all raid leaders on the overview; the raid page shows them too. (Owner 2026-11-03, ADR 109, 110)
+- **FR-10.17** A raid MUST have one or more raid leaders (Raidleitung). A raid created from a series MUST get the series' leaders (FR-9.1); a raid created by hand with another first leader keeps it first and gets the series' other leaders after it. Changing a series MUST NOT change existing raids. Staff MUST be able to set the list under the raid-state rules of FR-13.11, also for archived raids, and with the reason rule of FR-26.5: active players, each once, at least one. Raid leaders MUST NOT grant permissions. The change MUST be audited. Everyone, also without a session, sees all raid leaders on the overview; the raid page shows them too. (Owner 2026-11-03, ADR 109, 110, 112)
 
 ### 11. Current raid and dashboard
 

@@ -149,6 +149,9 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 			if err := raids.Create(ctx, next); err != nil {
 				return fmt.Errorf("create successor: %w", err)
 			}
+			if err := raids.CopySeriesLeaders(ctx, next, series.LeaderIDs); err != nil {
+				return fmt.Errorf("copy successor leaders: %w", err)
+			}
 			if err := raids.Audit(ctx, actorID, next.ID, "create_successor", nil, next); err != nil {
 				return err
 			}

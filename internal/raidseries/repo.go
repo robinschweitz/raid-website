@@ -83,7 +83,34 @@ func (r *Repo) Get(ctx context.Context, id int64) (*Series, error) {
 		}
 		return nil, err
 	}
-	return decode(rd)
+	s, err := decode(rd)
+	if err != nil {
+		return nil, err
+	}
+	return s, r.loadLeaders(ctx, s)
+}
+
+// loadLeaders fills LeaderIDs: the first leader, then the others in order (ADR 112).
+func (r *Repo) loadLeaders(ctx context.Context, s *Series) error {
+	extra := []int64{}
+	if err := r.db.NewSelect().Table("raid_series_leaders").Column("player_id").Where("series_id = ?", s.ID).Order("position ASC").Scan(ctx, &extra); err != nil {
+		return err
+	}
+	s.LeaderIDs = append([]int64{s.RaidLeaderID}, extra...)
+	return nil
+}
+
+// ReplaceExtraLeaders stores the series leaders after the first one.
+func (r *Repo) ReplaceExtraLeaders(ctx context.Context, seriesID int64, playerIDs []int64) error {
+	if _, err := r.db.NewDelete().Table("raid_series_leaders").Where("series_id = ?", seriesID).Exec(ctx); err != nil {
+		return err
+	}
+	for position, playerID := range playerIDs {
+		if _, err := r.db.ExecContext(ctx, "INSERT INTO raid_series_leaders (series_id, player_id, position) VALUES (?, ?, ?)", seriesID, playerID, position+1); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (r *Repo) List(ctx context.Context) ([]Series, error) {
 	var rows []row
@@ -94,6 +121,9 @@ func (r *Repo) List(ctx context.Context) ([]Series, error) {
 	for _, rd := range rows {
 		s, err := decode(rd)
 		if err != nil {
+			return nil, err
+		}
+		if err := r.loadLeaders(ctx, s); err != nil {
 			return nil, err
 		}
 		result = append(result, *s)

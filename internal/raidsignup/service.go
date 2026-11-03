@@ -26,23 +26,26 @@ var (
 	ErrTooLate   = errors.New("raid has already started")
 )
 
-// Choice is a player's requested character and spec.
+// Choice is a player's requested character with one or more specs (ADR 109).
+// Spec alone is the single-spec form; Specs wins when both are sent.
 type Choice struct {
-	CharacterID int64  `json:"character_id"`
-	Spec        string `json:"spec"`
+	CharacterID int64    `json:"character_id"`
+	Spec        string   `json:"spec"`
+	Specs       []string `json:"specs"`
 }
 
 // Entry presents a signup together with its current roster association.
 type Entry struct {
-	ID            int64  `json:"id"`
-	PlayerID      int64  `json:"player_id"`
-	CharacterID   int64  `json:"character_id"`
-	CharacterName string `json:"character_name"`
-	Class         string `json:"class"`
-	Spec          string `json:"spec"`
-	IsWithdrawn   bool   `json:"is_withdrawn"`
-	IsAccepted    bool   `json:"is_accepted"`
-	AttendanceID  int64  `json:"attendance_id"`
+	ID            int64    `json:"id"`
+	PlayerID      int64    `json:"player_id"`
+	CharacterID   int64    `json:"character_id"`
+	CharacterName string   `json:"character_name"`
+	Class         string   `json:"class"`
+	Spec          string   `json:"spec"`
+	Specs         []string `json:"specs"`
+	IsWithdrawn   bool     `json:"is_withdrawn"`
+	IsAccepted    bool     `json:"is_accepted"`
+	AttendanceID  int64    `json:"attendance_id"`
 }
 
 // Absence marks a player who announced not to attend (DECLINED) or who is not
@@ -143,7 +146,7 @@ func (s *Service) Overview(ctx context.Context, raidID int64) (*Overview, error)
 			if err != nil {
 				return reference(err)
 			}
-			entry := Entry{ID: row.ID, PlayerID: row.PlayerID, CharacterID: row.CharacterID, CharacterName: c.Name, Class: attendance.NormalizeClass(c.Class), Spec: row.Spec, IsWithdrawn: row.IsWithdrawn}
+			entry := Entry{ID: row.ID, PlayerID: row.PlayerID, CharacterID: row.CharacterID, CharacterName: c.Name, Class: attendance.NormalizeClass(c.Class), Spec: row.Spec, Specs: row.specList(), IsWithdrawn: row.IsWithdrawn}
 			for _, a := range roster {
 				if a.PlayerID == row.PlayerID {
 					entry.AttendanceID = a.ID
@@ -242,9 +245,13 @@ func (s *Service) Save(ctx context.Context, raidID, actor int64, choices []Choic
 			if c.PlayerID != actor {
 				return ErrForbidden
 			}
-			spec := strings.TrimSpace(choice.Spec)
-			if !slices.Contains(validation.ClassSpecs[attendance.NormalizeClass(c.Class)], spec) {
-				return ErrInvalid
+			specs, err := choiceSpecs(choice, validation.ClassSpecs[attendance.NormalizeClass(c.Class)])
+			if err != nil {
+				return err
+			}
+			encodedSpecs, err := json.Marshal(specs)
+			if err != nil {
+				return err
 			}
 			for _, a := range roster {
 				if a.PlayerID == actor && a.CharacterID == c.ID {
@@ -252,7 +259,7 @@ func (s *Service) Save(ctx context.Context, raidID, actor int64, choices []Choic
 				}
 			}
 			now := s.now()
-			row := signupRow{RaidID: raidID, PlayerID: actor, CharacterID: c.ID, Spec: spec, CreatedAt: now, UpdatedAt: now}
+			row := signupRow{RaidID: raidID, PlayerID: actor, CharacterID: c.ID, Spec: specs[0], Specs: string(encodedSpecs), CreatedAt: now, UpdatedAt: now}
 			var before any
 			for _, existing := range rows {
 				if existing.CharacterID == c.ID {
@@ -318,9 +325,28 @@ func specRole(spec string) validation.AttendanceRole {
 	return validation.RoleDD
 }
 
+// choiceSpecs returns the trimmed specs of a choice, each valid for the class
+// and listed once. The first one is the signup's default spec.
+func choiceSpecs(choice Choice, classSpecs []string) ([]string, error) {
+	requested := choice.Specs
+	if len(requested) == 0 {
+		requested = []string{choice.Spec}
+	}
+	specs := make([]string, 0, len(requested))
+	for _, spec := range requested {
+		spec = strings.TrimSpace(spec)
+		if !slices.Contains(classSpecs, spec) || slices.Contains(specs, spec) {
+			return nil, ErrInvalid
+		}
+		specs = append(specs, spec)
+	}
+	return specs, nil
+}
+
 // Accept creates attendance or explicitly switches an existing roster slot.
 // expectedAttendanceID prevents silently replacing a concurrently created slot.
-func (s *Service) Accept(ctx context.Context, raidID, id, actor, expectedAttendanceID, expectedCharacterID int64) error {
+// spec picks one of the signed-up specs; empty takes the first one.
+func (s *Service) Accept(ctx context.Context, raidID, id, actor, expectedAttendanceID, expectedCharacterID int64, spec string) error {
 	return s.repo.transaction(ctx, func(r *Repo) error {
 		if err := s.authorize(ctx, r, actor, validation.RoleRaidassistent); err != nil {
 			return err
@@ -343,7 +369,11 @@ func (s *Service) Accept(ctx context.Context, raidID, id, actor, expectedAttenda
 		if err != nil {
 			return reference(err)
 		}
-		if c.PlayerID != row.PlayerID || !slices.Contains(validation.ClassSpecs[attendance.NormalizeClass(c.Class)], row.Spec) {
+		spec = strings.TrimSpace(spec)
+		if spec == "" {
+			spec = row.Spec
+		}
+		if c.PlayerID != row.PlayerID || !slices.Contains(row.specList(), spec) || !slices.Contains(validation.ClassSpecs[attendance.NormalizeClass(c.Class)], spec) {
 			return ErrInvalid
 		}
 		roster, err := r.attendance.ListByRaid(ctx, raidID)
@@ -362,9 +392,9 @@ func (s *Service) Accept(ctx context.Context, raidID, id, actor, expectedAttenda
 		if current != nil && current.CharacterID == row.CharacterID {
 			return nil
 		}
-		role := specRole(row.Spec)
+		role := specRole(spec)
 		class := attendance.NormalizeClass(c.Class)
-		snapshot := raidcorrection.SnapshotPatch{CharacterName: &c.Name, Class: &class, Spec: &row.Spec}
+		snapshot := raidcorrection.SnapshotPatch{CharacterName: &c.Name, Class: &class, Spec: &spec}
 		var after *attendance.Attendance
 		if current == nil {
 			if expectedAttendanceID != 0 {

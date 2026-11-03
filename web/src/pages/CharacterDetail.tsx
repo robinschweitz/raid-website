@@ -7,6 +7,10 @@ import { useSubmission } from '../useSubmission'
 import { CharacterWishlist } from '../components/CharacterWishlist'
 import { atLeast, type Character, type LootAward, type NameHistory, type Player } from '../types'
 import { ErrorMessage } from '../components/ErrorMessage'
+import { canonicalClass, useCharacterOptions } from '../characterOptions'
+
+/** Owners may reload their profile once per 7 days (FR-6.15). */
+const OWN_RELOAD_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000
 
 const LOOT_METHOD_LABELS = { MAIN: 'Main-Spec', SECOND: 'Second-Spec', ENHANCED: 'Enhanced', BOE: 'BoE' }
 const LOOT_METHOD_CLASSES = { MAIN: 'main', SECOND: 'second', ENHANCED: 'enhanced', BOE: 'boe' }
@@ -34,6 +38,10 @@ function CharacterDetail({ characterID }: Props) {
   const [namesOpen, setNamesOpen] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
+  const [editingSpecs, setEditingSpecs] = useState(false)
+  const [mainSpec, setMainSpec] = useState('')
+  const [secondSpec, setSecondSpec] = useState('')
+  const { options: classSpecs } = useCharacterOptions()
 
   useEffect(() => {
     let active = true
@@ -71,10 +79,15 @@ function CharacterDetail({ characterID }: Props) {
     : []
   const visibleLoot = exactLoot.length > 0 ? exactLoot : nameFallbackLoot
   const hasNameHistory = history.length > 0
-  const canReloadProfile = Boolean(me && atLeast(me.role, 'ADMIN') && character.external_source === 'rising-gods' && character.external_profile_id)
-
   // The server lets owners and staff read a wishlist; only the owner (MEMBER and up) edits it.
   const isOwner = Boolean(me && me.id === character.player_id)
+  const isAdmin = Boolean(me && atLeast(me.role, 'ADMIN'))
+  const isLinked = character.external_source === 'rising-gods' && Boolean(character.external_profile_id)
+  const isOwnMember = Boolean(me && isOwner && atLeast(me.role, 'MEMBER'))
+  const nextOwnReload = character.profile_reloaded_at ? Date.parse(character.profile_reloaded_at) + OWN_RELOAD_INTERVAL_MS : 0
+  const ownReloadWaits = !isAdmin && nextOwnReload > Date.now()
+  const canReloadProfile = isLinked && (isAdmin || isOwnMember)
+  const specOptions = classSpecs[canonicalClass(character.class)] ?? []
   const canReadWishlist = Boolean(me && (isOwner || atLeast(me.role, 'RAIDASSISTENT')))
   const canEditWishlist = Boolean(me && isOwner && atLeast(me.role, 'MEMBER'))
 
@@ -97,7 +110,7 @@ function CharacterDetail({ characterID }: Props) {
   }
 
   const reloadProfile = async () => {
-    if (!canReloadProfile) return
+    if (!canReloadProfile || ownReloadWaits) return
     await submit(async () => {
       setError('')
       setStatus('')
@@ -108,6 +121,22 @@ function CharacterDetail({ characterID }: Props) {
         setStatus('Rising-Gods-Profil wurde neu geladen.')
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Profil konnte nicht neu geladen werden')
+      }
+    })
+  }
+
+  const saveSpecs = async () => {
+    await submit(async () => {
+      setError('')
+      setStatus('')
+      try {
+        const updated = await api.put<Character>(`/api/v1/characters/${character.id}/specs`, { main_spec: mainSpec, second_spec: secondSpec })
+        if (!isActive()) return
+        setCharacter(updated)
+        setEditingSpecs(false)
+        setStatus('Specs gespeichert. Ein Neuladen des Profils ändert sie nicht mehr.')
+      } catch (err) {
+        if (isActive()) setError(err instanceof ApiError ? err.message : 'Specs konnten nicht gespeichert werden')
       }
     })
   }
@@ -131,7 +160,7 @@ function CharacterDetail({ characterID }: Props) {
         <p><strong>{character.class}</strong>{character.main_spec && ` · ${character.main_spec}`}{character.second_spec && ` / ${character.second_spec}`} {character.is_main && <span className="badge">Main</span>} {!character.active && <span className="badge bad">Inaktiv</span>}</p>
         {owner && <p className="muted">Gehört zu <Link to={`/players/${owner.id}`}>{owner.name}</Link>.</p>}
         {canRetryLink && <div className="actions character-profile-actions"><button type="button" disabled={pending} onClick={() => void retryLink()}>{pending ? 'Suche Profil…' : 'Rising-Gods-Verknüpfung erneut versuchen'}</button></div>}
-        {canReloadProfile && <div className="actions character-profile-actions"><button type="button" disabled={pending} onClick={() => void reloadProfile()}>{pending ? 'Lade neu…' : 'Rising-Gods-Profil neu laden'}</button></div>}
+        {canReloadProfile && <div className="actions character-profile-actions"><button type="button" disabled={pending || ownReloadWaits} onClick={() => void reloadProfile()}>{pending ? 'Lade neu…' : 'Rising-Gods-Profil neu laden'}</button>{!isAdmin && <span className="muted">{ownReloadWaits ? `Wieder möglich ab ${new Date(nextOwnReload).toLocaleString('de-DE')}.` : 'Einmal pro Woche möglich.'}</span>}</div>}
       </div>
     </header>
 
@@ -143,12 +172,33 @@ function CharacterDetail({ characterID }: Props) {
       <dl>
         <div><dt>Main-Spec</dt><dd>{character.main_spec || '—'}</dd></div>
         <div><dt>Second-Spec</dt><dd>{character.second_spec || '—'}</dd></div>
+        {character.profile_reloaded_at && <div><dt>Profil neu geladen</dt><dd>{formatDate(character.profile_reloaded_at)}</dd></div>}
         <div><dt>GearScore</dt><dd>{character.gear_score ?? '—'}</dd></div>
         <div><dt>Status</dt><dd>{character.active ? 'Aktiv' : 'Inaktiv'}</dd></div>
         <div><dt>Angelegt</dt><dd>{formatDate(character.created_at)}</dd></div>
         <div><dt>Letzte Namensänderung</dt><dd>{formatDate(character.name_changed_at)}</dd></div>
         <div><dt>Rising Gods</dt><dd>{character.external_profile_url ? <a href={character.external_profile_url} target="_blank" rel="noreferrer">Profil öffnen</a> : '—'}</dd></div>
       </dl>
+      {isOwnMember && !editingSpecs && <div className="actions"><button type="button" disabled={pending || !specOptions.length} onClick={() => { setMainSpec(character.main_spec); setSecondSpec(character.second_spec); setEditingSpecs(true) }}>Specs ändern</button></div>}
+      {isOwnMember && editingSpecs && <form className="subcard" onSubmit={(event) => { event.preventDefault(); void saveSpecs() }}>
+        <label>Main-Spec
+          <select value={mainSpec} disabled={pending} required onChange={(event) => setMainSpec(event.target.value)}>
+            {!specOptions.includes(mainSpec) && <option value="">Spec wählen</option>}
+            {specOptions.map((spec) => <option key={spec} value={spec}>{spec}</option>)}
+          </select>
+        </label>
+        <label>Second-Spec
+          <select value={secondSpec} disabled={pending} onChange={(event) => setSecondSpec(event.target.value)}>
+            <option value="">Kein Second-Spec</option>
+            {specOptions.filter((spec) => spec !== mainSpec).map((spec) => <option key={spec} value={spec}>{spec}</option>)}
+          </select>
+        </label>
+        <p className="field-hint">Deine Wahl bleibt, auch wenn das Rising-Gods-Profil neu geladen wird.</p>
+        <div className="actions">
+          <button type="submit" className="primary-action" disabled={pending || !specOptions.includes(mainSpec) || secondSpec === mainSpec}>{pending ? 'Speichert…' : 'Specs speichern'}</button>
+          <button type="button" disabled={pending} onClick={() => setEditingSpecs(false)}>Abbrechen</button>
+        </div>
+      </form>}
     </section>
 
     {canReadWishlist && <CharacterWishlist characterID={character.id} canEdit={canEditWishlist} />}

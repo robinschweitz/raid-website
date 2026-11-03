@@ -22,9 +22,9 @@ implemented yet when it differs from the code.
 ### 1. Access and roles
 
 - **FR-1.1** Every permission in this file MUST be enforced by the server (SC-001). (ADR 010)
-- **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the statistics, the privacy contact, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044; Owner 2026-10-22, OQ-6)
+- **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the raid leaders of a raid, the EP balance list (FR-16.9), the statistics, the privacy contact, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044, 110; Owner 2026-10-22, OQ-6)
 - **FR-1.3** The public player list MUST show only ID, name, guild rank, and active state. It MUST NOT show login names. (ADR 067, 084)
-- **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/kontosicherheit`, `/statistics`, and the privacy page `/datenschutz` without a session. (ADR 083, 085, 092; Owner 2026-10-22, OQ-6 and OQ-9)
+- **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/kontosicherheit`, `/statistics`, `/punkte`, and the privacy page `/datenschutz` without a session. (ADR 083, 085, 092; Owner 2026-10-22, OQ-6 and OQ-9)
 - **FR-1.5** The system MUST require a session for all other reads. (ADR 067)
 - **FR-1.6** The system MUST reject a request with a role that is too low with HTTP 403. It MUST reject a request without a session on a protected endpoint with HTTP 401. (ADR 010)
 - **FR-1.7** These reads MUST require RAIDASSISTENT or higher: the archive preview, the recruitment template, and the wishlist interests of a raid. (ADR 068, 069)
@@ -97,7 +97,7 @@ implemented yet when it differs from the code.
 - **FR-6.3** Character names MUST be changeable. The system MUST keep a name history. The system MUST NOT require globally unique character names. (ADR 013)
 - **FR-6.4** Interactive creation of a character MUST use a loaded Rising-Gods profile for name, class, and specs. (ADR 042)
 - **FR-6.5** The system MUST NOT link one Rising-Gods profile to two players. (ADR 042)
-- **FR-6.6** Only an ADMIN MUST be able to create or edit a live character outside raid quick-add. Edits MUST be audited and MUST write the name history. (ADR 032)
+- **FR-6.6** Only an ADMIN MUST be able to create or edit a live character outside raid quick-add, except the owner's own specs (FR-6.16) and own profile reload (FR-6.15). Edits MUST be audited and MUST write the name history. (ADR 032, 109)
 - **FR-6.7** An ADMIN MUST be able to move a character to another existing player. The move MUST also move the wishlist and the player reference of every roster row of that character, also in archived raids. (ADR 090, 091)
 - **FR-6.8** A character move MUST NOT move loot, EP transactions, item locks, or signups. (ADR 091)
 - **FR-6.9** A character move MUST be rejected when the target player already has the character in the same raid roster. (ADR 091)
@@ -105,7 +105,9 @@ implemented yet when it differs from the code.
 - **FR-6.11** A character merge MUST be rejected when both characters have records for the same raid or the same wishlist item. (ADR 051)
 - **FR-6.12** A character merge MUST NOT change or recreate EP transactions. (ADR 051)
 - **FR-6.13** An ADMIN MUST be able to retry the Rising-Gods link of a character. The retry MUST load the profile `eu.rising-gods.<name>` directly and MUST NOT run a list search. (ADR 052)
-- **FR-6.14** An ADMIN MUST be able to reload the Rising-Gods profile data of a linked character. (code; Owner 2026-10-22, review)
+- **FR-6.14** An ADMIN MUST be able to reload the Rising-Gods profile data of a linked character at any time. (code; Owner 2026-10-22, review)
+- **FR-6.15** The owner of a linked character, MEMBER or higher, MUST be able to reload its Rising-Gods profile at most once per 7 days per character; an earlier attempt MUST give HTTP 409 `profile_reload_too_soon` and change nothing. Every reload, also by an ADMIN, MUST record its time and MUST be audited. (Owner 2026-11-03, ADR 109)
+- **FR-6.16** The owner of a character, MEMBER or higher, MUST be able to set its main spec and second spec to valid specs of its class; the second spec is optional and MUST differ from the main spec. The change MUST be audited. After the owner has set the specs, a profile reload (FR-6.14, FR-6.15) MUST keep them and update only name and gear score. (Owner 2026-11-03, ADR 109)
 
 ### 7. Rising-Gods lookup
 
@@ -153,6 +155,7 @@ implemented yet when it differs from the code.
 - **FR-10.14** Archived raids MUST stay visible as history. (ADR 021)
 - **FR-10.15** Archiving a raid that was COMPLETED before this rule MUST only set the archive time. It MUST NOT award EP or start a series chain. (ADR 021)
 - **FR-10.16** Cancelling and archiving a raid MUST need a confirmation (which actions: `DESIGN.md` "Interaction & Rendering Safety"). (ADR 069)
+- **FR-10.17** A raid MUST have one or more raid leaders (Raidleitung). The first comes from the series or the create form. Staff MUST be able to set the list under the raid-state rules of FR-13.11, also for archived raids, and with the reason rule of FR-26.5: active players, each once, at least one. Raid leaders MUST NOT grant permissions. The change MUST be audited. Everyone, also without a session, sees all raid leaders on the overview; the raid page shows them too. (Owner 2026-11-03, ADR 109, 110)
 
 ### 11. Current raid and dashboard
 
@@ -166,9 +169,9 @@ implemented yet when it differs from the code.
 
 - **FR-12.1** Staff MUST be able to open and close signups of a raid. (ADR 033)
 - **FR-12.2** Signups MUST be open only when enabled, the raid is active and not archived, and the server time is before the scheduled start. (ADR 033)
-- **FR-12.3** MEMBER and higher MUST be able to sign up one or more own characters, each with any valid spec of its class. A signup MUST NOT change the saved specs of the character. (ADR 033)
+- **FR-12.3** MEMBER and higher MUST be able to sign up one or more own characters, each with one or more valid specs of its class; the form offers the character's main and second spec. A signup MUST NOT change the saved specs of the character. (ADR 033, 109)
 - **FR-12.4** While signups are open, the player MUST be able to edit or withdraw pending choices. The player MUST NOT edit or withdraw an accepted choice. (ADR 033)
-- **FR-12.5** Staff MUST be able to accept one character per player. Acceptance MUST create the roster row with name, class, spec, and the role of the spec. (ADR 033)
+- **FR-12.5** Staff MUST be able to accept one character per player with one of its signed-up specs, by default the first. A spec that was not signed up MUST be rejected. Acceptance MUST create the roster row with name, class, spec, and the role of the spec. (ADR 033, 109)
 - **FR-12.6** Staff MUST be able to switch the accepted character of a player. A stale switch request MUST be rejected. (ADR 033)
 - **FR-12.7** Staff MUST be able to accept choices of an active raid after signups close. Cancelled, completed, and archived raids MUST reject acceptance. (ADR 033)
 - **FR-12.8** The accepted state MUST come from the roster. A removed roster row MUST show its signup as pending again. (ADR 033, 076)
@@ -226,6 +229,7 @@ implemented yet when it differs from the code.
 - **FR-16.5** A correction of a completed raid MUST add only the change in EP eligibility: +10 when a player becomes eligible, −10 when a player is no longer eligible, limited by FR-16.6. (ADR 018)
 - **FR-16.6** A correction MUST NOT make an EP balance lower than 0. It MUST take only the points that the player still has. The points not taken MUST NOT be taken later. (Owner 2026-10-22, review)
 - **FR-16.7** The system MUST NOT recalculate existing ledger history under new rules. (owner brief)
+- **FR-16.9** The public page `/punkte` MUST list every active player with the current EP balance, without the roll range, sorted by balance descending, then by name. The public list MUST contain only player ID, player name, and balance; EP transactions MUST stay readable only with a session. (Owner 2026-11-03, ADR 110)
 - **FR-16.8** Before staff save a correction that FR-16.6 limits, the system MUST warn them with the player and the number of points not taken. The audit entry MUST record that number. (Owner 2026-10-22, review)
 
 ### 17. Item locks

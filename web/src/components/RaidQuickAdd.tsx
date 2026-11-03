@@ -64,7 +64,7 @@ export function RaidQuickAdd({ raidID, players, options, needsReason, onAdded, o
         // An unknown outcome must be retried with the same payload and key.
         const unknown = !(err instanceof ApiError) || err.status >= 500
         setUncertain(unknown)
-        setError(unknown ? 'Antwort nicht verfügbar. Bitte unverändert erneut speichern; der Eintrag wird nicht doppelt angelegt.' : err.message)
+        setError(unknown ? 'Keine Antwort vom Server. Bitte ohne Änderung noch einmal speichern; der Eintrag wird nicht doppelt angelegt.' : err.message)
       }
     })
   }

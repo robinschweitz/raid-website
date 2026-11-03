@@ -271,6 +271,64 @@ func (a *API) configureRaidSchedule(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]any{"data": rd})
 }
 
+func (a *API) getRaidLeaders(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid raid id")
+		return
+	}
+	ids, err := raid.NewService(a.Raids).Leaders(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, raid.ErrNotFound) {
+			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, "internal", "could not load raid leaders")
+		return
+	}
+	writeListJSON(w, ids)
+}
+
+func (a *API) setRaidLeaders(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
+		return
+	}
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid raid id")
+		return
+	}
+	var req struct {
+		PlayerIDs []int64 `json:"player_ids"`
+		Reason    string  `json:"reason"`
+	}
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	ids, err := raid.NewService(a.Raids).SetLeaders(r.Context(), id, actor, req.PlayerIDs, req.Reason)
+	if err != nil {
+		switch {
+		case errors.Is(err, raid.ErrNotFound):
+			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
+		case errors.Is(err, raid.ErrActorNotFound):
+			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "raid actor not found")
+		case errors.Is(err, raid.ErrLeadersInvalid):
+			WriteError(w, http.StatusBadRequest, "raid_leaders_invalid", "Bitte mindestens eine Raidleitung wählen, jede nur einmal und nur aktive Spieler.")
+		case errors.Is(err, raid.ErrReasonRequired):
+			WriteError(w, http.StatusBadRequest, "reason_required", "Bei archivierten Raids ist eine Begründung nötig.")
+		case errors.Is(err, raid.ErrScheduleNotEditable):
+			WriteError(w, http.StatusConflict, "schedule_not_editable", "Bei abgesagten Raids kann die Raidleitung nicht geändert werden.")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "could not set raid leaders")
+		}
+		return
+	}
+	writeListJSON(w, ids)
+}
+
 func parseOptionalTime(raw *string) (*time.Time, error) {
 	if raw == nil || *raw == "" {
 		return nil, nil

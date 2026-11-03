@@ -64,6 +64,26 @@ func (r *Repo) ListByPlayer(ctx context.Context, playerID int64) ([]Transaction,
 	return ts, nil
 }
 
+// PublicBalance is the only EP data visitors see (FR-16.9).
+type PublicBalance struct {
+	PlayerID   int64  `bun:"player_id" json:"player_id"`
+	PlayerName string `bun:"player_name" json:"player_name"`
+	Balance    int    `bun:"balance" json:"balance"`
+}
+
+// ActiveBalances lists every active player's balance, highest first, then by name.
+func (r *Repo) ActiveBalances(ctx context.Context) ([]PublicBalance, error) {
+	rows := []PublicBalance{}
+	err := r.db.NewSelect().
+		TableExpr("players AS p").
+		ColumnExpr("p.id AS player_id, p.name AS player_name").
+		ColumnExpr("COALESCE((SELECT SUM(t.amount) FROM enhance_point_transactions AS t WHERE t.player_id = p.id), 0) AS balance").
+		Where("p.active = TRUE").
+		OrderExpr("balance DESC, p.name ASC, p.id ASC").
+		Scan(ctx, &rows)
+	return rows, err
+}
+
 func (r *Repo) Balance(ctx context.Context, playerID int64) (int, error) {
 	var sum int
 	err := r.db.NewSelect().

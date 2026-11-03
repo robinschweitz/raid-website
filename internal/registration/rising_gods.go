@@ -26,22 +26,23 @@ var (
 	ErrExternalInvalid     = errors.New("rising-gods profile invalid")
 	ErrExternalUnavailable = errors.New("rising-gods unavailable")
 
-	listviewProfileID = regexp.MustCompile(`"id"\s*:\s*(\d+)`)
-	listviewName      = regexp.MustCompile(`"name"\s*:\s*"([^"]+)"`)
-	listviewClass     = regexp.MustCompile(`"classs"\s*:\s*(\d+)`)
-	listviewLevel     = regexp.MustCompile(`"level"\s*:\s*(\d+)`)
-	listviewTree1     = regexp.MustCompile(`"talenttree1"\s*:\s*(\d+)`)
-	listviewTree2     = regexp.MustCompile(`"talenttree2"\s*:\s*(\d+)`)
-	listviewTree3     = regexp.MustCompile(`"talenttree3"\s*:\s*(\d+)`)
-	profileIDField    = regexp.MustCompile(`"id"\s*:\s*(\d+)`)
-	profileLevel      = regexp.MustCompile(`"level"\s*:\s*(\d+)`)
-	profileClass      = regexp.MustCompile(`"classs"\s*:\s*(\d+)`)
-	profileRace       = regexp.MustCompile(`"race"\s*:\s*(\d+)`)
-	profileFaction    = regexp.MustCompile(`"faction"\s*:\s*(\d+)`)
-	profileName       = regexp.MustCompile(`"name"\s*:\s*"([^"]+)"`)
-	profileTalent     = regexp.MustCompile(`"talents"\s*:\s*"([0-9]+)"`)
-	profilePageID     = regexp.MustCompile(`profilah\.initialize\([^)]*\{\s*id\s*:\s*(\d+)`)
-	risingGodsItemAdd = regexp.MustCompile(`g_items\.add\(\d+,\s*`)
+	listviewProfileID   = regexp.MustCompile(`"id"\s*:\s*(\d+)`)
+	listviewName        = regexp.MustCompile(`"name"\s*:\s*"([^"]+)"`)
+	listviewClass       = regexp.MustCompile(`"classs"\s*:\s*(\d+)`)
+	listviewLevel       = regexp.MustCompile(`"level"\s*:\s*(\d+)`)
+	listviewTree1       = regexp.MustCompile(`"talenttree1"\s*:\s*(\d+)`)
+	listviewTree2       = regexp.MustCompile(`"talenttree2"\s*:\s*(\d+)`)
+	listviewTree3       = regexp.MustCompile(`"talenttree3"\s*:\s*(\d+)`)
+	profileIDField      = regexp.MustCompile(`"id"\s*:\s*(\d+)`)
+	profileLevel        = regexp.MustCompile(`"level"\s*:\s*(\d+)`)
+	profileClass        = regexp.MustCompile(`"classs"\s*:\s*(\d+)`)
+	profileRace         = regexp.MustCompile(`"race"\s*:\s*(\d+)`)
+	profileFaction      = regexp.MustCompile(`"faction"\s*:\s*(\d+)`)
+	profileName         = regexp.MustCompile(`"name"\s*:\s*"([^"]+)"`)
+	profileTalent       = regexp.MustCompile(`"talents"\s*:\s*"([0-9]+)"`)
+	profilePageID       = regexp.MustCompile(`profilah\.initialize\([^)]*\{\s*id\s*:\s*(\d+)`)
+	risingGodsItemAdd   = regexp.MustCompile(`g_items\.add\((\d+),\s*`)
+	risingGodsInventory = regexp.MustCompile(`"inventory"\s*:\s*`)
 
 	defaultRisingGodsCache = newRisingGodsCache()
 )
@@ -396,8 +397,9 @@ func calculateGearScoreFromProfileBody(body, class string) *int {
 }
 
 func gearScoreItemsFromProfileBody(body string) []gearScoreItem {
-	matches := risingGodsItemAdd.FindAllStringIndex(body, -1)
+	matches := risingGodsItemAdd.FindAllStringSubmatchIndex(body, -1)
 	items := make([]gearScoreItem, 0, len(matches))
+	byID := map[string]gearScoreItem{}
 	for _, match := range matches {
 		object := extractJSONObjectAt(body, match[1])
 		if object == "" {
@@ -410,9 +412,45 @@ func gearScoreItemsFromProfileBody(body string) []gearScoreItem {
 		item, ok := gearScoreItemFromProfileItem(parsed)
 		if ok {
 			items = append(items, item)
+			byID[body[match[2]:match[3]]] = item
 		}
 	}
-	return items
+	equipped, ok := equippedItemIDs(body)
+	if !ok {
+		return items
+	}
+	// The page also lists each slot's transmog appearance; count only what is worn.
+	worn := make([]gearScoreItem, 0, len(equipped))
+	for _, id := range equipped {
+		if item, ok := byID[id]; ok {
+			worn = append(worn, item)
+		}
+	}
+	return worn
+}
+
+// equippedItemIDs reads the worn item of each slot (the first field of every
+// inventory entry). It reports false when the profile has no inventory map.
+func equippedItemIDs(body string) ([]string, bool) {
+	match := risingGodsInventory.FindStringIndex(body)
+	if match == nil {
+		return nil, false
+	}
+	object := extractJSONObjectAt(body, match[1])
+	if object == "" {
+		return nil, false
+	}
+	var inventory map[string][]int64
+	if err := json.Unmarshal([]byte(object), &inventory); err != nil {
+		return nil, false
+	}
+	ids := make([]string, 0, len(inventory))
+	for _, slot := range inventory {
+		if len(slot) > 0 && slot[0] > 0 {
+			ids = append(ids, strconv.FormatInt(slot[0], 10))
+		}
+	}
+	return ids, true
 }
 
 func gearScoreItemFromProfileItem(item risingGodsProfileItem) (gearScoreItem, bool) {

@@ -15,6 +15,7 @@ import { PollsPage } from './pages/Polls'
 import { RaidSeriesPage } from './pages/RaidSeries'
 import { RaidsPage } from './pages/Raids'
 import { StatisticsPage } from './pages/Statistics'
+import { PointsPage } from './pages/Points'
 import { GuildCrest } from './components/GuildCrest'
 import { NavIcon } from './components/NavIcon'
 import { LootCatalogPage } from './pages/LootCatalog'
@@ -66,6 +67,7 @@ function Routes() {
   }
   if (parts[0] === 'raid-series') return <RaidSeriesPage />
   if (parts[0] === 'statistics') return <StatisticsPage />
+  if (parts[0] === 'punkte') return <PointsPage />
   if (parts[0] === 'loot-catalog') return <LootCatalogPage />
   if (parts[0] === 'polls') {
     return <PollsPage />
@@ -110,6 +112,7 @@ function Layout() {
           <Link className={path === '/raids/current' ? 'nav-link active' : 'nav-link'} to="/raids/current"><NavIcon name="zap" />Aktueller Raid</Link>
           <Link className={path.startsWith('/players') ? 'nav-link active' : 'nav-link'} to="/players"><NavIcon name="players" />Spieler</Link>
           <Link className={path === '/statistics' ? 'nav-link active' : 'nav-link'} to="/statistics"><NavIcon name="chart" />Statistiken</Link>
+          <Link className={path === '/punkte' ? 'nav-link active' : 'nav-link'} to="/punkte"><NavIcon name="award" />EP-Stand</Link>
           <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
           <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
           <Link className={path === '/schattengram' ? 'nav-link active' : 'nav-link'} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>
@@ -148,6 +151,7 @@ function Layout() {
         <Link className={path === '/raids/current' ? 'active' : ''} to="/raids/current"><NavIcon name="zap" />Aktuell</Link>
         <Link className={path.startsWith('/players') ? 'active' : ''} to="/players"><NavIcon name="players" />Spieler</Link>
         <Link className={path === '/statistics' ? 'active' : ''} to="/statistics"><NavIcon name="chart" />Statistik</Link>
+        <Link className={path === '/punkte' ? 'active' : ''} to="/punkte"><NavIcon name="award" />EP</Link>
         <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>
         <Link className={path === '/loot-catalog' ? 'active' : ''} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
         <Link className={path === '/schattengram' ? 'active' : ''} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>
@@ -179,8 +183,8 @@ function Gate() {
     )
   }
   // The guide, the addons pages and the account-security page must be readable before an
-  // account exists (ADR 083, ADR 085, ADR 092); so must the statistics (FR-1.4).
-  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/') && path !== '/statistics' && path !== '/passwort-zuruecksetzen' && path !== '/datenschutz') {
+  // account exists (ADR 083, ADR 085, ADR 092); so must the statistics and the EP standing (FR-1.4).
+  if (!player && path !== '/' && path !== '/anleitung' && path !== '/kontosicherheit' && path !== '/addons' && !path.startsWith('/addons/') && path !== '/statistics' && path !== '/punkte' && path !== '/passwort-zuruecksetzen' && path !== '/datenschutz') {
     return <LoginPage />
   }
   return <Layout />

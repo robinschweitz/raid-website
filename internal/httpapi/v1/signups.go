@@ -115,8 +115,9 @@ func (a *API) acceptSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		ReplaceAttendanceID int64 `json:"replace_attendance_id"`
-		ExpectedCharacterID int64 `json:"expected_character_id"`
+		ReplaceAttendanceID int64  `json:"replace_attendance_id"`
+		ExpectedCharacterID int64  `json:"expected_character_id"`
+		Spec                string `json:"spec"`
 	}
 	if err := DecodeJSON(r, &req); err != nil {
 		BadRequest(w, "malformed json body")
@@ -124,7 +125,7 @@ func (a *API) acceptSignup(w http.ResponseWriter, r *http.Request) {
 	}
 	actor, _ := ActorID(r)
 	before := a.rosterSnapshot(r.Context(), id)
-	if err := a.Signups.Accept(r.Context(), id, signupID, actor, req.ReplaceAttendanceID, req.ExpectedCharacterID); err != nil {
+	if err := a.Signups.Accept(r.Context(), id, signupID, actor, req.ReplaceAttendanceID, req.ExpectedCharacterID, req.Spec); err != nil {
 		writeSignupError(w, err)
 		return
 	}

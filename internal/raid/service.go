@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"raid-website/internal/audit"
 	"raid-website/internal/enhancepoints"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/validation"
@@ -19,6 +20,8 @@ var (
 	ErrScheduleNotEditable = errors.New("finalized, cancelled or archived raid schedule cannot be changed")
 	ErrNameNotEditable     = errors.New("raid name can only be changed for raids without series")
 	ErrOccurrenceConflict  = errors.New("raid series occurrence or successor already exists")
+	ErrLeadersInvalid      = errors.New("raid leaders must be active players, each once, at least one")
+	ErrReasonRequired      = errors.New("changes to an archived raid need a reason")
 )
 
 type Service struct {
@@ -188,6 +191,78 @@ func (s *Service) CreateRaid(ctx context.Context, rd *Raid, actorID int64) error
 		}
 		return repo.Audit(ctx, actorID, rd.ID, "create", nil, rd)
 	})
+}
+
+// Leaders lists all raid leaders of a raid; the first is raids.raid_leader_id (FR-10.17).
+func (s *Service) Leaders(ctx context.Context, raidID int64) ([]int64, error) {
+	rd, err := s.repo.Get(ctx, raidID)
+	if err != nil {
+		return nil, err
+	}
+	extra, err := s.repo.ExtraLeaders(ctx, raidID)
+	if err != nil {
+		return nil, err
+	}
+	return append([]int64{rd.RaidLeaderID}, extra...), nil
+}
+
+// SetLeaders replaces the raid leaders of a planned, open, or completed raid, also
+// an archived one, which needs a reason (FR-13.11, FR-26.5). Leaders are shown
+// only; they grant no permissions (ADR 109).
+func (s *Service) SetLeaders(ctx context.Context, raidID, actorID int64, playerIDs []int64, reason string) ([]int64, error) {
+	reason = strings.TrimSpace(reason)
+	if len(playerIDs) == 0 {
+		return nil, ErrLeadersInvalid
+	}
+	seen := map[int64]bool{}
+	for _, id := range playerIDs {
+		if id <= 0 || seen[id] {
+			return nil, ErrLeadersInvalid
+		}
+		seen[id] = true
+	}
+	err := s.repo.InTransaction(ctx, func(repo *Repo) error {
+		if err := repo.RequireActor(ctx, actorID); err != nil {
+			return err
+		}
+		rd, err := repo.Get(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		if rd.Status == validation.RaidStatusCancelled || (rd.ArchivedAt != nil && rd.Status != validation.RaidStatusCompleted) {
+			return ErrScheduleNotEditable
+		}
+		if rd.ArchivedAt != nil && reason == "" {
+			return ErrReasonRequired
+		}
+		for _, id := range playerIDs {
+			exists, err := repo.ActivePlayerExists(ctx, id)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				return ErrLeadersInvalid
+			}
+		}
+		extra, err := repo.ExtraLeaders(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		before := append([]int64{rd.RaidLeaderID}, extra...)
+		rd.RaidLeaderID = playerIDs[0]
+		rd.UpdatedAt = time.Now().UTC()
+		if err := repo.Update(ctx, rd); err != nil {
+			return err
+		}
+		if err := repo.ReplaceExtraLeaders(ctx, raidID, playerIDs[1:]); err != nil {
+			return err
+		}
+		return audit.NewRepo(repo.db).Record(ctx, actorID, "raid", raidID, "set_leaders", map[string]any{"leader_ids": before}, map[string]any{"leader_ids": playerIDs}, reason)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return playerIDs, nil
 }
 
 func IsCompletedOrCancelled(s validation.RaidStatus) bool {

@@ -111,6 +111,13 @@ func (r *Repo) MoveHistoricalReferences(ctx context.Context, sourceID, targetID 
 	if _, err := r.db.NewDelete().Table("poll_votes").Where("player_id = ?", sourceID).Where("EXISTS (SELECT 1 FROM poll_votes AS target WHERE target.poll_id = poll_votes.poll_id AND target.player_id = ?)", targetID).Exec(ctx); err != nil {
 		return err
 	}
+	// A raid that lists both players as leaders keeps the target's place.
+	if _, err := r.db.NewDelete().Table("raid_leaders").Where("player_id = ?", sourceID).Where("EXISTS (SELECT 1 FROM raids WHERE raids.id = raid_leaders.raid_id AND raids.raid_leader_id = ?) OR EXISTS (SELECT 1 FROM raid_leaders AS target WHERE target.raid_id = raid_leaders.raid_id AND target.player_id = ?)", targetID, targetID).Exec(ctx); err != nil {
+		return err
+	}
+	if _, err := r.db.NewDelete().Table("raid_leaders").Where("player_id = ?", targetID).Where("EXISTS (SELECT 1 FROM raids WHERE raids.id = raid_leaders.raid_id AND raids.raid_leader_id = ?)", sourceID).Exec(ctx); err != nil {
+		return err
+	}
 	if _, err := r.db.NewDelete().Table("raid_quick_add_requests").Where("actor_id = ?", sourceID).Where("EXISTS (SELECT 1 FROM raid_quick_add_requests AS target WHERE target.raid_id = raid_quick_add_requests.raid_id AND target.actor_id = ? AND target.request_id = raid_quick_add_requests.request_id)", targetID).Exec(ctx); err != nil {
 		return err
 	}
@@ -124,6 +131,7 @@ func (r *Repo) MoveHistoricalReferences(ctx context.Context, sourceID, targetID 
 		{"password_reset_codes", "player_id"}, {"password_reset_codes", "created_by_player_id"},
 		{"registration_codes", "created_by_player_id"}, {"registration_codes", "used_by_player_id"},
 		{"raid_boss_kills", "created_by_player_id"}, {"raid_boss_kills", "removed_by_player_id"},
+		{"raid_leaders", "player_id"},
 	}
 	for _, statement := range statements {
 		if _, err := r.db.NewUpdate().Table(statement.table).Set(statement.column+" = ?", targetID).Where(statement.column+" = ?", sourceID).Exec(ctx); err != nil {

@@ -224,13 +224,56 @@ func (a *API) reloadCharacterProfile(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, character.ErrInvalidActor):
 			WriteError(w, http.StatusUnauthorized, "invalid_actor", "actor does not exist")
 		case errors.Is(err, character.ErrForbidden):
-			WriteError(w, http.StatusForbidden, "forbidden", "character profile reload requires admin")
+			WriteError(w, http.StatusForbidden, "forbidden", "Nur der Besitzer oder ein Admin kann das Profil neu laden.")
+		case errors.Is(err, registration.ErrProfileReloadTooSoon):
+			WriteError(w, http.StatusConflict, "profile_reload_too_soon", "Das Profil wurde in den letzten 7 Tagen schon neu geladen.")
+		case errors.Is(err, registration.ErrExternalUnavailable):
+			log.Printf("rising-gods reload unavailable character_id=%d: %v", id, err)
+			WriteError(w, http.StatusBadGateway, "rising_gods_unavailable", "Rising Gods ist momentan nicht erreichbar.")
 		case errors.Is(err, registration.ErrProfileMissing):
 			WriteError(w, http.StatusBadRequest, "profile_missing", "character has no Rising-Gods profile")
 		case errors.Is(err, registration.ErrProfileRequired), errors.Is(err, registration.ErrProfileUnusable):
 			WriteError(w, http.StatusBadRequest, "profile_unusable", "Rising-Gods profile could not be loaded")
 		default:
 			WriteError(w, http.StatusInternalServerError, "internal", "could not reload character profile")
+		}
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": c})
+}
+
+func (a *API) setOwnCharacterSpecs(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "authentication required")
+		return
+	}
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid character id")
+		return
+	}
+	var req struct {
+		MainSpec   string `json:"main_spec"`
+		SecondSpec string `json:"second_spec"`
+	}
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	c, err := character.NewService(a.Characters).SetOwnSpecs(r.Context(), actor, id, req.MainSpec, req.SecondSpec)
+	if err != nil {
+		switch {
+		case errors.Is(err, character.ErrNotFound):
+			WriteError(w, http.StatusNotFound, "not_found", "character not found")
+		case errors.Is(err, character.ErrInvalidActor):
+			WriteError(w, http.StatusUnauthorized, "invalid_actor", "actor does not exist")
+		case errors.Is(err, character.ErrForbidden):
+			WriteError(w, http.StatusForbidden, "forbidden", "Nur der Besitzer kann die Specs seines Charakters ändern.")
+		case errors.Is(err, character.ErrInvalidSpec):
+			WriteError(w, http.StatusBadRequest, "invalid_spec", "Bitte gültige, unterschiedliche Specs der Klasse wählen.")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "could not change character specs")
 		}
 		return
 	}

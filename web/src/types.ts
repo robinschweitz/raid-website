@@ -47,6 +47,10 @@ export interface Character {
   external_source: string
   external_profile_id: string
   external_profile_url: string
+  /** Last Rising-Gods reload; the owner may reload once per 7 days (FR-6.15). */
+  profile_reloaded_at?: string | null
+  /** Set once the owner chose the specs; reloads keep them (FR-6.16). */
+  specs_chosen_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -177,6 +181,8 @@ export interface RaidSignup {
   character_name: string
   class: string
   spec: string
+  /** Signed-up specs, the first one is the default (ADR 109). */
+  specs?: string[]
   is_withdrawn: boolean
   is_accepted: boolean
   attendance_id: number

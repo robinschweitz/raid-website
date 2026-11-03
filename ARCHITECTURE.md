@@ -117,7 +117,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   FR-29.8).
 - **Public interface.** Without a session, only these reads answer (FR-1.2): `GET /api/v1/raids`,
   `/players`, `/polls`, `/raids/{id}/attendance`, `/addons`, `/addons/{name}/download`,
-  `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/statistics`, and `/privacy-contact`. Login, MFA, and registration writes are public too.
+  `/raids/{id}/leaders`, `/points`, `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/statistics`, and `/privacy-contact`. Login, MFA, and registration writes are public too.
 - **API notes.** Catalog reads: `GET /api/v1/loot-catalog` and its `/instances`, `/bosses`,
   `/items`; there are no catalog write endpoints. Raid series: `weekdays` are 0 (Sunday) to 6
   (Saturday), `start_time` is `HH:MM`, `timezone` an IANA name. `PATCH /api/v1/raids/{id}` takes
@@ -321,6 +321,12 @@ None open. The owner resolved AQ-1 to AQ-8 on 2026-10-22; the answers are in the
 - **AQ-8** `go mod tidy`, delete `internal/logger` (DR-11, DR-12).
 
 Addon loot imports (#96) reserve the SQLite writer before a fresh preview/kill read. The addon coordinator binds every repository and both loot services to the same transaction, so selected awards, unclaimed entries, kills, lock changes, EP and audit writes commit together or roll back together.
+
+### Own specs, weekly reload, multi-spec signups, raid leaders (ADR 109)
+- `raid_signups.specs` holds the signed-up specs as a JSON array; empty means a legacy single-spec signup (`spec`). `POST /api/v1/raids/{id}/signups/{signupID}/accept` takes an optional `spec`.
+- `characters.profile_reloaded_at` gates the owner's weekly `POST /api/v1/characters/{id}/reload-profile` (MEMBER, owner or Admin); `characters.specs_chosen_at` marks specs set through `PUT /api/v1/characters/{id}/specs` (MEMBER, owner only), which reloads then keep.
+- The `raid` package owns `raid_leaders` (leaders after `raids.raid_leader_id`, which stays the first). `GET /api/v1/raids/{id}/leaders` (public, ADR 110) and `PUT` (RAIDASSISTENT and higher, body `player_ids` and `reason`, required for archived raids) read and replace the list; it grants no permissions.
+- The gear score counts only the worn item of each slot (first field of the profile's `inventory` entry), never the transmog appearance listed beside it.
 
 ### Raid-News (#202)
 - `raid_news` stores publication status and text; `raid_news_acknowledgements` stores per-player confirmation.

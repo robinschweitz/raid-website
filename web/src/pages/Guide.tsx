@@ -151,6 +151,7 @@ export function GuidePage() {
             <tr><td><strong>Aktueller Raid</strong></td><td>Direkt zum Raid von heute Abend: der neueste Raid, der schon begonnen hat (sonst der nächste). Auf dem Handy heißt er <strong>Aktuell</strong>.</td></tr>
             <tr><td><strong>Spieler</strong></td><td>Alle Spieler. Über deinen Namen (auch oben rechts) kommst du zu deinem Profil.</td></tr>
             <tr><td><strong>Statistiken</strong></td><td>Auswertungen über Raids und Loot (ohne Anmeldung sichtbar, ohne Items und Enhance Points)</td></tr>
+            <tr><td><strong>EP-Stand</strong></td><td>Aktueller EP-Stand aller aktiven Spieler (ohne Anmeldung sichtbar, ohne einzelne Buchungen)</td></tr>
             <tr><td><strong>Umfragen</strong></td><td>Abstimmen, z. B. über einen neuen Raidtag</td></tr>
             <tr><td><strong>Beute</strong></td><td>Item-Katalog. Hier fügst du Items zur Wunschliste hinzu.</td></tr>
             <tr><td><strong>Schattengram</strong></td><td>Wer an Schattengram arbeitet, bei welchem Schritt, in welcher Reihenfolge, und wer schon fertig ist.</td></tr>
@@ -197,12 +198,12 @@ export function GuidePage() {
       <ol>
         <li>Klicke auf der Karte auf <strong>Anderer Charakter oder Spec</strong>.</li>
         <li>Setze unter <em>Meine Charaktere anmelden / Spec ändern</em> ein Häkchen bei jedem Charakter, den du anbieten willst.</li>
-        <li>Wähle für jeden Charakter den gewünschten <strong>Spec</strong>.</li>
+        <li>Kreuze für jeden Charakter an, welche <strong>Specs</strong> du spielen kannst: Main, Second oder beide. Die Raidleitung sucht sich beim Übernehmen einen davon aus.</li>
         <li>Klicke auf <strong>Ausgewählte Charaktere anmelden</strong>.</li>
       </ol>
       <p><strong>Beispiel:</strong> Sternfall bietet zusätzlich seinen Schamanen-Twink <em>Morgentau</em> als <em>Wiederherstellung</em> an. Die Raidleitung nimmt dann den, der besser passt.</p>
       <Shot name="14-raid-anmeldungen-mitglied" caption="Raid, Reiter Anmeldungen: dein Status und wer abgesagt hat" />
-      <Shot name="15-raid-anmeldungen-formular" caption="Charaktere wählen, Spec wählen, absagen oder unsicher melden" />
+      <Shot name="15-raid-anmeldungen-formular" caption="Charaktere wählen, Specs ankreuzen, absagen oder unsicher melden" />
     </Section>
 
     <Section id="wunschliste" audience="mitglieder" title="Wunschliste und Addon-Export">
@@ -244,7 +245,7 @@ export function GuidePage() {
         <li><strong>Nur der Gewinner zahlt.</strong> Verlorene Würfe kosten nichts.</li>
       </ul>
       <p><strong>Beispiel:</strong> Sternfall hat 160 EP. Sein Enhanced-Wurf geht von <strong>51 bis 150</strong>, weil höchstens 50 EP zählen.</p>
-      <Shot name="19-profil-ep" caption="Reiter EP: Stand, Wurfspanne und Historie" />
+      <Shot name="19-profil-ep" caption="Reiter EP: Stand, Enhanced-Wurf und Historie" />
       <h3>Item-Locks</h3>
       <ul>
         <li>Mit einem Lock reservierst du ein Item in einem bestimmten Raid.</li>
@@ -310,7 +311,7 @@ export function GuidePage() {
       </ul>
       <Shot name="32-raid-anmeldungen-leitung" caption="Anmeldungen aus Sicht der Raidleitung" />
       <h3>In die Aufstellung übernehmen</h3>
-      <p>In der <strong>Anmeldeliste</strong> steht jeder Spieler in einer Zeile, offene Anmeldungen zuerst. Jeder Charakter zeigt Klassensymbol, Klasse und Spec. Bei <em>Ausstehend</em> klickst du <strong>In Aufstellung übernehmen</strong>. Mit <strong>Auf diesen Charakter wechseln</strong> tauschst du den Charakter. Pro Spieler kommt nur ein Charakter in den Raid.</p>
+      <p>In der <strong>Anmeldeliste</strong> steht jeder Spieler in einer Zeile, offene Anmeldungen zuerst. Jeder Charakter zeigt Klassensymbol, Klasse und Spec. Bei <em>Ausstehend</em> klickst du <strong>In Aufstellung übernehmen</strong>; hat der Spieler mehrere Specs angekreuzt, wählst du daneben vorher den Spec. Mit <strong>Auf diesen Charakter wechseln</strong> tauschst du den Charakter. Pro Spieler kommt nur ein Charakter in den Raid.</p>
       <Shot name="33-anmeldungen-uebernehmen" caption="Anmeldeliste nach Status" />
       <h3>Die Aufstellung</h3>
       <p>Der Reiter <strong>Aufstellung</strong> sortiert nach Tanks, Heilung, Nahkampf und Fernkampf, dazu die Ersatzbank. Mit <strong>Teilnahme hinzufügen</strong> trägst du jemanden ohne Anmeldung ein. Mit dem <strong>Stift</strong> änderst du Charakter und Spec oder nimmst jemanden mit <strong>Entfernen</strong> heraus.</p>

@@ -2,6 +2,7 @@ package raidsignup
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/uptrace/bun"
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
@@ -20,9 +21,20 @@ type signupRow struct {
 	PlayerID      int64
 	CharacterID   int64
 	Spec          string
+	Specs         string
 	IsWithdrawn   bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+}
+
+// specList decodes the signed-up specs. A signup from before several specs
+// per signup (empty column) has only its spec.
+func (row signupRow) specList() []string {
+	var specs []string
+	if err := json.Unmarshal([]byte(row.Specs), &specs); err != nil || len(specs) == 0 {
+		return []string{row.Spec}
+	}
+	return specs
 }
 
 // Repo owns signup persistence and the roster transaction boundary.

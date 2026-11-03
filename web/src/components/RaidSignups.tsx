@@ -22,7 +22,8 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
   const { pending, submit, isActive } = useSubmission()
   const [overview, setOverview] = useState<SignupOverview | null>(null)
   const [characters, setCharacters] = useState<Character[]>([])
-  const [choices, setChoices] = useState<Record<number, string>>({})
+  const [choices, setChoices] = useState<Record<number, string[]>>({})
+  const [acceptSpecs, setAcceptSpecs] = useState<Record<number, string>>({})
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [switchEntry, setSwitchEntry] = useState<RaidSignup | null>(null)
@@ -109,15 +110,18 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
   function save(event: FormEvent) {
     event.preventDefault()
     void mutate(() => api.put<SignupOverview>(base, {
-      choices: Object.entries(choices).map(([characterID, spec]) => ({ character_id: Number(characterID), spec })),
+      choices: Object.entries(choices).map(([characterID, specs]) => ({ character_id: Number(characterID), specs })),
     }), 'Ausgewählte Charaktere wurden angemeldet. Andere Anmeldungen bleiben erhalten.')
   }
+
+  const entrySpecs = (entry: RaidSignup) => entry.specs?.length ? entry.specs : [entry.spec]
 
   function accept(entry: RaidSignup, replace = false) {
     const current = attendance.find((row) => row.id === entry.attendance_id)
     void mutate(() => api.post(`${base}/${entry.id}/accept`, {
       replace_attendance_id: replace ? entry.attendance_id : 0,
       expected_character_id: replace ? current?.character_id ?? 0 : 0,
+      spec: acceptSpecs[entry.id] ?? entrySpecs(entry)[0],
     }), 'Die Aufstellung wurde aktualisiert.', true)
   }
 
@@ -129,31 +133,45 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
       {characters.map((character) => {
         const entry = overview.entries.find((row) => row.character_id === character.id)
         const accepted = attendance.some((row) => row.player_id === player?.id && row.character_id === character.id)
-        const specs = overview.class_specs[canonicalClass(character.class)] ?? []
+        const classSpecs = overview.class_specs[canonicalClass(character.class)] ?? []
+        // The form offers the character's own main and second spec (ADR 109).
+        const ownSpecs = [character.main_spec, character.second_spec].filter((spec, index, list) => spec && classSpecs.includes(spec) && list.indexOf(spec) === index)
+        const specs = ownSpecs.length ? ownSpecs : classSpecs
         const selected = character.id in choices
-        const defaultSpec = specs.includes(entry?.spec ?? '') ? entry!.spec : specs.includes(character.main_spec) ? character.main_spec : specs[0] ?? ''
+        const signedUp = entry && !entry.is_withdrawn ? entrySpecs(entry).filter((spec) => specs.includes(spec)) : []
+        const defaultSpecs = signedUp.length ? signedUp : specs.slice(0, 1)
+        const chosen = choices[character.id] ?? defaultSpecs
         return <div className="subcard" key={character.id}>
           <label className={`check ${characterClassName(character.class)}`}>
             <input type="checkbox" checked={selected} disabled={pending || accepted || !specs.length} onChange={(event) => {
               const checked = event.target.checked
               setChoices((previous) => {
                 const next = { ...previous }
-                if (checked) next[character.id] = defaultSpec
+                if (checked) next[character.id] = defaultSpecs
                 else delete next[character.id]
                 return next
               })
             }} /> <span className="character-name">{character.name}</span> · {character.class}{accepted ? ' · Bestätigt (Änderungen durch Raidleitung)' : entry && !entry.is_withdrawn ? ' · Angemeldet' : ''}
           </label>
-          <label>Gewünschter Spec für {character.name}
-            <select disabled={pending || !selected || accepted} value={choices[character.id] ?? defaultSpec} onChange={(event) => setChoices((previous) => ({ ...previous, [character.id]: event.target.value }))}>
-              {specs.map((spec) => <option key={spec} value={spec}>{spec}</option>)}
-            </select>
-          </label>
+          <fieldset className="signup-specs" disabled={pending || !selected || accepted}>
+            <legend>Gewünschte Specs für {character.name}</legend>
+            {specs.map((spec) => <label key={spec} className="check">
+              <input type="checkbox" checked={chosen.includes(spec)} onChange={(event) => {
+                const checked = event.target.checked
+                setChoices((previous) => {
+                  const current = previous[character.id] ?? defaultSpecs
+                  const next = checked ? specs.filter((row) => row === spec || current.includes(row)) : current.filter((row) => row !== spec)
+                  return { ...previous, [character.id]: next }
+                })
+              }} /> {spec}{spec === character.main_spec ? ' (Main)' : spec === character.second_spec ? ' (Second)' : ''}
+            </label>)}
+          </fieldset>
         </div>
       })}
       {characters.length > 0 && <>
         {!Object.keys(choices).length && !pending && <p className="field-hint">Mindestens einen Charakter ankreuzen.</p>}
-        <button className="primary-action" disabled={pending || !Object.keys(choices).length}>Ausgewählte Charaktere anmelden</button>
+        {Object.values(choices).some((specs) => !specs.length) && <p className="field-hint">Pro angekreuztem Charakter mindestens einen Spec wählen.</p>}
+        <button className="primary-action" disabled={pending || !Object.keys(choices).length || Object.values(choices).some((specs) => !specs.length)}>Ausgewählte Charaktere anmelden</button>
       </>}
     </form>}
     {canDeclineOwn && <section className="subcard absence-panel" aria-label="Absage">
@@ -205,19 +223,22 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
       {(row.entries.length > 0 || row.directRoster.length > 0) && <ul className="signup-characters">
         {row.entries.map((entry) => <li key={entry.id} className="signup-character">
           <span className="signup-character-name"><ClassEmblem characterClass={entry.class} /><strong className={characterClassName(entry.class)}>{entry.character_name}</strong></span>
-          <span className="muted">{entry.class} · {entry.spec}</span>
+          <span className="muted">{entry.class} · {entry.is_accepted ? entry.spec : entrySpecs(entry).join(' / ')}</span>
           {(entry.is_accepted || entry.attendance_id > 0 || row.state !== 'pending') && <span className={entry.is_accepted ? 'badge ok' : entry.attendance_id ? 'badge' : 'badge info'}>{entry.is_accepted ? 'Bestätigt' : entry.attendance_id ? 'Alternative' : 'Ausstehend'}</span>}
           <span className="signup-character-actions">
             {isOpen && canSignup && row.playerID === player?.id && !entry.is_accepted && <button type="button" disabled={pending} onClick={() => {
               void mutate(() => api.post(`${base}/${entry.id}/withdraw`), 'Anmeldung zurückgezogen.')
             }}>Zurückziehen</button>}
+            {canManage && isActiveRaid && !entry.is_accepted && entrySpecs(entry).length > 1 && <select aria-label={`Spec für ${entry.character_name}`} disabled={pending} value={acceptSpecs[entry.id] ?? entrySpecs(entry)[0]} onChange={(event) => setAcceptSpecs((previous) => ({ ...previous, [entry.id]: event.target.value }))}>
+              {entrySpecs(entry).map((spec) => <option key={spec} value={spec}>{spec}</option>)}
+            </select>}
             {canManage && isActiveRaid && !entry.is_accepted && <button type="button" className="primary-action" disabled={pending} onClick={() => {
               if (entry.attendance_id) setSwitchEntry(entry)
               else accept(entry)
             }}>{entry.attendance_id ? 'Auf diesen Charakter wechseln' : 'In Aufstellung übernehmen'}</button>}
           </span>
           {switchEntry?.id === entry.id && <div className="signup-switch">
-            <p>Den bisherigen Charakter dieses Spielers in der Aufstellung durch {entry.character_name} ({entry.spec}) ersetzen?</p>
+            <p>Den bisherigen Charakter dieses Spielers in der Aufstellung durch {entry.character_name} ({acceptSpecs[entry.id] ?? entrySpecs(entry)[0]}) ersetzen?</p>
             <button type="button" disabled={pending} onClick={() => accept(entry, true)}>Charakterwechsel bestätigen</button>
             <button type="button" disabled={pending} onClick={() => setSwitchEntry(null)}>Abbrechen</button>
           </div>}
@@ -243,7 +264,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
 
   return <section className="card raid-signups" aria-label="Raidanmeldungen">
     <h2>Anmeldungen</h2>
-    {!canManage && <p className="muted">Melde einen oder mehrere eigene Charaktere mit deinem gewünschten Spec an. Die Raidleitung übernimmt einen Charakter pro Spieler in die Aufstellung.</p>}
+    {!canManage && <p className="muted">Melde einen oder mehrere eigene Charaktere mit den Specs an, die du spielen kannst. Die Raidleitung übernimmt einen Charakter pro Spieler in die Aufstellung.</p>}
     {error && <ErrorMessage>{error}</ErrorMessage>}
     {message && <p className="success-message" role="status"><span>{message}</span><button type="button" aria-label="Meldung schließen" onClick={() => setMessage('')}>Schließen</button></p>}
     {pending && <p role="status">Wird gespeichert…</p>}

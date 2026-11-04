@@ -1180,6 +1180,31 @@ test('the player list is a staff menu entry while the EP standing is for everyon
   }
 })
 
+test('the menu offers each role only the pages it can open', () => {
+  const visitorPages = ['/', '/statistics', '/punkte', '/addons', '/anleitung', '/datenschutz']
+  const signedInPages = ['/raids', '/raids/current', '/polls', '/loot-catalog', '/schattengram', '/changelog']
+  const memberPages = ['/wishlist']
+  const staffPages = ['/players']
+  const adminPages = ['/roster', '/raid-series', '/registration-requests', '/audit-log']
+  const cases = [
+    [null, visitorPages, [...signedInPages, ...memberPages, ...staffPages, ...adminPages]],
+    [{ id: 1, role: 'GUEST' }, [...visitorPages, ...signedInPages], [...memberPages, ...staffPages, ...adminPages]],
+    [{ id: 1, role: 'MEMBER' }, [...visitorPages, ...signedInPages, ...memberPages], [...staffPages, ...adminPages]],
+    [{ id: 1, role: 'RAIDASSISTENT' }, [...visitorPages, ...signedInPages, ...memberPages, ...staffPages], adminPages],
+    [{ id: 1, role: 'ADMIN' }, [...visitorPages, ...signedInPages, ...memberPages, ...staffPages, ...adminPages], []],
+  ]
+  for (const [player, shown, hidden] of cases) {
+    const s = setup(player)
+    const app = s.load('App.tsx').default()
+    const gate = s.mount(app.props.children.type)
+    const layout = s.mount(gate.tree.type)
+    const role = player ? player.role : 'visitor'
+    const links = (to) => nodes(layout.tree, (n) => n.props && n.props.to === to)
+    for (const to of shown) assert.ok(links(to).length > 0, `${role} sees ${to}`)
+    for (const to of hidden) assert.equal(links(to).length, 0, `${role} does not see ${to}`)
+  }
+})
+
 test('logout UI guards duplicates and handles network rejection without losing identity', async () => {
   const s = setup()
   s.auth.logout = () => s.api.post('/logout')

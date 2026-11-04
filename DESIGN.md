@@ -334,6 +334,10 @@ One dark theme only (`color-scheme: dark`); there is no light mode.
   grouped under captions, version link at the bottom) and the content to its right. The
   "Administration" caption groups staff pages: "Spieler" for RAIDASSISTENT and higher, the
   configuration pages for ADMIN only (FR-1.10). "EP-Stand" is in the main group for everyone.
+- **Menu shows only reachable pages:** the sidebar and the mobile navigation list only pages the
+  viewer can open. A visitor without a session sees only the public pages of FR-1.4 (Übersicht,
+  Statistiken, EP-Stand, Addons, Anleitung, Datenschutz); the version is shown as plain text, without
+  the changelog link. Signed-in roles see the pages their role reaches (FR-1.7, FR-1.8, FR-1.10).
 - **Mobile (850px and below):** the sidebar becomes a top bar, and a fixed bottom companion
   navigation shows the main destinations with short labels (for example "Aktuell", "Hilfe").
   Safe-area insets are respected.

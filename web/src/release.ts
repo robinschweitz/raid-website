@@ -1,8 +1,13 @@
-export const appVersion = '1.0.83'
+export const appVersion = '1.0.84'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Aufgeräumtes Menü',
+    changes: ['Das Menü zeigt nur noch Seiten, die du öffnen kannst. Ohne Anmeldung siehst du die öffentlichen Seiten wie Übersicht, Statistiken, EP-Stand, Addons und Anleitung; Raids, Umfragen, Beute und Schattengram erscheinen nach der Anmeldung.'],
+  },
+  {
+    version: '1.0.83',
     title: 'Übersichtlichere Raid-News',
     changes: ['Die Übersicht zeigt nur noch die drei neuesten Raid-News. Ältere Mitteilungen findest du darunter unter „Ältere Raid-News“.'],
   },

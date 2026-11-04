@@ -109,15 +109,17 @@ function Layout() {
       <aside className="sidebar">
         <Link className="guild-brand" to="/"><GuildCrest /><span>Bratwurst<small>des Schicksals</small></span></Link>
         <p className="sidebar-caption">Gildenverwaltung</p>
+        {/* The menu offers only pages the viewer can open: visitors get the public pages of FR-1.4,
+            signed-in roles the pages their role reaches (DESIGN.md "Layout"). */}
         <nav aria-label="Hauptnavigation">
           <Link className={path === '/' ? 'nav-link active' : 'nav-link'} to="/"><NavIcon name="home" />&Uuml;bersicht</Link>
-          <Link className={path.startsWith('/raids') && path !== '/raids/current' ? 'nav-link active' : 'nav-link'} to="/raids"><NavIcon name="raids" />Raids</Link>
-          <Link className={path === '/raids/current' ? 'nav-link active' : 'nav-link'} to="/raids/current"><NavIcon name="zap" />Aktueller Raid</Link>
+          {player && <Link className={path.startsWith('/raids') && path !== '/raids/current' ? 'nav-link active' : 'nav-link'} to="/raids"><NavIcon name="raids" />Raids</Link>}
+          {player && <Link className={path === '/raids/current' ? 'nav-link active' : 'nav-link'} to="/raids/current"><NavIcon name="zap" />Aktueller Raid</Link>}
           <Link className={path === '/statistics' ? 'nav-link active' : 'nav-link'} to="/statistics"><NavIcon name="chart" />Statistiken</Link>
           <Link className={path === '/punkte' ? 'nav-link active' : 'nav-link'} to="/punkte"><NavIcon name="award" />EP-Stand</Link>
-          <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>
-          <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
-          <Link className={path === '/schattengram' ? 'nav-link active' : 'nav-link'} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>
+          {player && <Link className={path === '/polls' ? 'nav-link active' : 'nav-link'} to="/polls"><NavIcon name="polls" />Umfragen</Link>}
+          {player && <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>}
+          {player && <Link className={path === '/schattengram' ? 'nav-link active' : 'nav-link'} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>}
           {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'nav-link active' : 'nav-link'} to="/wishlist"><NavIcon name="heart" />Meine Wunschliste</Link>}
           <Link className={path.startsWith('/addons') ? 'nav-link active' : 'nav-link'} to="/addons"><NavIcon name="download" />Addons</Link>
           <Link className={path === '/anleitung' ? 'nav-link active' : 'nav-link'} to="/anleitung"><NavIcon name="info" />Anleitung</Link>
@@ -133,8 +135,8 @@ function Layout() {
           </>}
         </nav>
         <div className="sidebar-footer">
-          <Link to="/datenschutz">Datenschutz</Link><br /><Link to="/changelog">Version {appVersion}</Link>
-          <span>Änderungen ansehen</span>
+          <Link to="/datenschutz">Datenschutz</Link><br />{player ? <><Link to="/changelog">Version {appVersion}</Link>
+          <span>Änderungen ansehen</span></> : <>Version {appVersion}</>}
         </div>
       </aside>
       <div className="main-shell">
@@ -152,13 +154,13 @@ function Layout() {
       </div>
       <nav className="mobile-nav" aria-label="Mobile Hauptnavigation">
         <Link className={path === '/' ? 'active' : ''} to="/"><NavIcon name="home" />&Uuml;bersicht</Link>
-        <Link className={path.startsWith('/raids') && path !== '/raids/current' ? 'active' : ''} to="/raids"><NavIcon name="raids" />Raids</Link>
-        <Link className={path === '/raids/current' ? 'active' : ''} to="/raids/current"><NavIcon name="zap" />Aktuell</Link>
+        {player && <Link className={path.startsWith('/raids') && path !== '/raids/current' ? 'active' : ''} to="/raids"><NavIcon name="raids" />Raids</Link>}
+        {player && <Link className={path === '/raids/current' ? 'active' : ''} to="/raids/current"><NavIcon name="zap" />Aktuell</Link>}
         <Link className={path === '/statistics' ? 'active' : ''} to="/statistics"><NavIcon name="chart" />Statistik</Link>
         <Link className={path === '/punkte' ? 'active' : ''} to="/punkte"><NavIcon name="award" />EP</Link>
-        <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>
-        <Link className={path === '/loot-catalog' ? 'active' : ''} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>
-        <Link className={path === '/schattengram' ? 'active' : ''} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>
+        {player && <Link className={path === '/polls' ? 'active' : ''} to="/polls"><NavIcon name="polls" />Umfragen</Link>}
+        {player && <Link className={path === '/loot-catalog' ? 'active' : ''} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>}
+        {player && <Link className={path === '/schattengram' ? 'active' : ''} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>}
         {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'active' : ''} to="/wishlist"><NavIcon name="heart" />Wunschliste</Link>}
         {player && atLeast(player.role, 'RAIDASSISTENT') && <Link className={path.startsWith('/players') ? 'active' : ''} to="/players"><NavIcon name="players" />Spieler</Link>}
         <Link className={path === '/anleitung' ? 'active' : ''} to="/anleitung"><NavIcon name="info" />Hilfe</Link>

@@ -161,7 +161,8 @@ export function GuidePage() {
           </tbody>
         </table>
       </div>
-      <p>Unten links steht die Version. Ein Klick darauf zeigt, was zuletzt neu dazugekommen ist.</p>
+      <p>Das Menü zeigt nur, was du öffnen kannst. Ohne Anmeldung siehst du nur Übersicht, Statistiken, EP-Stand, Addons und Anleitung; die übrigen Punkte erscheinen nach der Anmeldung, je nach Rolle.</p>
+      <p>Unten links steht die Version. Angemeldet zeigt ein Klick darauf, was zuletzt neu dazugekommen ist.</p>
       <Shot name="11-uebersicht-unten" caption="Übersicht: nächster Raid, Aufstellung, Anwesenheit, Umfrage, Raidhistorie" />
     </Section>
 

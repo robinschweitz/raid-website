@@ -494,3 +494,4 @@ None open. The owner resolved DQ-1 to DQ-5 on 2026-10-22; the answers are in the
 ### Raid-News (Owner 2026-10-28)
 - Dashboard news use existing cards and German labels. Important unread messages display a labelled dialog with “Verstanden”.
 - News rendered as plain text respecting line breaks. Staff editing behind a disclosure.
+- The dashboard shows the three newest posts; older posts sit in a collapsed "Ältere Raid-News (n)" disclosure below them, so they stay in the list (FR-NEWS-3) without pushing the page down.

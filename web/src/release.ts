@@ -1,8 +1,13 @@
-export const appVersion = '1.0.82'
+export const appVersion = '1.0.83'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Übersichtlichere Raid-News',
+    changes: ['Die Übersicht zeigt nur noch die drei neuesten Raid-News. Ältere Mitteilungen findest du darunter unter „Ältere Raid-News“.'],
+  },
+  {
+    version: '1.0.82',
     title: 'Mehrere Raidleiter pro Raidserie',
     changes: ['In einer Raidserie lassen sich jetzt mehrere Raidleiter eintragen. Jeder neue Raid der Serie bekommt sie automatisch, auch beim Vorausplanen und beim Archivieren. Bestehende Raids ändern sich dadurch nicht.'],
   },

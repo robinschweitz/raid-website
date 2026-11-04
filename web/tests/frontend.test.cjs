@@ -3326,6 +3326,22 @@ test('anonymous dashboard shows public widgets without profile or personal reque
   view.unmount()
 })
 
+test('the overview shows the three newest raid news and folds older ones away', async () => {
+  const s = setup(null)
+  const { RaidNews } = s.load('components/RaidNews.tsx')
+  const view = s.mount(RaidNews, { player: null })
+  const news = [5, 4, 3, 2, 1].map((id) => ({ id, title: `News ${id}`, body: 'Text', important: false, published: true, acknowledged: false, created_at: '2026-11-01T20:00:00Z' }))
+  resolveIf(s, '/api/v1/raid-news', news)
+  await flush(view)
+  const older = nodes(view.tree, (node) => node.type === 'details' && node.props.className === 'raid-news-older')
+  assert.equal(older.length, 1)
+  assert.match(text(older[0]), /Ältere Raid-News \( ?2 ?\)/)
+  const shown = (root) => nodes(root, (node) => node.props?.item?.title).map((node) => node.props.item.id)
+  assert.deepEqual(shown(older[0]), [2, 1])
+  assert.deepEqual(shown(view.tree), [5, 4, 3, 2, 1])
+  view.unmount()
+})
+
 test('a member can announce an absence with a reason and take it back before the raid starts', async () => {
   const s = setup({ id: 2, role: 'MEMBER' })
   const { RaidSignups } = s.load('components/RaidSignups.tsx')

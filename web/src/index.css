@@ -2017,6 +2017,8 @@ input[type='checkbox'] {
 .badge.unclaimed-nobody { color: #a9b6c2; border-color: #5d6b78; }
 
 /* Raid-News editor: keep the message fields together, with clear checkbox labels. */
+.raid-news-older { margin-top: .5rem; }
+.raid-news-older > summary { cursor: pointer; color: var(--accent); font-weight: 600; margin-bottom: .75rem; }
 .raid-news-management { margin-top: 1rem; }
 .raid-news-management > summary { cursor: pointer; color: var(--accent); font-weight: 600; }
 .raid-news-form {

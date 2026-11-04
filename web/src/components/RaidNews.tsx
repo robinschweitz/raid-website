@@ -6,6 +6,16 @@ import { atLeast, type Player } from '../types'
 type News = { id: number; title: string; body: string; important: boolean; published: boolean; acknowledged: boolean; created_at: string }
 type Draft = { title: string; body: string; important: boolean; published: boolean }
 const emptyDraft: Draft = { title: '', body: '', important: true, published: true }
+// The overview shows only the newest posts; older ones stay readable in a collapsed section.
+const visibleNews = 3
+
+function NewsArticle({ item }: { item: News }) {
+  return <article style={{ marginBottom: '1rem', overflowWrap: 'anywhere' }}>
+    <h3>{item.title}</h3>
+    <p style={{ whiteSpace: 'pre-wrap' }}>{item.body}</p>
+    <small className="muted">{new Date(item.created_at).toLocaleDateString('de-DE')}</small>
+  </article>
+}
 
 export function RaidNews({ player }: { player: Player | null }) {
   const [items, setItems] = useState<News[]>([])
@@ -54,11 +64,11 @@ export function RaidNews({ player }: { player: Player | null }) {
     <div className="section-heading"><h2>Raid-News</h2><span className="eyebrow">Mitteilungen</span></div>
     {error && <ErrorMessage>{error}</ErrorMessage>}
     {items.length === 0 && <p className="muted">Keine Raid-News vorhanden.</p>}
-    {items.map((item) => <article key={item.id} style={{ marginBottom: '1rem', overflowWrap: 'anywhere' }}>
-      <h3>{item.important ? '' : ''}{item.title}</h3>
-      <p style={{ whiteSpace: 'pre-wrap' }}>{item.body}</p>
-      <small className="muted">{new Date(item.created_at).toLocaleDateString('de-DE')}</small>
-    </article>)}
+    {items.slice(0, visibleNews).map((item) => <NewsArticle key={item.id} item={item} />)}
+    {items.length > visibleNews && <details className="raid-news-older">
+      <summary>Ältere Raid-News ({items.length - visibleNews})</summary>
+      {items.slice(visibleNews).map((item) => <NewsArticle key={item.id} item={item} />)}
+    </details>}
     {canManage && <details className="raid-news-management">
       <summary>Raid-News verwalten</summary>
       <form onSubmit={save} className="raid-news-form">

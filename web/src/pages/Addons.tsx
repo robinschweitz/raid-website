@@ -247,14 +247,14 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
           <li>Beute aus <strong>Plündern als Gruppe</strong> (Bedarf/Gier) wird nicht mehr eingetragen.</li>
           <li><strong>Beute-Knopf:</strong> Als Gruppenleitung siehst du in Instanzen einen kleinen roten Knopf, wenn die Beuteart nicht passt: im Bosskampf ohne Plündermeister und außerhalb eines Bosskampfs mit Plündermeister. Ein Klick stellt um, danach verschwindet er. Direkt nach einem Boss erinnert er dich auch ans Umstellen: Erst die Leiche fertig plündern. RaidLedger stellt die Beuteart nie von selbst um.</li>
         </ul>
-        <p>Alle RaidLedger-Nutzer in der Gruppe sehen dieselbe Liste; angesagt wird jede Vergabe nur von dem Ledger, der sie eingetragen hat. Nach einem Absturz holt <strong>VERGABEN ABGLEICHEN</strong> (oder <code>/ledger sync</code>) die Vergaben aus der Gruppe zurück.</p>
+        <p>Alle RaidLedger-Nutzer in der Gruppe sehen dieselbe Liste; angesagt wird jede Vergabe nur von dem Ledger, der sie eingetragen hat. Nach einem Absturz holt <strong>VERGABEN ABGLEICHEN</strong> (oder <code>/ledger sync</code>) die Vergaben aus der Gruppe zurück, auch die eines Plündermeisters, der gerade nicht online ist. Gehören die Vergaben eines anderen zu einem anderen Raid, landen sie im <strong>VERLAUF</strong>; RaidLedger sagt, von wem sie sind, und fragt, ob du zu diesem Raid wechseln willst. Ohne dein Ja wechselt nichts.</p>
       </Feature>
 
       <Feature title="5. Items pro Spieler: SPIELER" shot={<Shot name="raidledger-spieler" caption="SPIELER: Items und Tokens pro Spieler, nach Main- und Second-Spec" width={709} height={448} />}>
         <p>Der Reiter <strong>SPIELER</strong> zeigt jeden im Raid mit seinen Items und Tokens, je Main- und Second-Spec: genau die Zahlen, nach denen „wer weniger hat, gewinnt“ entscheidet.</p>
         <ul>
           <li>Spieler auswählen: <strong>−</strong> / <strong>+</strong> korrigiert die Zahlen, z. B. für Loot von vor dem Start des Addons. Korrigierte Werte stehen gold mit <strong>*</strong>.</li>
-          <li>Korrekturen zählen beim Würfeln, gehen an die anderen Ledger in der Gruppe, werden mit <strong>NEUER RAID</strong> zurückgesetzt und kommen nie in den Website-Export.</li>
+          <li>Korrekturen zählen beim Würfeln, gehen an die anderen Ledger in der Gruppe, beginnen mit <strong>NEUER RAID</strong> wieder bei null (der alte Raid behält sie im VERLAUF) und kommen nie in den Website-Export.</li>
           <li>Darunter stehen die Vergaben des Spielers; ein Klick öffnet sie in VERGABEN.</li>
         </ul>
       </Feature>
@@ -281,6 +281,16 @@ function RaidLedgerPage({ addon, error }: { addon?: AddonDownload, error: string
 
       <Feature title="8. Wer will was? Die Wunschlisten im Blick">
         <p>Raider mit RaidWishlist teilen ihre Wunschliste mit deinem RaidLedger. Jeder Drop zeigt <strong>WL n</strong>: wie viele Wunschlisten ihn nennen. Mit der Maus darüber siehst du, wer ihn will (Main-Spec zuerst, nach Rang, mit Enhanced). In der Wurfliste steht bei Würflern mit dem Item auf der Liste <code>[WL #Rang]</code>.</p>
+      </Feature>
+
+      <Feature title="9. Frühere Raids: VERLAUF" shot={<Shot name="raidledger-verlauf" caption="VERLAUF: die beendeten Raids, rechts der ausgewählte mit seinen Items pro Spieler" width={709} height={448} />}>
+        <p><strong>NEUER RAID</strong> löscht nichts mehr: Der fertige Raid kommt mit Vergaben, Würfen, Korrekturen, Raid-ID und Entzauberer in den Reiter <strong>VERLAUF</strong>. Dort stehen die Raids mit Datum, wer sie erfasst hat, Raid-ID und Zahl der Vergaben. Ein Klick zeigt, wer im Raid wie viele Items bekam.</p>
+        <ul>
+          <li><strong>VERGABEN ZEIGEN</strong> öffnet die Vergaben des Raids in VERGABEN. Bearbeiter können sie dort korrigieren, <strong>EXPORT</strong> baut den Website-Export dieses Raids. <strong>AKTUELLER RAID</strong> führt zurück.</li>
+          <li><strong>TEILEN</strong> schickt den Raid an die Gruppe. Ihre Ledger und Wunschlisten behalten ihn im Verlauf, so kommt z. B. der Loot vom Montag auch auf einen anderen Charakter.</li>
+          <li><strong>FORTSETZEN</strong> macht ihn wieder zum aktuellen Raid, etwa am zweiten Abend; der aktuelle kommt in den Verlauf. <strong>LÖSCHEN</strong> entfernt ihn nur aus deinem Ledger.</li>
+          <li><strong>BEHALTEN</strong> legt fest, wie viele Raids bleiben (Standard 20, ohne Obergrenze). Würfe und SPIELER zählen nur den aktuellen Raid.</li>
+        </ul>
       </Feature>
     </section>
 
@@ -397,16 +407,17 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
         <p>Startet die Raidleitung einen Wurf auf ein Item von deiner Liste, erscheint oben am Bildschirm ein Hinweis mit Rang und Notiz und zwei Knöpfen: <strong>WÜRFELN MS 21-120</strong> (dein Spec und Bereich) oder <strong>PASSEN</strong>.</p>
         <ul>
           <li><strong>AUTO-WURF: AN</strong> würfelt etwa eine Sekunde nach dem Start für dich, z. B. wenn du kurz weg bist.</li>
-          <li>Das Addon würfelt höchstens einmal pro Wurf (nur der erste zählt), beim Stechen nur, wenn du dabei bist, und nicht auf Items, die du in diesem Raid schon bekommen hast. Was du in einem früheren Raid bekommen hast, zählt nicht.</li>
+          <li>Das Addon würfelt höchstens einmal pro Wurf (nur der erste zählt), beim Stechen nur, wenn du dabei bist. Auch auf Items, die du schon bekommen hast, würfelt es wieder; der Hinweis sagt dann <strong>schon erhalten</strong>.</li>
           <li>Enhanced würfelt <strong>1+X bis 100+X</strong> mit X = EP, höchstens 50. Nach einem Enhanced-Gewinn senkt das Addon seinen EP-Stand bis zum nächsten Export.</li>
         </ul>
       </Feature>
 
-      <Feature title="4. Einstellungen: EP und Chat-Erinnerung" shot={<Shot name="raidwishlist-einstellungen" caption="EINSTELLUNGEN: EP-Stand und Chat-Würfel-Erinnerung" width={466} height={410} />}>
-        <p><strong>EINSTELLUNGEN</strong> (oben rechts im Fenster oder im Editor) hat zwei Teile:</p>
+      <Feature title="4. Einstellungen: EP, Chat-Erinnerung, frühere Raids" shot={<Shot name="raidwishlist-einstellungen" caption="EINSTELLUNGEN: EP-Stand und Chat-Würfel-Erinnerung" width={466} height={410} />}>
+        <p><strong>EINSTELLUNGEN</strong> (oben rechts im Fenster oder im Editor) hat drei Teile:</p>
         <ul>
           <li><strong>ENHANCE-PUNKTE:</strong> dein aktueller EP-Stand, wenn du nicht von der Website importierst. Der Wert ersetzt den alten Stand und bestimmt den Bereich für Enhanced.</li>
-          <li><strong>CHAT-WÜRFEL-ERINNERUNG:</strong> für Raids ohne RaidLedger, Standard: aus. Ist sie <strong>AN</strong>, öffnet sich die Würfel-Abfrage, wenn der Plündermeister ein Item von deiner Liste zusammen mit einem Schlüsselwort (Standard: <code>roll</code>, <code>würfel</code>) in den Gruppen- oder Raidchat schreibt. Statt nur dem Plündermeister kannst du alle Gruppenmitglieder zulassen. Ansagen von RaidLedger selbst lösen keine zweite Abfrage aus.</li>
+          <li><strong>CHAT-WÜRFEL-ERINNERUNG:</strong> für Raids ohne RaidLedger, Standard: aus. Ist sie <strong>AN</strong>, öffnet sich die Würfel-Abfrage, wenn der Plündermeister ein Item von deiner Liste in den Gruppen- oder Raidchat oder als Schlachtzugswarnung schreibt. Schlüsselwörter sind freiwillig (Standard: keine). Ohne Plündermeister dürfen Raidleitung und Assistenten ansagen. Statt nur dem Plündermeister kannst du alle Gruppenmitglieder zulassen. Dieselbe Zeile noch einmal erinnert erneut. Ansagen von RaidLedger selbst lösen keine zweite Abfrage aus.</li>
+          <li><strong>FRÜHERE RAIDS:</strong> wie viele frühere Raids DIESER RAID behält (Standard 20).</li>
         </ul>
         <p><strong>EINSTELLUNGEN SPEICHERN</strong> speichert alles, <strong>ABBRECHEN</strong> verwirft die Änderungen.</p>
       </Feature>
@@ -416,7 +427,7 @@ function RaidWishlistPage({ addon, error }: { addon?: AddonDownload, error: stri
         <ul>
           <li><strong>WUNSCHLISTE:</strong> deine Wünsche nach Rang, mit Notiz und Würfelbereich. Erhaltene Wünsche zeigen <strong>ERHALTEN</strong>. Ein Item, das dein Spiel noch nie gesehen hat, steht kurz als <code>[Gegenstand 12345]</code> da, bis der Server seinen Namen schickt.</li>
           <li><strong>OFFEN:</strong> Beute, die noch ausgewürfelt wird: auf der Leiche, beim Plündermeister oder bei einem Raider geparkt, mit Status <strong>OFFEN</strong>, <strong>WIRD GEWÜRFELT</strong> oder dem Gewinner. Items von deiner Liste sind markiert. Wird ein Wunsch-Item ausgewürfelt, öffnet sich das Fenster hier.</li>
-          <li><strong>DIESER RAID:</strong> jede Vergabe der Raidleitung mit Item, Empfänger und Spec. Oben stehen deine Items bisher (Items und Tokens, je Main- und Second-Spec), die bei knappen Würfen entscheiden.</li>
+          <li><strong>DIESER RAID:</strong> jede Vergabe der Raidleitung mit Item, Empfänger und Spec. Oben stehen deine Items bisher (Items und Tokens, je Main- und Second-Spec), die bei knappen Würfen entscheiden. <strong>&lt;</strong> und <strong>&gt;</strong> zeigen frühere Raids, auch geteilte aus dem VERLAUF von RaidLedger; was dort steht, zählt nicht für ERHALTEN und deine Items bisher.</li>
         </ul>
       </Feature>
 

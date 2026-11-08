@@ -3,7 +3,7 @@
 This file owns HOW the system is built: components, boundaries, technology choices, data
 ownership, data flow, and dependency rules. Behaviour is owned by `REQUIREMENTS.md`, look and
 interaction by `DESIGN.md`, and security controls by `SECURITY.md`; this file references their
-IDs instead of restating them. It describes the code of v1.0.27 (2026-10-22). Choices that
+IDs instead of restating them. It describes the code of v1.0.86 (2026-11-08). Choices that
 the owner made on 2026-10-22 and that the code does not follow yet are marked
 "Owner 2026-10-22" and "not built". ADRs keep the history of each decision.
 
@@ -111,10 +111,10 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   boss come from `lootcatalog` drops for the raid's instance and size (FR-29.5, FR-29.6,
   FR-29.9, FR-29.14) (Owner 2026-10-22, AQ-5). Endpoints: `GET /api/v1/raids/{id}/kills`
   (signed-in), `POST /api/v1/raids/{id}/kills`, `PATCH /api/v1/raids/{id}/kills/{killID}`,
-  `POST /api/v1/raids/{id}/kills/{killID}/remove` (RAIDASSISTENT and higher). The raid page lists and manages the kills (`RaidKills`), and the dashboard and `BossProgression` mark recorded kills only (FR-29.4). Not built:
-  `loot` reading the kill for the award difficulty, and the manual loot path and the
-  `addonsync` import creating a missing kill and the loot in one transaction (FR-29.7,
-  FR-29.8).
+  `POST /api/v1/raids/{id}/kills/{killID}/remove` (RAIDASSISTENT and higher). The raid page lists and manages the kills (`RaidKills`), and the dashboard and `BossProgression` mark recorded kills only (FR-29.4). A new
+  award takes its difficulty from the boss's kill, and the manual loot path
+  (`loot.EnsureBossKill`) and the `addonsync` import (`missing_kills` in the preview) create a
+  missing kill and the loot in one transaction (FR-29.3, FR-29.7, FR-29.8; #95, #96).
 - **Public interface.** Without a session, only these reads answer (FR-1.2): `GET /api/v1/raids`,
   `/players`, `/polls`, `/raids/{id}/attendance`, `/addons`, `/addons/{name}/download`,
   `/raids/{id}/leaders`, `/points`, `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/statistics`, and `/privacy-contact`. Login, MFA, and registration writes are public too.

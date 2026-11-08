@@ -1,8 +1,17 @@
-export const appVersion = '1.0.84'
+export const appVersion = '1.0.85'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'RaidLedger 2.10.0 und RaidWishlist 2.5.0',
+    changes: [
+      'Neue Addon-Versionen zum Herunterladen unter „Addons“. RaidLedger hat den neuen Reiter VERLAUF: Neuer Raid löscht nichts mehr, frühere Raids lassen sich ansehen, exportieren, fortsetzen, löschen und mit TEILEN an die Gruppe schicken.',
+      'Vergaben abgleichen holt jetzt auch die Vergaben eines Plündermeisters, der nicht online ist. Vergaben eines anderen Raids landen im Verlauf, und RaidLedger fragt, bevor es wechselt.',
+      'RaidWishlist zeigt frühere Raids unter DIESER RAID, würfelt auch auf schon erhaltene Items wieder und braucht für die Chat-Erinnerung kein Schlüsselwort mehr.',
+    ],
+  },
+  {
+    version: '1.0.84',
     title: 'Aufgeräumtes Menü',
     changes: ['Das Menü zeigt nur noch Seiten, die du öffnen kannst. Ohne Anmeldung siehst du die öffentlichen Seiten wie Übersicht, Statistiken, EP-Stand, Addons und Anleitung; Raids, Umfragen, Beute und Schattengram erscheinen nach der Anmeldung.'],
   },

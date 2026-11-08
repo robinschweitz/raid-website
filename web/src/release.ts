@@ -1,8 +1,13 @@
-export const appVersion = '1.0.85'
+export const appVersion = '1.0.86'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'RaidLedger 2.10.1',
+    changes: ['Neue RaidLedger-Version zum Herunterladen unter „Addons“. Würfelt bei mehreren gleichen offenen Tokens niemand, kommen sie wieder unter OFFENE ITEMS, und Entzaubern, Gildenbank und Vergeben bleiben gesperrt. Bisher führten diese Knöpfe zu einem Lua-Fehler.'],
+  },
+  {
+    version: '1.0.85',
     title: 'RaidLedger 2.10.0 und RaidWishlist 2.5.0',
     changes: [
       'Neue Addon-Versionen zum Herunterladen unter „Addons“. RaidLedger hat den neuen Reiter VERLAUF: Neuer Raid löscht nichts mehr, frühere Raids lassen sich ansehen, exportieren, fortsetzen, löschen und mit TEILEN an die Gruppe schicken.',

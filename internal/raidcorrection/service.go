@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"raid-website/internal/attendance"
 	"raid-website/internal/audit"
@@ -30,6 +31,9 @@ var (
 	// The write is rolled back until staff confirm (FR-16.8).
 	ErrEPShortfall = errors.New("correction would take more EP than the player has")
 )
+
+// MaxAttendanceNoteLength is the longest staff note on a roster row, in characters.
+const MaxAttendanceNoteLength = 200
 
 // Shortfall names a player whose EP deduction the zero floor limits (FR-16.6).
 type Shortfall struct {
@@ -232,6 +236,13 @@ func (s *Service) saveAttendance(ctx context.Context, row *attendance.Attendance
 		if row.ID == 0 || referenceChanged || input.Spec != nil || (old != nil && old.Spec != row.Spec) {
 			row.Spec = strings.TrimSpace(row.Spec)
 			if row.Spec == "" {
+				return ErrInvalid
+			}
+		}
+		// Only a new or changed note is checked, so older long notes stay editable otherwise.
+		if old == nil || old.Notes != row.Notes {
+			row.Notes = strings.TrimSpace(row.Notes)
+			if utf8.RuneCountInString(row.Notes) > MaxAttendanceNoteLength {
 				return ErrInvalid
 			}
 		}

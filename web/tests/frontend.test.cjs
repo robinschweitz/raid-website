@@ -139,7 +139,7 @@ function text(tree) {
 }
 const button = (view, label) => nodes(view.tree, (n) => n.type === 'button' && text(n) === label)[0]
 const form = (view, index = 0) => nodes(view.tree, (n) => n.type === 'form')[index]
-const input = (view, placeholder) => nodes(view.tree, (n) => n.type === 'input' && n.props.placeholder === placeholder)[0]
+const input = (view, placeholder) => nodes(view.tree, (n) => n.type === 'input' && (n.props.placeholder === placeholder || n.props['aria-label'] === placeholder))[0]
 const labelled = (view, label) => nodes(view.tree, (n) => n.type === 'input' && n.props['aria-label'] === label)[0]
 const select = (view, label) => nodes(view.tree, (n) => (n.type === 'select' || n.type === 'input') && n.props['aria-label'] === label)[0]
 const suggestions = (view, label) => nodes(view.tree, (n) => n.type === 'datalist' && n.props.id === select(view, label)?.props.list)[0]
@@ -1253,6 +1253,10 @@ test('archived attendance additions require trimmed reason and send all form fie
   input(view, 'Teilnahme-Begründung').props.onChange(change('  missed participant  '))
   checkbox(view, 'Ersatzbank').props.onChange({ target: { checked: true } })
   view.render()
+  assert.match(input(view, 'Teilnahme-Notiz').props.placeholder, /hilft beim Auffüllen/)
+  assert.equal(input(view, 'Teilnahme-Notiz').props.maxLength, 200)
+  input(view, 'Teilnahme-Notiz').props.onChange(change('  kann mit Twink mit  '))
+  view.render()
   const submit = form(view).props.onSubmit
   const first = submit(event)
   await submit(event)
@@ -1263,7 +1267,7 @@ test('archived attendance additions require trimmed reason and send all form fie
   assert.equal(write.body.reason, 'missed participant')
   assert.equal(write.body.character_id, 20)
   assert.equal(write.body.is_bench, true)
-  assert.equal('notes' in write.body, false)
+  assert.equal(write.body.notes, 'kann mit Twink mit')
   assert.equal('is_substitute' in write.body, false)
   write.reject(new Error('offline'))
   await first
@@ -1280,6 +1284,7 @@ test('archived attendance edits in place, prefills saved values and PATCHes with
   assert.equal(select(view, 'Teilnahme-Rolle').props.value, 'HEAL')
   assert.equal(checkbox(view, 'Ersatzbank').props.checked, false)
   assert.equal(input(view, 'Teilnahme-Begründung').props.value, '')
+  assert.equal(input(view, 'Teilnahme-Notiz').props.value, 'old attendance note')
   await flush(view)
   assert.match(select(view, 'Teilnahme-Charakter').props.value, /Char 11/)
   assert.doesNotMatch(select(view, 'Teilnahme-Charakter').props.value, /#11/)
@@ -2230,6 +2235,30 @@ test('role-only historical PATCH omits untouched unknown and blank snapshots', a
   assert.equal(writes(s)[0].body.role, 'TANK')
   writes(s)[0].reject(new Error('offline'))
   await first
+})
+
+test('editing a roster row sends a changed note trimmed, and a cleared note as empty', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { attendance: [{ ...attendanceRow, is_bench: true, character_name: 'Bankplatz', class: 'Magier', spec: 'Feuer' }] })
+  await flush(view)
+  button(view, 'Teilnahme korrigieren').props.onClick()
+  view.render()
+  await flush(view)
+  input(view, 'Teilnahme-Notiz').props.onChange(change('  hilft beim Auffüllen  '))
+  view.render()
+  const first = form(view).props.onSubmit(event)
+  assert.equal(writes(s)[0].method, 'patch')
+  assert.equal(writes(s)[0].body.notes, 'hilft beim Auffüllen')
+  writes(s)[0].reject(new Error('offline'))
+  await first
+  view.render()
+  input(view, 'Teilnahme-Notiz').props.onChange(change(''))
+  view.render()
+  const second = form(view).props.onSubmit(event)
+  assert.equal(writes(s)[1].body.notes, '')
+  writes(s)[1].reject(new Error('offline'))
+  await second
 })
 
 test('reference changes use selected character defaults and allow explicit spec changes', async () => {

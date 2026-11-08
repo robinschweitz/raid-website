@@ -154,6 +154,7 @@ function RaidDetail({ raidID, initialView }: Props) {
   const [attEditing, setAttEditing] = useState<Attendance | null>(null)
   const [attDetails, setAttDetails] = useState({ is_bench: false, late_join: false, early_leave: false })
   const [attReason, setAttReason] = useState('')
+  const [attNotes, setAttNotes] = useState('')
   const [attSnapshot, setAttSnapshot] = useState<{ character_name?: string; class?: string; spec?: string }>({})
   const [rosterSearch, setRosterSearch] = useState('')
   const [rosterRole, setRosterRole] = useState<AttendanceRole | ''>('')
@@ -395,6 +396,7 @@ function RaidDetail({ raidID, initialView }: Props) {
       late_join: row?.late_join ?? false, early_leave: row?.early_leave ?? false,
     })
     setAttReason('')
+    setAttNotes(row?.notes ?? '')
     setAttSnapshot(row ? { character_name: row.character_name || undefined, class: row.class || undefined, spec: row.spec || undefined } : {})
   }
 
@@ -434,6 +436,7 @@ function RaidDetail({ raidID, initialView }: Props) {
         setAttRole('DD')
         setAttDetails({ is_bench: false, late_join: false, early_leave: false })
         setAttReason('')
+        setAttNotes('')
         setAttSnapshot({})
         setMessage(`${name} wurde aus dem Raid entfernt.`)
         await load()
@@ -546,6 +549,7 @@ function RaidDetail({ raidID, initialView }: Props) {
           character_id: Number(attCharacter),
           role: attRole,
           ...attDetails,
+          ...(attNotes.trim() !== (attEditing?.notes ?? '').trim() ? { notes: attNotes.trim() } : {}),
           ...snapshotChanges,
           ...(attNeedsReason ? { reason: attReason.trim() } : {}),
           ...(confirmShortfall ? { confirm_ep_shortfall: true } : {}),
@@ -564,6 +568,7 @@ function RaidDetail({ raidID, initialView }: Props) {
         setAttRole('DD')
         setAttDetails({ is_bench: false, late_join: false, early_leave: false })
         setAttReason('')
+        setAttNotes('')
         setAttSnapshot({})
         focusAttendanceInput.current = !attEditing
         setMessage(attEditing ? 'Teilnahme-Korrektur gespeichert.' : 'Teilnahme hinzugefügt.')
@@ -1000,6 +1005,7 @@ function RaidDetail({ raidID, initialView }: Props) {
                   setAttDetails((previous) => ({ ...previous, [key]: checked }))
                 }} /> {label}
               </label>)}</fieldset>
+              <label>Notiz<input aria-label="Teilnahme-Notiz" disabled={pending} maxLength={200} placeholder={attDetails.is_bench ? 'z. B. kann mit Twink Eisblock mit, hilft beim Auffüllen' : 'z. B. kommt 20 Minuten später'} value={attNotes} onChange={(e) => setAttNotes(e.target.value)} /></label>
               {attNeedsReason && <label>Begründung (Pflicht)<input disabled={pending} placeholder="Teilnahme-Begründung" value={attReason} onChange={(e) => setAttReason(e.target.value)} required /></label>}
               {attEditing && error && <ErrorMessage>{error}</ErrorMessage>}
               {!pending && (!hasAttCharacter ? <p className="field-hint">Zuerst einen Charakter wählen.</p> : attNeedsReason && !attReason.trim() ? <p className="field-hint">Begründung eintragen.</p> : null)}

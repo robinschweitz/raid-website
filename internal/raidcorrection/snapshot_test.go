@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -115,3 +116,53 @@ func TestRosterSnapshotCorrectionDefaultsValidationAndArchive(t *testing.T) {
 }
 
 func stringPointer(value string) *string { return &value }
+
+func TestRosterNoteIsTrimmedAndLimited(t *testing.T) {
+	ctx := context.Background()
+	database, err := db.Open(ctx, "file:"+filepath.Join(t.TempDir(), "note.db")+"?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	m, err := migrations.NewMigrator(database.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r := NewRepo(database.DB)
+	s := NewService(r)
+	now := time.Now().UTC()
+	p := &player.Player{Name: "Actor", Role: validation.RoleAdmin, CreatedAt: now, UpdatedAt: now}
+	if err := r.players.Create(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	c := &character.Character{PlayerID: p.ID, Name: "Bankplatz", Class: "Magier", MainSpec: "Feuer", CreatedAt: now, UpdatedAt: now}
+	if err := r.characters.Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	rd := &raid.Raid{Name: "Planned", RaidLeaderID: p.ID, Status: validation.RaidStatusPlanned, CreatedAt: now, UpdatedAt: now}
+	if err := r.raids.Create(ctx, rd); err != nil {
+		t.Fatal(err)
+	}
+	tooLong := strings.Repeat("ä", MaxAttendanceNoteLength+1)
+	if err := s.SaveAttendance(ctx, &attendance.Attendance{RaidID: rd.ID, PlayerID: p.ID, CharacterID: c.ID, Role: validation.RoleDD, IsBench: true, Notes: tooLong}, p.ID, ""); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("long note on create: %v", err)
+	}
+	row := &attendance.Attendance{RaidID: rd.ID, PlayerID: p.ID, CharacterID: c.ID, Role: validation.RoleDD, IsBench: true, Notes: "  kann mit Twink mit  "}
+	if err := s.SaveAttendance(ctx, row, p.ID, ""); err != nil || row.Notes != "kann mit Twink mit" {
+		t.Fatalf("trimmed note: %q %v", row.Notes, err)
+	}
+	maxNote := strings.Repeat("ä", MaxAttendanceNoteLength)
+	if row, err = s.CorrectAttendance(ctx, rd.ID, row.ID, p.ID, "", func(a *attendance.Attendance) { a.Notes = maxNote }); err != nil || row.Notes != maxNote {
+		t.Fatalf("200 characters: %v", err)
+	}
+	if _, err := s.CorrectAttendance(ctx, rd.ID, row.ID, p.ID, "", func(a *attendance.Attendance) { a.Notes = tooLong }); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("long note on correction: %v", err)
+	}
+	stored, err := r.attendance.Get(ctx, row.ID)
+	if err != nil || stored.Notes != maxNote {
+		t.Fatalf("rejected note persisted: %v", err)
+	}
+}

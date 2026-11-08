@@ -198,6 +198,7 @@ implemented yet when it differs from the code.
 - **FR-13.11** Staff MUST be able to correct and add roster rows and loot of PLANNED, OPEN, and COMPLETED raids, also when archived. Cancelled raids, and archived raids that are not COMPLETED, MUST reject these writes. (ADR 018, 032)
 - **FR-13.12** A correction of an archived raid MUST NOT change the archive times, run the finalization again, create a successor, or revive a used or expired lock. (ADR 032)
 - **FR-13.13** Roster rows from before snapshots existed MUST show missing name, class, role, or spec as unavailable. The system MUST NOT fill them from live character data. (ADR 022)
+- **FR-13.14** Staff MUST be able to write an optional note of at most 200 characters on any roster row, for example on a bench row which character the player can also bring. The note MUST be shown with the row, follows the raid-state and reason rules of FR-13.11 and FR-26.5, and is audited. A longer note MUST be rejected; a note stored before this rule stays until it is changed. (Owner 2026-11-08)
 
 ### 14. Loot awards
 

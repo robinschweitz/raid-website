@@ -1,8 +1,13 @@
-export const appVersion = '1.0.86'
+export const appVersion = '1.0.87'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Notizen in der Aufstellung',
+    changes: ['Die Raidleitung kann zu jedem Platz in der Aufstellung eine kurze Notiz eintragen, zum Beispiel bei der Ersatzbank „kann mit Twink X mit, hilft beim Auffüllen“. Die Notiz steht direkt am Spieler.'],
+  },
+  {
+    version: '1.0.86',
     title: 'RaidLedger 2.10.1',
     changes: ['Neue RaidLedger-Version zum Herunterladen unter „Addons“. Würfelt bei mehreren gleichen offenen Tokens niemand, kommen sie wieder unter OFFENE ITEMS, und Entzaubern, Gildenbank und Vergeben bleiben gesperrt. Bisher führten diese Knöpfe zu einem Lua-Fehler.'],
   },

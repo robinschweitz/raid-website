@@ -220,7 +220,7 @@ After changing the unit, reinstall it and check the running binary:
 ```sh
 install -m 0644 deploy/systemd/raid-website-update.service /etc/systemd/system/raid-website-update.service
 systemctl daemon-reload
-go version /opt/raid-website/server   # shows go1.26.10 or newer
+go version /opt/raid-website/server   # shows go1.26.11 or newer
 ```
 
 ```sh
@@ -312,10 +312,10 @@ and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
      Changing the variable alone therefore does not change the live password.
      Set a new strong value in `/etc/raid-website.env` (so a rebuilt database
      gets it), then change the live password: log in as an Admin and change the
-     own password in the app, which ends all other sessions (FR-2.13). If you
-     are locked out, use the server-side reset code command `cmd/reset-code`
-     (SC-051, see "Recover the only Admin with a reset code" below). Any other Admin whose password may be known gets a new
-     password in the app (FR-2.14).
+     own password in the app, which ends all other sessions (FR-2.13). If the
+     only Admin is locked out, use the server-side reset-code command described
+     in "Recover the only Admin with a reset code" below (SC-051). Any other
+     Admin whose password may be known gets a new password in the app (FR-2.14).
    - **Worker token (`RISING_GODS_PROXY_TOKEN`).** The token exists twice and
      both must match: the Worker secret `UPSTREAM_AUTH_TOKEN` in Cloudflare and
      `RISING_GODS_PROXY_TOKEN` in `/etc/raid-website.env`. Generate a value with
@@ -387,19 +387,22 @@ The command prints the 72-hour code once and revokes earlier unused codes. Send
 it ingame to that player's main character; do not paste it into a ticket or log.
 Unknown/ambiguous names fail without a write; use the numeric ID when needed.
 The audit identifies the actor as `server operator`; the security event contains
-only the player ID. Redeeming the code removes MFA and all sessions.
+only the player ID. Redeeming the code runs the reset flow implemented in #82,
+which removes MFA and all sessions.
 The Admin must set up MFA again before using Admin functions (SC-040).
 
 ### TOTP encryption (SC-014)
 
-Before deploying #64, stop the service and take the deployment snapshot (NFR-2.1).
+For an upgrade from a release before #64, stop the service and take the deployment
+snapshot (NFR-2.1) before deploying the encryption migration.
 Set `TOTP_ENCRYPTION_KEY` in the protected environment file to the base64 encoding
 of 32 random bytes (generate with `openssl rand -base64 32`). Keep this key with
 the backup key material; never put it in the database, repository, or a ticket.
 Start the service and check its journal. Before accepting requests it encrypts
-all plaintext TOTP secrets atomically. On failure it reports only a count and
-refuses to start; correct the configuration or restore the snapshot and retry.
-A successful restart leaves existing authenticator apps and recovery codes usable.
+any remaining plaintext TOTP secrets atomically. On failure it reports only a
+count and refuses to start; correct the configuration or restore the snapshot
+and retry. A successful restart leaves existing authenticator apps and recovery
+codes usable.
 Without the key, a server with stored TOTP cannot start, and a fresh server cannot
 create TOTP secrets. This applies in development too. A repeat startup does not
 rewrite values already under this key. To rotate after #65, stop the service and take the deployment snapshot. Put the

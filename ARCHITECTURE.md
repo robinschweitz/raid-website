@@ -3,7 +3,7 @@
 This file owns HOW the system is built: components, boundaries, technology choices, data
 ownership, data flow, and dependency rules. Behaviour is owned by `REQUIREMENTS.md`, look and
 interaction by `DESIGN.md`, and security controls by `SECURITY.md`; this file references their
-IDs instead of restating them. It describes the code of v1.0.86 (2026-11-08). Choices that
+IDs instead of restating them. It describes the code of v1.0.87 (2026-11-08). Choices that
 the owner made on 2026-10-22 and that the code does not follow yet are marked
 "Owner 2026-10-22" and "not built". ADRs keep the history of each decision.
 

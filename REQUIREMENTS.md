@@ -1,6 +1,6 @@
 # Requirements — raid-website
 
-This file owns WHAT the system must do. It describes the behaviour of version 1.0.86
+This file owns WHAT the system must do. It describes the behaviour of version 1.0.87
 (2026-11-08). It was first derived on 2026-10-22 from the owner's original brief (the pre-2026-10-22 `AGENTS.md`), `docs/decisions/*.md`, and the code. The text in
 parentheses after a requirement names its source decision. The ADRs keep the reasons; this
 file keeps the current rule. If code and an ADR disagree, the item is in `## Open Questions`.

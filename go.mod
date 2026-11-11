@@ -2,7 +2,7 @@ module raid-website
 
 go 1.26.0
 
-toolchain go1.26.10
+toolchain go1.26.11
 
 require (
 	github.com/go-webauthn/webauthn v0.18.2

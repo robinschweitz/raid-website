@@ -2,8 +2,10 @@
 
 This file owns the security posture: secure-coding rules, controls, trust-boundary enforcement,
 and open security decisions. All security controls are written here; other files reference the
-`SC-###` and `OD-###` IDs. It reflects the code of v1.0.86 and the deployment templates in
-`deploy/` as of 2026-11-08. Each rule says in its **Evidence** whether the current code complies.
+`SC-###` and `OD-###` IDs. It was reviewed against the code at `d0f67d6` (v1.0.87) and the
+deployment templates in `deploy/` on 2026-11-11. Each rule says in its **Evidence** whether the
+current repository code complies; live production state is identified separately where it cannot
+be verified from the repository.
 
 ## Secure-Coding Inputs
 
@@ -353,7 +355,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** A password reset MUST use a single-use reset code that an Admin creates for a player and sends in game to that player's main character, with the same randomness, hashing, and revocation as registration codes (SC-013) and a lifetime of 72 hours. Redeeming it MUST set a new password (SC-005), MUST remove the player's TOTP settings, recovery codes, and security keys, and MUST end all sessions of the player (SC-017), in one audited transaction. An Admin MUST NOT set another player's password directly for a reset. Creating a reset code MUST revoke any earlier unused reset code of the same player. Failed redemptions of reset and registration codes MUST count against the per-address limit of SC-043. Creating and redeeming a reset code MUST be logged as security events (SC-041). The in-game message is the only notification channel; a player who did not ask for the reset notices because their old password stops working (accepted: the site stores no e-mail). A reset of an ADMIN is followed by SC-040.
 - **Enforcement:** reset-code workflow in `registration`, on the registration-code infrastructure (owner 2026-10-23, backlog #48); `auth`.
-- **Evidence:** FR-5.8, OD-014, OD-018 (owner, 2026-10-23). Code: Admin code creation, 72-hour expiry, hash-only storage, replacement revocation and the prohibition on directly setting another player's password are built in #81. Redemption is built in #82: one transaction changes the password, consumes the code, removes MFA and all sessions, revokes push delivery and records counts without secrets. Reset and registration redemptions share the per-address failed-attempt budget. The operator command is tracked in #83. Threats: T-026.
+- **Evidence:** FR-5.8, OD-014, OD-018 (owner, 2026-10-23). Code: Admin code creation, 72-hour expiry, hash-only storage, replacement revocation and the prohibition on directly setting another player's password are built in #81. Redemption is built in #82: one transaction changes the password, consumes the code, removes MFA and all sessions, revokes push delivery and records counts without secrets. Reset and registration redemptions share the per-address failed-attempt budget. The operator command is built in #83. Threats: T-026.
 - **Verification:** A redeemed code works once; afterwards old sessions return 401, MFA is off, and the new password logs in; a second code revokes the first; the 31st failed redemption from one address in 15 minutes is rejected; a code older than 72 hours is rejected.
 
 **SC-043 - Login limit per client address**
@@ -367,14 +369,14 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** `deploy/README.md` MUST contain an incident plan with these steps: end all sessions (the documented database command that deletes every session row), rotate `ADMIN_PASSWORD`, the Worker token, the Cloudflare API token, the TOTP key, and the VAPID key (SC-054), pause automatic deploys (stop `raid-website-update.timer`), and restore from a verified snapshot. There is no in-app "log everyone out" action. The owner is the only person who acts (T-040 accepted).
 - **Enforcement:** `deploy/README.md`.
-- **Evidence:** OD-015 (owner, 2026-10-23). Code: plan written in `deploy/README.md` ("Incident plan and secret rotation", #108): detection, containment, rotation, restore, review. The TOTP key step rotates the key as SC-014 describes, and the Admin password step notes that the env variable does not change an existing account (FR-2.10) and refers to `cmd/reset-code` (SC-051). Owner dry run still pending. Threats: T-040, T-041.
+- **Evidence:** OD-015 (owner, 2026-10-23). The plan is documented in `deploy/README.md` ("Incident plan and secret rotation", #108). TOTP encryption/key rotation (SC-014) and the server-side Admin reset command (SC-051) are implemented; the runbook documents their use. Changing `ADMIN_PASSWORD` alone still does not change an existing account (FR-2.10). The owner dry run remains to be verified. Threats: T-040, T-041.
 - **Verification:** Each step was carried out once on a test setup and old session cookies returned 401 afterwards.
 
 **SC-045 - Patched Go toolchain**
 - **Status:** ACTIVE
-- **Rule:** `go.mod` MUST name a `toolchain` at least as new as the newest Go patch release that fixes every reachable `govulncheck` finding (today `go1.26.10`), so that CI and the production build use it even when the host's Go is older. The vulnerability scan of SC-039 MUST run with that toolchain.
+- **Rule:** `go.mod` MUST name a `toolchain` at least as new as the newest Go patch release that fixes every reachable `govulncheck` finding (currently `go1.26.11`), so that CI and the production build use it even when the host's Go is older. The vulnerability scan of SC-039 MUST run with that toolchain.
 - **Enforcement:** `go.mod`; `.github/workflows/ci.yml`; the host update script (SC-037).
-- **Evidence:** `THREAT_MODEL_CODE.md` CT-001: 29 reachable standard-library vulnerabilities with `go1.26.0`, all fixed in `go1.26.10`; `go.mod` now names `toolchain go1.26.10`, CI checks that its Go is at least that version, and the update service sets `GOTOOLCHAIN=auto` (#102). Code: compliant in the repository; production compliant once the updated unit is installed (`deploy/README.md`). Threats: T-046.
+- **Evidence:** `THREAT_MODEL_CODE.md` CT-001: 29 reachable standard-library vulnerabilities with `go1.26.0` were fixed in `go1.26.10`; a later reachable finding, GO-2026-6859, affects `go1.26.10` and is fixed in `go1.26.11`. `go.mod` names `toolchain go1.26.11`, CI checks that its Go is at least that version, and the update service sets `GOTOOLCHAIN=auto` (#102). Code: compliant in the repository; production compliance requires the installed unit and binary to be verified (`deploy/README.md`). Threats: T-046.
 - **Verification:** `govulncheck ./...` with the toolchain from `go.mod` reports no reachable vulnerability; `go version -m` of the production binary shows that toolchain.
 
 **SC-046 - No account hints before a valid code**
@@ -415,7 +417,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 **SC-051 - Server-side reset code for a locked-out Admin**
 - **Status:** ACTIVE
 - **Rule:** A command `cmd/reset-code`, run on the server as the application user, MUST create a reset code (SC-042) for a named player and print it once. It MUST open the database directly, MUST NOT be reachable over HTTP, MUST write an audit entry with the actor "server operator", and MUST be logged as a security event (SC-041). It MUST NOT set a password or remove MFA itself; that happens only when the code is redeemed.
-- **Enforcement:** `cmd/reset-code` (new) using the `registration` reset-code service.
+- **Enforcement:** `cmd/reset-code` using the `registration` reset-code service.
 - **Evidence:** FR-3.11, OD-019 (owner, 2026-10-23). Code: built in #83: `cmd/reset-code` uses the shared reset service, audits as "server operator", logs a security event without the code and prints it once. Threats: T-049.
 - **Verification:** Running the command for the only Admin prints a code that works once within 72 hours; the audit log shows the operator entry; no HTTP route reaches the command.
 

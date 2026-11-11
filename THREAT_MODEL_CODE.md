@@ -40,14 +40,15 @@ No numeric risk scores; the **Impact** line says in words what an attacker gains
   actually reached with `go1.26.0`, among them HTTP/2 server memory exhaustion and crash
   (GO-2026-6603, GO-2026-6617), unbounded Range headers (GO-2026-6609), request desynchronisation
   (GO-2026-6613), and several `crypto/x509` flaws reached through WebAuthn (GO-2026-4866,
-  GO-2026-6809). All are fixed in `go1.26.10`. `go.mod` names `toolchain go1.26.10`, CI checks
-  its Go version and runs `govulncheck`, and the update service sets `GOTOOLCHAIN=auto` (SC-045).
-  The production binary/unit still requires host verification. The original scan also found 19
-  module findings that were not reachable.
+  GO-2026-6809). These findings are fixed in `go1.26.10`. A later scan found GO-2026-6859,
+  reachable in `go1.26.10` and fixed in `go1.26.11`. `go.mod` now names `toolchain go1.26.11`,
+  CI checks its Go version and runs `govulncheck`, and the update service sets `GOTOOLCHAIN=auto`
+  (SC-045). The production binary/unit still requires host verification. The original scan also
+  found 19 module findings that were not reachable.
 - **Impact:** If production still runs a binary built with the vulnerable standard library, a
   remote visitor could cause availability or WebAuthn certificate-validation impact; the installed
   production binary has not been verified in this review.
-- **Status:** MITIGATED in the repository; production verification remains pending (SC-045). **Response:** Mitigate. **Rules:** SC-045, SC-039.
+- **Status:** FIXED in the repository by upgrading to `go1.26.11`; production verification remains pending (SC-045). **Response:** Mitigate. **Rules:** SC-045, SC-039.
 
 **CT-002 — Frontend dependencies**
 - **Evidence:** The recorded `npm audit` found 0 vulnerabilities (runtime and dev); this result is time-sensitive. CI currently runs `npm audit --omit=dev --audit-level=high`.
@@ -382,7 +383,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 | A03 Injection | none found |
 | A04 Insecure Design | CT-005 (fixed), CT-028 (mitigated) |
 | A05 Security Misconfiguration | CT-007, CT-013, CT-014, CT-021 (fixed); CT-018 live state requires verification |
-| A06 Vulnerable and Outdated Components | CT-001 (repository mitigated; production verification pending), CT-019 (fixed in repository) |
+| A06 Vulnerable and Outdated Components | CT-001 (fixed in repository; production verification pending), CT-019 (fixed in repository) |
 | A07 Identification and Authentication Failures | CT-003, CT-004, CT-009, CT-010, CT-012, CT-022, CT-024 to CT-026 (fixed) |
 | A08 Software and Data Integrity Failures | CT-017, CT-018, CT-019 (repository controls present; live branch state requires verification) |
 | A09 Security Logging and Monitoring Failures | CT-023 (fixed) |
@@ -393,7 +394,7 @@ Two separate views, maintained in the backlog as separate workstreams.
 
 | Code threat | Status | Response | VAST | Rule | Spec threat |
 | --- | --- | --- | --- | --- | --- |
-| CT-001 | MITIGATED (repository; production verify) | Mitigate | Ops + App | SC-045, SC-039 | T-046 |
+| CT-001 | FIXED in repository; production verify pending | Mitigate | Ops + App | SC-045, SC-039 | T-046 |
 | CT-003 | FIXED | Mitigate | App | SC-046 | T-042 |
 | CT-004 | FIXED | Mitigate | App | SC-009 | T-004 |
 | CT-005 | FIXED | Mitigate | App | SC-049, FR-4.5 | T-043 |

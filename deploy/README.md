@@ -220,7 +220,7 @@ After changing the unit, reinstall it and check the running binary:
 ```sh
 install -m 0644 deploy/systemd/raid-website-update.service /etc/systemd/system/raid-website-update.service
 systemctl daemon-reload
-go version /opt/raid-website/server   # shows go1.26.10 or newer
+go version /opt/raid-website/server   # shows go1.26.11 or newer
 ```
 
 ```sh

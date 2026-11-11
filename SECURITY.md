@@ -374,9 +374,9 @@ chapter level only; requirement IDs are not cited until each is verified against
 
 **SC-045 - Patched Go toolchain**
 - **Status:** ACTIVE
-- **Rule:** `go.mod` MUST name a `toolchain` at least as new as the newest Go patch release that fixes every reachable `govulncheck` finding (today `go1.26.10`), so that CI and the production build use it even when the host's Go is older. The vulnerability scan of SC-039 MUST run with that toolchain.
+- **Rule:** `go.mod` MUST name a `toolchain` at least as new as the newest Go patch release that fixes every reachable `govulncheck` finding (currently `go1.26.11`), so that CI and the production build use it even when the host's Go is older. The vulnerability scan of SC-039 MUST run with that toolchain.
 - **Enforcement:** `go.mod`; `.github/workflows/ci.yml`; the host update script (SC-037).
-- **Evidence:** `THREAT_MODEL_CODE.md` CT-001: 29 reachable standard-library vulnerabilities with `go1.26.0`, all fixed in `go1.26.10`; `go.mod` now names `toolchain go1.26.10`, CI checks that its Go is at least that version, and the update service sets `GOTOOLCHAIN=auto` (#102). Code: compliant in the repository; production compliant once the updated unit is installed (`deploy/README.md`). Threats: T-046.
+- **Evidence:** `THREAT_MODEL_CODE.md` CT-001: 29 reachable standard-library vulnerabilities with `go1.26.0` were fixed in `go1.26.10`; a later reachable finding, GO-2026-6859, affects `go1.26.10` and is fixed in `go1.26.11`. `go.mod` names `toolchain go1.26.11`, CI checks that its Go is at least that version, and the update service sets `GOTOOLCHAIN=auto` (#102). Code: compliant in the repository; production compliance requires the installed unit and binary to be verified (`deploy/README.md`). Threats: T-046.
 - **Verification:** `govulncheck ./...` with the toolchain from `go.mod` reports no reachable vulnerability; `go version -m` of the production binary shows that toolchain.
 
 **SC-046 - No account hints before a valid code**

@@ -330,14 +330,14 @@ and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
      a new one with only the Workers edit permission for this account, then
      replace the GitHub repository secret of the same name. Check with a manual
      run of that workflow (`workflow_dispatch`).
-   - **TOTP key (`TOTP_ENCRYPTION_KEY`).** TOTP secrets are encrypted at rest
-     (SC-014). If the key may have been exposed, rotate it using the procedure
-     in "TOTP encryption" below: retain the old key temporarily as
-     `TOTP_ENCRYPTION_KEYS_PREVIOUS`, set a new key, and restart so stored
-     secrets are re-encrypted. Keep the old key with the backup key material
-     until the last snapshot that uses it has expired. If both the database
-     and its key may have been exposed, treat the TOTP secrets as compromised
-     and have users reset their MFA as appropriate.
+   - **TOTP key (`TOTP_ENCRYPTION_KEY`).** Rotate it as "TOTP encryption
+     (SC-014)" below describes: the old key goes into
+     `TOTP_ENCRYPTION_KEYS_PREVIOUS`, and startup re-encrypts every secret under
+     the new key. Keep the old key with the backup key material until the last
+     snapshot that uses it has expired. If the database file or a snapshot
+     leaked together with the key, rotating the key is not enough: treat every
+     TOTP secret as exposed and ask each user to disable and set up TOTP again
+     (users with a lost second factor get a password reset, FR-3.11).
    - **VAPID key (`VAPID_PRIVATE_KEY`).** Create a new key with
      `go run ./cmd/vapid-key`, replace the line in `/etc/raid-website.env`, and
      restart the service. Every existing push subscription stops working with

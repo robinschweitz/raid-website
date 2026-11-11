@@ -1,7 +1,7 @@
 # Requirements — raid-website
 
-This file owns WHAT the system must do. It describes the behaviour of version 1.0.27
-(2026-10-22), derived from the owner's original brief (the pre-2026-10-22 `AGENTS.md`), `docs/decisions/*.md`, and the code. The text in
+This file owns WHAT the system must do. It describes the behaviour of version 1.0.87
+(2026-11-08). It was first derived on 2026-10-22 from the owner's original brief (the pre-2026-10-22 `AGENTS.md`), `docs/decisions/*.md`, and the code. The text in
 parentheses after a requirement names its source decision. The ADRs keep the reasons; this
 file keeps the current rule. If code and an ADR disagree, the item is in `## Open Questions`.
 A requirement marked "Owner 2026-10-22" is a decision from the owner's question and review pass. It is not
@@ -231,8 +231,8 @@ implemented yet when it differs from the code.
 - **FR-16.5** A correction of a completed raid MUST add only the change in EP eligibility: +10 when a player becomes eligible, −10 when a player is no longer eligible, limited by FR-16.6. (ADR 018)
 - **FR-16.6** A correction MUST NOT make an EP balance lower than 0. It MUST take only the points that the player still has. The points not taken MUST NOT be taken later. (Owner 2026-10-22, review)
 - **FR-16.7** The system MUST NOT recalculate existing ledger history under new rules. (owner brief)
-- **FR-16.9** The public page `/punkte` MUST list every active player with the current EP balance, without the roll range, sorted by balance descending, then by name. The public list MUST contain only player ID, player name, and balance; EP transactions MUST stay readable only with a session. (Owner 2026-11-03, ADR 110)
 - **FR-16.8** Before staff save a correction that FR-16.6 limits, the system MUST warn them with the player and the number of points not taken. The audit entry MUST record that number. (Owner 2026-10-22, review)
+- **FR-16.9** The public page `/punkte` MUST list every active player with the current EP balance, without the roll range, sorted by balance descending, then by name. The public list MUST contain only player ID, player name, and balance; EP transactions MUST stay readable only with a session. (Owner 2026-11-03, ADR 110)
 
 ### 17. Item locks
 

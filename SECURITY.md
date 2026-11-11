@@ -383,7 +383,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Public endpoints that take a registration or reset code MUST validate the code before they reveal anything about accounts; with an invalid code they MUST answer `registration_code_invalid` whatever the username. The username check MUST run inside the code transaction, and a duplicate username there MUST map to `409 username_taken`, not to a server error.
 - **Enforcement:** `registration.RedeemNewAccount`; the reset-code flow (SC-042).
-- **Evidence:** `THREAT_MODEL_CODE.md` CT-003. Code: compliant for `registration.RedeemNewAccount` since #75 — the username check runs inside the code transaction after the code is validated, and a duplicate answers `409 username_taken` (`TestReqAccount010_*`). Reset-code redemption also validates the code before account changes (SC-042, #82). Threats: T-042.
+- **Evidence:** `THREAT_MODEL_CODE.md` CT-003. Code: compliant for `registration.RedeemNewAccount` since #75 — the username check runs inside the code transaction after the code is validated, and a duplicate answers `409 username_taken` (`TestReqAccount010_*`); the reset-code redemption (#82, `registration.RedeemResetCode`) takes no username, so it cannot reveal one: it checks the code first and answers `400 reset_code_invalid` for any invalid code. Threats: T-042.
 - **Verification:** With an invalid code, a taken and a free username get the same answer.
 
 **SC-047 - The last Admin stays an Admin**

@@ -314,8 +314,7 @@ and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
      gets it), then change the live password: log in as an Admin and change the
      own password in the app, which ends all other sessions (FR-2.13). If you
      are locked out, use the server-side reset code command `cmd/reset-code`
-     (SC-051, not built yet); until it exists, restore access from a verified
-     snapshot (step 5). Any other Admin whose password may be known gets a new
+     (SC-051, see "Recover the only Admin with a reset code" below). Any other Admin whose password may be known gets a new
      password in the app (FR-2.14).
    - **Worker token (`RISING_GODS_PROXY_TOKEN`).** The token exists twice and
      both must match: the Worker secret `UPSTREAM_AUTH_TOKEN` in Cloudflare and
@@ -331,15 +330,14 @@ and put it only in `/etc/raid-website.env` or Cloudflare secrets (SC-033).
      a new one with only the Workers edit permission for this account, then
      replace the GitHub repository secret of the same name. Check with a manual
      run of that workflow (`workflow_dispatch`).
-   - **TOTP key (`TOTP_ENCRYPTION_KEY`).** SC-014 specifies the key and its
-     rotation (`TOTP_ENCRYPTION_KEYS_PREVIOUS`, re-encryption at startup), but it
-     is **not built**: TOTP secrets are still stored as plaintext and the
-     variable is not read. Until SC-014 is implemented there is no key to
-     rotate. If the database file or a snapshot leaked, treat every TOTP secret
-     as exposed: ask each user to disable and set up TOTP again (users with a
-     lost second factor get a password reset, FR-3.11). Once SC-014 is built,
-     rotate as it describes and keep the old key with the backup key material
-     until the last snapshot that uses it has expired.
+   - **TOTP key (`TOTP_ENCRYPTION_KEY`).** Rotate it as "TOTP encryption
+     (SC-014)" below describes: the old key goes into
+     `TOTP_ENCRYPTION_KEYS_PREVIOUS`, and startup re-encrypts every secret under
+     the new key. Keep the old key with the backup key material until the last
+     snapshot that uses it has expired. If the database file or a snapshot
+     leaked together with the key, rotating the key is not enough: treat every
+     TOTP secret as exposed and ask each user to disable and set up TOTP again
+     (users with a lost second factor get a password reset, FR-3.11).
    - **VAPID key (`VAPID_PRIVATE_KEY`).** Create a new key with
      `go run ./cmd/vapid-key`, replace the line in `/etc/raid-website.env`, and
      restart the service. Every existing push subscription stops working with
@@ -389,7 +387,7 @@ The command prints the 72-hour code once and revokes earlier unused codes. Send
 it ingame to that player's main character; do not paste it into a ticket or log.
 Unknown/ambiguous names fail without a write; use the numeric ID when needed.
 The audit identifies the actor as `server operator`; the security event contains
-only the player ID. Redemption requires #82 and removes MFA and all sessions.
+only the player ID. Redeeming the code removes MFA and all sessions.
 The Admin must set up MFA again before using Admin functions (SC-040).
 
 ### TOTP encryption (SC-014)

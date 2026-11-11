@@ -2,8 +2,8 @@
 
 This file owns the security posture: secure-coding rules, controls, trust-boundary enforcement,
 and open security decisions. All security controls are written here; other files reference the
-`SC-###` and `OD-###` IDs. It reflects the code of v1.0.27 and the deployment templates in
-`deploy/` as of 2026-10-22. Each rule says in its **Evidence** whether the current code complies.
+`SC-###` and `OD-###` IDs. It reflects the code of v1.0.86 and the deployment templates in
+`deploy/` as of 2026-11-08. Each rule says in its **Evidence** whether the current code complies.
 
 ## Secure-Coding Inputs
 
@@ -367,7 +367,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** `deploy/README.md` MUST contain an incident plan with these steps: end all sessions (the documented database command that deletes every session row), rotate `ADMIN_PASSWORD`, the Worker token, the Cloudflare API token, the TOTP key, and the VAPID key (SC-054), pause automatic deploys (stop `raid-website-update.timer`), and restore from a verified snapshot. There is no in-app "log everyone out" action. The owner is the only person who acts (T-040 accepted).
 - **Enforcement:** `deploy/README.md`.
-- **Evidence:** OD-015 (owner, 2026-10-23). Code: plan written in `deploy/README.md` ("Incident plan and secret rotation", #108): detection, containment, rotation, restore, review. The TOTP key step says SC-014 is not built, and the Admin password step notes that the env variable does not change an existing account (FR-2.10) and refers to `cmd/reset-code` (SC-051, not built). Owner dry run still pending. Threats: T-040, T-041.
+- **Evidence:** OD-015 (owner, 2026-10-23). Code: plan written in `deploy/README.md` ("Incident plan and secret rotation", #108): detection, containment, rotation, restore, review. The TOTP key step rotates the key as SC-014 describes, and the Admin password step notes that the env variable does not change an existing account (FR-2.10) and refers to `cmd/reset-code` (SC-051). Owner dry run still pending. Threats: T-040, T-041.
 - **Verification:** Each step was carried out once on a test setup and old session cookies returned 401 afterwards.
 
 **SC-045 - Patched Go toolchain**
@@ -381,7 +381,7 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Status:** ACTIVE
 - **Rule:** Public endpoints that take a registration or reset code MUST validate the code before they reveal anything about accounts; with an invalid code they MUST answer `registration_code_invalid` whatever the username. The username check MUST run inside the code transaction, and a duplicate username there MUST map to `409 username_taken`, not to a server error.
 - **Enforcement:** `registration.RedeemNewAccount`; the reset-code flow (SC-042).
-- **Evidence:** `THREAT_MODEL_CODE.md` CT-003. Code: compliant for `registration.RedeemNewAccount` since #75 — the username check runs inside the code transaction after the code is validated, and a duplicate answers `409 username_taken` (`TestReqAccount010_*`); the reset-code flow still has to follow (SC-042). Threats: T-042.
+- **Evidence:** `THREAT_MODEL_CODE.md` CT-003. Code: compliant for `registration.RedeemNewAccount` since #75 — the username check runs inside the code transaction after the code is validated, and a duplicate answers `409 username_taken` (`TestReqAccount010_*`); the reset-code redemption (#82, `registration.RedeemResetCode`) takes no username, so it cannot reveal one: it checks the code first and answers `400 reset_code_invalid` for any invalid code. Threats: T-042.
 - **Verification:** With an invalid code, a taken and a free username get the same answer.
 
 **SC-047 - The last Admin stays an Admin**

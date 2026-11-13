@@ -71,7 +71,15 @@ func (s *Service) CreateLock(ctx context.Context, lock *ItemLock, actorID int64)
 		if isArchived || status == validation.RaidStatusCompleted || status == validation.RaidStatusCancelled {
 			return ErrLockRaidClosed
 		}
-		balance, err := repo.Balance(ctx, lock.PlayerID)
+		poolID, _, err := repo.RaidEP(ctx, lock.RaidID)
+		if err != nil {
+			return err
+		}
+		if poolID == nil {
+			return ErrRaidHasNoPool
+		}
+		lock.PoolID = *poolID
+		balance, err := repo.Balance(ctx, lock.PlayerID, lock.PoolID)
 		if err != nil {
 			return fmt.Errorf("load lock balance: %w", err)
 		}

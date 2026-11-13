@@ -18,7 +18,11 @@ type Series struct {
 	StartTime     string  `json:"start_time"`
 	Timezone      string  `json:"timezone"`
 	// PlanWeeksAhead keeps this many weeks of future raids created; 0 is off (ADR 078).
-	PlanWeeksAhead int       `json:"plan_weeks_ahead"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	PlanWeeksAhead int `json:"plan_weeks_ahead"`
+	// EPPoolID is the EP pool its raids award and spend in; nil means no
+	// points (ADR 113). EPAward is the archive award, 0 to 100.
+	EPPoolID  *int64    `json:"ep_pool_id"`
+	EPAward   int       `json:"ep_award"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

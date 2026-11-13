@@ -24,6 +24,9 @@ type seriesRequest struct {
 	StartTime         *string  `json:"start_time"`
 	Timezone          *string  `json:"timezone"`
 	PlanWeeksAhead    *int     `json:"plan_weeks_ahead"`
+	// EPPoolID 0 means "no pool"; omitted keeps it, or on create uses the first pool.
+	EPPoolID *int64 `json:"ep_pool_id"`
+	EPAward  *int   `json:"ep_award"`
 }
 
 func (a *API) listRaidSeries(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +55,7 @@ func (a *API) saveRaidSeries(w http.ResponseWriter, r *http.Request, update bool
 		BadRequest(w, "malformed json body")
 		return
 	}
-	series, err := raidseries.NewService(a.RaidSeries).Configure(r.Context(), id, raidseries.Changes{ActorID: actor, Name: req.Name, NameTemplate: req.NameTemplate, NextRaidNumber: req.NextRaidNumber, RaidLeaderID: req.RaidLeaderID, LeaderIDs: req.LeaderIDs, Weekdays: req.Weekdays, IntervalWeeks: req.IntervalWeeks, StartTime: req.StartTime, Timezone: req.Timezone, PlanWeeksAhead: req.PlanWeeksAhead, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize})
+	series, err := raidseries.NewService(a.RaidSeries).Configure(r.Context(), id, raidseries.Changes{ActorID: actor, Name: req.Name, NameTemplate: req.NameTemplate, NextRaidNumber: req.NextRaidNumber, RaidLeaderID: req.RaidLeaderID, LeaderIDs: req.LeaderIDs, Weekdays: req.Weekdays, IntervalWeeks: req.IntervalWeeks, StartTime: req.StartTime, Timezone: req.Timezone, PlanWeeksAhead: req.PlanWeeksAhead, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize, EPPoolID: req.EPPoolID, EPAward: req.EPAward})
 	if err != nil {
 		if !writeSeriesError(w, err) {
 			WriteError(w, http.StatusInternalServerError, "internal", "could not save series")
@@ -129,6 +132,9 @@ func writeSeriesError(w http.ResponseWriter, err error) bool {
 	case errors.Is(err, raid.ErrOccurrenceConflict):
 		code = "occurrence_conflict"
 		status = http.StatusConflict
+	case errors.Is(err, raidseries.ErrPoolNotFound):
+		code = "ep_pool_not_found"
+		status = http.StatusNotFound
 	case errors.Is(err, raidseries.ErrNotFound):
 		code = "series_not_found"
 		status = http.StatusNotFound

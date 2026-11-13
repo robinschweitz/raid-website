@@ -70,6 +70,10 @@ func (a *API) createLock(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusNotFound, "not_found", "Raid nicht gefunden")
 			return
 		}
+		if errors.Is(err, enhancepoints.ErrRaidHasNoPool) {
+			WriteError(w, http.StatusConflict, "raid_has_no_ep_pool", "Dieser Raid hat keinen EP-Topf, Locks sind nicht möglich")
+			return
+		}
 		if errors.Is(err, enhancepoints.ErrLockRaidClosed) {
 			WriteError(w, http.StatusConflict, "lock_raid_closed", "Dieser Raid nimmt keine Locks mehr an")
 			return

@@ -137,6 +137,9 @@ func PlanOccurrences(ctx context.Context, repo *Repo, series *raidseries.Series,
 		if err := repo.CopySeriesLeaders(ctx, rd, series.LeaderIDs); err != nil {
 			return nil, err
 		}
+		if err := repo.CopySeriesEP(ctx, rd, series); err != nil {
+			return nil, err
+		}
 		if err := repo.Audit(ctx, actorID, rd.ID, "plan", nil, rd); err != nil {
 			return nil, err
 		}

@@ -460,6 +460,8 @@ func importErrorMessage(err error) (string, string) {
 		return "recipient_not_in_roster", "Empfänger steht nicht in der Aufstellung"
 	case errors.Is(err, loot.ErrInvalidMethod):
 		return "invalid_award_method", "Vergabeart muss MAIN, SECOND, ENHANCED oder BOE sein"
+	case errors.Is(err, enhancepoints.ErrRaidHasNoPool):
+		return "raid_has_no_ep_pool", "Dieser Raid hat keinen EP-Topf, Enhanced-Loot ist nicht möglich"
 	case errors.Is(err, enhancepoints.ErrInsufficientBalance):
 		return "insufficient_balance", "Spieler hat keine EP für Enhanced-Loot"
 	case errors.Is(err, loot.ErrLockConflict):
@@ -719,10 +721,14 @@ func defaultMethod(line LootLine, itemName string) loot.Method {
 	}
 }
 
-// enhancedPoints is X = min(balance, 50) for the player (ADR 023); -1 when the
+// enhancedPoints is X = min(balance, 50) for the player in the raid's EP pool
+// (ADR 023, 113); -1 when the
 // balance cannot be read, so the preview warns instead of guessing.
 func (r *resolver) enhancedPoints(ctx context.Context, playerID int64) int {
-	balance, err := r.service.points.Balance(ctx, playerID)
+	if r.raid.EPPoolID == nil {
+		return 0
+	}
+	balance, err := r.service.points.Balance(ctx, playerID, *r.raid.EPPoolID)
 	if err != nil {
 		return -1
 	}

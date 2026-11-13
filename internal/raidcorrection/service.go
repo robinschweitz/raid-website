@@ -540,6 +540,14 @@ func (s *Service) pointEligibility(ctx context.Context, r *Repo, raidID int64) (
 	if err != nil {
 		return nil, err
 	}
+	// A raid without a pool, or with award 0, owes nobody points (FR-16.2, ADR 113).
+	poolID, award, err := r.points.RaidEP(ctx, raidID)
+	if err != nil {
+		return nil, err
+	}
+	if poolID == nil {
+		award = 0
+	}
 	desired := make(map[int64]int)
 	for _, row := range rows {
 		if _, exists := desired[row.PlayerID]; exists {
@@ -551,7 +559,7 @@ func (s *Service) pointEligibility(ctx context.Context, r *Repo, raidID int64) (
 			return nil, err
 		}
 		if !hasLoot {
-			desired[row.PlayerID] = 10
+			desired[row.PlayerID] = award
 		}
 	}
 	return desired, nil
@@ -574,6 +582,13 @@ func (s *Service) reconcilePoints(ctx context.Context, r *Repo, raidID, actor in
 	sort.Slice(playerIDs, func(i, j int) bool { return playerIDs[i] < playerIDs[j] })
 	confirmed, _ := ctx.Value(confirmKey{}).(bool)
 	var shortfalls []Shortfall
+	poolID, _, err := r.points.RaidEP(ctx, raidID)
+	if err != nil {
+		return err
+	}
+	if poolID == nil {
+		return nil
+	}
 	// Apply only the eligibility change, never backfill historical raid awards.
 	for _, playerID := range playerIDs {
 		amount := after[playerID] - before[playerID]
@@ -583,7 +598,7 @@ func (s *Service) reconcilePoints(ctx context.Context, r *Repo, raidID, actor in
 		var notTaken int
 		if amount < 0 {
 			// A deduction never takes a balance below 0 and the rest is not taken later (FR-16.6).
-			balance, err := r.points.Balance(ctx, playerID)
+			balance, err := r.points.Balance(ctx, playerID, *poolID)
 			if err != nil {
 				return err
 			}
@@ -598,7 +613,7 @@ func (s *Service) reconcilePoints(ctx context.Context, r *Repo, raidID, actor in
 			}
 		}
 		if amount != 0 {
-			if err := r.points.InsertTransaction(ctx, &enhancepoints.Transaction{PlayerID: playerID, RaidID: &raidID, Amount: amount, Type: "correction_no_mainspec_loot", Reason: strings.TrimSpace(reason), RefType: "raid", RefID: strconv.FormatInt(raidID, 10), ActorID: actor, CreatedAt: time.Now().UTC()}); err != nil {
+			if err := r.points.InsertTransaction(ctx, &enhancepoints.Transaction{PlayerID: playerID, PoolID: *poolID, RaidID: &raidID, Amount: amount, Type: "correction_no_mainspec_loot", Reason: strings.TrimSpace(reason), RefType: "raid", RefID: strconv.FormatInt(raidID, 10), ActorID: actor, CreatedAt: time.Now().UTC()}); err != nil {
 				return err
 			}
 		}

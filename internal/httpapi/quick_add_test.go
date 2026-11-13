@@ -130,14 +130,14 @@ func TestRaidQuickAddAtomicRetriesAndPermissions(t *testing.T) {
 	if err := json.Unmarshal(response, &archived); err != nil {
 		t.Fatal(err)
 	}
-	balance, err := enhancepoints.NewRepo(db).Balance(ctx, archived.Data.PlayerID)
+	balance, err := enhancepoints.NewRepo(db).Balance(ctx, archived.Data.PlayerID, 1)
 	if err != nil || balance != 10 {
 		t.Fatalf("archive correction EP: %d %v", balance, err)
 	}
 	if status, _ := do(t, srv.Client(), http.MethodPost, url, token, body); status != http.StatusCreated {
 		t.Fatalf("archived retry: %d", status)
 	}
-	balance, err = enhancepoints.NewRepo(db).Balance(ctx, archived.Data.PlayerID)
+	balance, err = enhancepoints.NewRepo(db).Balance(ctx, archived.Data.PlayerID, 1)
 	if err != nil || balance != 10 {
 		t.Fatalf("retry awarded EP twice: %d %v", balance, err)
 	}

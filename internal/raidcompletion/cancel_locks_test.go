@@ -71,7 +71,7 @@ func TestReqRaid010_AC01(t *testing.T) {
 	if stored := lockStatus(t, db, untouched); stored.Status != validation.LockStatusActive {
 		t.Fatalf("lock of another raid changed: %+v", stored)
 	}
-	balance, err := enhancepoints.NewRepo(db).Balance(ctx, actor)
+	balance, err := enhancepoints.NewRepo(db).Balance(ctx, actor, 1)
 	if err != nil || balance != 200 {
 		t.Fatalf("EP changed: %d %v", balance, err)
 	}

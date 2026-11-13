@@ -155,6 +155,9 @@ export type RaidStatus = 'PLANNED' | 'OPEN' | 'COMPLETED' | 'CANCELLED'
 export interface Raid {
   id: number
   name: string
+  /** Copied from the series; null means no points and no ENHANCED or locks (ADR 113). */
+  ep_pool_id?: number | null
+  ep_award?: number
   raid_leader_id: number
   status: RaidStatus
   scheduled_start: string | null
@@ -241,6 +244,9 @@ export interface RaidSeries {
   plan_weeks_ahead?: number
   catalog_instance_id?: string | null
   raid_size?: number | null
+  /** EP pool of the series' raids; null means the raids give no points (ADR 113). */
+  ep_pool_id?: number | null
+  ep_award?: number
 }
 
 export interface CatalogSource {
@@ -356,8 +362,12 @@ export interface PointTransaction {
   created_at: string
 }
 
+/** A separate EP balance; series choose one or none (ADR 113). */
+export interface EpPool { id: number; name: string }
+
 export interface PointsResponse {
   player_id: number
+  pool_id: number
   balance: number
   transactions: PointTransaction[]
 }

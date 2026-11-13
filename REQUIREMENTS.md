@@ -22,7 +22,7 @@ implemented yet when it differs from the code.
 ### 1. Access and roles
 
 - **FR-1.1** Every permission in this file MUST be enforced by the server (SC-001). (ADR 010)
-- **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the raid leaders of a raid, the EP balance list (FR-16.9), the statistics, the privacy contact, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044, 110; Owner 2026-10-22, OQ-6)
+- **FR-1.2** The system MUST let a visitor without a session read only these API resources: the raid list, the player list, the poll list, the attendance of a raid, the raid leaders of a raid, the EP balance list and the EP pool list (FR-16.9), the statistics, the privacy contact, the addon list, the addon downloads, and the Rising-Gods character search. (ADR 067, 085, 044, 110; Owner 2026-10-22, OQ-6)
 - **FR-1.3** The public player list MUST show only ID, name, guild rank, and active state. It MUST NOT show login names. (ADR 067, 084)
 - **FR-1.4** The system MUST let a visitor open the pages `/`, `/anleitung`, `/addons`, `/kontosicherheit`, `/statistics`, `/punkte`, and the privacy page `/datenschutz` without a session. (ADR 083, 085, 092; Owner 2026-10-22, OQ-6 and OQ-9)
 - **FR-1.5** The system MUST require a session for all other reads. (ADR 067)
@@ -127,7 +127,7 @@ implemented yet when it differs from the code.
 
 ### 9. Raid series and planning
 
-- **FR-9.1** An ADMIN MUST be able to create and edit a raid series with name, one or more raid leaders (existing players, each once, in order), weekdays, week interval, local start time, IANA timezone, name template, next number, instance, size, and planning window. (ADR 021, 034, 078, 112)
+- **FR-9.1** An ADMIN MUST be able to create and edit a raid series with name, one or more raid leaders (existing players, each once, in order), weekdays, week interval, local start time, IANA timezone, name template, next number, instance, size, planning window, EP pool, and EP award (FR-16.10). (ADR 021, 034, 078, 112, 113)
 - **FR-9.2** The system MUST NOT create a default series or schedule. (ADR 021)
 - **FR-9.3** A name template MUST support `{number}`, `{name}`, `{date}`, and `{week}`. An empty template MUST give the series name. (ADR 034)
 - **FR-9.4** Recurrence weeks MUST count from the local Monday week of the current raid. (ADR 021)
@@ -150,7 +150,7 @@ implemented yet when it differs from the code.
 - **FR-10.8** In one transaction, archiving MUST award EP (FR-16.2), expire unused item locks, and link or create the next occurrence. (ADR 021)
 - **FR-10.9** Archiving MUST be idempotent. A repeated request MUST NOT award EP twice or create a second successor. (ADR 021)
 - **FR-10.10** The successor MUST be the first occurrence after the scheduled start and after the archive time. An existing PLANNED or OPEN occurrence MUST be reused without change. A cancelled occurrence MUST be skipped. A completed, archived, or differently linked occurrence MUST give a conflict. (ADR 021, 078)
-- **FR-10.11** Staff MUST get an archive preview with each roster player's current EP, the EP to award, and the reason. The preview MUST NOT change data. (ADR 069)
+- **FR-10.11** Staff MUST get an archive preview with each roster player's current EP in the raid's pool, the EP to award, and the reason. The preview MUST NOT change data. (ADR 069)
 - **FR-10.12** On archive, staff MAY exclude roster players with a DECLINED absence from the EP award. Any other excluded player MUST give HTTP 400 `invalid_exclusion`. (ADR 069, 082)
 - **FR-10.13** The archive dialog MUST preselect "no EP" for each declined roster player. (ADR 069)
 - **FR-10.14** Archived raids MUST stay visible as history. (ADR 021)
@@ -206,7 +206,7 @@ implemented yet when it differs from the code.
 - **FR-14.2** The boss and item MUST be a pair of the bundled catalog for the instance and size of the raid. Missing raid context MUST give HTTP 409 `catalog_context_required`. An invalid pair MUST give HTTP 400 `catalog_item_invalid`. (ADR 027)
 - **FR-14.3** The recipient MUST be a character in the roster of that raid. (ADR 024)
 - **FR-14.4** MAIN and ENHANCED MUST count as main-spec loot. SECOND and BOE MUST NOT. (ADR 024)
-- **FR-14.5** An ENHANCED award MUST debit X = min(balance, 50) from the recipient in the same transaction. It MUST require X ≥ 1. Staff MUST NOT choose or split the amount. (ADR 023, 024)
+- **FR-14.5** An ENHANCED award MUST debit X = min(balance, 50) from the recipient's balance in the raid's EP pool, in the same transaction. It MUST require X ≥ 1. Staff MUST NOT choose or split the amount. A raid without a pool MUST reject it with HTTP 409 `raid_has_no_ep_pool`. (ADR 023, 024, 113)
 - **FR-14.6** A new ENHANCED award MUST carry a nonblank `request_id`. An identical retry MUST return the stored award. The same key with other content MUST give a conflict. (ADR 024)
 - **FR-14.7** When an active item lock matches the item, the award MUST go to the lock owner as MAIN for 0 EP, and the lock MUST become USED. (ADR 012, 017)
 - **FR-14.8** A correction that keeps an ENHANCED recipient and method MUST keep the original cost. A change away from ENHANCED MUST refund the cost. A change of the ENHANCED recipient MUST refund the old winner and charge min(new balance, 50). (ADR 024)
@@ -224,20 +224,23 @@ implemented yet when it differs from the code.
 
 ### 16. Enhance Points
 
-- **FR-16.1** The EP balance MUST be the sum of the EP transactions of the player. The system MUST NOT change or delete an EP transaction. A correction MUST add a new transaction. (ADR 004)
-- **FR-16.2** Archiving MUST award +10 EP one time to each roster player who got no main-spec loot in the raid, except players excluded under FR-10.12. (ADR 004, 016, 021)
+- **FR-16.1** The EP balance MUST be the sum of the EP transactions of the player in one EP pool (FR-16.10); every transaction belongs to exactly one pool. The system MUST NOT change or delete an EP transaction. A correction MUST add a new transaction. (ADR 004)
+- **FR-16.2** Archiving MUST award the raid's EP award (FR-16.11) one time, in the raid's pool, to each roster player who got no main-spec loot in the raid, except players excluded under FR-10.12. A raid without a pool or with award 0 MUST award nothing. (ADR 004, 016, 021, 113)
 - **FR-16.3** The website MUST NOT generate rolls or offer a spend action, amount selector, or roll button. (ADR 023)
 - **FR-16.4** The UI MUST show the balance, the shifted roll range 1+X to 100+X with X = min(balance, 50), and the history. (ADR 023, 026)
-- **FR-16.5** A correction of a completed raid MUST add only the change in EP eligibility: +10 when a player becomes eligible, −10 when a player is no longer eligible, limited by FR-16.6. (ADR 018)
+- **FR-16.5** A correction of a completed raid MUST add only the change in EP eligibility: the raid's award when a player becomes eligible, minus that award when a player is no longer eligible, in the raid's pool, limited by FR-16.6. (ADR 018, 113)
 - **FR-16.6** A correction MUST NOT make an EP balance lower than 0. It MUST take only the points that the player still has. The points not taken MUST NOT be taken later. (Owner 2026-10-22, review)
 - **FR-16.7** The system MUST NOT recalculate existing ledger history under new rules. (owner brief)
 - **FR-16.8** Before staff save a correction that FR-16.6 limits, the system MUST warn them with the player and the number of points not taken. The audit entry MUST record that number. (Owner 2026-10-22, review)
-- **FR-16.9** The public page `/punkte` MUST list every active player with the current EP balance, without the roll range, sorted by balance descending, then by name. The public list MUST contain only player ID, player name, and balance; EP transactions MUST stay readable only with a session. (Owner 2026-11-03, ADR 110)
+- **FR-16.9** The public page `/punkte` MUST list every active player with the current EP balance in one pool, without the roll range, sorted by balance descending, then by name. The viewer MUST be able to choose the pool; the first pool (lowest ID) is the default, and with one pool no choice is shown. The public list MUST contain only player ID, player name, and balance, and the public pool list only pool ID and name; EP transactions MUST stay readable only with a session. (Owner 2026-11-03, ADR 110, 113)
+- **FR-16.10** An ADMIN MUST be able to create and rename EP pools, each with a unique, nonblank name. A pool MUST NOT be deleted. Both writes MUST be audited. Pools exist from migration 089 on with one pool "ICC" that holds all earlier transactions and locks. (Owner 2026-11-08, ADR 113)
+- **FR-16.11** A raid series MUST have an optional EP pool and an EP award from 0 to 100 (default 10); several series MAY share a pool. A raid MUST copy pool and award from its series when it is created from the series or when its series is set (FR-10.5), and changing a series MUST NOT change existing raids. Setting another series on a raid that already has EP transactions or item locks MUST be rejected with HTTP 409 `raid_ep_locked` when it would change the raid's pool or award. (Owner 2026-11-08, ADR 113)
+- **FR-16.12** The player profile MUST show balance, roll range, and history for one pool at a time, chosen like FR-16.9. The 50 cap of FR-14.5 and the 150 threshold of FR-17.2 MUST be the same in every pool. (Owner 2026-11-08, ADR 113)
 
 ### 17. Item locks
 
 - **FR-17.1** A MEMBER or higher MUST be able to create and cancel only own item locks. No role MAY act on the locks of another player. (ADR 017, 020)
-- **FR-17.2** Creating a lock MUST require a balance of at least 150 EP. A lock MUST cost 0 EP. (ADR 012)
+- **FR-17.2** Creating a lock MUST require a balance of at least 150 EP in the raid's EP pool, and the lock MUST belong to that pool. A raid without a pool MUST reject it with HTTP 409 `raid_has_no_ep_pool`. A lock MUST cost 0 EP. (ADR 012, 113)
 - **FR-17.3** A player MAY hold locks on different items. A raid MUST have at most one active lock for the same item. A competing lock MUST be rejected. (ADR 012, 017)
 - **FR-17.4** Item identity MUST use the trimmed item ID when both records have one, else the trimmed item name. (ADR 017)
 - **FR-17.5** Completed, cancelled, and archived raids MUST reject new locks. (ADR 017)
@@ -270,8 +273,8 @@ implemented yet when it differs from the code.
 - **FR-20.9** `parked` and `deleted` lines MUST be shown and MUST NOT be imported (`not_importable`). (ADR 070)
 - **FR-20.10** `disenchanted` and `bank` lines MUST be imported as unclaimed loot, once per line key. (ADR 089)
 - **FR-20.11** An import MUST NOT withdraw or move an existing award. The preview MUST warn when the export names another recipient. (ADR 045, 070)
-- **FR-20.12** When the addon range and the account balance disagree, the preview MUST warn and the system MUST debit the account value. (ADR 070)
-- **FR-20.13** The owner and staff MUST be able to get the WL2 wishlist export with the current EP balance, in priority order: header `WL2;<character>;<exportUnix>;<EP balance>`, lines `<itemID>;<ms|os>;<enhanced 0/1>;<rank>;<note>`. (ADR 070)
+- **FR-20.12** When the addon range and the account balance in the raid's pool disagree, the preview MUST warn and the system MUST debit the account value. (ADR 070)
+- **FR-20.13** The owner and staff MUST be able to get the WL2 wishlist export with the current EP balance in a chosen pool (default as FR-16.9), in priority order: header `WL2;<character>;<exportUnix>;<EP balance>`, lines `<itemID>;<ms|os>;<enhanced 0/1>;<rank>;<note>`. (ADR 070)
 - **FR-20.14** In the loot import preview, a `held` line with a winner MUST suggest the winner as recipient and be preselected with a warning that the trade is open; a `held` line without a winner MUST NOT be preselected. (ADR 045, 070)
 - **FR-20.15** A changed exchange format MUST get a new version prefix and matching changes in the addon repository. (ADR 045)
 

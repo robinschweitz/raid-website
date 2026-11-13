@@ -407,7 +407,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	if status != http.StatusCreated || !bytes.Contains(body, []byte(`"token_award":true`)) {
 		t.Fatalf("create token loot: status %d body %s", status, body)
 	}
-	balanceBefore, err := enhancepoints.NewRepo(bdb).Balance(ctx, plain)
+	balanceBefore, err := enhancepoints.NewRepo(bdb).Balance(ctx, plain, 1)
 	if err != nil || balanceBefore != 0 {
 		t.Fatalf("EP must wait for archive: balance %d error %v", balanceBefore, err)
 	}
@@ -477,7 +477,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 	if status != http.StatusNotFound {
 		t.Fatalf("removed roll endpoint: want 404 got %d %s", status, body)
 	}
-	balanceAfter, err := enhancepoints.NewRepo(bdb).Balance(ctx, plain)
+	balanceAfter, err := enhancepoints.NewRepo(bdb).Balance(ctx, plain, 1)
 	if err != nil || balanceAfter != 10 {
 		t.Fatalf("removed roll changed balance: %d %v", balanceAfter, err)
 	}
@@ -572,7 +572,7 @@ func TestPointsAndLocksSelfServiceOwnership(t *testing.T) {
 			t.Fatalf("guest own %s: want 403, got %d %s", action, status, body)
 		}
 	}
-	balance, err := points.Balance(ctx, ownerID)
+	balance, err := points.Balance(ctx, ownerID, 1)
 	if err != nil || balance != 150 {
 		t.Fatalf("denied calls changed balance: %d, err %v", balance, err)
 	}
@@ -595,7 +595,7 @@ func TestPointsAndLocksSelfServiceOwnership(t *testing.T) {
 			t.Fatalf("invalid created lock: %+v", out.Data)
 		}
 	}
-	balance, err = points.Balance(ctx, ownerID)
+	balance, err = points.Balance(ctx, ownerID, 1)
 	if err != nil || balance != 150 {
 		t.Fatalf("locks must not debit: %d, err %v", balance, err)
 	}

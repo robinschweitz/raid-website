@@ -158,7 +158,7 @@ func TestArchiveReusesPreplannedOccurrenceWithoutOverwriting(t *testing.T) {
 			if err != nil || len(afterList) != len(beforeList) {
 				t.Fatalf("duplicate occurrence created: %d %v", len(afterList), err)
 			}
-			balance, err := enhancepoints.NewRepo(database).Balance(ctx, actor)
+			balance, err := enhancepoints.NewRepo(database).Balance(ctx, actor, 1)
 			wantBalance := 0
 			if shouldSucceed {
 				wantBalance = 10

@@ -92,6 +92,8 @@ func stableErrorMessage(code string) string {
 		return "Die Zuordnung zum Beutekatalog ist ungültig."
 	case "occurrence_conflict":
 		return "Für diesen Serientermin existiert bereits ein Raid."
+	case "ep_pool_not_found":
+		return "Der EP-Topf wurde nicht gefunden."
 	case "series_not_found":
 		return "Die Raidserie wurde nicht gefunden."
 	case "invalid_series":

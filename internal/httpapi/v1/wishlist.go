@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"raid-website/internal/enhancepoints"
 	"raid-website/internal/validation"
 	"raid-website/internal/wishlist"
 )
@@ -149,8 +150,16 @@ func (h WishlistHandlers) addonExport(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	text, err := h.Wishlist.AddonExport(r.Context(), charID, time.Now().UTC())
+	poolID, ok := queryPoolID(w, r)
+	if !ok {
+		return
+	}
+	text, err := h.Wishlist.AddonExport(r.Context(), charID, poolID, time.Now().UTC())
 	if err != nil {
+		if errors.Is(err, enhancepoints.ErrPoolNotFound) {
+			WriteError(w, http.StatusNotFound, "ep_pool_not_found", "EP-Topf nicht gefunden")
+			return
+		}
 		if errors.Is(err, wishlist.ErrCharacterNotFound) {
 			WriteError(w, http.StatusNotFound, "not_found", "Charakter nicht gefunden")
 			return

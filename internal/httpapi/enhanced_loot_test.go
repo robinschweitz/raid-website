@@ -236,7 +236,7 @@ func TestEnteringEnhancedRequiresHistoricalRecipientInRoster(t *testing.T) {
 			f.request(http.MethodPost, "/attendance", map[string]any{"player_id": f.first, "character_id": f.firstChar, "role": "DD", "reason": "actual historical participant"}, http.StatusCreated)
 			f.request(http.MethodPatch, suffix, f.selection(map[string]any{"award_method": "ENHANCED", "awarded_to_character_id": f.firstChar, "reason": "actual roster winner"}, true), http.StatusOK)
 			cost := f.award(old.ID).EnhancedCost
-			balance, err := enhancepoints.NewRepo(f.db).Balance(context.Background(), f.first)
+			balance, err := enhancepoints.NewRepo(f.db).Balance(context.Background(), f.first, 1)
 			if err != nil || cost != 50 {
 				t.Fatalf("valid winner cost: %d %v", cost, err)
 			}

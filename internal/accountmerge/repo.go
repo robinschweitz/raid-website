@@ -244,8 +244,8 @@ func (r *Repo) ExportSections(ctx context.Context, playerID int64) (map[string][
 		{"absences", "raid_absences", "id, raid_id, player_id, reason, status, created_at", "player_id = ?"},
 		{"roster", "raid_attendance", "id, raid_id, player_id, character_id, character_name, class, spec, role, is_substitute, is_bench, late_join, early_leave, notes, created_at, updated_at", "player_id = ?"},
 		{"loot", "loot_awards", "id, raid_id, catalog_boss_id, boss, item_id, item_name, awarded_to_player_id, awarded_to_character_id, awarded_to_character_name, awarded_by_player_id, source, is_main_spec, award_method, enhanced_cost, item_lock_id, notes, awarded_at, withdrawn_at, withdrawn_by_player_id, withdrawn_reason, created_at, updated_at", "awarded_to_player_id = ?"},
-		{"ep_transactions", "enhance_point_transactions", "id, player_id, raid_id, loot_award_id, amount, type, reason, ref_type, ref_id, actor_id, created_at", "player_id = ?"},
-		{"item_locks", "item_locks", "id, player_id, raid_id, item_id, item_name, boss, status, locked_at, used_at, expired_at, cancelled_at, actor_id, notes, created_at, updated_at", "player_id = ?"},
+		{"ep_transactions", "enhance_point_transactions", "id, player_id, pool_id, raid_id, loot_award_id, amount, type, reason, ref_type, ref_id, actor_id, created_at", "player_id = ?"},
+		{"item_locks", "item_locks", "id, player_id, pool_id, raid_id, item_id, item_name, boss, status, locked_at, used_at, expired_at, cancelled_at, actor_id, notes, created_at, updated_at", "player_id = ?"},
 		{"wishlist", "character_wishlist", "id, player_id, character_id, item_id, item_name, priority, notes, spec, is_enhanced, created_at, updated_at", "player_id = ?"},
 		{"votes", "poll_votes", "id, poll_id, player_id, choice, voted_at", "player_id = ?"},
 	} {

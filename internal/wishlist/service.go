@@ -142,7 +142,9 @@ func (s *Service) Update(ctx context.Context, actorID, charID int64, itemID stri
 
 // AddonExport renders the character's wishlist for the RaidWishlist
 // addon, with the owner's EP balance for enhanced rolls.
-func (s *Service) AddonExport(ctx context.Context, charID int64, now time.Time) (string, error) {
+// AddonExport renders WL2 with the balance in poolID; 0 means the first pool
+// (FR-20.13, ADR 113). An unknown pool gives enhancepoints.ErrPoolNotFound.
+func (s *Service) AddonExport(ctx context.Context, charID, poolID int64, now time.Time) (string, error) {
 	if charID <= 0 {
 		return "", ErrInvalid
 	}
@@ -157,7 +159,14 @@ func (s *Service) AddonExport(ctx context.Context, charID int64, now time.Time) 
 	if err != nil {
 		return "", fmt.Errorf("list wishlist of character %d: %w", charID, err)
 	}
-	balance, err := s.points.Balance(ctx, ch.PlayerID)
+	if poolID == 0 {
+		if poolID, err = s.points.DefaultPoolID(ctx); err != nil {
+			return "", fmt.Errorf("load default EP pool: %w", err)
+		}
+	} else if _, err := s.points.GetPool(ctx, poolID); err != nil {
+		return "", err
+	}
+	balance, err := s.points.Balance(ctx, ch.PlayerID, poolID)
 	if err != nil {
 		return "", fmt.Errorf("load EP balance of player %d: %w", ch.PlayerID, err)
 	}

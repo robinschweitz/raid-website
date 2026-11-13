@@ -2,6 +2,8 @@ package enhancepoints
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -47,7 +49,16 @@ func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
 	return nil
 }
 
+// InsertTransaction appends a ledger row. A row without a pool, such as an
+// imported opening balance, counts in the first pool (ADR 113).
 func (r *Repo) InsertTransaction(ctx context.Context, t *Transaction) error {
+	if t.PoolID == 0 {
+		poolID, err := r.DefaultPoolID(ctx)
+		if err != nil {
+			return fmt.Errorf("default EP pool: %w", err)
+		}
+		t.PoolID = poolID
+	}
 	_, err := r.db.NewInsert().Model(t).Exec(ctx)
 	return err
 }
@@ -71,25 +82,28 @@ type PublicBalance struct {
 	Balance    int    `bun:"balance" json:"balance"`
 }
 
-// ActiveBalances lists every active player's balance, highest first, then by name.
-func (r *Repo) ActiveBalances(ctx context.Context) ([]PublicBalance, error) {
+// ActiveBalances lists every active player's balance in one pool, highest
+// first, then by name (FR-16.9).
+func (r *Repo) ActiveBalances(ctx context.Context, poolID int64) ([]PublicBalance, error) {
 	rows := []PublicBalance{}
 	err := r.db.NewSelect().
 		TableExpr("players AS p").
 		ColumnExpr("p.id AS player_id, p.name AS player_name").
-		ColumnExpr("COALESCE((SELECT SUM(t.amount) FROM enhance_point_transactions AS t WHERE t.player_id = p.id), 0) AS balance").
+		ColumnExpr("COALESCE((SELECT SUM(t.amount) FROM enhance_point_transactions AS t WHERE t.player_id = p.id AND t.pool_id = ?), 0) AS balance", poolID).
 		Where("p.active = TRUE").
 		OrderExpr("balance DESC, p.name ASC, p.id ASC").
 		Scan(ctx, &rows)
 	return rows, err
 }
 
-func (r *Repo) Balance(ctx context.Context, playerID int64) (int, error) {
+// Balance sums a player's transactions in one EP pool (FR-16.1).
+func (r *Repo) Balance(ctx context.Context, playerID, poolID int64) (int, error) {
 	var sum int
 	err := r.db.NewSelect().
 		ColumnExpr("COALESCE(SUM(amount), 0)").
 		TableExpr("enhance_point_transactions").
 		Where("player_id = ?", playerID).
+		Where("pool_id = ?", poolID).
 		Scan(ctx, &sum)
 	if err != nil {
 		return 0, err
@@ -183,4 +197,96 @@ func (r *Repo) ListLocksByPlayer(ctx context.Context, playerID int64) ([]ItemLoc
 		return nil, err
 	}
 	return locks, nil
+}
+
+// RaidEP reads the EP pool and award a raid copied from its series (ADR 113).
+// A nil pool means the raid gives and spends no points.
+func (r *Repo) RaidEP(ctx context.Context, raidID int64) (*int64, int, error) {
+	var poolID *int64
+	var award int
+	if err := r.db.NewSelect().TableExpr("raids").Column("ep_pool_id", "ep_award").
+		Where("id = ?", raidID).Scan(ctx, &poolID, &award); err != nil {
+		return nil, 0, fmt.Errorf("load raid %d EP pool: %w", raidID, err)
+	}
+	return poolID, award, nil
+}
+
+// RaidHasEP reports whether a raid already has EP transactions or item locks,
+// which fix its pool and award (FR-16.11).
+func (r *Repo) RaidHasEP(ctx context.Context, raidID int64) (bool, error) {
+	transactions, err := r.db.NewSelect().Model((*Transaction)(nil)).Where("raid_id = ?", raidID).Count(ctx)
+	if err != nil {
+		return false, err
+	}
+	locks, err := r.db.NewSelect().Model((*ItemLock)(nil)).Where("raid_id = ?", raidID).Count(ctx)
+	if err != nil {
+		return false, err
+	}
+	return transactions+locks > 0, nil
+}
+
+// ListPools returns every EP pool, oldest first; the first is the default view.
+func (r *Repo) ListPools(ctx context.Context) ([]Pool, error) {
+	pools := []Pool{}
+	err := r.db.NewSelect().Model(&pools).Order("id ASC").Scan(ctx)
+	return pools, err
+}
+
+// DefaultPoolID is the pool shown when a viewer chose none: the first one.
+func (r *Repo) DefaultPoolID(ctx context.Context) (int64, error) {
+	var id int64
+	err := r.db.NewSelect().Model((*Pool)(nil)).Column("id").Order("id ASC").Limit(1).Scan(ctx, &id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrPoolNotFound
+	}
+	return id, err
+}
+
+// GetPool loads one pool; an unknown ID gives ErrPoolNotFound.
+func (r *Repo) GetPool(ctx context.Context, id int64) (*Pool, error) {
+	pool := new(Pool)
+	err := r.db.NewSelect().Model(pool).Where("id = ?", id).Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrPoolNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return pool, nil
+}
+
+// PoolNameTaken reports whether another pool already uses the name.
+func (r *Repo) PoolNameTaken(ctx context.Context, name string, exceptID int64) (bool, error) {
+	count, err := r.db.NewSelect().Model((*Pool)(nil)).Where("name = ?", name).Where("id != ?", exceptID).Count(ctx)
+	return count > 0, err
+}
+
+func (r *Repo) InsertPool(ctx context.Context, pool *Pool) error {
+	_, err := r.db.NewInsert().Model(pool).Exec(ctx)
+	return err
+}
+
+func (r *Repo) UpdatePool(ctx context.Context, pool *Pool) error {
+	_, err := r.db.NewUpdate().Model(pool).WherePK().Exec(ctx)
+	return err
+}
+
+// AuditPool records a pool change in the same transaction (FR-16.10).
+func (r *Repo) AuditPool(ctx context.Context, actorID int64, action string, before, after *Pool) error {
+	var b any
+	if before != nil {
+		b = before
+	}
+	return audit.NewRepo(r.db).Record(ctx, actorID, "ep_pool", after.ID, action, b, after, "")
+}
+
+// ListByPlayerInPool lists a player's transactions in one pool, oldest first.
+func (r *Repo) ListByPlayerInPool(ctx context.Context, playerID, poolID int64) ([]Transaction, error) {
+	ts := []Transaction{}
+	err := r.db.NewSelect().Model(&ts).
+		Where("player_id = ?", playerID).
+		Where("pool_id = ?", poolID).
+		Order("created_at ASC").
+		Scan(ctx)
+	return ts, err
 }

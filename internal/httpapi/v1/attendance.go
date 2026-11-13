@@ -213,6 +213,8 @@ func writeCorrectionError(w http.ResponseWriter, err error) {
 		WriteError(w, http.StatusConflict, "catalog_context_required", "Raidinstanz und Raidgroesse muessen vor der Lootauswahl konfiguriert werden")
 	case errors.Is(err, lootcatalog.ErrInvalid):
 		WriteError(w, http.StatusBadRequest, "catalog_item_invalid", "Bitte einen Katalogboss und einen passenden Gegenstand fuer die Raidinstanz und Raidgroesse auswaehlen")
+	case errors.Is(err, enhancepoints.ErrRaidHasNoPool):
+		WriteError(w, http.StatusConflict, "raid_has_no_ep_pool", "Dieser Raid hat keinen EP-Topf, Enhanced-Loot ist nicht möglich")
 	case errors.Is(err, enhancepoints.ErrInsufficientBalance):
 		WriteError(w, http.StatusUnprocessableEntity, "insufficient_balance", "Spieler hat keine EP fuer Enhanced-Loot")
 	case errors.Is(err, loot.ErrInvalidMethod):

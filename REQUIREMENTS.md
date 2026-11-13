@@ -320,6 +320,7 @@ implemented yet when it differs from the code.
 - **FR-25.2** Every authenticated role MUST be able to read the catalog. (ADR 027)
 - **FR-25.3** The catalog MUST group drops into NORMAL, HEROIC, and HARDMODE, MUST keep the raw source paths of merged drops as source variants, and MUST mark unproven drops as conditional. Loot masks MUST NOT imply a mode. (ADR 027)
 - **FR-25.4** The system MUST NOT rewrite historical free-text or imported loot to match the catalog. (ADR 027)
+- **FR-25.5** The catalog MUST cover the boss loot of Ulduar, Trial of the Crusader, Icecrown Citadel, and The Ruby Sanctum, in 10 and 25 players and every difficulty these raids have. Trash and recipe tables are not part of it. (Owner 2026-11-08)
 
 ### 26. Audit log
 

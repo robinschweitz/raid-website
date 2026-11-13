@@ -43,6 +43,16 @@ var encounterNPCs = map[string]string{
 	"37970": "encounter:631:blood-prince-council", // Prince Valanar
 	"37972": "encounter:631:blood-prince-council", // Prince Keleseth
 	"37973": "encounter:631:blood-prince-council", // Prince Taldaram
+	"32867": "encounter:603:iron-council",         // Steelbreaker
+	"32927": "encounter:603:iron-council",         // Runemaster Molgeim
+	"32857": "encounter:603:iron-council",         // Stormcaller Brundir
+	"34796": "encounter:649:northrend-beasts",     // Gormok the Impaler
+	"35144": "encounter:649:northrend-beasts",     // Acidmaw
+	"34799": "encounter:649:northrend-beasts",     // Dreadscale
+	"34797": "encounter:649:northrend-beasts",     // Icehowl
+	"34497": "encounter:649:twin-valkyr",          // Fjola Lightbane
+	"34496": "encounter:649:twin-valkyr",          // Eydis Darkbane
+	"40142": "39863",                              // Halion, twilight realm
 }
 
 // Service builds invite exports and imports recorded loot.

@@ -133,6 +133,8 @@ type localizedBoss struct {
 type localizedLootEntry struct {
 	ItemID  int    `json:"item_id"`
 	TableID string `json:"table_id"`
+	// HardMode marks loot listed under AtlasLoot's hard-mode header (Ulduar).
+	HardMode bool `json:"hard_mode"`
 }
 
 type localizedItem struct {
@@ -228,11 +230,15 @@ func decodeLocalizedBundled(raw string) (Dataset, error) {
 					return Dataset{}, fmt.Errorf("unsupported localized difficulty %q", difficulty)
 				}
 				for _, entry := range entries {
+					source := sourceDifficulty
+					if entry.HardMode {
+						source += "/" + hardmodeToken + "true"
+					}
 					out.Drops = append(out.Drops, Drop{
 						BossID:     bossID,
 						ItemID:     fmt.Sprint(entry.ItemID),
 						RaidSize:   raidSize,
-						Difficulty: sourceDifficulty + "/" + lootModePathToken + unconditionalLootPath,
+						Difficulty: source + "/" + lootModePathToken + unconditionalLootPath,
 						LootMode:   1,
 					})
 				}
@@ -372,43 +378,72 @@ func localizedDifficulty(label string) (int, string, bool) {
 	}
 }
 
+// atlasInstanceIDs maps AtlasLoot instance keys to the game's map IDs, which
+// raids and the web client use as catalog instance IDs.
+var atlasInstanceIDs = map[string]string{
+	"Ulduar":               "603",
+	"IcecrownCitadel":      "631",
+	"TrialoftheCrusader_A": "649",
+	"Halion":               "724",
+}
+
+// atlasBossIDs maps AtlasLoot boss tables to creature IDs, which the loot
+// addon reports. Encounters with several creatures get an encounter key; the
+// addon import maps their creatures in encounterNPCs.
+var atlasBossIDs = map[string]map[string]string{
+	"603": {
+		"UlduarLeviathan":     "33113",
+		"UlduarRazorscale":    "33186",
+		"UlduarIgnis":         "33118",
+		"UlduarDeconstructor": "33293",
+		"UlduarIronCouncil":   "encounter:603:iron-council",
+		"UlduarKologarn":      "32930",
+		"UlduarAlgalon":       "32871",
+		"UlduarAuriaya":       "33515",
+		"UlduarHodir":         "32845",
+		"UlduarThorim":        "32865",
+		"UlduarFreya":         "32906",
+		"UlduarMimiron":       "33350",
+		"UlduarVezax":         "33271",
+		"UlduarYoggSaron":     "33288",
+	},
+	"631": {
+		"ICCLordMarrowgar":    "36612",
+		"ICCLadyDeathwhisper": "36855",
+		"ICCGunshipBattle":    "encounter:631:gunship",
+		"ICCSaurfang":         "37813",
+		"ICCFestergut":        "36626",
+		"ICCRotface":          "36627",
+		"ICCPutricide":        "36678",
+		"ICCCouncil":          "encounter:631:blood-prince-council",
+		"ICCLanathel":         "37955",
+		"ICCValithria":        "36789",
+		"ICCSindragosa":       "36853",
+		"ICCLichKing":         "36597",
+	},
+	"649": {
+		"TrialoftheCrusaderNorthrendBeasts":  "encounter:649:northrend-beasts",
+		"TrialoftheCrusaderLordJaraxxus":     "34780",
+		"TrialoftheCrusaderFactionChampions": "encounter:649:faction-champions",
+		"TrialoftheCrusaderTwinValkyrs":      "encounter:649:twin-valkyr",
+		"TrialoftheCrusaderAnubarak":         "34564",
+		"TrialoftheCrusaderTribute":          "encounter:649:tribute-chest",
+	},
+	"724": {
+		"Halion": "39863",
+	},
+}
+
 func localizedInstanceID(id string) string {
-	switch id {
-	case "IcecrownCitadel":
-		return "631"
-	default:
-		return id
+	if mapped, ok := atlasInstanceIDs[id]; ok {
+		return mapped
 	}
+	return id
 }
 
 func localizedBossID(instanceID string, id string) string {
-	if instanceID == "631" {
-		switch id {
-		case "ICCLordMarrowgar":
-			return "36612"
-		case "ICCLadyDeathwhisper":
-			return "36855"
-		case "ICCGunshipBattle":
-			return "encounter:631:gunship"
-		case "ICCSaurfang":
-			return "37813"
-		case "ICCFestergut":
-			return "36626"
-		case "ICCRotface":
-			return "36627"
-		case "ICCPutricide":
-			return "36678"
-		case "ICCCouncil":
-			return "encounter:631:blood-prince-council"
-		case "ICCLanathel":
-			return "37955"
-		case "ICCValithria":
-			return "36789"
-		case "ICCSindragosa":
-			return "36853"
-		case "ICCLichKing":
-			return "36597"
-		}
+	if mapped, ok := atlasBossIDs[instanceID][id]; ok {
+		return mapped
 	}
 	return "encounter:" + instanceID + ":" + slug(id)
 }

@@ -366,6 +366,7 @@ def strip_atlas_codes(text: str) -> str:
 def parse_loot_rows(table_body: str) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     row_re = re.compile(r"^\s*\{(.*)\}\s*;?\s*$")
+    hard_mode = False
 
     for line in table_body.splitlines():
         line = line.split("--", 1)[0].strip()
@@ -393,6 +394,9 @@ def parse_loot_rows(table_body: str) -> list[dict[str, Any]]:
 
         item_id = int(item_token)
         if item_id <= 0:
+            # A section header: Ulduar marks its hard-mode loot with the
+            # "#j53#" (Hard Mode) header; any other header ends that section.
+            hard_mode = "#j53#" in fields[3]
             continue
 
         name = strip_atlas_codes(first_quoted_string(fields[3]))
@@ -417,6 +421,7 @@ def parse_loot_rows(table_body: str) -> list[dict[str, Any]]:
                 "description": description or None,
                 "price": price or None,
                 "drop_rate": drop_rate or None,
+                "hard_mode": hard_mode,
             }
         )
 
@@ -428,6 +433,10 @@ def parse_instance_table_ids(
     instance_key: str,
 ) -> list[str]:
     block = extract_named_table(dropdown_source, instance_key)
+    if block is None and table_entry_pattern(instance_key).search(dropdown_source):
+        # Single-boss raids such as The Ruby Sanctum ("Halion") are listed as
+        # one "Table" entry instead of a submenu; the key is the boss table.
+        return [instance_key]
     if block is None:
         raise KeyError(
             f'Instance "{instance_key}" was not found in '
@@ -446,6 +455,27 @@ def parse_instance_table_ids(
     return ids
 
 
+def dropdown_base_id(table_ref: str) -> str:
+    """
+    Reduce a dropdown table reference to the base that difficulty suffixes
+    attach to. Trial of the Crusader lists faction tables
+    ("TrialoftheCrusaderAnubarak_A", tables "...25Man_A", "...HEROIC_A") and
+    its heroic-only tribute chest as "...TributeHEROIC_A".
+    """
+    base = re.sub(r"_[AH]$", "", table_ref)
+    if base.endswith("HEROIC"):
+        base = base[: -len("HEROIC")]
+    return base
+
+
+def table_entry_pattern(instance_key: str) -> re.Pattern[str]:
+    return re.compile(
+        r'\{\s*BabbleZone\["(?:\\.|[^"\\])*"\]\s*,\s*"'
+        + re.escape(instance_key)
+        + r'"\s*,\s*"Table"\s*\}'
+    )
+
+
 def parse_instance_zone_keys(dropdown_source: str) -> dict[str, str]:
     """
     Parse submenu declarations such as:
@@ -454,7 +484,7 @@ def parse_instance_zone_keys(dropdown_source: str) -> dict[str, str]:
     result: dict[str, str] = {}
     pattern = re.compile(
         r'\{\s*BabbleZone\["((?:\\.|[^"\\])*)"\]\s*,\s*'
-        r'"((?:\\.|[^"\\])*)"\s*,\s*"Submenu"\s*\}'
+        r'"((?:\\.|[^"\\])*)"\s*,\s*"(?:Submenu|Table)"\s*\}'
     )
     for zone_raw, key_raw in pattern.findall(dropdown_source):
         result[decode_lua_string(key_raw)] = decode_lua_string(zone_raw)
@@ -1289,6 +1319,7 @@ def build_database(
         raise ValueError('config.json must contain a non-empty "instances" list')
 
     include_trash = bool(config.get("include_trash", True))
+    include_patterns = bool(config.get("include_patterns", True))
     faction_setting = str(config.get("faction", "both")).upper()
     if faction_setting not in {"A", "H", "BOTH"}:
         raise ValueError('"faction" must be "A", "H", or "both"')
@@ -1347,6 +1378,13 @@ def build_database(
         }
 
         for base_id in base_ids:
+            if not include_patterns and "patterns" in base_id.lower():
+                # Recipe and plan tables are not boss loot.
+                skipped_refs.append(
+                    {"instance": instance_key, "table_ref": base_id}
+                )
+                continue
+            base_id = dropdown_base_id(base_id)
             possible: list[str] = []
             for suffix in DIFFICULTY_SUFFIXES:
                 candidate = base_id + suffix
@@ -1429,6 +1467,17 @@ def build_database(
                         ):
                             atlas_name_by_id[item_id] = row["atlas_name"]
 
+                        # Some tables list an item twice (the Trial of the
+                        # Crusader tribute chests per attempt count); the
+                        # catalog keeps one drop per boss, item, and mode.
+                        if any(
+                            entry["item_id"] == item_id
+                            and bool(entry.get("hard_mode"))
+                            == bool(row.get("hard_mode"))
+                            for entry in boss_obj["loot"][difficulty]
+                        ):
+                            continue
+
                         boss_obj["loot"][difficulty].append(
                             {
                                 "item_id": item_id,
@@ -1438,6 +1487,11 @@ def build_database(
                                 "table_id": actual_table_id,
                                 "faction": faction,
                                 "position": row.get("position"),
+                                **(
+                                    {"hard_mode": True}
+                                    if row.get("hard_mode")
+                                    else {}
+                                ),
                             }
                         )
 
@@ -1654,6 +1708,7 @@ def main() -> int:
     output_path.write_text(
         json.dumps(db, ensure_ascii=False, indent=2),
         encoding="utf-8",
+        newline="\n",  # keep LF on Windows, as committed
     )
 
     print(f"\nWrote: {output_path}")

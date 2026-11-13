@@ -55,7 +55,7 @@ func TestColdStartAndIdempotentRestart(t *testing.T) {
 	s, b := setup(t)
 	ctx := context.Background()
 	before, err := s.List(ctx)
-	if err != nil || len(before.Instances) != 1 || len(before.Drops) == 0 {
+	if err != nil || len(before.Instances) != 4 || len(before.Drops) == 0 {
 		t.Fatalf("automatic source: %+v %v", before.Sources, err)
 	}
 	report, err := s.EnsureBundled(ctx)
@@ -238,6 +238,9 @@ func TestLocalizedICCHasNoHardmodeSelections(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, boss := range catalog.Bosses {
+		if boss.InstanceID != "631" {
+			continue
+		}
 		normal, err := s.Items(ctx, Filter{BossID: boss.ID, RaidSize: 10, Mode: ModeNormal})
 		if err != nil {
 			t.Fatal(err)
@@ -248,6 +251,50 @@ func TestLocalizedICCHasNoHardmodeSelections(t *testing.T) {
 		}
 		if len(normal) == 0 || len(hardmode) != 0 {
 			t.Fatalf("boss %s: normal=%d hardmode=%d", boss.ID, len(normal), len(hardmode))
+		}
+	}
+}
+
+// FR-25.5: the bundled catalog covers Ulduar, Trial of the Crusader, Icecrown
+// Citadel, and The Ruby Sanctum with the difficulties each raid has.
+func TestBundledRaidsAndTheirModes(t *testing.T) {
+	s := NewService(NewRepo(nil))
+	ctx := context.Background()
+	catalog, err := s.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instances := map[string]bool{}
+	for _, instance := range catalog.Instances {
+		instances[instance.ID] = true
+	}
+	for _, id := range []string{"603", "631", "649", "724"} {
+		if !instances[id] {
+			t.Fatalf("instance %s missing from %v", id, instances)
+		}
+	}
+	cases := []struct {
+		bossID string
+		size   int
+		mode   Mode
+		want   bool
+	}{
+		{"32845", 10, ModeNormal, true},    // Hodir
+		{"32845", 25, ModeHardmode, true},  // Hodir hard mode
+		{"33118", 25, ModeHardmode, false}, // Ignis has no hard mode
+		{"33118", 10, ModeHeroic, false},   // Ulduar has no heroic mode
+		{"34564", 25, ModeHeroic, true},    // Anub'arak
+		{"encounter:649:tribute-chest", 10, ModeNormal, false},
+		{"encounter:649:tribute-chest", 25, ModeHeroic, true},
+		{"39863", 10, ModeHeroic, true}, // Halion
+	}
+	for _, tc := range cases {
+		items, err := s.Items(ctx, Filter{BossID: tc.bossID, RaidSize: tc.size, Mode: tc.mode})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (len(items) > 0) != tc.want {
+			t.Fatalf("boss %s %d %s: %d items, want any=%v", tc.bossID, tc.size, tc.mode, len(items), tc.want)
 		}
 	}
 }

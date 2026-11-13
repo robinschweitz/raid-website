@@ -142,7 +142,7 @@ func TestConcurrentEnhancedAwardsAcrossDatabaseHandles(t *testing.T) {
 			if sameRequest {
 				wantBalance, wantAwards = 20, 1
 			}
-			balance, err := r.points.Balance(ctx, p.ID)
+			balance, err := r.points.Balance(ctx, p.ID, 1)
 			if err != nil || balance != wantBalance {
 				t.Fatalf("balance %d error %v", balance, err)
 			}
@@ -174,7 +174,7 @@ func TestConcurrentEnhancedAwardsAcrossDatabaseHandles(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				balance, err := r.points.Balance(ctx, p.ID)
+				balance, err := r.points.Balance(ctx, p.ID, 1)
 				if err != nil || balance != 70 {
 					t.Fatalf("concurrent refunds: %d %v", balance, err)
 				}

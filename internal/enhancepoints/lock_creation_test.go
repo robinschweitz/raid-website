@@ -121,7 +121,7 @@ func TestConcurrentCompetingLockCreation(t *testing.T) {
 				t.Fatalf("want one active lock, got %v, err %v", locks, err)
 			}
 			for _, playerID := range players {
-				balance, err := repo.Balance(ctx, playerID)
+				balance, err := repo.Balance(ctx, playerID, 1)
 				if err != nil || balance != 150 {
 					t.Fatalf("balance changed: %d, err %v", balance, err)
 				}

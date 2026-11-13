@@ -137,7 +137,7 @@ func TestArchiveRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
 		t.Fatalf("invalid archive result: %+v %+v", archived, next)
 	}
 
-	plainBalance, err := pointsRepo.Balance(ctx, plainID)
+	plainBalance, err := pointsRepo.Balance(ctx, plainID, 1)
 	if err != nil {
 		t.Fatalf("balance plain: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestArchiveRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
 		t.Fatalf("plain balance: want 10 got %d", plainBalance)
 	}
 
-	rewardedBalance, err := pointsRepo.Balance(ctx, rewardedID)
+	rewardedBalance, err := pointsRepo.Balance(ctx, rewardedID, 1)
 	if err != nil {
 		t.Fatalf("balance rewarded: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestArchiveRaidAwardsPointsWithoutMainSpecLoot(t *testing.T) {
 	if retry == nil || retry.ID != next.ID {
 		t.Fatalf("retry successor: %+v", retry)
 	}
-	plainBalance, err = pointsRepo.Balance(ctx, plainID)
+	plainBalance, err = pointsRepo.Balance(ctx, plainID, 1)
 	if err != nil {
 		t.Fatalf("balance plain after second: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestArchiveRaidCancelledAwardsNoPoints(t *testing.T) {
 		t.Fatalf("want ErrRaidCancelled got %v", err)
 	}
 
-	balance, err := pointsRepo.Balance(ctx, plainID)
+	balance, err := pointsRepo.Balance(ctx, plainID, 1)
 	if err != nil {
 		t.Fatalf("balance: %v", err)
 	}

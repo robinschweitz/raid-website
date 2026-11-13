@@ -169,7 +169,7 @@ func TestArchiveRollsBackLedgersLocksAndSuccessor(t *testing.T) {
 			if stored.Status != validation.RaidStatusOpen || stored.CompletedAt != nil || stored.ArchivedAt != nil || !stored.UpdatedAt.Equal(before.UpdatedAt) {
 				t.Fatalf("raid did not roll back: %+v", stored)
 			}
-			balance, err := enhancepoints.NewRepo(db).Balance(ctx, actor)
+			balance, err := enhancepoints.NewRepo(db).Balance(ctx, actor, 1)
 			if err != nil || balance != 0 {
 				t.Fatalf("ledger did not roll back: %d %v", balance, err)
 			}
@@ -191,7 +191,7 @@ func TestArchiveRollsBackLedgersLocksAndSuccessor(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			balance, err = enhancepoints.NewRepo(db).Balance(ctx, actor)
+			balance, err = enhancepoints.NewRepo(db).Balance(ctx, actor, 1)
 			if err != nil || balance != 10 {
 				t.Fatalf("retry ledger: %d %v", balance, err)
 			}
@@ -241,7 +241,7 @@ func TestHistoricAndOldArchivedActiveRaids(t *testing.T) {
 					t.Fatalf("historical result: %+v %+v %v", stored, next, err)
 				}
 			}
-			balance, err := enhancepoints.NewRepo(db).Balance(ctx, actor)
+			balance, err := enhancepoints.NewRepo(db).Balance(ctx, actor, 1)
 			if err != nil || balance != 73 {
 				t.Fatalf("historical award recreated: %d %v", balance, err)
 			}
@@ -256,7 +256,7 @@ func TestHistoricAndOldArchivedActiveRaids(t *testing.T) {
 			if _, _, err := svc.ArchiveRaid(ctx, rd.ID, actor); err != nil {
 				t.Fatal(err)
 			}
-			balance, err := enhancepoints.NewRepo(db).Balance(ctx, actor)
+			balance, err := enhancepoints.NewRepo(db).Balance(ctx, actor, 1)
 			if err != nil || balance != 83 {
 				t.Fatalf("explicit legacy finalization: %d %v", balance, err)
 			}
@@ -371,7 +371,7 @@ func TestArchiveScheduleErrorsAndOccurrenceConflictAreAtomic(t *testing.T) {
 			if err != nil || stored.Status != validation.RaidStatusOpen || stored.CompletedAt != nil || stored.ArchivedAt != nil {
 				t.Fatalf("scheduling failure mutated raid: %+v %v", stored, err)
 			}
-			balance, err := enhancepoints.NewRepo(db).Balance(ctx, actor)
+			balance, err := enhancepoints.NewRepo(db).Balance(ctx, actor, 1)
 			if err != nil || balance != 0 {
 				t.Fatalf("scheduling failure wrote ledger: %d %v", balance, err)
 			}
@@ -493,7 +493,7 @@ func TestArchiveWithoutPointsForDeclinedPlayers(t *testing.T) {
 		}
 		_, _, err = NewService(NewRepo(db)).ArchiveRaidWithout(ctx, rd.ID, actor, translate(without))
 		for i, p := range []int64{actor, other} {
-			balances[i], _ = enhancepoints.NewRepo(db).Balance(ctx, p)
+			balances[i], _ = enhancepoints.NewRepo(db).Balance(ctx, p, 1)
 		}
 		return balances, err
 	}

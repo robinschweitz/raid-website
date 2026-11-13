@@ -259,6 +259,8 @@ func (a *API) configureRaidSchedule(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "raid actor not found")
 		case errors.Is(err, raid.ErrScheduleNotEditable):
 			WriteError(w, http.StatusConflict, "schedule_not_editable", "finalized, cancelled or archived raid schedule cannot be changed")
+		case errors.Is(err, raid.ErrEPLocked):
+			WriteError(w, http.StatusConflict, "raid_ep_locked", "Der Raid hat schon EP oder Locks; EP-Topf und Vergabe der neuen Serie passen nicht dazu.")
 		case errors.Is(err, raid.ErrNameRequired):
 			WriteError(w, http.StatusBadRequest, "name_required", "name is required")
 		case errors.Is(err, raid.ErrNameNotEditable):

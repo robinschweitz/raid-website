@@ -158,7 +158,7 @@ func (f *correctionFixture) legacyCompleted(rewardedPlayerIDs ...int64) {
 
 func (f *correctionFixture) points(playerID int64, want int) {
 	f.t.Helper()
-	got, err := enhancepoints.NewRepo(f.db).Balance(context.Background(), playerID)
+	got, err := enhancepoints.NewRepo(f.db).Balance(context.Background(), playerID, 1)
 	if err != nil || got != want {
 		f.t.Fatalf("points player %d: got %d want %d error %v", playerID, got, want, err)
 	}

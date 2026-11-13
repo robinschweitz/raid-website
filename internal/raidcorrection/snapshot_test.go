@@ -100,7 +100,7 @@ func TestRosterSnapshotCorrectionDefaultsValidationAndArchive(t *testing.T) {
 	if _, err := s.CorrectAttendance(ctx, rd.ID, row.ID, p.ID, "historical metadata only", nil, SnapshotPatch{Spec: &playedSpec}); err != nil {
 		t.Fatal(err)
 	}
-	if balance, err := r.points.Balance(ctx, p.ID); err != nil || balance != 0 {
+	if balance, err := r.points.Balance(ctx, p.ID, 1); err != nil || balance != 0 {
 		t.Fatalf("metadata awarded points: %d %v", balance, err)
 	}
 	rd.ArchivedAt = &now

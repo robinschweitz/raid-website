@@ -55,7 +55,7 @@ func TestArchiveAPIRosterIncompleteAndHistoricalCompatibility(t *testing.T) {
 	if err != nil || storedRow.Spec != "" || storedRow.Class != "Priester" || storedRow.CharacterName != "PlayedCharacter" {
 		t.Fatalf("snapshot inferred from live character: %+v %v", storedRow, err)
 	}
-	balance, err := enhancepoints.NewRepo(database).Balance(ctx, actor)
+	balance, err := enhancepoints.NewRepo(database).Balance(ctx, actor, 1)
 	if err != nil || balance != 0 {
 		t.Fatalf("failed archive awarded EP: %d %v", balance, err)
 	}
@@ -84,7 +84,7 @@ func TestArchiveAPIRosterIncompleteAndHistoricalCompatibility(t *testing.T) {
 	if err != nil || storedUnknown.CharacterName != "" || storedUnknown.Class != "" || storedUnknown.Spec != "" {
 		t.Fatalf("historical unknown snapshots guessed: %+v %v", storedUnknown, err)
 	}
-	balance, err = enhancepoints.NewRepo(database).Balance(ctx, actor)
+	balance, err = enhancepoints.NewRepo(database).Balance(ctx, actor, 1)
 	if err != nil || balance != 10 {
 		t.Fatalf("historical EP regenerated: %d %v", balance, err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"raid-website/internal/audit"
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
+	"raid-website/internal/raidseries"
 )
 
 type Repo struct {
@@ -117,7 +119,8 @@ func (r *Repo) RequireActor(ctx context.Context, actorID int64) error {
 }
 
 func (r *Repo) Create(ctx context.Context, rd *Raid) error {
-	_, err := r.db.NewInsert().Model(rd).Exec(ctx)
+	// EP pool and award keep their column defaults; SetEP writes them (ADR 113).
+	_, err := r.db.NewInsert().Model(rd).ExcludeColumn("ep_pool_id", "ep_award").Exec(ctx)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: raids.series_id, raids.scheduled_start") || strings.Contains(err.Error(), "UNIQUE constraint failed: raids.previous_raid_id")) {
 		return errors.Join(ErrOccurrenceConflict, err)
 	}
@@ -158,6 +161,26 @@ func (r *Repo) CopySeriesLeaders(ctx context.Context, rd *Raid, seriesLeaderIDs 
 	return r.ReplaceExtraLeaders(ctx, rd.ID, extra)
 }
 
+// CopySeriesEP gives a raid the EP pool and award of its series (FR-16.11).
+func (r *Repo) CopySeriesEP(ctx context.Context, rd *Raid, series *raidseries.Series) error {
+	return r.SetEP(ctx, rd, series.EPPoolID, series.EPAward)
+}
+
+// SetEP stores a raid's EP pool and award.
+func (r *Repo) SetEP(ctx context.Context, rd *Raid, poolID *int64, award int) error {
+	if _, err := r.db.NewUpdate().Table("raids").Set("ep_pool_id = ?", poolID).Set("ep_award = ?", award).Where("id = ?", rd.ID).Exec(ctx); err != nil {
+		return fmt.Errorf("set raid %d EP pool: %w", rd.ID, err)
+	}
+	rd.EPPoolID, rd.EPAward = poolID, award
+	return nil
+}
+
+// LoadEP reads the stored EP pool and award back into rd after an insert,
+// because the columns are scan-only and fall back to their defaults.
+func (r *Repo) LoadEP(ctx context.Context, rd *Raid) error {
+	return r.db.NewSelect().Table("raids").Column("ep_pool_id", "ep_award").Where("id = ?", rd.ID).Scan(ctx, &rd.EPPoolID, &rd.EPAward)
+}
+
 // ActivePlayerExists reports whether a raid leader candidate is an active player.
 func (r *Repo) ActivePlayerExists(ctx context.Context, playerID int64) (bool, error) {
 	return r.db.NewSelect().Table("players").Where("id = ? AND active = TRUE", playerID).Exists(ctx)
@@ -193,7 +216,7 @@ func (r *Repo) List(ctx context.Context, _ bool) ([]Raid, error) {
 }
 
 func (r *Repo) Update(ctx context.Context, rd *Raid) error {
-	_, err := r.db.NewUpdate().Model(rd).WherePK().Exec(ctx)
+	_, err := r.db.NewUpdate().Model(rd).ExcludeColumn("ep_pool_id", "ep_award").WherePK().Exec(ctx)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: raids.series_id, raids.scheduled_start") || strings.Contains(err.Error(), "UNIQUE constraint failed: raids.previous_raid_id")) {
 		return errors.Join(ErrOccurrenceConflict, err)
 	}

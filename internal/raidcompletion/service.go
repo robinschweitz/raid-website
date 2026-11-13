@@ -18,8 +18,6 @@ import (
 	"raid-website/internal/validation"
 )
 
-const noMainSpecAward = 10
-
 var (
 	ErrRaidCancelled     = errors.New("raid is cancelled")
 	ErrRaidNotArchivable = errors.New("raid is not archivable")
@@ -152,6 +150,9 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 			if err := raids.CopySeriesLeaders(ctx, next, series.LeaderIDs); err != nil {
 				return fmt.Errorf("copy successor leaders: %w", err)
 			}
+			if err := raids.CopySeriesEP(ctx, next, series); err != nil {
+				return err
+			}
 			if err := raids.Audit(ctx, actorID, next.ID, "create_successor", nil, next); err != nil {
 				return err
 			}
@@ -218,8 +219,12 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 			}
 		}
 
+		// A raid without a pool, or with award 0, gives no points (FR-16.2, ADR 113).
 		awardedPlayers := make(map[int64]struct{}, len(rows))
 		for _, a := range rows {
+			if rd.EPPoolID == nil || rd.EPAward == 0 {
+				break
+			}
 			if _, done := awardedPlayers[a.PlayerID]; done || skip[a.PlayerID] {
 				continue
 			}
@@ -244,8 +249,9 @@ func (s *Service) ArchiveRaidWithout(ctx context.Context, raidID, actorID int64,
 			raidIDCopy := raidID
 			t := &enhancepoints.Transaction{
 				PlayerID:  a.PlayerID,
+				PoolID:    *rd.EPPoolID,
 				RaidID:    &raidIDCopy,
-				Amount:    noMainSpecAward,
+				Amount:    rd.EPAward,
 				Type:      "award_no_mainspec_loot",
 				Reason:    fmt.Sprintf("raid %d completed without main-spec loot", raidID),
 				RefType:   "raid",
@@ -315,9 +321,12 @@ func (s *Service) PreviewArchive(ctx context.Context, raidID int64) ([]PreviewRo
 			continue
 		}
 		seen[a.PlayerID] = true
-		row := PreviewRow{PlayerID: a.PlayerID, Reason: PreviewAward, Award: noMainSpecAward}
-		if row.Balance, err = s.repo.points.Balance(ctx, a.PlayerID); err != nil {
-			return nil, err
+		row := PreviewRow{PlayerID: a.PlayerID, Reason: PreviewAward}
+		if rd.EPPoolID != nil {
+			row.Award = rd.EPAward
+			if row.Balance, err = s.repo.points.Balance(ctx, a.PlayerID, *rd.EPPoolID); err != nil {
+				return nil, err
+			}
 		}
 		hasMain, err := s.repo.loot.PlayerHasMainSpecAward(ctx, raidID, a.PlayerID)
 		if err != nil {

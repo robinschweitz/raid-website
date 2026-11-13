@@ -117,7 +117,7 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   missing kill and the loot in one transaction (FR-29.3, FR-29.7, FR-29.8; #95, #96).
 - **Public interface.** Without a session, only these reads answer (FR-1.2): `GET /api/v1/raids`,
   `/players`, `/polls`, `/raids/{id}/attendance`, `/addons`, `/addons/{name}/download`,
-  `/raids/{id}/leaders`, `/points`, `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/statistics`, and `/privacy-contact`. Login, MFA, and registration writes are public too.
+  `/raids/{id}/leaders`, `/points`, `/ep-pools`, `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/statistics`, and `/privacy-contact`. Login, MFA, and registration writes are public too.
 - **API notes.** Catalog reads: `GET /api/v1/loot-catalog` and its `/instances`, `/bosses`,
   `/items`; there are no catalog write endpoints. Raid series: `weekdays` are 0 (Sunday) to 6
   (Saturday), `start_time` is `HH:MM`, `timezone` an IANA name. `PATCH /api/v1/raids/{id}` takes
@@ -157,7 +157,7 @@ and similar notes say which specified parts the code does not have yet. All rows
 | `raidcorrection` | Roster and loot writes, corrections, withdrawal, quick-add, manual unclaimed loot with its kill | Raid-state rules, archived reason, EP eligibility delta, retry receipts | quick-add receipts (coordinator otherwise) | FR-13, FR-14.8–14.10, FR-16.5–16.6, FR-29.5 | SUPPORTED |
 | `loot` | Loot awards, methods, enhanced cost, lock auto-award, token derivation | Roster recipient, request-ID idempotency, cost formula | loot awards | FR-14, FR-18 | SUPPORTED |
 | `unclaimedloot` | Items that went to nobody | No player effect | unclaimed loot | FR-15 | SUPPORTED |
-| `enhancepoints` | EP ledger, balances, item locks | 150-EP lock threshold, competing locks, ownership | EP transactions, item locks | FR-16, FR-17 | SUPPORTED |
+| `enhancepoints` | EP pools, EP ledger, balances per pool, item locks | 150-EP lock threshold per pool, competing locks, ownership, unique pool names | EP pools, EP transactions, item locks | FR-16, FR-17 | SUPPORTED |
 | `raidcompletion` | Archive: EP award, lock expiry, successor, plan-ahead top-up, preview | Idempotent finalisation, exclusions, successor conflicts | (coordinator) | FR-10.6–10.15 | SUPPORTED |
 | `addonsync` | RS1/RS2 parsing, roster and loot import previews and applies, invite export | Raid-scoped request IDs, importable states | (coordinator) | FR-20 | SUPPORTED |
 | `addons` | Embedded addon bundles and download zips | Bundle completeness | embedded files | FR-21 | SUPPORTED |
@@ -182,7 +182,7 @@ and similar notes say which specified parts the code does not have yet. All rows
    sends it as `X-CSRF-Token` (SC-019). The handler passes the actor from the context to a domain service
    or coordinator, which opens one transaction for the record, its ledger consequences, and its
    audit entry.
-3. **Archive a raid.** Staff → `raidcompletion` → in one transaction: lifecycle, +10 EP rows,
+3. **Archive a raid.** Staff → `raidcompletion` → in one transaction: lifecycle, EP rows (the raid's award, in its pool),
    lock expiry, successor link or creation, plan-ahead top-up, audit (FR-10.8).
 4. **Register a player.** Visitor → Rising-Gods search (cache, else Rising-Gods directly or via the
    Worker) → registration request → Admin creates a code → the code is delivered in game by a
@@ -264,7 +264,7 @@ sequenceDiagram
   RC->>DB: BEGIN
   RC->>DB: read raid state, roster, loot, locks
   RC->>DB: set COMPLETED + archived_at
-  RC->>DB: insert +10 EP rows (eligible players)
+  RC->>DB: insert EP rows (award and pool of the raid)
   RC->>DB: expire unused locks
   RC->>DB: link or create successor, top up plan window
   RC->>DB: insert audit entries
@@ -321,6 +321,12 @@ None open. The owner resolved AQ-1 to AQ-8 on 2026-10-22; the answers are in the
 - **AQ-8** `go mod tidy`, delete `internal/logger` (DR-11, DR-12).
 
 Addon loot imports (#96) reserve the SQLite writer before a fresh preview/kill read. The addon coordinator binds every repository and both loot services to the same transaction, so selected awards, unclaimed entries, kills, lock changes, EP and audit writes commit together or roll back together.
+
+### EP pools and award per series (ADR 113)
+- The `enhancepoints` package owns `ep_pools` (ID, unique name). `enhance_point_transactions.pool_id` and `item_locks.pool_id` name the pool of every row; balances are summed per pool (`Repo.Balance(player, pool)`). Migration 089 creates pool 1 "ICC" and gives it every earlier row.
+- `raid_series.ep_pool_id` / `ep_award` (owned by `raidseries`) and `raids.ep_pool_id` / `ep_award` (owned by `raid`) default to pool 1 and 10; NULL means no pool. Ordinary `Create`/`Update` calls exclude these columns, so only `raidseries.Repo.SetEP` and `raid.Repo.SetEP`/`CopySeriesEP` write them. A raid copies them wherever it is created from a series (create, plan ahead, successor) and when `PATCH /api/v1/raids/{id}` sets a series; `enhancepoints.Repo.RaidHasEP` makes that PATCH answer `409 raid_ep_locked` when it would change the pool of a raid with EP rows or locks.
+- `raidcompletion` awards `raids.ep_award` in the raid's pool; `raidcorrection` uses the same award for eligibility changes; `loot.ReconcileEnhanced` and lock creation read `enhancepoints.Repo.RaidEP` and answer `409 raid_has_no_ep_pool` without a pool.
+- Endpoints: `GET /api/v1/ep-pools` (public, `{id, name}` only), `POST /api/v1/ep-pools` and `PATCH /api/v1/ep-pools/{id}` (ADMIN, audited as `ep_pool`). `GET /api/v1/points`, `GET /api/v1/players/{id}/points`, and the WL2 export take an optional `pool_id` query; without it the first pool is used. The series API carries `ep_pool_id` (0 = no pool) and `ep_award`.
 
 ### Own specs, weekly reload, multi-spec signups, raid leaders (ADR 109)
 - `raid_signups.specs` holds the signed-up specs as a JSON array; empty means a legacy single-spec signup (`spec`). `POST /api/v1/raids/{id}/signups/{signupID}/accept` takes an optional `spec`.

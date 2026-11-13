@@ -168,6 +168,9 @@ func (a *API) Register(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/players/{id}/points", RequireAuth(a.getPoints))
 	mux.HandleFunc("GET /api/v1/points", a.listPublicPoints)
+	mux.HandleFunc("GET /api/v1/ep-pools", a.listPools)
+	mux.HandleFunc("POST /api/v1/ep-pools", RequireRole(validation.RoleAdmin, a.createPool))
+	mux.HandleFunc("PATCH /api/v1/ep-pools/{id}", RequireRole(validation.RoleAdmin, a.updatePool))
 	mux.HandleFunc("GET /api/v1/players/{id}/loot", RequireAuth(a.listPlayerLoot))
 
 	mux.HandleFunc("GET /api/v1/players/{id}/locks", RequireAuth(a.listLocks))

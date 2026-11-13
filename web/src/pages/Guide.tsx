@@ -241,7 +241,8 @@ export function GuidePage() {
       <p>Dein Profil öffnest du mit einem Klick auf deinen Namen oben rechts. Dort gibt es die Reiter <strong>EP</strong>, <strong>Loot</strong>, <strong>Charaktere</strong>, <strong>Item-Locks</strong> und <strong>Konto</strong>.</p>
       <h3>EP (Enhance Points)</h3>
       <ul>
-        <li>Wird ein Raid archiviert, bekommt jeder Teilnehmer <strong>ohne Main-Spec-Item +10 EP</strong>.</li>
+        <li>Wird ein Raid archiviert, bekommt jeder Teilnehmer <strong>ohne Main-Spec-Item EP</strong>, meist +10. Wie viele, legt die Raidserie fest; manche Raids geben keine EP.</li>
+        <li>Es kann mehrere <strong>EP-Töpfe</strong> geben, zum Beispiel einen für ICC und einen für Ulduar. EP aus einem Topf zählen nur in Raids dieses Topfs. Gibt es mehrere, wählst du beim EP-Stand und im Profil den Topf aus.</li>
         <li>Bei einem <strong>Enhanced</strong>-Wurf würfelst du <strong>1+X bis 100+X</strong>. X ist dein EP-Stand, höchstens 50.</li>
         <li><strong>Nur der Gewinner zahlt.</strong> Verlorene Würfe kosten nichts.</li>
       </ul>
@@ -348,7 +349,7 @@ export function GuidePage() {
 
       <div className="table-scroll">
         <table className="table">
-          <thead><tr><th>Vergabeart</th><th>Bedeutung</th><th>+10 EP beim Archivieren?</th></tr></thead>
+          <thead><tr><th>Vergabeart</th><th>Bedeutung</th><th>EP beim Archivieren?</th></tr></thead>
           <tbody>
             <tr><td><strong>Main-Spec</strong></td><td>Für den Haupt-Spec</td><td>Nein</td></tr>
             <tr><td><strong>Enhanced</strong></td><td>Mit EP-Wurf gewonnen, EP werden automatisch abgezogen</td><td>Nein</td></tr>
@@ -365,7 +366,7 @@ export function GuidePage() {
       <h3>Beute ohne Empfänger</h3>
       <p>Items, die entzaubert wurden, in die Gildenbank gehen oder die niemand wollte, gehören keinem Spieler. Die Raidleitung trägt sie im Reiter <strong>Loot</strong> unter <strong>Loot erfassen</strong> ein: Boss, Schwierigkeit und Item wählen, bei <strong>Vergabemethode</strong> <em>Entzaubern</em>, <em>Gildenbank</em> oder <em>Wollte niemand</em> nehmen. Beim Entzaubern wählst du den Charakter aus dem Raidroster, der entzaubert hat, sonst optional, bei wem es liegt. Fehlt der Kill des Bosses noch, wird er dabei mit eingetragen. Alle sehen sie danach in der Liste <strong>Beute ohne Empfänger</strong>. Sie zählen für niemanden und kosten keine EP. Der Addon-Import übernimmt Zeilen, die RaidLedger als <em>DE</em> oder <em>BANK</em> vergeben hat, automatisch dorthin.</p>
       <h3>Archivieren nach dem Raid</h3>
-      <p>Archivieren beendet den Raid endgültig. Teilnehmer ohne Main-Spec-Loot bekommen +10 EP, ungenutzte Locks verfallen, und der nächste Serientermin entsteht.</p>
+      <p>Archivieren beendet den Raid endgültig. Teilnehmer ohne Main-Spec-Loot bekommen die EP der Serie (meist +10), ungenutzte Locks verfallen, und der nächste Serientermin entsteht.</p>
       <ol>
         <li>Reiter <strong>Planung &amp; Details</strong> öffnen und nach unten scrollen.</li>
         <li>Die <strong>EP-Übersicht vor dem Archivieren</strong> prüfen.</li>
@@ -411,6 +412,8 @@ export function GuidePage() {
       <p>Hat jemand zwei Accounts, nutze <strong>Konto zusammenführen</strong> mit einem Grund. Unter <strong>Spieler</strong> → <strong>Neuer Spieler</strong> legst du jemanden ohne Login an.</p>
       <h3>Raidserien</h3>
       <p>Eine Raidserie ist ein fester Raid wie <em>ICC25 Donnerstag</em>: Wochentag, Uhrzeit, Rhythmus, Namensvorlage (<code>{'ICC25-{number}'}</code>), Raidleitung, Instanz und Größe. Unter <strong>Weitere Raidleiter</strong> trägst du Co-Leiter ein; jeder neue Raid der Serie bekommt sie mit. Dort stellst du auch ein, wie viele Wochen automatisch im Voraus geplant werden.</p>
+      <p>Unter <strong>Enhance Points</strong> wählst du den <strong>EP-Topf</strong> der Serie und wie viele EP das Archivieren gibt (0 bis 100). Mit <strong>Keine EP</strong> gibt die Serie weder EP noch Enhanced-Loot oder Locks, etwa für einen Spaßraid. Mehrere Serien können sich einen Topf teilen, zum Beispiel ICC und Rubinsanktum. Neue Töpfe legst du darunter bei <strong>EP-Töpfe</strong> an. Bestehende Raids behalten ihre Einstellung.</p>
+      <p><strong>Beispiel:</strong> Du legst den Topf <em>Ulduar</em> an und stellst die Serie <em>Ulduar Mittwoch</em> auf diesen Topf mit 10 EP. Wer dort ohne Main-Spec-Item dabei ist, bekommt 10 EP im Ulduar-Topf; sein ICC-Stand bleibt gleich.</p>
       <Shot name="50-raidserien" caption="Raidserien" />
       <h3>Boss-Reihenfolge</h3>
       <p>Unten auf der Seite <strong>Beute</strong> stellst du pro Instanz die Reihenfolge der Bosse ein: mit <strong>↑ / ↓</strong> verschieben, dann <strong>Reihenfolge speichern</strong>. Sie gilt für die Boss-Auswahl beim Loot-Eintragen und für die Boss-Gruppen in der Beuteliste eines Raids.</p>

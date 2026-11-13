@@ -26,6 +26,10 @@ type Raid struct {
 	CancelledAt       *time.Time            `bun:"cancelled_at,nullzero" json:"cancelled_at"`
 	ArchivedAt        *time.Time            `bun:"archived_at,nullzero" json:"archived_at"`
 	Notes             string                `bun:"notes,notnull,default:''" json:"notes"`
-	CreatedAt         time.Time             `bun:"created_at,notnull" json:"created_at"`
-	UpdatedAt         time.Time             `bun:"updated_at,notnull" json:"updated_at"`
+	// EPPoolID and EPAward come from the series (ADR 113); nil means no points.
+	// Create and Update leave them out; only SetEP writes them.
+	EPPoolID  *int64    `bun:"ep_pool_id" json:"ep_pool_id"`
+	EPAward   int       `bun:"ep_award" json:"ep_award"`
+	CreatedAt time.Time `bun:"created_at,notnull" json:"created_at"`
+	UpdatedAt time.Time `bun:"updated_at,notnull" json:"updated_at"`
 }

@@ -18,10 +18,12 @@ var (
 	ErrNameRequired        = errors.New("raid name is required")
 	ErrNotCancellable      = errors.New("raid is not cancellable")
 	ErrScheduleNotEditable = errors.New("finalized, cancelled or archived raid schedule cannot be changed")
-	ErrNameNotEditable     = errors.New("raid name can only be changed for raids without series")
-	ErrOccurrenceConflict  = errors.New("raid series occurrence or successor already exists")
-	ErrLeadersInvalid      = errors.New("raid leaders must be active players, each once, at least one")
-	ErrReasonRequired      = errors.New("changes to an archived raid need a reason")
+	// ErrEPLocked: the raid has EP rows or locks, so its pool and award stay (FR-16.11).
+	ErrEPLocked           = errors.New("raid ep pool is fixed by existing points or locks")
+	ErrNameNotEditable    = errors.New("raid name can only be changed for raids without series")
+	ErrOccurrenceConflict = errors.New("raid series occurrence or successor already exists")
+	ErrLeadersInvalid     = errors.New("raid leaders must be active players, each once, at least one")
+	ErrReasonRequired     = errors.New("changes to an archived raid need a reason")
 )
 
 type Service struct {
@@ -62,6 +64,14 @@ func (s *Service) CancelRaid(ctx context.Context, raidID, actorID int64) (*Raid,
 	return rd, err
 }
 
+// sameEP reports whether a raid already has the series' EP pool and award.
+func sameEP(rd *Raid, series *raidseries.Series) bool {
+	if rd.EPAward != series.EPAward || (rd.EPPoolID == nil) != (series.EPPoolID == nil) {
+		return false
+	}
+	return rd.EPPoolID == nil || *rd.EPPoolID == *series.EPPoolID
+}
+
 // ScheduleChanges contains only explicitly supplied scheduling prerequisites.
 type ScheduleChanges struct {
 	Name              *string
@@ -87,6 +97,7 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 			return ErrScheduleNotEditable
 		}
 		before := *rd
+		var newSeries *raidseries.Series
 		if changes.SeriesID != nil {
 			if *changes.SeriesID <= 0 {
 				return raidseries.ErrSeriesRequired
@@ -103,6 +114,7 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 				return err
 			}
 			rd.SeriesID = changes.SeriesID
+			newSeries = series
 		}
 		if changes.ScheduledStart != nil {
 			start := changes.ScheduledStart.UTC()
@@ -135,6 +147,19 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 		if err := repo.Update(ctx, rd); err != nil {
 			return err
 		}
+		if newSeries != nil && !sameEP(rd, newSeries) {
+			// Points already booked or locked in the raid's pool fix it (FR-16.11).
+			hasEP, err := enhancepoints.NewRepo(repo.db).RaidHasEP(ctx, rd.ID)
+			if err != nil {
+				return err
+			}
+			if hasEP {
+				return ErrEPLocked
+			}
+			if err := repo.CopySeriesEP(ctx, rd, newSeries); err != nil {
+				return err
+			}
+		}
 		return repo.Audit(ctx, actorID, rd.ID, "update", &before, rd)
 	})
 	if err != nil {
@@ -149,6 +174,7 @@ func (s *Service) ConfigureSchedule(ctx context.Context, raidID, actorID int64, 
 func (s *Service) CreateRaid(ctx context.Context, rd *Raid, actorID int64) error {
 	return s.repo.InTransaction(ctx, func(repo *Repo) error {
 		var seriesLeaderIDs []int64
+		var fromSeries *raidseries.Series
 		if rd.SeriesID != nil {
 			seriesRepo := raidseries.NewRepo(repo.db)
 			series, err := seriesRepo.Get(ctx, *rd.SeriesID)
@@ -156,6 +182,7 @@ func (s *Service) CreateRaid(ctx context.Context, rd *Raid, actorID int64) error
 				return err
 			}
 			seriesLeaderIDs = series.LeaderIDs
+			fromSeries = series
 			if err := raidseries.Validate(series); err != nil {
 				return err
 			}
@@ -192,6 +219,13 @@ func (s *Service) CreateRaid(ctx context.Context, rd *Raid, actorID int64) error
 			return err
 		}
 		if err := repo.CopySeriesLeaders(ctx, rd, seriesLeaderIDs); err != nil {
+			return err
+		}
+		if fromSeries != nil {
+			if err := repo.CopySeriesEP(ctx, rd, fromSeries); err != nil {
+				return err
+			}
+		} else if err := repo.LoadEP(ctx, rd); err != nil {
 			return err
 		}
 		return repo.Audit(ctx, actorID, rd.ID, "create", nil, rd)

@@ -117,7 +117,7 @@ func TestCreateLockHTTPRules(t *testing.T) {
 			if err != nil || len(locks) != wantCount {
 				t.Fatalf("want %d locks, got %v, err %v", wantCount, locks, err)
 			}
-			balance, err := points.Balance(ctx, actor.ID)
+			balance, err := points.Balance(ctx, actor.ID, 1)
 			if err != nil || balance != tc.balance {
 				t.Fatalf("lock request changed balance: %d, err %v", balance, err)
 			}

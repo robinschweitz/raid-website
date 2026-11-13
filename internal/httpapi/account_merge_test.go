@@ -75,7 +75,7 @@ func TestAdminAccountMergeTransfersOwnershipAndRevokesSourceAuth(t *testing.T) {
 		t.Fatalf("lock owner = %+v, %v", lock, err)
 	}
 	points := enhancepoints.NewRepo(bdb)
-	if balance, err := points.Balance(ctx, targetID); err != nil || balance != 44 {
+	if balance, err := points.Balance(ctx, targetID, 1); err != nil || balance != 44 {
 		t.Fatalf("target balance = %d, %v", balance, err)
 	}
 	for _, table := range []string{"sessions", "player_mfa_settings", "mfa_recovery_codes"} {

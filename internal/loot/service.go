@@ -320,8 +320,21 @@ func ReconcileEnhanced(ctx context.Context, repo *Repo, a, old *Award, actor int
 		a.EnhancedCost = old.EnhancedCost
 		return nil
 	}
+	// The raid's pool cannot change once it has EP rows (FR-16.11), so refunds
+	// and debits of one award always land in the same pool.
+	poolID, _, err := points.RaidEP(ctx, a.RaidID)
+	if err != nil {
+		return err
+	}
+	if poolID == nil {
+		if a.AwardMethod == Enhanced || (old != nil && old.AwardMethod == Enhanced && old.EnhancedCost > 0) {
+			return enhancepoints.ErrRaidHasNoPool
+		}
+		a.EnhancedCost = 0
+		return nil
+	}
 	appendEntry := func(playerID int64, amount int) error {
-		return points.InsertTransaction(ctx, &enhancepoints.Transaction{PlayerID: playerID, RaidID: &a.RaidID, LootAwardID: &a.ID, Amount: amount, Type: "enhanced_loot", RefType: "loot_award", RefID: fmt.Sprint(a.ID), Reason: reason, ActorID: actor, CreatedAt: time.Now().UTC()})
+		return points.InsertTransaction(ctx, &enhancepoints.Transaction{PlayerID: playerID, PoolID: *poolID, RaidID: &a.RaidID, LootAwardID: &a.ID, Amount: amount, Type: "enhanced_loot", RefType: "loot_award", RefID: fmt.Sprint(a.ID), Reason: reason, ActorID: actor, CreatedAt: time.Now().UTC()})
 	}
 	if old != nil && old.AwardMethod == Enhanced && old.EnhancedCost > 0 {
 		if err := appendEntry(old.AwardedToPlayerID, old.EnhancedCost); err != nil {
@@ -332,7 +345,7 @@ func ReconcileEnhanced(ctx context.Context, repo *Repo, a, old *Award, actor int
 	if a.AwardMethod != Enhanced {
 		return nil
 	}
-	balance, err := points.Balance(ctx, a.AwardedToPlayerID)
+	balance, err := points.Balance(ctx, a.AwardedToPlayerID, *poolID)
 	if err != nil {
 		return err
 	}

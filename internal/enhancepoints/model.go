@@ -9,8 +9,10 @@ import (
 type Transaction struct {
 	bun.BaseModel `bun:"table:enhance_point_transactions"`
 
-	ID          int64     `bun:"id,pk,autoincrement" json:"id"`
-	PlayerID    int64     `bun:"player_id,notnull" json:"player_id"`
+	ID       int64 `bun:"id,pk,autoincrement" json:"id"`
+	PlayerID int64 `bun:"player_id,notnull" json:"player_id"`
+	// PoolID is the EP pool the transaction counts in (ADR 113).
+	PoolID      int64     `bun:"pool_id,notnull" json:"pool_id"`
 	RaidID      *int64    `bun:"raid_id,nullzero" json:"raid_id"`
 	LootAwardID *int64    `bun:"loot_award_id,nullzero" json:"loot_award_id"`
 	Amount      int       `bun:"amount,notnull" json:"amount"`

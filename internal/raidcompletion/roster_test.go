@@ -71,7 +71,7 @@ func TestArchiveRejectsIncompleteRosterBeforeWrites(t *testing.T) {
 			if err != nil || !reflect.DeepEqual(before, after) {
 				t.Fatalf("snapshot guessed from live character: %+v %v", after, err)
 			}
-			balance, err := enhancepoints.NewRepo(database).Balance(ctx, actor)
+			balance, err := enhancepoints.NewRepo(database).Balance(ctx, actor, 1)
 			if err != nil || balance != 0 {
 				t.Fatalf("points written: %d %v", balance, err)
 			}

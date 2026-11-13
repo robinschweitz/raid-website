@@ -1070,7 +1070,7 @@ function RaidDetail({ raidID, initialView }: Props) {
               {lootEditing && <p>Gespeicherte Identität: {lootBoss || 'Boss historisch nicht gespeichert'} · {lootItem} · Item-ID {lootItemID || 'historisch nicht gespeichert'}</p>}
               </>}
               <label>Vergabemethode<select aria-label="Loot-Vergabemethode" disabled={pending} value={lootMethod} onChange={(e) => changeLoot(() => setLootMethod(e.target.value as LootMethod))}>
-                {Object.entries(awardLabels).map(([method, label]) => <option key={method} value={method}>{label}</option>)}
+                {Object.entries(awardLabels).filter(([method]) => method !== 'ENHANCED' || raid?.ep_pool_id !== null || lootMethod === 'ENHANCED').map(([method, label]) => <option key={method} value={method}>{label}</option>)}
                 {!lootEditing && Object.entries(unclaimedMethods).map(([method, label]) => <option key={method} value={method}>{label}</option>)}
               </select></label>
               {needsLootCharacter && <>
@@ -1089,6 +1089,7 @@ function RaidDetail({ raidID, initialView }: Props) {
               </>}
               {isUnclaimedMethod && <p className="muted">Zählt für keinen Spieler als Loot und kostet keine EP.</p>}
               {isUnclaimedMethod && !isDisenchanting && <label>Bei (optional)<input aria-label="Loot-Verbleib bei" disabled={pending} value={lootHolder} placeholder="Wer hat das Item?" onChange={(e) => changeLoot(() => setLootHolder(e.target.value))} /></label>}
+              {raid?.ep_pool_id === null && !isUnclaimedMethod && <p className="muted">Dieser Raid gibt keine EP: Enhanced-Loot ist nicht möglich.</p>}
               {lootMethod === 'ENHANCED' && <p className="muted">Betrag wird aus dem aktuellen EP-Stand ermittelt, maximal 50 EP; nur der Gewinner zahlt. Ein positiver EP-Stand ist erforderlich. Der Server prüft und bucht atomar beim Speichern.</p>}
               {lootEditing && <p className="muted">Unveränderter Enhanced-Gewinner behält seine historischen Kosten. Ein Methoden- oder Empfängerwechsel wird vom Server samt EP, abgeleiteter Token-Sicht und Audit atomar ausgeglichen.</p>}
               <label>Notizen<input disabled={pending} placeholder="Loot-Notizen" value={lootNotes} onChange={(e) => changeLoot(() => setLootNotes(e.target.value))} /></label>

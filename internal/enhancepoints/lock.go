@@ -11,9 +11,11 @@ import (
 type ItemLock struct {
 	bun.BaseModel `bun:"table:item_locks"`
 
-	ID          int64                 `bun:"id,pk,autoincrement" json:"id"`
-	PlayerID    int64                 `bun:"player_id,notnull" json:"player_id"`
-	RaidID      int64                 `bun:"raid_id,notnull" json:"raid_id"`
+	ID       int64 `bun:"id,pk,autoincrement" json:"id"`
+	PlayerID int64 `bun:"player_id,notnull" json:"player_id"`
+	RaidID   int64 `bun:"raid_id,notnull" json:"raid_id"`
+	// PoolID is the EP pool of the raid when the lock was made (ADR 113).
+	PoolID      int64                 `bun:"pool_id,notnull" json:"pool_id"`
 	ItemID      string                `bun:"item_id,notnull,default:''" json:"item_id"`
 	ItemName    string                `bun:"item_name,notnull,default:''" json:"item_name"`
 	Boss        string                `bun:"boss,notnull,default:''" json:"boss"`

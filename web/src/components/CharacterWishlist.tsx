@@ -4,6 +4,8 @@ import { useSubmission } from '../useSubmission'
 import { Link } from '../router'
 import type { WishlistAddonExport, WishlistSpec, WishlistWish } from '../types'
 import { ErrorMessage } from './ErrorMessage'
+import { useEpPools } from '../epPools'
+import { PoolSelect } from './PoolSelect'
 
 interface Props {
   characterID: number
@@ -20,6 +22,8 @@ export function CharacterWishlist({ characterID, canEdit }: Props) {
   const { pending, submit, isActive } = useSubmission()
   const [wishes, setWishes] = useState<WishlistWish[] | null>(null)
   const [error, setError] = useState('')
+  const pools = useEpPools()
+  const [exportPoolID, setExportPoolID] = useState<number | null>(null)
   const [exportText, setExportText] = useState('')
   const [copied, setCopied] = useState(false)
 
@@ -72,7 +76,7 @@ export function CharacterWishlist({ characterID, canEdit }: Props) {
       setError('')
       setCopied(false)
       try {
-        const result = await api.get<WishlistAddonExport>(`/api/v1/characters/${characterID}/wishlist/addon-export`)
+        const result = await api.get<WishlistAddonExport>(`/api/v1/characters/${characterID}/wishlist/addon-export${exportPoolID === null ? '' : `?pool_id=${exportPoolID}`}`)
         if (!isActive()) return
         setExportText(result.text)
         try {
@@ -101,6 +105,7 @@ export function CharacterWishlist({ characterID, canEdit }: Props) {
         <li>Im Spiel <code>/wish import</code> eingeben.</li>
         <li>Mit <strong>Strg+V</strong> einfügen und bestätigen.</li>
       </ol>
+      <PoolSelect pools={pools} value={exportPoolID} label="EP aus Topf" onChange={(poolID) => { setExportPoolID(poolID); setExportText(''); setCopied(false) }} />
       <div className="actions">
         <button type="button" className="primary-action" disabled={pending} onClick={() => void copyExport()}>Export kopieren</button>
         {copied && <span className="badge ok" role="status">Kopiert – jetzt im Spiel /wish import</span>}

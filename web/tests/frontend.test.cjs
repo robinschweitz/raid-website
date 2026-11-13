@@ -1994,7 +1994,7 @@ test('admin series form starts empty, validates weekdays, creates and edits full
   await form(view).props.onSubmit(event)
   assert.equal(writes(s).length, 1)
   assert.equal(writes(s)[0].url, '/api/v1/raid-series')
-  assert.deepEqual(JSON.parse(JSON.stringify(writes(s)[0].body)), { name: 'Explicit name', leader_ids: [2], weekdays: [0], interval_weeks: 3, start_time: '19:45', timezone: 'Europe/Berlin', plan_weeks_ahead: 0, catalog_instance_id: 'map:631', raid_size: 25 })
+  assert.deepEqual(JSON.parse(JSON.stringify(writes(s)[0].body)), { name: 'Explicit name', leader_ids: [2], weekdays: [0], interval_weeks: 3, start_time: '19:45', timezone: 'Europe/Berlin', plan_weeks_ahead: 0, catalog_instance_id: 'map:631', raid_size: 25, ep_award: 10 })
   writes(s)[0].resolve({ ...seriesRow, id: 4 })
   await first
   view.render()

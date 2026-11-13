@@ -102,7 +102,7 @@ func TestCompletedCorrectionsOnlyApplyEligibilityDeltaWithoutOriginalAwards(t *t
 			}
 			assertBalance := func(playerID int64, want int) {
 				t.Helper()
-				balance, err := r.points.Balance(ctx, playerID)
+				balance, err := r.points.Balance(ctx, playerID, 1)
 				if err != nil || balance != want {
 					t.Fatalf("player %d balance: got %d want %d error %v", playerID, balance, want, err)
 				}

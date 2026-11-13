@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata"
+
+	"raid-website/internal/enhancepoints"
 )
 
 var (
@@ -20,6 +22,7 @@ var (
 	ErrLocalTimeNonexistent   = errors.New("local occurrence does not exist")
 	ErrLocalTimeAmbiguous     = errors.New("local occurrence is ambiguous")
 	ErrScheduleRange          = errors.New("schedule exceeds representable calendar range")
+	ErrPoolNotFound           = errors.New("ep pool not found")
 )
 
 // MaxPlanWeeks bounds how far ahead raids are created (ten years); it only
@@ -85,6 +88,9 @@ type Changes struct {
 	StartTime      *string
 	Timezone       *string
 	PlanWeeksAhead *int
+	// EPPoolID sets the EP pool; a pointer to 0 means "no pool" (ADR 113).
+	EPPoolID *int64
+	EPAward  *int
 }
 
 // Configure creates or patches configuration under the same writer reservation as archival.
@@ -160,6 +166,9 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		if err := repo.ReplaceExtraLeaders(ctx, series.ID, series.LeaderIDs[1:]); err != nil {
 			return err
 		}
+		if err := applyEP(ctx, repo, series, changes); err != nil {
+			return err
+		}
 		action := "update"
 		if id == 0 {
 			action, before = "create", nil
@@ -171,6 +180,34 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		return nil
 	})
 	return result, err
+}
+
+// applyEP stores the pool and award a change supplies; a new series without
+// them keeps the column defaults (the first pool, award 10).
+func applyEP(ctx context.Context, repo *Repo, series *Series, changes Changes) error {
+	if changes.EPPoolID == nil && changes.EPAward == nil {
+		return repo.LoadEP(ctx, series)
+	}
+	if err := repo.LoadEP(ctx, series); err != nil {
+		return err
+	}
+	if changes.EPPoolID != nil {
+		series.EPPoolID = nil
+		if *changes.EPPoolID != 0 {
+			if err := repo.RequirePool(ctx, *changes.EPPoolID); err != nil {
+				return err
+			}
+			poolID := *changes.EPPoolID
+			series.EPPoolID = &poolID
+		}
+	}
+	if changes.EPAward != nil {
+		if !enhancepoints.ValidAward(*changes.EPAward) {
+			return ErrInvalid
+		}
+		series.EPAward = *changes.EPAward
+	}
+	return repo.SetEP(ctx, series.ID, series.EPPoolID, series.EPAward)
 }
 
 // nextLeaders resolves the leader list after a change. A full list must hold

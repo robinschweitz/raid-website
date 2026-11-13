@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"raid-website/internal/audit"
+	"raid-website/internal/enhancepoints"
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
 )
@@ -28,8 +29,11 @@ type row struct {
 	StartTime         string
 	Timezone          string
 	PlanWeeksAhead    int
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	// Written only by SetEP, so saving other fields keeps them (ADR 113).
+	EPPoolID  *int64 `bun:"ep_pool_id"`
+	EPAward   int    `bun:"ep_award"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // Repo owns persistence for series configuration.
@@ -60,6 +64,27 @@ func (r *Repo) InTransaction(ctx context.Context, fn func(*Repo) error) error {
 		return fn(r.WithTx(tx))
 	})
 }
+
+// SetEP stores the series' EP pool and award (FR-16.11).
+func (r *Repo) SetEP(ctx context.Context, seriesID int64, poolID *int64, award int) error {
+	_, err := r.db.NewUpdate().Table("raid_series").Set("ep_pool_id = ?", poolID).Set("ep_award = ?", award).Where("id = ?", seriesID).Exec(ctx)
+	return err
+}
+
+// LoadEP reads the stored pool and award, including column defaults after an insert.
+func (r *Repo) LoadEP(ctx context.Context, s *Series) error {
+	return r.db.NewSelect().Table("raid_series").Column("ep_pool_id", "ep_award").Where("id = ?", s.ID).Scan(ctx, &s.EPPoolID, &s.EPAward)
+}
+
+// RequirePool rejects an unknown EP pool.
+func (r *Repo) RequirePool(ctx context.Context, poolID int64) error {
+	_, err := enhancepoints.NewRepo(r.db).GetPool(ctx, poolID)
+	if errors.Is(err, enhancepoints.ErrPoolNotFound) {
+		return ErrPoolNotFound
+	}
+	return err
+}
+
 func (r *Repo) RequireLeader(ctx context.Context, id int64) error {
 	_, err := player.NewRepo(r.db).Get(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -70,6 +95,7 @@ func (r *Repo) RequireLeader(ctx context.Context, id int64) error {
 func decode(rd row) (*Series, error) {
 	s := &Series{ID: rd.ID, Name: rd.Name, NameTemplate: rd.NameTemplate, NextRaidNumber: rd.NextRaidNumber, RaidLeaderID: rd.RaidLeaderID, IntervalWeeks: rd.IntervalWeeks, StartTime: rd.StartTime, Timezone: rd.Timezone, PlanWeeksAhead: rd.PlanWeeksAhead, CreatedAt: rd.CreatedAt, UpdatedAt: rd.UpdatedAt}
 	s.CatalogInstanceID, s.RaidSize = rd.CatalogInstanceID, rd.RaidSize
+	s.EPPoolID, s.EPAward = rd.EPPoolID, rd.EPAward
 	if err := json.Unmarshal([]byte(rd.Weekdays), &s.Weekdays); err != nil {
 		return nil, errors.Join(ErrInvalid, err)
 	}
@@ -138,10 +164,10 @@ func (r *Repo) Save(ctx context.Context, s *Series) error {
 	rd := &row{ID: s.ID, Name: s.Name, NameTemplate: s.NameTemplate, NextRaidNumber: s.NextRaidNumber, RaidLeaderID: s.RaidLeaderID, Weekdays: string(weekdays), IntervalWeeks: s.IntervalWeeks, StartTime: s.StartTime, Timezone: s.Timezone, PlanWeeksAhead: s.PlanWeeksAhead, CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt}
 	rd.CatalogInstanceID, rd.RaidSize = s.CatalogInstanceID, s.RaidSize
 	if s.ID == 0 {
-		_, err = r.db.NewInsert().Model(rd).Exec(ctx)
+		_, err = r.db.NewInsert().Model(rd).ExcludeColumn("ep_pool_id", "ep_award").Exec(ctx)
 		s.ID = rd.ID
 	} else {
-		_, err = r.db.NewUpdate().Model(rd).WherePK().Exec(ctx)
+		_, err = r.db.NewUpdate().Model(rd).ExcludeColumn("ep_pool_id", "ep_award").WherePK().Exec(ctx)
 	}
 	return err
 }

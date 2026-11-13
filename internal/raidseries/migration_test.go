@@ -60,6 +60,25 @@ func TestSeriesMigrationPreservesLegacyHistoryWithoutDefaults(t *testing.T) {
 		apply("007_loot_catalog.up.sql")
 		apply("014_raid_series_naming.up.sql")
 		apply("070_raid_series_plan_ahead.up.sql")
+		// The repositories read the EP pool columns of ADR 113; an older
+		// migration applied again rebuilds raid_series without them.
+		if pass == 0 {
+			apply("089_ep_pools.up.sql")
+		}
+		for _, table := range []string{"raid_series", "raids"} {
+			var columns int
+			if err := database.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = 'ep_pool_id'", table).Scan(&columns); err != nil {
+				t.Fatal(err)
+			}
+			if columns == 0 {
+				if _, err := database.DB.ExecContext(ctx, "ALTER TABLE "+table+" ADD COLUMN ep_pool_id INTEGER DEFAULT 1"); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := database.DB.ExecContext(ctx, "ALTER TABLE "+table+" ADD COLUMN ep_award INTEGER NOT NULL DEFAULT 10"); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
 		series, err := raidseries.NewRepo(database.DB).List(ctx)
 		if err != nil || len(series) != 0 {
 			t.Fatalf("migration seeded guild defaults: %+v %v", series, err)
@@ -79,7 +98,7 @@ func TestSeriesMigrationPreservesLegacyHistoryWithoutDefaults(t *testing.T) {
 				t.Fatalf("old archived active raid changed: %+v", rd)
 			}
 		}
-		balance, err := enhancepoints.NewRepo(database.DB).Balance(ctx, actor.ID)
+		balance, err := enhancepoints.NewRepo(database.DB).Balance(ctx, actor.ID, 1)
 		if err != nil || balance != 91 {
 			t.Fatalf("migration wrote rewards: %d %v", balance, err)
 		}

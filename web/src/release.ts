@@ -1,8 +1,17 @@
-export const appVersion = '1.0.87'
+export const appVersion = '1.0.88'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'EP-Töpfe pro Raidserie',
+    changes: [
+      'Admins können EP-Töpfe anlegen, zum Beispiel für ICC und Ulduar. Jeder Topf ist ein eigener EP-Stand; EP aus einem Topf zählen nur in Raids dieses Topfs. Alle bisherigen EP liegen im Topf „ICC“.',
+      'Jede Raidserie wählt ihren Topf und wie viele EP das Archivieren gibt (0 bis 100). Mit „Keine EP“ gibt eine Serie weder EP noch Enhanced-Loot oder Locks.',
+      'EP-Stand, Profil und Wunschlisten-Export zeigen einen Topf; gibt es mehrere, wählst du ihn aus.',
+    ],
+  },
+  {
+    version: '1.0.87',
     title: 'Notizen in der Aufstellung',
     changes: ['Die Raidleitung kann zu jedem Platz in der Aufstellung eine kurze Notiz eintragen, zum Beispiel bei der Ersatzbank „kann mit Twink X mit, hilft beim Auffüllen“. Die Notiz steht direkt am Spieler.'],
   },

@@ -1,6 +1,9 @@
 {
   "instances": [
-    "IcecrownCitadel"
+    "Ulduar",
+    "TrialoftheCrusader_A",
+    "IcecrownCitadel",
+    "Halion"
   ],
   "locales": [
     "enUS",
@@ -11,6 +14,7 @@
     "all"
   ],
   "include_trash": false,
+  "include_patterns": false,
   "faction": "A",
   "request_delay_seconds": 0.1,
   "cache_dir": ".cache/wowhead",

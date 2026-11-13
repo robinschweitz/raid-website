@@ -1,8 +1,13 @@
-export const appVersion = '1.0.87'
+export const appVersion = '1.0.88'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Ulduar, Prüfung des Kreuzfahrers und Rubinsanktum',
+    changes: ['Der Beutekatalog kennt jetzt auch Ulduar, die Prüfung des Kreuzfahrers und das Rubinsanktum, mit allen Schwierigkeiten. Raidserien für diese Instanzen können Beute, Bosskills und den Addon-Import genauso nutzen wie in der Eiskronenzitadelle.'],
+  },
+  {
+    version: '1.0.87',
     title: 'Notizen in der Aufstellung',
     changes: ['Die Raidleitung kann zu jedem Platz in der Aufstellung eine kurze Notiz eintragen, zum Beispiel bei der Ersatzbank „kann mit Twink X mit, hilft beim Auffüllen“. Die Notiz steht direkt am Spieler.'],
   },

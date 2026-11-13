@@ -58,15 +58,15 @@ func TestCreateRaidDerivesNameFromSeriesOrRequiresExplicitName(t *testing.T) {
 		t.Fatalf("second derived raid: %+v", second)
 	}
 	explicit := create(map[string]any{"name": "Weihnachtsraid", "raid_leader_id": actor, "series_id": numbered.ID, "scheduled_start": start.AddDate(0, 0, 14).Format(time.RFC3339)})
-	if explicit.status != http.StatusCreated || explicit.name != "ICC25-37" {
-		t.Fatalf("explicit name raid must be derived from template: %+v", explicit)
+	if explicit.status != http.StatusCreated || explicit.name != "Weihnachtsraid" {
+		t.Fatalf("explicit name wins over the template: %+v", explicit)
 	}
 	stored, err := raidseries.NewRepo(database).Get(ctx, numbered.ID)
 	if err != nil {
 		t.Fatalf("reload series: %v", err)
 	}
 	if stored.NextRaidNumber != 38 {
-		t.Fatalf("explicit name must not override template; counter consumed: next %d", stored.NextRaidNumber)
+		t.Fatalf("an explicit name still consumes the counter: next %d", stored.NextRaidNumber)
 	}
 
 	fallback := create(map[string]any{"raid_leader_id": actor, "series_id": plain.ID, "scheduled_start": start.Format(time.RFC3339)})
@@ -132,9 +132,11 @@ func TestRaidWithoutSeriesCanBeRenamedWhileActive(t *testing.T) {
 		t.Fatal(err)
 	}
 	status, body = do(t, srv.Client(), http.MethodPatch, fmt.Sprintf("%s/api/v1/raids/%d", srv.URL, seriesRaid.ID), token, map[string]any{"name": "Direkter Serienname"})
-	assertArchiveCode(t, status, body, "name_not_editable")
+	if status != http.StatusOK {
+		t.Fatalf("rename series raid: %d %s", status, body)
+	}
 	stored, err = raids.Get(ctx, seriesRaid.ID)
-	if err != nil || stored.Name != "Serienraid" {
-		t.Fatalf("series rename changed raid: %+v %v", stored, err)
+	if err != nil || stored.Name != "Direkter Serienname" {
+		t.Fatalf("series rename not stored: %+v %v", stored, err)
 	}
 }

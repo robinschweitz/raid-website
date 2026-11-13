@@ -22,7 +22,7 @@ func TestArchivedCorrectionsStaffPermissionsReasonsAndFinalization(t *testing.T)
 	ctx := context.Background()
 	attendanceID := f.attend(f.first, f.firstChar)
 	awardID := correctionID(t, f.request(http.MethodPost, "/loot", f.selection(map[string]any{"award_method": "SECOND", "awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar}, false), http.StatusCreated))
-	series := &raidseries.Series{Name: "Correction series", RaidLeaderID: f.actor, Weekdays: []int{0, 1, 2, 3, 4, 5, 6}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "UTC"}
+	series := &raidseries.Series{Name: "Correction series", RaidLeaderID: f.actor, Weekdays: []int{0, 1, 2, 3, 4, 5, 6}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "Europe/Berlin"}
 	if err := raidseries.NewService(raidseries.NewRepo(f.db)).Save(ctx, series); err != nil {
 		t.Fatal(err)
 	}

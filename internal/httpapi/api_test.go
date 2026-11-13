@@ -349,7 +349,7 @@ func TestRaidLifecycleAndPoints(t *testing.T) {
 
 	tokenBoss, tokenItem, ordinaryBoss, ordinaryItem := bundledICCDrops(t, bdb)
 	instance, size := "631", 25
-	series := &raidseries.Series{Name: "ICC", CatalogInstanceID: &instance, RaidSize: &size, RaidLeaderID: leader, Weekdays: []int{int(now.Weekday())}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "UTC"}
+	series := &raidseries.Series{Name: "ICC", CatalogInstanceID: &instance, RaidSize: &size, RaidLeaderID: leader, Weekdays: []int{int(now.Weekday())}, IntervalWeeks: 1, StartTime: "20:00", Timezone: "Europe/Berlin"}
 	if err := raidseries.NewService(raidseries.NewRepo(bdb)).Save(ctx, series); err != nil {
 		t.Fatalf("create series: %v", err)
 	}

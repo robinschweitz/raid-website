@@ -127,7 +127,7 @@ implemented yet when it differs from the code.
 
 ### 9. Raid series and planning
 
-- **FR-9.1** An ADMIN MUST be able to create and edit a raid series with name, one or more raid leaders (existing players, each once, in order), weekdays, week interval, local start time, IANA timezone, name template, next number, instance, size, planning window, EP pool, and EP award (FR-16.10). (ADR 021, 034, 078, 112, 113)
+- **FR-9.1** An ADMIN MUST be able to create and edit a raid series with name, one or more raid leaders (existing players, each once, in order), weekdays, week interval, local start time (server time, always `Europe/Berlin`), name template, next number, instance, size, planning window, EP pool, and EP award (FR-16.10). The timezone MUST NOT be configurable; another sent value MUST be rejected. (ADR 021, 034, 078, 112, 113, 114)
 - **FR-9.2** The system MUST NOT create a default series or schedule. (ADR 021)
 - **FR-9.3** A name template MUST support `{number}`, `{name}`, `{date}`, and `{week}`. An empty template MUST give the series name. (ADR 034)
 - **FR-9.4** Recurrence weeks MUST count from the local Monday week of the current raid. (ADR 021)
@@ -140,11 +140,11 @@ implemented yet when it differs from the code.
 
 ### 10. Raid lifecycle
 
-- **FR-10.1** Staff MUST be able to create a raid with an instance, a size, an optional series, and an optional scheduled start. (ADR 021)
-- **FR-10.2** With a series, the system MUST take the raid name from the series template and MUST ignore a sent name. Without a series, the name MUST be given, else `name_required`. (ADR 035)
+- **FR-10.1** Staff MUST be able to create a raid with an instance, a size, an optional series, an optional scheduled start, the raid leaders (FR-10.17), and an EP pool and award (FR-16.11). The form MUST prefill leaders, pool, award, instance, and size from the chosen series. (ADR 021, 114)
+- **FR-10.2** With a series, a sent name MUST win; without one the system MUST take the raid name from the series template. A raid created from a series MUST consume the template counter either way. Without a series, the name MUST be given, else `name_required`. (ADR 035, 114)
 - **FR-10.3** A raid MUST have one status: PLANNED, OPEN, COMPLETED, or CANCELLED. (owner brief)
 - **FR-10.4** Staff MUST be able to cancel a raid that is not archived, completed, or cancelled. A cancelled raid MUST NOT get EP. Cancelling MUST expire the active item locks of the raid (FR-17.6). (ADR 015; Owner 2026-10-22, OQ-2)
-- **FR-10.5** Staff MUST be able to set the series and scheduled start of an active raid. The name MUST be editable only for a raid without a series. (ADR 021)
+- **FR-10.5** Staff MUST be able to set the series and scheduled start of an active raid. The name MUST be editable for every active raid, with or without a series. (ADR 021, 114)
 - **FR-10.6** "Archivieren" MUST be the only final action. It MUST set COMPLETED, the completion time, and the archive time together. (ADR 021)
 - **FR-10.7** Archiving MUST be rejected when the raid has no series, no scheduled start, or an incomplete roster. Then no record MUST change. (ADR 021, 022)
 - **FR-10.8** In one transaction, archiving MUST award EP (FR-16.2), expire unused item locks, and link or create the next occurrence. (ADR 021)
@@ -156,7 +156,7 @@ implemented yet when it differs from the code.
 - **FR-10.14** Archived raids MUST stay visible as history. (ADR 021)
 - **FR-10.15** Archiving a raid that was COMPLETED before this rule MUST only set the archive time. It MUST NOT award EP or start a series chain. (ADR 021)
 - **FR-10.16** Cancelling and archiving a raid MUST need a confirmation (which actions: `DESIGN.md` "Interaction & Rendering Safety"). (ADR 069)
-- **FR-10.17** A raid MUST have one or more raid leaders (Raidleitung). A raid created from a series MUST get the series' leaders (FR-9.1); a raid created by hand with another first leader keeps it first and gets the series' other leaders after it. Changing a series MUST NOT change existing raids. Staff MUST be able to set the list under the raid-state rules of FR-13.11, also for archived raids, and with the reason rule of FR-26.5: active players, each once, at least one. Raid leaders MUST NOT grant permissions. The change MUST be audited. Everyone, also without a session, sees all raid leaders on the overview; the raid page shows them too. (Owner 2026-11-03, ADR 109, 110, 112)
+- **FR-10.17** A raid MUST have one or more raid leaders (Raidleitung). A raid created from a series MUST get the series' leaders (FR-9.1); a raid created by hand with another first leader keeps it first and gets the series' other leaders after it; leaders chosen on the new-raid form MUST replace the series' list. Changing a series MUST NOT change existing raids. Staff MUST be able to set the list under the raid-state rules of FR-13.11, also for archived raids, and with the reason rule of FR-26.5: active players, each once, at least one. Raid leaders MUST NOT grant permissions. The change MUST be audited. Everyone, also without a session, sees all raid leaders on the overview; the raid page shows them too. (Owner 2026-11-03, ADR 109, 110, 112)
 
 ### 11. Current raid and dashboard
 
@@ -234,7 +234,7 @@ implemented yet when it differs from the code.
 - **FR-16.8** Before staff save a correction that FR-16.6 limits, the system MUST warn them with the player and the number of points not taken. The audit entry MUST record that number. (Owner 2026-10-22, review)
 - **FR-16.9** The public page `/punkte` MUST list every active player with the current EP balance in one pool, without the roll range, sorted by balance descending, then by name. The viewer MUST be able to choose the pool; the first pool (lowest ID) is the default, and with one pool no choice is shown. The public list MUST contain only player ID, player name, and balance, and the public pool list only pool ID and name; EP transactions MUST stay readable only with a session. (Owner 2026-11-03, ADR 110, 113)
 - **FR-16.10** An ADMIN MUST be able to create and rename EP pools, each with a unique, nonblank name. A pool MUST NOT be deleted. Both writes MUST be audited. Pools exist from migration 089 on with one pool "ICC" that holds all earlier transactions and locks. (Owner 2026-11-08, ADR 113)
-- **FR-16.11** A raid series MUST have an optional EP pool and an EP award from 0 to 100 (default 10); several series MAY share a pool. A raid MUST copy pool and award from its series when it is created from the series or when its series is set (FR-10.5), and changing a series MUST NOT change existing raids. Setting another series on a raid that already has EP transactions or item locks MUST be rejected with HTTP 409 `raid_ep_locked` when it would change the raid's pool or award. (Owner 2026-11-08, ADR 113)
+- **FR-16.11** A raid series MUST have an optional EP pool and an EP award from 0 to 100 (default 10); several series MAY share a pool. A raid MUST copy pool and award from its series when it is created from the series or when its series is set (FR-10.5), unless staff choose them on the new-raid form (FR-10.1); and changing a series MUST NOT change existing raids. Setting another series on a raid that already has EP transactions or item locks MUST be rejected with HTTP 409 `raid_ep_locked` when it would change the raid's pool or award. (Owner 2026-11-08, ADR 113)
 - **FR-16.12** The player profile MUST show balance, roll range, and history for one pool at a time, chosen like FR-16.9. The 50 cap of FR-14.5 and the 150 threshold of FR-17.2 MUST be the same in every pool. (Owner 2026-11-08, ADR 113)
 
 ### 17. Item locks

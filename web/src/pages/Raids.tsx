@@ -6,6 +6,7 @@ import { atLeast, catalogRaidSizes, type LootCatalog, type Player, type Raid, ty
 import { useSubmission } from '../useSubmission'
 import { CatalogAssociationFields } from '../components/CatalogAssociationFields'
 import { ErrorMessage } from '../components/ErrorMessage'
+import { useEpPools } from '../epPools'
 
 function statusClass(status: Raid['status']): string {
   switch (status) {
@@ -51,6 +52,10 @@ export function RaidsPage() {
   const [seriesID, setSeriesID] = useState('')
   const [players, setPlayers] = useState<Player[]>([])
   const [leaderID, setLeaderID] = useState('')
+  const [extraLeaders, setExtraLeaders] = useState<number[]>([])
+  const [epPoolID, setEpPoolID] = useState('')
+  const [epAward, setEpAward] = useState('10')
+  const pools = useEpPools()
   const [filter, setFilter] = useState('all')
   const [planSeriesID, setPlanSeriesID] = useState('')
   const [planUntil, setPlanUntil] = useState('')
@@ -81,13 +86,20 @@ export function RaidsPage() {
 
   const onCreate = async (event: FormEvent) => {
     event.preventDefault()
-    if (!player || !canManage || (!name.trim() && !selectedSeries) || !leaderID || !scheduled || !associationValid || (!!selectedSeries?.catalog_instance_id && !instanceID)) return
+    const award = Number(epAward)
+    if (!player || !canManage || (!name.trim() && !selectedSeries) || !leaderID || !scheduled || !associationValid || (!!selectedSeries?.catalog_instance_id && !instanceID)
+      || !Number.isInteger(award) || award < 0 || award > 100) return
+    const firstLeader = Number(leaderID)
     await submit(async () => {
       setError('')
       try {
         const created = await api.post<Raid>('/api/v1/raids', {
           name: name.trim(),
-          raid_leader_id: Number(leaderID),
+          raid_leader_id: firstLeader,
+          leader_ids: [firstLeader, ...extraLeaders.filter((id) => id !== firstLeader)],
+          // An empty choice keeps the series' pool, or the first pool without a series (ADR 113).
+          ...(epPoolID !== '' ? { ep_pool_id: Number(epPoolID) } : {}),
+          ep_award: award,
           ...(selectedSeries ? { series_id: selectedSeries.id } : {}),
           scheduled_start: new Date(scheduled).toISOString(),
           ...(instanceID ? { catalog_instance_id: instanceID, ...(raidSize ? { raid_size: Number(raidSize) } : {}) } : {}),
@@ -95,6 +107,7 @@ export function RaidsPage() {
         if (!isActive()) return
         setName('')
         setScheduled('')
+        setExtraLeaders([])
         navigate(`/raids/${created.id}`)
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Anlegen fehlgeschlagen')
@@ -138,23 +151,39 @@ export function RaidsPage() {
             setSeriesID(e.target.value)
             const selected = series.find((s) => s.id === Number(e.target.value))
             setLeaderID(selected ? String(selected.raid_leader_id) : '')
+            setExtraLeaders(selected ? (selected.leader_ids ?? []).slice(1) : [])
+            setEpPoolID(selected ? (selected.ep_pool_id == null ? '0' : String(selected.ep_pool_id)) : '')
+            setEpAward(String(selected?.ep_award ?? 10))
             setInstanceID(selected?.catalog_instance_id ?? '')
             setRaidSize(selected?.raid_size == null ? '' : String(selected.raid_size))
           }}><option value="">Keine Serie</option>{series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-          <p className="muted">Die Serie übernimmt Raidleiter, Raidinstanz und Raidgröße; der Raidname wird aus der Namensvorlage abgeleitet. {selectedSeries && `Wiederholung: ${selectedSeries.start_time}, ${selectedSeries.timezone}, alle ${selectedSeries.interval_weeks} Wochen.`}</p>
+          <p className="muted">Die Serie füllt Raidleitung, EP-Topf, Raidinstanz und Raidgröße vor; alles lässt sich für diesen Raid ändern. {selectedSeries && `Wiederholung: ${selectedSeries.start_time} Uhr Serverzeit, ${selectedSeries.interval_weeks === 1 ? 'jede Woche' : `alle ${selectedSeries.interval_weeks} Wochen`}.`}</p>
           {series.length === 0 && <p className="muted">Keine Raidserie vorhanden — ein Raid ohne Serie benötigt einen eigenen Namen.</p>}
           <label>Raidleiter<select aria-label="Neuer Raidleiter" disabled={pending} required value={leaderID} onChange={(e) => setLeaderID(e.target.value)}><option value="">Raidleiter auswählen</option>{players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+          <fieldset className="series-leaders" disabled={pending}><legend>Weitere Raidleiter (optional)</legend>
+            {extraLeaders.filter((id) => String(id) !== leaderID).map((id) => <p key={id}>{players.find((p) => p.id === id)?.name ?? 'Nicht verfügbar'} <button type="button" onClick={() => setExtraLeaders(extraLeaders.filter((row) => row !== id))}>Entfernen</button></p>)}
+            <label>Raidleiter hinzufügen<select aria-label="Weiteren Raidleiter hinzufügen" value="" onChange={(e) => { const id = Number(e.target.value); if (id) setExtraLeaders([...extraLeaders, id]) }}>
+              <option value="">Spieler wählen</option>
+              {players.filter((p) => p.active && String(p.id) !== leaderID && !extraLeaders.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select></label>
+          </fieldset>
+          <fieldset disabled={pending}><legend>Enhance Points</legend>
+            <label>EP-Topf<select aria-label="EP-Topf des Raids" value={epPoolID} onChange={(e) => setEpPoolID(e.target.value)}>
+              {!selectedSeries && <option value="">Standard ({pools[0]?.name ?? 'erster EP-Topf'})</option>}
+              {pools.map((pool) => <option key={pool.id} value={pool.id}>{pool.name}</option>)}
+              <option value="0">Keine EP</option>
+            </select></label>
+            <label>EP beim Archivieren<input aria-label="EP beim Archivieren" required type="number" min="0" max="100" step="1" value={epAward} onChange={(e) => setEpAward(e.target.value)} /></label>
+            <p className="muted">Ohne EP-Topf gibt es weder EP noch Enhanced-Loot oder Locks.</p>
+          </fieldset>
           {catalogError && <ErrorMessage>{catalogError}</ErrorMessage>}
           <CatalogAssociationFields catalog={catalog} instanceID={instanceID} raidSize={raidSize} disabled={pending} existingInstanceID={selectedSeries?.catalog_instance_id ?? ''} existingRaidSize={selectedSeries?.raid_size == null ? '' : String(selectedSeries?.raid_size)} onChange={(instance, size) => { if (!isPending() && isActive()) { setInstanceID(instance); setRaidSize(size) } }} />
           {!associationValid && <ErrorMessage>Bitte eine verfügbare Raidgröße zur Raidinstanz auswählen.</ErrorMessage>}
-          {selectedSeries ? (
-            <p className="muted">Name wird aus der Namensvorlage abgeleitet: {previewSeriesName(selectedSeries, scheduled)}</p>
-          ) : (
-            <label>
-              Name
-              <input aria-label="Neuer Raidname" value={name} onChange={(e) => setName(e.target.value)} required />
-            </label>
-          )}
+          <label>
+            Name
+            <input aria-label="Neuer Raidname" value={name} placeholder={selectedSeries ? previewSeriesName(selectedSeries, scheduled) : ''} onChange={(e) => setName(e.target.value)} required={!selectedSeries} />
+          </label>
+          {selectedSeries && <p className="muted">Leer lassen für den Namen aus der Namensvorlage: {previewSeriesName(selectedSeries, scheduled)}</p>}
           <label>
             Start ({Intl.DateTimeFormat().resolvedOptions().timeZone}, wird als UTC gespeichert)
             <input disabled={pending} required type="datetime-local" value={scheduled} onChange={(e) => setScheduled(e.target.value)} />

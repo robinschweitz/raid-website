@@ -173,9 +173,9 @@ func TestCatalogRaidSeriesInheritanceAndPreplannedReuse(t *testing.T) {
 				}
 				return result
 			}
-			config := map[string]any{"name": "Explicit series", "raid_leader_id": f.actor, "weekdays": []int{1}, "interval_weeks": 1, "start_time": "20:00", "timezone": "UTC", "catalog_instance_id": "631", "raid_size": 10}
+			config := map[string]any{"name": "Explicit series", "raid_leader_id": f.actor, "weekdays": []int{1}, "interval_weeks": 1, "start_time": "20:00", "timezone": "Europe/Berlin", "catalog_instance_id": "631", "raid_size": 10}
 			seriesID := correctionID(t, request(http.MethodPost, "/raid-series", config, http.StatusCreated))
-			start := time.Date(2090, 1, 2, 20, 0, 0, 0, time.UTC)
+			start := time.Date(2090, 1, 2, 19, 0, 0, 0, time.UTC) // 20:00 Europe/Berlin
 			f.raidID = correctionID(t, request(http.MethodPost, "/raids", map[string]any{"name": "Manual", "raid_leader_id": f.actor, "series_id": seriesID, "scheduled_start": start.Format(time.RFC3339)}, http.StatusCreated))
 			rd, err := raid.NewRepo(f.db).Get(context.Background(), f.raidID)
 			if err != nil || rd.CatalogInstanceID == nil || *rd.CatalogInstanceID != "631" || rd.RaidSize == nil || *rd.RaidSize != 10 {

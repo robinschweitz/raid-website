@@ -79,7 +79,6 @@ function raidError(err: unknown, fallback: string): string {
     schedule_not_editable: 'Die Planung eines abgeschlossenen, abgesagten oder archivierten Raids kann nicht mehr geändert werden. Bitte neu laden.',
     name_required: 'Bitte einen Raidnamen eintragen.',
     attendance_has_loot: 'Dieser Charakter hat in diesem Raid schon Loot erhalten. Bitte zuerst den Loot zurückziehen.',
-    name_not_editable: 'Raidnamen aus einer Raidserie können nicht direkt geändert werden.',
     invalid_scheduled_start: 'Bitte einen gültigen geplanten Start angeben.',
     difficulty_required: 'Bitte die Schwierigkeit des Boss-Kills wählen.',
     kill_difficulty_conflict: 'Die gespeicherte Schwierigkeit des Boss-Kills hat sich geändert. Bitte neu laden.',
@@ -755,7 +754,7 @@ function RaidDetail({ raidID, initialView }: Props) {
   const saveSchedule = async () => {
     if (!canManage || !isActiveRaid || !raid || (raid.series_id && !seriesID)) return
     const changes: { name?: string; series_id?: number; scheduled_start?: string } = {}
-    if (!raid.series_id && !seriesID && raidName.trim() !== raid.name) {
+    if (raidName.trim() !== raid.name) {
       if (!raidName.trim()) { setError('Bitte einen Raidnamen eintragen.'); return }
       changes.name = raidName.trim()
     }
@@ -901,16 +900,16 @@ function RaidDetail({ raidID, initialView }: Props) {
 
       {canManage && isActiveRaid && <section className="card">
         <h2>Raidplanung</h2>
-        {!raid.series_id && <label>Raidname
+        <label>Raidname
           <input aria-label="Raidname" disabled={pending} value={raidName} onChange={(e) => setRaidName(e.target.value)} required />
-        </label>}
+        </label>
         <select aria-label="Raidserie zuordnen" disabled={pending} value={seriesID} onChange={(e) => setSeriesID(e.target.value)}>
-          <option value="">Serie auswählen</option>{series.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.start_time}, {s.timezone})</option>)}
+          <option value="">Serie auswählen</option>{series.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.start_time})</option>)}
         </select>
         <label>Geplanter Start ({Intl.DateTimeFormat().resolvedOptions().timeZone}, wird als UTC gespeichert)
           <input aria-label="Geplanter Start" disabled={pending} required={!raid.scheduled_start} type="datetime-local" value={scheduled} onChange={(e) => setScheduled(e.target.value)} />
         </label>
-        <button className="primary-action" disabled={pending || (!!raid.series_id && !seriesID) || (!raid.series_id && !raidName.trim()) || (Number(seriesID) === (raid.series_id ?? 0) && scheduled === localStart(raid.scheduled_start) && (!!raid.series_id || !!seriesID || raidName.trim() === raid.name))} onClick={saveSchedule}>Planung speichern</button>
+        <button className="primary-action" disabled={pending || (!!raid.series_id && !seriesID) || !raidName.trim() || (Number(seriesID) === (raid.series_id ?? 0) && scheduled === localStart(raid.scheduled_start) && raidName.trim() === raid.name)} onClick={saveSchedule}>Planung speichern</button>
         {!raid.series_id && <p className="muted">Vor dem Archivieren muss eine Serie zugeordnet sein.</p>}
         {!raid.scheduled_start && <p className="muted">Vor dem Archivieren muss ein geplanter Start eingetragen und gespeichert sein.</p>}
         <p className="muted">Nur geänderte Werte werden gespeichert. Vorhandene Werte können nicht geleert werden.</p>

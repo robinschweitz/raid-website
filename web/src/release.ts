@@ -7,6 +7,16 @@ export const changelog = [
     changes: ['Ein abgesagter Raid lässt sich unter „Planung & Details“ wieder aufnehmen. Er bekommt den Status von vor der Absage zurück; Item-Locks, die beim Absagen verfallen sind, müssen neu gesetzt werden.'],
   },
   {
+    version: '1.0.90',
+    title: 'Mehr Auswahl bei „Neuer Raid“',
+    changes: [
+      'Beim Anlegen eines Raids wählst du jetzt alle Raidleiter, den EP-Topf und die EP beim Archivieren. Die Raidserie füllt alles vor, du kannst es für diesen Raid ändern.',
+      'Auch mit Raidserie kannst du einen eigenen Raidnamen eintragen; leer bleibt der Name aus der Namensvorlage.',
+      'Unter „Planung & Details“ lässt sich der Name jedes geplanten oder offenen Raids ändern, auch bei Raids aus einer Serie.',
+      'Raidserien fragen keine Zeitzone mehr ab: Startzeiten sind immer Serverzeit (deutsche Zeit).',
+    ],
+  },
+  {
     version: '1.0.89',
     title: 'EP-Töpfe pro Raidserie',
     changes: [

@@ -10,7 +10,7 @@ import { EpPoolsPanel } from '../components/EpPoolsPanel'
 import { useEpPools } from '../epPools'
 
 const weekdays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
-const emptySchedule = { name: '', name_template: '', next_raid_number: '1', raid_leader_id: '', extra_leaders: [] as number[], weekdays: [] as number[], interval_weeks: '', start_time: '', timezone: '', plan_weeks_ahead: '0', catalog_instance_id: '', raid_size: '', ep_pool_id: '', ep_award: '10' }
+const emptySchedule = { name: '', name_template: '', next_raid_number: '1', raid_leader_id: '', extra_leaders: [] as number[], weekdays: [] as number[], interval_weeks: '', start_time: '', plan_weeks_ahead: '0', catalog_instance_id: '', raid_size: '', ep_pool_id: '', ep_award: '10' }
 
 export function RaidSeriesPage() {
   const { player } = useAuth()
@@ -49,7 +49,7 @@ export function RaidSeriesPage() {
     if (!isAdmin || isPending() || !isActive()) return
     ++editVersion.current
     setEditingID(row?.id ?? null)
-    setSchedule(row ? { name: row.name, name_template: row.name_template ?? '', next_raid_number: String(row.next_raid_number ?? 1), raid_leader_id: String(row.raid_leader_id), extra_leaders: (row.leader_ids ?? []).slice(1), weekdays: [...row.weekdays], interval_weeks: String(row.interval_weeks), start_time: row.start_time, timezone: row.timezone, plan_weeks_ahead: String(row.plan_weeks_ahead ?? 0), catalog_instance_id: row.catalog_instance_id ?? '', raid_size: row.raid_size == null ? '' : String(row.raid_size), ep_pool_id: row.ep_pool_id == null ? '0' : String(row.ep_pool_id), ep_award: String(row.ep_award ?? 10) } : emptySchedule)
+    setSchedule(row ? { name: row.name, name_template: row.name_template ?? '', next_raid_number: String(row.next_raid_number ?? 1), raid_leader_id: String(row.raid_leader_id), extra_leaders: (row.leader_ids ?? []).slice(1), weekdays: [...row.weekdays], interval_weeks: String(row.interval_weeks), start_time: row.start_time, plan_weeks_ahead: String(row.plan_weeks_ahead ?? 0), catalog_instance_id: row.catalog_instance_id ?? '', raid_size: row.raid_size == null ? '' : String(row.raid_size), ep_pool_id: row.ep_pool_id == null ? '0' : String(row.ep_pool_id), ep_award: String(row.ep_award ?? 10) } : emptySchedule)
     setError('')
   }
 
@@ -57,7 +57,7 @@ export function RaidSeriesPage() {
     event.preventDefault()
     if (!isAdmin || renderedEditVersion !== editVersion.current || !schedule.name.trim() || !schedule.raid_leader_id || !schedule.weekdays.length
       || !Number.isInteger(Number(schedule.interval_weeks)) || Number(schedule.interval_weeks) < 1
-      || !schedule.start_time || !schedule.timezone.trim() || !associationValid
+      || !schedule.start_time || !associationValid
       || !Number.isInteger(Number(schedule.plan_weeks_ahead)) || Number(schedule.plan_weeks_ahead) < 0
       || !Number.isInteger(Number(schedule.ep_award)) || Number(schedule.ep_award) < 0 || Number(schedule.ep_award) > 100
       || (!!existing?.catalog_instance_id && !schedule.catalog_instance_id) || (existing?.raid_size != null && !schedule.raid_size)) return
@@ -68,7 +68,7 @@ export function RaidSeriesPage() {
         const trimmedTemplate = name_template.trim()
         // The first leader comes first; the others follow once each (ADR 112).
         const firstLeader = Number(raid_leader_id)
-        const body = { ...fields, name: schedule.name.trim(), leader_ids: [firstLeader, ...extra_leaders.filter((id) => id !== firstLeader)], interval_weeks: Number(schedule.interval_weeks), timezone: schedule.timezone.trim(), plan_weeks_ahead: Number(schedule.plan_weeks_ahead),
+        const body = { ...fields, name: schedule.name.trim(), leader_ids: [firstLeader, ...extra_leaders.filter((id) => id !== firstLeader)], interval_weeks: Number(schedule.interval_weeks), plan_weeks_ahead: Number(schedule.plan_weeks_ahead),
           ...(trimmedTemplate || (editingID !== null && !!existing?.name_template) ? { name_template: trimmedTemplate, next_raid_number: Number(next_raid_number) } : {}),
           ...(!associationUnchanged && catalog_instance_id ? { catalog_instance_id, raid_size: Number(raid_size) } : {}),
           // An empty choice on a new series keeps the server default: the first pool (ADR 113).
@@ -109,10 +109,9 @@ export function RaidSeriesPage() {
         <input type="checkbox" checked={schedule.weekdays.includes(index)} onChange={(e) => setSchedule({ ...schedule, weekdays: e.target.checked ? [...schedule.weekdays, index].sort((a, b) => a - b) : schedule.weekdays.filter((d) => d !== index) })} /> {day}
       </label>)}</fieldset>
       <label>Intervall in Wochen<input disabled={pending} required type="number" min="1" step="1" placeholder="Wochenintervall" value={schedule.interval_weeks} onChange={(e) => setSchedule({ ...schedule, interval_weeks: e.target.value })} /></label>
-      <label>Startzeit in der Serien-Zeitzone<input disabled={pending} required type="time" value={schedule.start_time} onChange={(e) => setSchedule({ ...schedule, start_time: e.target.value })} /></label>
+      <label>Startzeit (Serverzeit)<input disabled={pending} required type="time" value={schedule.start_time} onChange={(e) => setSchedule({ ...schedule, start_time: e.target.value })} /></label>
       <label>Automatisch im Voraus planen (Wochen, 0 = aus)<input aria-label="Wochen im Voraus" disabled={pending} required type="number" min="0" step="1" value={schedule.plan_weeks_ahead} onChange={(e) => setSchedule({ ...schedule, plan_weeks_ahead: e.target.value })} /></label>
       <p className="muted">Hält so viele Wochen an Raids dieser Serie angelegt, mit offener Anmeldung. Aufgefüllt wird beim Speichern der Serie und bei jedem Archivieren.</p>
-      <label>IANA-Zeitzone<input disabled={pending} required placeholder="IANA-Zeitzone" value={schedule.timezone} onChange={(e) => setSchedule({ ...schedule, timezone: e.target.value })} /></label>
       <fieldset disabled={pending}><legend>Enhance Points</legend>
         <label>EP-Topf<select aria-label="EP-Topf der Serie" value={schedule.ep_pool_id} onChange={(e) => setSchedule({ ...schedule, ep_pool_id: e.target.value })}>
           {editingID === null && <option value="">Standard ({pools[0]?.name ?? 'erster EP-Topf'})</option>}
@@ -132,14 +131,14 @@ export function RaidSeriesPage() {
   return <div>
     <p><Link to="/roster">← Gildenkonfiguration</Link></p>
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Raidserien</h1></div></div>
-    <p className="muted">Beim Archivieren entsteht der nächste zukünftige Termin nach dieser Konfiguration; abgesagte Termine werden übersprungen. Raids lassen sich auch auf der Raidseite im Voraus anlegen. Die Wiederholung verwendet die konfigurierte IANA-Zeitzone, nicht die Browser-Zeitzone.</p>
+    <p className="muted">Beim Archivieren entsteht der nächste zukünftige Termin nach dieser Konfiguration; abgesagte Termine werden übersprungen. Raids lassen sich auch auf der Raidseite im Voraus anlegen. Startzeiten sind Serverzeit (deutsche Zeit, mit Sommerzeit), nicht die Zeitzone des Browsers.</p>
     {error && <ErrorMessage>{error}</ErrorMessage>}
     {isAdmin && editingID === null && <details className="card editor-disclosure"><summary>Neue Raidserie</summary>{editorForm}</details>}
     <ul className="series-directory">{series.map((s) => <li className={`card${editingID === s.id ? ' is-editing' : ''}`} key={s.id}>
       <h2>{s.name}</h2>
       {isAdmin && editingID === s.id ? editorForm : <>
         <p>{s.weekdays.map((day) => weekdays[day]).join(', ')} · {s.start_time}</p>
-        <p className="muted">{s.interval_weeks === 1 ? 'Jede Woche' : `Alle ${s.interval_weeks} Wochen`} · {s.timezone}</p>
+        <p className="muted">{s.interval_weeks === 1 ? 'Jede Woche' : `Alle ${s.interval_weeks} Wochen`}</p>
         {!!s.plan_weeks_ahead && <p className="muted">Automatisch {s.plan_weeks_ahead === 1 ? '1 Woche' : `${s.plan_weeks_ahead} Wochen`} im Voraus geplant</p>}
         {s.name_template && <p className="muted">Namensvorlage: {s.name_template} · Nächste Nummer: {s.next_raid_number}</p>}
         <p className="muted">Raidleitung: {(s.leader_ids?.length ? s.leader_ids : [s.raid_leader_id]).map(playerName).join(', ')}{s.catalog_instance_id && ` · ${catalog?.instances.find((instance) => instance.id === s.catalog_instance_id)?.name ?? `Instanz #${s.catalog_instance_id}`}${s.raid_size ? ` · ${s.raid_size} Spieler` : ''}`}</p>

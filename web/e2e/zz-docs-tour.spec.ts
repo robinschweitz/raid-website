@@ -127,8 +127,8 @@ test.beforeAll(async ({ request }) => {
   const byName = (pattern: RegExp) => drops.find((row: { name: string }) => pattern.test(row.name))
   const axe = byName(/Bryntroll/) ?? drops[0]
   const second = drops.find((row: { item_id: string }) => row.item_id !== axe.item_id)
-  await api.post(`/api/v1/raids/${past.id}/loot`, { catalog_boss_id: axe.boss_id, item_id: axe.item_id, award_method: 'MAIN', awarded_to_player_id: ids.Eisenfaust, awarded_to_character_id: chars.Eisenfaust })
-  await api.post(`/api/v1/raids/${past.id}/loot`, { catalog_boss_id: second.boss_id, item_id: second.item_id, award_method: 'SECOND', awarded_to_player_id: ids.Funkenflug, awarded_to_character_id: chars.Funkenflug })
+  await api.post(`/api/v1/raids/${past.id}/loot`, { catalog_boss_id: axe.boss_id, item_id: axe.item_id, award_method: 'MAIN', difficulty: axe.mode ?? 'NORMAL', awarded_to_player_id: ids.Eisenfaust, awarded_to_character_id: chars.Eisenfaust })
+  await api.post(`/api/v1/raids/${past.id}/loot`, { catalog_boss_id: second.boss_id, item_id: second.item_id, award_method: 'SECOND', difficulty: (second.boss_id === axe.boss_id ? axe.mode : second.mode) ?? 'NORMAL', awarded_to_player_id: ids.Funkenflug, awarded_to_character_id: chars.Funkenflug })
   await api.post(`/api/v1/raid-series/${series.id}/plan`, { until: thursday(3).toISOString().slice(0, 10) })
   await api.post(`/api/v1/raids/${past.id}/archive`, {})
   const raids = (await (await request.get('/api/v1/raids')).json()).data

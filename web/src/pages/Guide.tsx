@@ -284,7 +284,8 @@ export function GuidePage() {
       <h3>Einen Raid anlegen</h3>
       <ol>
         <li>Klicke auf <strong>Neuer Raid</strong>.</li>
-        <li>Wähle die <strong>Raidserie</strong>, z. B. <em>ICC25 Donnerstag</em>. Raidleiter, Instanz, Größe und Name (z. B. <em>ICC25-6</em>) werden übernommen.</li>
+        <li>Wähle die <strong>Raidserie</strong>, z. B. <em>ICC25 Donnerstag</em>. Raidleiter, EP-Topf, EP, Instanz und Größe werden vorausgefüllt; der Name kommt aus der Namensvorlage (z. B. <em>ICC25-6</em>).</li>
+        <li>Ändere bei Bedarf Raidleiter, EP-Topf oder EP für diesen Raid, oder trage einen eigenen <strong>Namen</strong> ein.</li>
         <li>Wähle den <strong>Start</strong> und klicke auf <strong>Anlegen</strong>.</li>
       </ol>
       <Shot name="30-raids-neuer-raid" caption="Neuer Raid aus einer Raidserie" />
@@ -298,8 +299,8 @@ export function GuidePage() {
       <p><strong>Beispiel:</strong> Serie <em>ICC25 Donnerstag</em> bis 12.11. ergibt ICC25-2 bis ICC25-5. Alle Mitglieder sehen sie sofort unter <em>Meine nächsten Raids</em>.</p>
       <Shot name="31-raids-voraus-planen" caption="Termine im Voraus anlegen und der Raidkalender" />
       <Tip>Beim Archivieren entsteht der nächste Termin der Serie automatisch. Admins können pro Serie einstellen, wie viele Wochen immer im Voraus geplant bleiben.</Tip>
-      <h3>Verschieben oder absagen</h3>
-      <p>Im Raid unter <strong>Planung &amp; Details</strong> den Start ändern und <strong>Planung speichern</strong>. Fällt der Raid aus, weiter unten <strong>Absagen</strong>. War die Absage ein Versehen, holt <strong>Absage rückgängig machen</strong> den Raid zurück; Item-Locks müssen danach neu gesetzt werden.</p>
+      <h3>Umbenennen, verschieben oder absagen</h3>
+      <p>Im Raid unter <strong>Planung &amp; Details</strong> den Raidnamen oder den Start ändern und <strong>Planung speichern</strong>. Fällt der Raid aus, weiter unten <strong>Absagen</strong>. War die Absage ein Versehen, holt <strong>Absage rückgängig machen</strong> den Raid zurück; Item-Locks müssen danach neu gesetzt werden.</p>
       <Shot name="38-planung-details" caption="Planung & Details" />
     </Section>
 

@@ -23,6 +23,11 @@ type createRaidRequest struct {
 	ScheduledEnd      *string `json:"scheduled_end"`
 	Notes             string  `json:"notes"`
 	SeriesID          *int64  `json:"series_id"`
+	// LeaderIDs lists all raid leaders in order; it wins over RaidLeaderID.
+	LeaderIDs []int64 `json:"leader_ids"`
+	// EPPoolID 0 means "no pool"; omitted takes the series' pool or the default.
+	EPPoolID *int64 `json:"ep_pool_id"`
+	EPAward  *int   `json:"ep_award"`
 }
 
 type configureRaidScheduleRequest struct {
@@ -69,7 +74,7 @@ func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, "malformed json body")
 		return
 	}
-	if req.RaidLeaderID <= 0 {
+	if req.RaidLeaderID <= 0 && len(req.LeaderIDs) == 0 {
 		BadRequest(w, "raid_leader_id is required")
 		return
 	}
@@ -107,9 +112,17 @@ func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
-	if err := raid.NewService(a.Raids).CreateRaid(r.Context(), rd, actor); err != nil {
-		if errors.Is(err, raid.ErrNameRequired) {
+	options := raid.CreateOptions{LeaderIDs: req.LeaderIDs, EPPoolID: req.EPPoolID, EPAward: req.EPAward}
+	if err := raid.NewService(a.Raids).CreateRaid(r.Context(), rd, actor, options); err != nil {
+		switch {
+		case errors.Is(err, raid.ErrNameRequired):
 			WriteError(w, http.StatusBadRequest, "name_required", "name is required")
+			return
+		case errors.Is(err, raid.ErrLeadersInvalid):
+			WriteError(w, http.StatusBadRequest, "raid_leaders_invalid", "Bitte mindestens eine Raidleitung wählen, jede nur einmal und nur aktive Spieler.")
+			return
+		case errors.Is(err, raid.ErrEPInvalid):
+			WriteError(w, http.StatusBadRequest, "invalid_ep_award", "Die EP-Vergabe muss zwischen 0 und 100 liegen.")
 			return
 		}
 		if writeSeriesError(w, err) {
@@ -263,8 +276,6 @@ func (a *API) configureRaidSchedule(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusConflict, "raid_ep_locked", "Der Raid hat schon EP oder Locks; EP-Topf und Vergabe der neuen Serie passen nicht dazu.")
 		case errors.Is(err, raid.ErrNameRequired):
 			WriteError(w, http.StatusBadRequest, "name_required", "name is required")
-		case errors.Is(err, raid.ErrNameNotEditable):
-			WriteError(w, http.StatusConflict, "name_not_editable", "raid name can only be changed for raids without series")
 		default:
 			WriteError(w, http.StatusInternalServerError, "internal", "could not configure raid schedule")
 		}

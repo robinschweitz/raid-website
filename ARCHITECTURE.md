@@ -120,8 +120,9 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   `/raids/{id}/leaders`, `/points`, `/ep-pools`, `/external/rising-gods/characters`, `/health` (also `/health` at the root), `/auth/csrf`, `/statistics`, and `/privacy-contact`. Login, MFA, and registration writes are public too.
 - **API notes.** Catalog reads: `GET /api/v1/loot-catalog` and its `/instances`, `/bosses`,
   `/items`; there are no catalog write endpoints. Raid series: `weekdays` are 0 (Sunday) to 6
-  (Saturday), `start_time` is `HH:MM`, `timezone` an IANA name. `PATCH /api/v1/raids/{id}` takes
-  `series_id` and/or `scheduled_start` (RFC3339); omitted fields stay unchanged.
+  (Saturday), `start_time` is `HH:MM`, `timezone` always `Europe/Berlin` (ADR 114).
+  `POST /api/v1/raids` takes optional `leader_ids`, `ep_pool_id` (0 = no pool), and `ep_award`;
+  `PATCH /api/v1/raids/{id}` takes `name`, `series_id`, and/or `scheduled_start` (RFC3339); omitted fields stay unchanged.
   `POST /api/v1/raids/{id}/archive` returns the raid in `data` and its successor in `next_raid`.
   Loot DTOs carry `award_method`, never a client-set `is_main_spec`.
 - **Security events and account recovery.** Security events are written as structured lines to

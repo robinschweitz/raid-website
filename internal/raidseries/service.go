@@ -25,6 +25,9 @@ var (
 	ErrPoolNotFound           = errors.New("ep pool not found")
 )
 
+// Timezone is the one timezone of every series: the realm's server time (ADR 114).
+const Timezone = "Europe/Berlin"
+
 // MaxPlanWeeks bounds how far ahead raids are created (ten years); it only
 // guards against runaway input, it is not a business limit (ADR 078).
 const MaxPlanWeeks = 520
@@ -132,9 +135,11 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		if changes.StartTime != nil {
 			series.StartTime = *changes.StartTime
 		}
-		if changes.Timezone != nil {
-			series.Timezone = *changes.Timezone
+		// The timezone is fixed; a sent value may only repeat it (ADR 114).
+		if changes.Timezone != nil && *changes.Timezone != Timezone {
+			return ErrInvalid
 		}
+		series.Timezone = Timezone
 		if changes.PlanWeeksAhead != nil {
 			series.PlanWeeksAhead = *changes.PlanWeeksAhead
 		}

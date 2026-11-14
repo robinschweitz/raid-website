@@ -42,7 +42,7 @@ func TestRaidSeriesAPIConfigurationAndPermissions(t *testing.T) {
 			t.Fatalf("nonadmin patch: %d", status)
 		}
 	}
-	for _, field := range []string{"name", "raid_leader_id", "weekdays", "interval_weeks", "start_time", "timezone"} {
+	for _, field := range []string{"name", "raid_leader_id", "weekdays", "interval_weeks", "start_time"} {
 		request := map[string]any{}
 		for key, value := range configured {
 			if key != field {

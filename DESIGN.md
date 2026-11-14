@@ -465,7 +465,7 @@ Target: WCAG 2.2 level AA.
 
 - **Text only:** names, notes, poll answers, Rising-Gods data, and addon lines appear as plain
   text, never as formatted HTML (rule: SC-022).
-- **Confirmations:** cancelling or archiving a raid, withdrawing loot, removing a roster row,
+- **Confirmations:** cancelling or archiving a raid, taking back a cancellation, withdrawing loot, removing a roster row,
   merging accounts or characters, moving a character, and finishing or removing a Shadowmourne
   entry ask for confirmation first; declining
   sends nothing (ADR 069, ADR 076). The archive dialog shows the EP preview before it commits

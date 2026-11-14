@@ -1,8 +1,13 @@
-export const appVersion = '1.0.89'
+export const appVersion = '1.0.91'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Absage rückgängig machen',
+    changes: ['Ein abgesagter Raid lässt sich unter „Planung & Details“ wieder aufnehmen. Er bekommt den Status von vor der Absage zurück; Item-Locks, die beim Absagen verfallen sind, müssen neu gesetzt werden.'],
+  },
+  {
+    version: '1.0.89',
     title: 'EP-Töpfe pro Raidserie',
     changes: [
       'Admins können EP-Töpfe anlegen, zum Beispiel für ICC und Ulduar. Jeder Topf ist ein eigener EP-Stand; EP aus einem Topf zählen nur in Raids dieses Topfs. Alle bisherigen EP liegen im Topf „ICC“.',

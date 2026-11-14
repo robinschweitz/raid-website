@@ -299,7 +299,7 @@ export function GuidePage() {
       <Shot name="31-raids-voraus-planen" caption="Termine im Voraus anlegen und der Raidkalender" />
       <Tip>Beim Archivieren entsteht der nächste Termin der Serie automatisch. Admins können pro Serie einstellen, wie viele Wochen immer im Voraus geplant bleiben.</Tip>
       <h3>Verschieben oder absagen</h3>
-      <p>Im Raid unter <strong>Planung &amp; Details</strong> den Start ändern und <strong>Planung speichern</strong>. Fällt der Raid aus, weiter unten <strong>Absagen</strong>.</p>
+      <p>Im Raid unter <strong>Planung &amp; Details</strong> den Start ändern und <strong>Planung speichern</strong>. Fällt der Raid aus, weiter unten <strong>Absagen</strong>. War die Absage ein Versehen, holt <strong>Absage rückgängig machen</strong> den Raid zurück; Item-Locks müssen danach neu gesetzt werden.</p>
       <Shot name="38-planung-details" caption="Planung & Details" />
     </Section>
 

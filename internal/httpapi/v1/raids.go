@@ -168,6 +168,35 @@ func (a *API) cancelRaid(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]any{"data": rd})
 }
 
+// uncancelRaid takes back a cancellation (ADR 115).
+func (a *API) uncancelRaid(w http.ResponseWriter, r *http.Request) {
+	actor, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "missing_actor", "session required")
+		return
+	}
+	id, ok := pathID(r, "id")
+	if !ok {
+		BadRequest(w, "invalid raid id")
+		return
+	}
+	rd, err := raid.NewService(a.Raids).UncancelRaid(r.Context(), id, actor)
+	if err != nil {
+		switch {
+		case errors.Is(err, raid.ErrNotFound):
+			WriteError(w, http.StatusNotFound, "not_found", "raid not found")
+		case errors.Is(err, raid.ErrActorNotFound):
+			WriteError(w, http.StatusUnprocessableEntity, "actor_not_found", "raid actor not found")
+		case errors.Is(err, raid.ErrNotCancelled):
+			WriteError(w, http.StatusConflict, "raid_not_cancelled", "Nur abgesagte, nicht archivierte Raids können wieder aufgenommen werden.")
+		default:
+			WriteError(w, http.StatusInternalServerError, "internal", "could not take back the cancellation")
+		}
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": rd})
+}
+
 func (a *API) archiveRaid(w http.ResponseWriter, r *http.Request) {
 	actor, ok := ActorID(r)
 	if !ok {

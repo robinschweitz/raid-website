@@ -2655,6 +2655,23 @@ test('cancelling a raid asks for confirmation and a declined prompt sends nothin
   await accepted
 })
 
+test('taking back a cancellation asks for confirmation and posts uncancel (ADR 115)', async () => {
+  const s = setup()
+  const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })
+  resolveRaid(s, 1, { raid: { status: 'CANCELLED' }, attendance: [recipientRow] })
+  await flush(view)
+  assert.equal(button(view, 'Absagen'), undefined)
+  s.confirmAnswers.push(false)
+  await button(view, 'Absage rückgängig machen').props.onClick()
+  assert.equal(writes(s).length, 0)
+  assert.match(s.confirms[0], /rückgängig/)
+  const accepted = button(view, 'Absage rückgängig machen').props.onClick()
+  assert.equal(writes(s).length, 1)
+  assert.match(writes(s)[0].url, /\/raids\/1\/uncancel$/)
+  writes(s)[0].reject(new Error('offline'))
+  await accepted
+})
+
 test('unsaved association is preview only; saved context invalidates old loot requests and handlers', async () => {
   const s = setup()
   const view = s.mount(s.load('pages/RaidDetail.tsx').RaidDetailPage, { raidID: 1 })

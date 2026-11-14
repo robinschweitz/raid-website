@@ -2,7 +2,9 @@ package raid
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +19,7 @@ var (
 	ErrActorNotFound       = errors.New("raid actor not found")
 	ErrNameRequired        = errors.New("raid name is required")
 	ErrNotCancellable      = errors.New("raid is not cancellable")
+	ErrNotCancelled        = errors.New("raid is not cancelled")
 	ErrScheduleNotEditable = errors.New("finalized, cancelled or archived raid schedule cannot be changed")
 	// ErrEPLocked: the raid has EP rows or locks, so its pool and award stay (FR-16.11).
 	ErrEPLocked           = errors.New("raid ep pool is fixed by existing points or locks")
@@ -62,6 +65,63 @@ func (s *Service) CancelRaid(ctx context.Context, raidID, actorID int64) (*Raid,
 		return enhancepoints.NewRepo(repo.db).ExpireRaidLocks(ctx, actorID, rd.ID, now)
 	})
 	return rd, err
+}
+
+// UncancelRaid takes back the cancellation of an unarchived raid (ADR 115). The raid
+// gets the status it had before the cancellation, read from the cancel audit entry;
+// without one it becomes PLANNED. Locks that the cancellation expired stay expired.
+func (s *Service) UncancelRaid(ctx context.Context, raidID, actorID int64) (*Raid, error) {
+	var rd *Raid
+	err := s.repo.InTransaction(ctx, func(repo *Repo) error {
+		if err := repo.RequireActor(ctx, actorID); err != nil {
+			return err
+		}
+		var err error
+		rd, err = repo.Get(ctx, raidID)
+		if err != nil {
+			return err
+		}
+		if rd.ArchivedAt != nil || rd.Status != validation.RaidStatusCancelled {
+			return ErrNotCancelled
+		}
+		previous, err := statusBeforeCancel(ctx, repo, raidID)
+		if err != nil {
+			return err
+		}
+		before := *rd
+		rd.Status = previous
+		rd.CancelledAt = nil
+		rd.UpdatedAt = time.Now().UTC()
+		if err := repo.Update(ctx, rd); err != nil {
+			return err
+		}
+		return repo.Audit(ctx, actorID, rd.ID, "uncancel", &before, rd)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return rd, nil
+}
+
+// statusBeforeCancel reads the status from the newest cancel audit entry of a raid.
+func statusBeforeCancel(ctx context.Context, repo *Repo, raidID int64) (validation.RaidStatus, error) {
+	logs, err := audit.NewRepo(repo.db).ListByEntity(ctx, "raid", strconv.FormatInt(raidID, 10))
+	if err != nil {
+		return "", err
+	}
+	for i := len(logs) - 1; i >= 0; i-- {
+		if logs[i].Action != "cancel" {
+			continue
+		}
+		var snapshot struct {
+			Status validation.RaidStatus `json:"status"`
+		}
+		if json.Unmarshal([]byte(logs[i].BeforeJSON), &snapshot) == nil && snapshot.Status == validation.RaidStatusOpen {
+			return validation.RaidStatusOpen, nil
+		}
+		break
+	}
+	return validation.RaidStatusPlanned, nil
 }
 
 // sameEP reports whether a raid already has the series' EP pool and award.

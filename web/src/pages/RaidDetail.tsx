@@ -680,10 +680,32 @@ function RaidDetail({ raidID, initialView }: Props) {
     })
   }
 
+  const uncancel = async () => {
+    if (!canManage || !raid || raid.archived_at || raid.status !== 'CANCELLED') return
+    if (!window.confirm('Absage rückgängig machen? Der Raid wird wieder geplant; verfallene Item-Locks bleiben verfallen.')) return
+    await submit(async () => {
+      setError('')
+      setMessage('')
+      try {
+        const result = await api.post<Raid>(`/api/v1/raids/${raidID}/uncancel`)
+        if (!isActive()) return
+        ++characterVersion.current
+        ++lootFormVersion.current
+        ++lootEditorVersion.current
+        ++catalogVersion.current
+        setRaid(result)
+        setMessage('Absage rückgängig gemacht. Item-Locks müssen neu gesetzt werden.')
+        await load()
+      } catch (err) {
+        if (isActive()) setError(raidError(err, 'Absage konnte nicht rückgängig gemacht werden'))
+      }
+    })
+  }
+
   const action = async (name: 'cancel' | 'archive') => {
     if (!canManage || !raid || raid.archived_at || raid.status === 'CANCELLED' || (name !== 'archive' && !isActiveRaid)) return
     if (name === 'archive' && isActiveRaid && (!raid.series_id || !raid.scheduled_start)) return
-    if (name === 'cancel' && !window.confirm('Raid wirklich absagen? Es werden keine EP vergeben.')) return
+    if (name === 'cancel' && !window.confirm('Raid wirklich absagen? Es werden keine EP vergeben und Item-Locks verfallen. Die Absage lässt sich rückgängig machen.')) return
     if (name === 'archive' && isActiveRaid && !archiveReview) {
       await submit(async () => {
         setError('')
@@ -917,6 +939,12 @@ function RaidDetail({ raidID, initialView }: Props) {
         </select></label>
         <button className="primary-action" type="button" disabled={pending || !associationChanged || !associationValid} onClick={saveAssociation}>Raidinstanz und Größe speichern</button>
       </section>}
+      {canManage && !raid.archived_at && raid.status === 'CANCELLED' && (
+        <section aria-label="Absage">
+          <p className="muted">Dieser Raid ist abgesagt. Rückgängig machen stellt den Status vor der Absage wieder her; verfallene Item-Locks bleiben verfallen.</p>
+          <div className="actions"><button disabled={pending} onClick={uncancel}>Absage rückgängig machen</button></div>
+        </section>
+      )}
       {canManage && !raid.archived_at && raid.status !== 'CANCELLED' && (
         <section>
         <p className="muted">{isActiveRaid ? 'Archivieren beendet den Raid endgültig: +10 EP pro Teilnehmer ohne Main-Spec-Loot, ungenutzte Locks verfallen und der nächste zukünftige Serientermin wird angelegt. Spätere Korrekturen erfordern eine Begründung.' : 'Dieser historische abgeschlossene Raid wird nur archiviert. Keine erneute EP-Vergabe und kein Nachfolger.'}</p>

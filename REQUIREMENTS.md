@@ -143,7 +143,7 @@ implemented yet when it differs from the code.
 - **FR-10.1** Staff MUST be able to create a raid with an instance, a size, an optional series, an optional scheduled start, the raid leaders (FR-10.17), and an EP pool and award (FR-16.11). The form MUST prefill leaders, pool, award, instance, and size from the chosen series. (ADR 021, 114)
 - **FR-10.2** With a series, a sent name MUST win; without one the system MUST take the raid name from the series template. A raid created from a series MUST consume the template counter either way. Without a series, the name MUST be given, else `name_required`. (ADR 035, 114)
 - **FR-10.3** A raid MUST have one status: PLANNED, OPEN, COMPLETED, or CANCELLED. (owner brief)
-- **FR-10.4** Staff MUST be able to cancel a raid that is not archived, completed, or cancelled. A cancelled raid MUST NOT get EP. Cancelling MUST expire the active item locks of the raid (FR-17.6). (ADR 015; Owner 2026-10-22, OQ-2)
+- **FR-10.4** Staff MUST be able to cancel a raid that is not archived, completed, or cancelled, and to take it back (FR-10.18). A cancelled raid MUST NOT get EP. Cancelling MUST expire the active item locks of the raid (FR-17.6). (ADR 015; Owner 2026-10-22, OQ-2)
 - **FR-10.5** Staff MUST be able to set the series and scheduled start of an active raid. The name MUST be editable for every active raid, with or without a series. (ADR 021, 114)
 - **FR-10.6** "Archivieren" MUST be the only final action. It MUST set COMPLETED, the completion time, and the archive time together. (ADR 021)
 - **FR-10.7** Archiving MUST be rejected when the raid has no series, no scheduled start, or an incomplete roster. Then no record MUST change. (ADR 021, 022)
@@ -157,6 +157,7 @@ implemented yet when it differs from the code.
 - **FR-10.15** Archiving a raid that was COMPLETED before this rule MUST only set the archive time. It MUST NOT award EP or start a series chain. (ADR 021)
 - **FR-10.16** Cancelling and archiving a raid MUST need a confirmation (which actions: `DESIGN.md` "Interaction & Rendering Safety"). (ADR 069)
 - **FR-10.17** A raid MUST have one or more raid leaders (Raidleitung). A raid created from a series MUST get the series' leaders (FR-9.1); a raid created by hand with another first leader keeps it first and gets the series' other leaders after it; leaders chosen on the new-raid form MUST replace the series' list. Changing a series MUST NOT change existing raids. Staff MUST be able to set the list under the raid-state rules of FR-13.11, also for archived raids, and with the reason rule of FR-26.5: active players, each once, at least one. Raid leaders MUST NOT grant permissions. The change MUST be audited. Everyone, also without a session, sees all raid leaders on the overview; the raid page shows them too. (Owner 2026-11-03, ADR 109, 110, 112)
+- **FR-10.18** Staff MUST be able to take back the cancellation of a cancelled, unarchived raid, also after its scheduled start. The raid MUST get the status it had before the cancellation (PLANNED when that is unknown). Item locks that the cancellation expired MUST stay expired. The undo MUST need a confirmation and MUST be audited. Another raid MUST give HTTP 409 `raid_not_cancelled`. (Owner 2026-11-14, ADR 115)
 
 ### 11. Current raid and dashboard
 

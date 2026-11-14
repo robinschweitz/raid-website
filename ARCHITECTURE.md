@@ -124,6 +124,8 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   `POST /api/v1/raids` takes optional `leader_ids`, `ep_pool_id` (0 = no pool), and `ep_award`;
   `PATCH /api/v1/raids/{id}` takes `name`, `series_id`, and/or `scheduled_start` (RFC3339); omitted fields stay unchanged.
   `POST /api/v1/raids/{id}/archive` returns the raid in `data` and its successor in `next_raid`.
+  `POST /api/v1/raids/{id}/uncancel` (RAIDASSISTENT and higher) restores the status before the
+  cancellation from the `cancel` audit entry (ADR 115).
   Loot DTOs carry `award_method`, never a client-set `is_main_spec`.
 - **Security events and account recovery.** Security events are written as structured lines to
   the systemd journal, which keeps them 30 days (SC-041). Password-reset codes reuse the

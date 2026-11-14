@@ -1,8 +1,13 @@
-export const appVersion = '1.0.90'
+export const appVersion = '1.0.91'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Absage rückgängig machen',
+    changes: ['Ein abgesagter Raid lässt sich unter „Planung & Details“ wieder aufnehmen. Er bekommt den Status von vor der Absage zurück; Item-Locks, die beim Absagen verfallen sind, müssen neu gesetzt werden.'],
+  },
+  {
+    version: '1.0.90',
     title: 'Mehr Auswahl bei „Neuer Raid“',
     changes: [
       'Beim Anlegen eines Raids wählst du jetzt alle Raidleiter, den EP-Topf und die EP beim Archivieren. Die Raidserie füllt alles vor, du kannst es für diesen Raid ändern.',

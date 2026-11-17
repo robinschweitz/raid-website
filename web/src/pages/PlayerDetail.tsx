@@ -373,8 +373,16 @@ function PlayerDetail({ playerID, initialView }: Props) {
       setError('')
       setClaimStatus('')
       try {
-        await api.post('/api/v1/characters/claim-requests', { profile_id: claimSelected.profile_id })
-        if (isActive()) setClaimStatus(`Anfrage für ${claimSelected.name} erstellt. Ein Admin sendet dir den Code ingame an diesen Charakter.`)
+        const result = await api.post<{ claimed: boolean }>('/api/v1/characters/claim', { profile_id: claimSelected.profile_id })
+        if (!isActive()) return
+        if (result.claimed) {
+          setClaimSelected(null)
+          setClaimResults([])
+          setClaimStatus(`${claimSelected.name} gehört jetzt dir.`)
+          await load()
+          return
+        }
+        setClaimStatus(`Anfrage für ${claimSelected.name} erstellt:Ein Admin prüft sie und sendet dir den Code ingame an diesen Charakter.`)
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Anfrage fehlgeschlagen')
       }
@@ -711,7 +719,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
         )}
         {isOwnProfile && (
           <details className="editor-disclosure"><summary>Charakter beanspruchen</summary>
-          <p className="muted">Suche deinen Rising-Gods-Charakter. Ein Admin sendet dir den Code ingame an diesen Charakter.</p>
+          <p className="muted">Suche deinen Rising-Gods-Charakter. Gehört er noch niemandem, ist er sofort deiner. Gehört er schon einem anderen Spieler, entsteht eine Anfrage, und ein Admin sendet dir den Code ingame an diesen Charakter.</p>
           <div className="inline-form">
             <label>Charakter suchen<input value={claimQuery} onChange={(e) => setClaimQuery(e.target.value)} placeholder="Mindestens 3 Zeichen" /></label>
             <button type="button" disabled={pending || claimQuery.trim().length < 3} onClick={() => void searchClaimCharacters()}>{claimSearching ? 'Suche…' : 'Suchen'}</button>
@@ -719,7 +727,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
           {claimSearching && <p className="search-status" role="status"><span className="search-spinner" aria-hidden="true" />Rising-Gods-Suche läuft… Das kann einige Sekunden dauern. Schneller geht es mit einem Rising-Gods-Profil-Link.</p>}
           {claimResults.length > 0 && <div className="plain-list">{claimResults.map((row) => <button key={row.profile_id} type="button" className={claimSelected?.profile_id === row.profile_id ? 'wishlist-toggle active' : 'wishlist-toggle'} onClick={() => setClaimSelected(row)}>{row.name} · {row.class} · Stufe {row.level || '—'}</button>)}</div>}
           <form className="inline-form" onSubmit={requestClaim}>
-            <button type="submit" disabled={pending || !claimSelected}>Anfrage erstellen</button>
+            <button type="submit" disabled={pending || !claimSelected}>Charakter übernehmen</button>
             {claimSelected && <p className="muted">Ausgewählt: {claimSelected.name} · {claimSelected.class}</p>}
           </form>
           <form className="inline-form" onSubmit={redeemClaim}>

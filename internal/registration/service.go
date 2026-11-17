@@ -378,6 +378,11 @@ func (s *Service) ListRequests(ctx context.Context, statuses []string) ([]Reques
 			}
 			rows[i].NameMatch = match
 		}
+		if rows[i].RequesterPlayerID != nil {
+			if requester, ok := players[*rows[i].RequesterPlayerID]; ok {
+				rows[i].Requester = &Requester{PlayerID: requester.ID, PlayerName: requester.Name}
+			}
+		}
 		redemption, ok := byRequest[rows[i].ID]
 		if !ok {
 			continue

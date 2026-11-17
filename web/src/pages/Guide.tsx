@@ -196,6 +196,7 @@ export function GuidePage() {
       <Shot name="13-angemeldet-und-unsicher" caption="Links angemeldet, in der Mitte als unsicher gemeldet" />
       <Tip><strong>Tipp:</strong> Du kannst deinen Status ändern, solange die Anmeldung offen ist. Eine Absage oder „unsicher“ löscht deine Anmeldung nicht. Die Raidleitung entscheidet, wer mitkommt.</Tip>
       <h3>Mit Twink oder anderem Spec anmelden</h3>
+      <p>Fehlt dein Twink noch, übernimm ihn in deinem Profil unter <strong>Charakter beanspruchen</strong>: suchen, auswählen, <strong>Charakter übernehmen</strong>. Gehört er noch niemandem mit Login, ist er sofort deiner; sonst entsteht eine Anfrage, und ein Admin schickt dir ingame einen Code.</p>
       <ol>
         <li>Klicke auf der Karte auf <strong>Anderer Charakter oder Spec</strong>.</li>
         <li>Setze unter <em>Meine Charaktere anmelden / Spec ändern</em> ein Häkchen bei jedem Charakter, den du anbieten willst.</li>

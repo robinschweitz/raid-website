@@ -89,6 +89,7 @@ export interface RegistrationRequest {
   linked_player?: { player_id: number, player_name: string, username: string | null, used_at: string }
   // Open new-account requests: a player without login owns a character with this name (SC-049).
   name_match?: { player_id: number, player_name: string }
+  requester?: { player_id: number, player_name: string }
 }
 
 // Admin-only account overview (ADR 084).

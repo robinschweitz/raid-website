@@ -181,7 +181,7 @@ export function RegistrationRequestsPage() {
       <tbody>{visibleRequests.map((request) => <Fragment key={request.id}>
         <tr>
           <td><strong>{request.character_name}</strong><small>{request.class} · {request.main_spec}{request.second_spec ? ` / ${request.second_spec}` : ''} · Stufe {request.level || '—'}</small></td>
-          <td><small>{request.purpose === 'CLAIM_CHARACTER' ? 'Charakter beanspruchen' : 'Neues Konto'}<br />{new Date(request.created_at).toLocaleDateString('de-DE')}</small></td>
+          <td><small>{request.purpose === 'CLAIM_CHARACTER' ? 'Charakter beanspruchen' : 'Neues Konto'}{request.requester && <> von <Link to={`/players/${request.requester.player_id}`}>{request.requester.player_name}</Link></>}<br />{new Date(request.created_at).toLocaleDateString('de-DE')}</small></td>
           <td><span className={`registration-status ${request.status.toLowerCase()}`}>{statusLabels[request.status] ?? request.status}</span></td>
           <td>{linkedPlayerCell(request)}</td>
           <td><button type="button" className="registration-details" aria-expanded={openRequestID === request.id} onClick={() => toggleDetails(request)}>{openRequestID === request.id ? 'Schließen' : 'Details'}</button></td>

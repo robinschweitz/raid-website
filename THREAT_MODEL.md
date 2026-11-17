@@ -501,7 +501,7 @@ unintended result. Findings are T-031 to T-036:
 | Item lock | Rejected on closed raids (FR-17.5) | Competing lock rejected (FR-17.3) | One transaction (DR-5) | Hoarding: T-031 |
 | Signup / absence | Server deadline (FR-12.2, FR-12.9) | Edits replace the choice | — | — |
 | Registration | Code only after Admin action (FR-4.3) | One open request per profile (FR-4.2) | Same rule | Flooding: T-035 |
-| Character claim | Code delivered in game (FR-4.6) | Single-use codes (SC-013) | — | — |
+| Character claim | Free characters at once for MEMBER and higher; a character of any other player, with or without a login, only through a code delivered in game (FR-4.6, ADR 116) | Single-use codes (SC-013); audit entry for every claim | — | — |
 | Merges, transfers | Admin only, reason (FR-5.3, FR-6.10) | Conflicts rejected (FR-5.6, FR-6.9, FR-6.11) | One transaction | — |
 | Poll vote | Closed polls rejected (FR-24.4) | One vote per player (FR-24.3) | — | — |
 

@@ -107,6 +107,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/raids/{id}/shadowmourne/{task}", RequireRole(validation.RoleRaidassistent, a.assignRaidShadowmourneTask))
 	mux.HandleFunc("GET /api/v1/player-accounts", RequireRole(validation.RoleAdmin, a.listPlayerAccounts))
 	mux.HandleFunc("POST /api/v1/characters/claim-requests", RequireAuth(a.createCharacterClaimRequest))
+	mux.HandleFunc("POST /api/v1/characters/claim", RequireAuth(a.claimCharacter))
 	mux.HandleFunc("POST /api/v1/characters/claim-with-code", RequireAuth(a.claimCharacterWithCode))
 
 	mux.HandleFunc("GET /api/v1/players", a.listPlayers)

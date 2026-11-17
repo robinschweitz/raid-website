@@ -1,8 +1,17 @@
-export const appVersion = '1.0.91'
+export const appVersion = '1.0.92'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Charaktere selbst übernehmen',
+    changes: [
+      'Mit Login übernimmst du einen weiteren Rising-Gods-Charakter im eigenen Profil sofort, ohne Code, wenn es ihn auf der Seite noch nicht gibt. Nur die erste Anmeldung braucht einen Code.',
+      'Gehört der Charakter schon einem anderen Spieler, entsteht wie bisher eine Anfrage, und du bekommst den Hinweis, dich bei einem Admin zu melden. Der Admin schickt den Code.',
+      'Die Admin-Liste der Anfragen zeigt jetzt, welcher Spieler eine Charakter-Anfrage gestellt hat.',
+    ],
+  },
+  {
+    version: '1.0.91',
     title: 'Absage rückgängig machen',
     changes: ['Ein abgesagter Raid lässt sich unter „Planung & Details“ wieder aufnehmen. Er bekommt den Status von vor der Absage zurück; Item-Locks, die beim Absagen verfallen sind, müssen neu gesetzt werden.'],
   },

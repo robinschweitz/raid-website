@@ -46,6 +46,15 @@ type Request struct {
 	// NameMatch is filled for open new-account requests in admin lists when a
 	// player without a login owns a character with the requested name (SC-049).
 	NameMatch *NameMatch `bun:"-" json:"name_match,omitempty"`
+	// Requester is filled in admin lists for requests of a logged-in player:
+	// who asked for the character (FR-4.12). It is not stored on the request.
+	Requester *Requester `bun:"-" json:"requester,omitempty"`
+}
+
+// Requester names the player who made a claim request.
+type Requester struct {
+	PlayerID   int64  `json:"player_id"`
+	PlayerName string `json:"player_name"`
 }
 
 // NameMatch is the player an Admin must confirm or refuse before a code is created.

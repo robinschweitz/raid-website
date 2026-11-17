@@ -126,6 +126,31 @@ func (a *API) createCharacterClaimRequest(w http.ResponseWriter, r *http.Request
 	WriteJSON(w, http.StatusCreated, map[string]any{"data": created})
 }
 
+// claimCharacter gives a free character to a MEMBER or higher at once and
+// otherwise creates a claim request for an Admin (FR-4.6, ADR 116).
+func (a *API) claimCharacter(w http.ResponseWriter, r *http.Request) {
+	actorID, ok := ActorID(r)
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "unauthenticated", "login required")
+		return
+	}
+	var req profileRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		BadRequest(w, "malformed json body")
+		return
+	}
+	result, err := a.Registration.ClaimCharacter(r.Context(), actorID, req.ProfileID)
+	if err != nil {
+		registrationError(w, err)
+		return
+	}
+	status := http.StatusCreated
+	if result.IsClaimed {
+		status = http.StatusOK
+	}
+	WriteJSON(w, status, map[string]any{"data": result})
+}
+
 func (a *API) listRegistrationRequests(w http.ResponseWriter, r *http.Request) {
 	statuses := make([]string, 0, 2)
 	for _, status := range strings.Split(r.URL.Query().Get("status"), ",") {

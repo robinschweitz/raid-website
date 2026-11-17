@@ -127,6 +127,9 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
   `POST /api/v1/raids/{id}/uncancel` (RAIDASSISTENT and higher) restores the status before the
   cancellation from the `cancel` audit entry (ADR 115).
   Loot DTOs carry `award_method`, never a client-set `is_main_spec`.
+  `POST /api/v1/characters/claim` (signed-in) gives a free character to a MEMBER or higher at once
+  and otherwise creates a claim request, with `owned_by_other` set when another player holds the character (FR-4.6, ADR 116); `registration.Service.ClaimCharacter`
+  decides inside one transaction. Admin request lists carry the claimant as `requester`.
 - **Security events and account recovery.** Security events are written as structured lines to
   the systemd journal, which keeps them 30 days (SC-041). Password-reset codes reuse the
   registration-code infrastructure in `registration` (owner 2026-10-23, backlog #48; hash-only reset-code creation built in #81, redemption built in #82), and the personal-data export

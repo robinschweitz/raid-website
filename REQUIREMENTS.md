@@ -71,13 +71,14 @@ implemented yet when it differs from the code.
 - **FR-4.3** An ADMIN MUST be able to list requests, reject a request, create a single-use code for a request, mark a code as sent, and revoke an unused code. (ADR 040)
 - **FR-4.4** A registration code MUST expire after its lifetime (SC-013). (ADR 040)
 - **FR-4.5** Redeeming a new-account code MUST create a MEMBER account, create or link the character, start a session, and consume the code. A login is attached to an existing player who has none when that player owns the requested Rising-Gods profile or, as a fallback, a character with the same name; the name fallback applies only when the ADMIN confirmed that player while creating the code (FR-4.3, SC-049). A GUEST player who gets a login this way MUST become MEMBER; a higher role stays. (ADR 040, 084, 103; Owner 2026-10-22, OQ-3; Owner 2026-10-23, OD-016; Owner 2026-10-25)
-- **FR-4.6** A logged-in user MUST be able to request a claim for a Rising-Gods character. Redeeming a claim code MUST link or move the character to the user. (ADR 040)
+- **FR-4.6** A logged-in user MUST be able to claim a Rising-Gods character. A MEMBER or higher MUST get the character at once, without a code, when it is free: no character holds that profile or that name, or the one that does belongs to the user. A character of any other player, with or without a login, MUST NOT be taken at once. The claim MUST reload the profile (FR-7.4), MUST be audited, and MUST be rejected with HTTP 409 `registration_request_exists` while another request for the profile is open (FR-4.2). Otherwise, and always for a GUEST, the claim MUST create a request that an ADMIN answers with a claim code; when the character belongs to another player, the user MUST be told to contact an ADMIN; redeeming that code MUST link or move the character to the user. Only the first login needs a registration code. (ADR 040, 116; Owner 2026-11-17)
 - **FR-4.7** A claim MUST NOT change existing raid roster snapshots. (ADR 040)
 - **FR-4.8** The first Rising-Gods talent build MUST become the main spec. The second build MUST become the second spec when it exists. (ADR 040)
 - **FR-4.9** The admin request list MUST show the linked player, login, and date after a code is redeemed. (ADR 084)
 - **FR-4.10** The system MUST NOT change the role of existing GUEST accounts (players who already have a login) automatically. An ADMIN promotes them (FR-1.9). A player without a login who gets one from a registration code follows FR-4.5. (Owner 2026-10-22, OQ-3; Owner 2026-10-25, ADR 103)
 
 - **FR-4.11** The Admin registration UI MUST show existing code status and validity, explain why plaintext is not recoverable, and offer replacement issuance and revocation using the existing authorized actions. (ADR 106; Owner 2026-10-23)
+- **FR-4.12** The Admin request list MUST name the player who made a claim request, linked to the player's profile. (Owner 2026-11-17, ADR 116)
 
 ### 5. Players and accounts
 

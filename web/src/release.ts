@@ -5,8 +5,8 @@ export const changelog = [
     version: appVersion,
     title: 'Charaktere selbst übernehmen',
     changes: [
-      'Mit Login übernimmst du einen weiteren Rising-Gods-Charakter im eigenen Profil sofort, ohne Code, wenn er noch niemandem mit Login gehört. Nur die erste Anmeldung braucht einen Code.',
-      'Gehört der Charakter schon einem anderen Spieler mit Login, entsteht wie bisher eine Anfrage, und ein Admin schickt den Code.',
+      'Mit Login übernimmst du einen weiteren Rising-Gods-Charakter im eigenen Profil sofort, ohne Code, wenn es ihn auf der Seite noch nicht gibt. Nur die erste Anmeldung braucht einen Code.',
+      'Gehört der Charakter schon einem anderen Spieler, entsteht wie bisher eine Anfrage, und du bekommst den Hinweis, dich bei einem Admin zu melden. Der Admin schickt den Code.',
       'Die Admin-Liste der Anfragen zeigt jetzt, welcher Spieler eine Charakter-Anfrage gestellt hat.',
     ],
   },

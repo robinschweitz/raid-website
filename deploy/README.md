@@ -413,3 +413,4 @@ login before removing the previous key from the environment and restarting.
 Keep every old key with the backup key material until the last snapshot using it
 expires: removing it from the live environment does not remove that obligation.
 An unknown key ID stops startup; restore the missing key rather than deleting data.
+Optionaler [BiS-Gear-Manager: privates V17-Paket vorbereiten und aktivieren](gear-manager.md).

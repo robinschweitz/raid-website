@@ -376,6 +376,8 @@ Depth comes from glass, not from stacked shadows.
 
 ## Components
 
+The signed-in navigation opens the V17 Gear-Manager as a separate document with a link back to the guild site. Its inventory and model stay together during equipment changes.
+
 All controls are native HTML elements (`button`, `input`, `select`, `textarea`, `table`,
 `dialog`-free confirmation). No UI or component library is used (ADR 026, ADR 068).
 

@@ -485,3 +485,6 @@ Decided by the owner on 2026-10-25 (review fixes):
 - All message text is untrusted, rendered as plain text, never HTML.
 - Create/edit require server-side RAIDASSISTENT authorization; drafts are available only from staff endpoint.
 - Confirmation takes player ID exclusively from authenticated session.
+## Gear-Manager (ADR 117)
+
+All planner requests, including direct asset reads, require the normal session check. Serve only allowlisted regular files beneath a dedicated operator-controlled directory, with private/no-store caching. No public static alias. The viewer document alone may start blob workers and display blob textures; no external scripts or inline script execution are allowed.

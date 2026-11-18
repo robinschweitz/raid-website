@@ -19,6 +19,8 @@ implemented yet when it differs from the code.
 
 ## Functional Requirements
 
+- **FR-GEAR-1** A signed-in player of any role can use the V17 BiS planner to manage browser-local character/spec checklists, import/export backups and preview checked equipment on a 3.3.5 character. Every planner and model request requires a session. No game data is bundled.
+
 ### 1. Access and roles
 
 - **FR-1.1** Every permission in this file MUST be enforced by the server (SC-001). (ADR 010)

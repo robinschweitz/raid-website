@@ -13,7 +13,12 @@ if (!rel.startsWith('..') && !isAbsolute(rel)) throw Error('Das private Paket mu
 const out = resolve(root, 'private-ui')
 let html = (await readFile(resolve(root, 'V17_Teststand/WotLK_BiS_Gear_Manager.html'), 'utf8')).replace(/^\uFEFF/, '').replaceAll('\r\n', '\n')
 if (createHash('sha256').update(html).digest('hex') !== '562dac465e7a25c4f6750af6a476019a916d6e4e741d078e8c63708bd0021d9f') throw Error('Unbekannte V17-Version. Bitte zuerst den Quelltext prüfen.')
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1]
+// The checksum above pins the template; extract its known application block,
+// rather than treating arbitrary HTML as input to a script sanitizer.
+const start = html.indexOf('<script>')
+const end = html.indexOf('</script>', start)
+if (start < 0 || end < 0) throw Error('V17-Anwendungsskript fehlt.')
+const script = html.slice(start + '<script>'.length, end)
 const js = script.replace('"wotlk_bis_manager_v1"', '"wotlk_bis_manager_v1:" + document.documentElement.dataset.player')
   .replaceAll("location.origin+'/data/", "location.origin+'/api/v1/gear-manager/data/")
   .replace('https://esm.sh/wotlk-model-viewer@1.1.8', './viewer.js')

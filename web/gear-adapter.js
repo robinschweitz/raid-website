@@ -15,12 +15,17 @@ if (frame) {
 }
 const classKey = {Todesritter:'DK', Krieger:'Warrior', Druide:'Druid', Schurke:'Rogue', Jäger:'Hunter', Hexer:'Warlock', Hexenmeister:'Warlock', Priester:'Priest', Schamane:'Shaman', Paladin:'Paladin', Magier:'Mage'}[setup.character.class]
 const options = SPECS.filter(s => SPEC_CLASS[s.name] === classKey)
+const raceID = {Mensch:1, Orc:2, Zwerg:3, Nachtelf:4, Untoter:5, Taure:6, Gnom:7, Troll:8, Blutelf:10, Draenei:11}[setup.profileRace]
 const selectSpec = byId('spec')
 selectSpec.replaceChildren(...options.map(s => new Option(s.name, s.name)))
 if (!options.length) {
   document.body.textContent = 'Für diese Klasse ist keine BiS-Liste verfügbar.'
 } else {
   activeChar = setup.character.name
+  if (raceID) {
+    byId('charRace').disabled = true
+    byId('charRace').title = 'Volk aus dem verknüpften Rising-Gods-Profil'
+  }
   const specHint = setup.character.main_spec.toLocaleLowerCase('de')
   activeSpec = options.find(s => s.name === store._last?.spec)?.name
     ?? options.find(s => specHint && s.name.toLocaleLowerCase('de').includes(specHint))?.name ?? options[0].name

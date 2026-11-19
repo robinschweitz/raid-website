@@ -3,15 +3,27 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { canonicalClass } from '../characterOptions'
 import { Link } from '../router'
-import { atLeast, type Character, type WishlistWish } from '../types'
+import { atLeast, type Character, type ExternalCharacter, type WishlistWish } from '../types'
 import { ErrorMessage } from '../components/ErrorMessage'
 
-type Setup = { character: Character; wishes: string[]; addWish?: (id: string, name: string) => Promise<void> }
+type Setup = { character: Character; profileRace: string; wishes: string[]; addWish?: (id: string, name: string) => Promise<void> }
 type PlannerWindow = Window & { startGearPlanner?: (setup: Setup) => void }
 
 function Planner({character, canWish}: {character: Character; canWish: boolean}) {
   const [wishes, setWishes] = useState<string[] | null>(null)
   const [error, setError] = useState('')
+  const [race, setRace] = useState<string | null>(null)
+  useEffect(() => {
+    let active = true
+    const id = character.external_profile_id
+    if (character.external_source === 'rising-gods' && id) {
+      const ref = `https://db.rising-gods.de/?profile=load&id=${encodeURIComponent(id)}`
+      api.get<ExternalCharacter[]>(`/api/v1/external/rising-gods/characters?q=${encodeURIComponent(ref)}`)
+        .then(rows => { if (active) setRace(rows.find(row => row.profile_id === id)?.race ?? '') })
+        .catch(() => { if (active) setRace('') })
+    } else setRace('')
+    return () => { active = false }
+  }, [character.external_profile_id, character.external_source])
   useEffect(() => {
     let active = true
     if (canWish) api.get<WishlistWish[]>(`/api/v1/characters/${character.id}/wishlist`)
@@ -24,11 +36,11 @@ function Planner({character, canWish}: {character: Character; canWish: boolean})
     try { await api.post(`/api/v1/characters/${character.id}/wishlist/items`, {item_id:id, item_name:name, priority:0, notes:''}) }
     catch (e) { if (!(e instanceof ApiError && e.code === 'wishlist_conflict')) throw e }
   }
-  return <>{error && <ErrorMessage>{error}</ErrorMessage>}{wishes !== null && <iframe title="BiS-Ausrüstung und 3D-Anprobe" className="gear-planner-frame" src="/api/v1/gear-manager/" onLoad={e => {
+  return <>{error && <ErrorMessage>{error}</ErrorMessage>}{race === null && <p className="muted">Lade Volk aus dem Charakterprofil…</p>}{race !== null && wishes !== null && <iframe title="BiS-Ausrüstung und 3D-Anprobe" className="gear-planner-frame" src="/api/v1/gear-manager/" onLoad={e => {
     const frame = e.currentTarget
     const win = frame.contentWindow as PlannerWindow | null
     if (!win?.startGearPlanner) { setError('Der Gear-Manager ist nicht verfügbar. Bitte die Seite neu laden oder die Gildenleitung informieren.'); return }
-    win.startGearPlanner({character: {...character, class: canonicalClass(character.class)}, wishes, addWish: canWish && !error ? addWish : undefined})
+    win.startGearPlanner({character: {...character, class: canonicalClass(character.class)}, profileRace: race, wishes, addWish: canWish && !error ? addWish : undefined})
   }} />}</>
 }
 

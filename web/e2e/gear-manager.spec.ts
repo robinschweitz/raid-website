@@ -20,10 +20,19 @@ test('V17 lädt Figur und Helm vom eigenen Server', async ({page}) => {
   const account = {username:'gear-test', password:'gear-preview-test', name:'Gear-Test', character:'Testfigur', characterClass:'Paladin', mainSpec:'Schutz', secondSpec:'Heilig'}
   const {characterID} = await createMember(page.request, account)
   await apiAs(page.request, {username:account.username,password:account.password})
+  await page.route('**/api/v1/players/*/characters', async route => {
+    const response = await route.fetch()
+    const body = await response.json()
+    Object.assign(body.data.find((c: {id:number}) => c.id === characterID), {external_source:'rising-gods',external_profile_id:'12345'})
+    await route.fulfill({response, json:body})
+  })
+  await page.route('**/api/v1/external/rising-gods/characters?*', route => route.fulfill({json:{data:[{profile_id:'12345',race:'Zwerg'}]}}))
   await page.goto('/#/gear-manager')
   await expect(page.getByLabel('Mein Charakter')).toHaveValue(String(characterID))
   const planner = page.frameLocator('iframe[title="BiS-Ausrüstung und 3D-Anprobe"]')
   await expect(planner.locator('#newchar, #deletechar')).toHaveCount(0)
+  await expect(planner.locator('#charRace')).toHaveValue('3')
+  await expect(planner.locator('#charRace')).toBeDisabled()
   await expect(planner.locator('#model_3d canvas')).toBeVisible()
   const frameHeight = () => page.locator('.gear-planner-frame').evaluate(el => el.clientHeight)
   const fullHeight = await frameHeight()
@@ -38,7 +47,7 @@ test('V17 lädt Figur und Helm vom eigenen Server', async ({page}) => {
   expect((await result).status()).toBe(201)
   await expect(planner.getByRole('button', {name:/^Auf der Wunschliste/}).first()).toBeDisabled()
   const helm = planner.locator('#gear-slot-0 input[type=checkbox]').first()
-  const mesh = page.waitForResponse(r => r.ok() && r.url().endsWith('/data/mo3/331359.mo3'))
+  const mesh = page.waitForResponse(r => r.ok() && r.url().endsWith('/data/meta/armor/1/178592.json'))
   await helm.check()
   await mesh
   await expect(planner.locator('#viewerStatus')).toContainText('3D-Charakter geladen')

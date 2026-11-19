@@ -1,9 +1,13 @@
 /* Scoped to the item list in the private planner document. */
 .gear-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 370px), 1fr));
-  grid-auto-rows: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   font: 14px/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  gap: 16px;
+}
+.gear-count-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 370px), 1fr));
   gap: 16px;
 }
 .gear-grid .card {

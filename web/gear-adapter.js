@@ -34,6 +34,20 @@ if (!options.length) {
   refreshCharacters(); render()
 }
 
+function groupGearCards(grid) {
+  const groups = new Map()
+  for (const card of grid.querySelectorAll(':scope > .card')) {
+    const count = card.querySelectorAll('.item-choice').length
+    if (!groups.has(count)) {
+      const group = document.createElement('div')
+      group.className = 'gear-count-group'
+      groups.set(count, group)
+    }
+    groups.get(count).append(card)
+  }
+  for (const count of [...groups.keys()].sort((a, b) => a - b)) grid.append(groups.get(count))
+}
+
 function wishControls(name, candidates, source, mapped, owned) {
   const controls = document.createElement('span')
   controls.className = 'wish-variants'

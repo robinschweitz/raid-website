@@ -376,7 +376,7 @@ Depth comes from glass, not from stacked shadows.
 
 ## Components
 
-The signed-in navigation opens the V17 Gear-Manager as a separate document with a link back to the guild site. Its inventory and model stay together during equipment changes.
+The Gear-Manager stays inside the signed-in site layout with its own active navigation entry. The profile picker precedes the themed inventory and 3D preview. Each identifiable missing item offers a wishlist action beside its checkbox.
 
 All controls are native HTML elements (`button`, `input`, `select`, `textarea`, `table`,
 `dialog`-free confirmation). No UI or component library is used (ADR 026, ADR 068).

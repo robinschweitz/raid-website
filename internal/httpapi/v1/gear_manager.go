@@ -63,7 +63,8 @@ func RegisterGearManager(mux *http.ServeMux, dir string) {
 			}
 			p, _ := CurrentPlayer(r)
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
+			w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'")
 			_, _ = w.Write(bytes.Replace(page, []byte("PLAYER_ID"), []byte(strconv.FormatInt(p.ID, 10)), 1))
 			return
 		}

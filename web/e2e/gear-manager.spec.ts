@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { admin, apiAs } from './fixtures'
+import { admin, apiAs, createMember } from './fixtures'
 
 const base = '/api/v1/gear-manager/'
 test('Gear-Manager schützt Seite, Skripte und Modelldaten vor Gastzugriff', async ({request}) => {
@@ -17,17 +17,25 @@ test('V17 lädt Figur und Helm vom eigenen Server', async ({page}) => {
   page.on('pageerror', e => errors.push(e.message))
   page.on('request', r => {if (/^https?:/.test(r.url()) && new URL(r.url()).hostname !== '127.0.0.1') errors.push(r.url())})
   page.on('response', r => {if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`)})
-  await apiAs(page.request,admin)
-  await page.goto(base)
-  page.on('dialog', d => d.accept('Testfigur'))
-  await page.locator('#newchar').click()
-  await expect(page.locator('#model_3d canvas')).toBeVisible()
-  const helm = page.locator('#gear-slot-0 input[type=checkbox]').first()
+  const account = {username:'gear-test', password:'gear-preview-test', name:'Gear-Test', character:'Testfigur', characterClass:'Paladin', mainSpec:'Schutz', secondSpec:'Heilig'}
+  const {characterID} = await createMember(page.request, account)
+  await apiAs(page.request, {username:account.username,password:account.password})
+  await page.goto('/#/gear-manager')
+  await expect(page.getByLabel('Mein Charakter')).toHaveValue(String(characterID))
+  const planner = page.frameLocator('iframe[title="BiS-Ausrüstung und 3D-Anprobe"]')
+  await expect(planner.locator('#newchar')).not.toBeVisible()
+  await expect(planner.locator('#model_3d canvas')).toBeVisible()
+  const wish = planner.getByRole('button', {name:/^Zur Wunschliste/}).first()
+  const result = page.waitForResponse(r => r.url().endsWith(`/characters/${characterID}/wishlist/items`) && r.request().method() === 'POST')
+  await wish.click()
+  expect((await result).status()).toBe(201)
+  await expect(planner.getByRole('button', {name:/^Auf der Wunschliste/}).first()).toBeDisabled()
+  const helm = planner.locator('#gear-slot-0 input[type=checkbox]').first()
   const mesh = page.waitForResponse(r => r.ok() && r.url().endsWith('/data/mo3/331359.mo3'))
   await helm.check()
   await mesh
-  await expect(page.locator('#viewerStatus')).toContainText('3D-Charakter geladen')
-  const canvas = page.locator('#model_3d canvas').first()
+  await expect(planner.locator('#viewerStatus')).toContainText('3D-Charakter geladen')
+  const canvas = planner.locator('#model_3d canvas').first()
   await canvas.hover()
   const rect = await canvas.boundingBox()
   if (!rect) throw Error('3D-Ansicht fehlt')

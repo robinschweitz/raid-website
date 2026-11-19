@@ -1,0 +1,44 @@
+// Inserted into the private planner's startGearPlanner(setup) scope.
+// V17 supplies render(), SPECS, SPEC_CLASS, byId(), and its local store.
+const classKey = {Todesritter:'DK', Krieger:'Warrior', Druide:'Druid', Schurke:'Rogue', Jäger:'Hunter', Hexer:'Warlock', Hexenmeister:'Warlock', Priester:'Priest', Schamane:'Shaman', Paladin:'Paladin', Magier:'Mage'}[setup.character.class]
+const options = SPECS.filter(s => SPEC_CLASS[s.name] === classKey)
+const selectSpec = byId('spec')
+selectSpec.replaceChildren(...options.map(s => new Option(s.name, s.name)))
+if (!options.length) {
+  document.body.textContent = 'Für diese Klasse ist keine BiS-Liste verfügbar.'
+} else {
+  activeChar = setup.character.name
+  const specHint = setup.character.main_spec.toLocaleLowerCase('de')
+  activeSpec = options.find(s => s.name === store._last?.spec)?.name
+    ?? options.find(s => specHint && s.name.toLocaleLowerCase('de').includes(specHint))?.name ?? options[0].name
+  selectSpec.value = activeSpec
+  refreshCharacters(); render()
+}
+
+function wishControls(name, candidates, source, mapped) {
+  const controls = document.createElement('span')
+  if (!setup.addWish) return controls
+  const variants = new Map()
+  const add = (id, mode) => { if (/^[1-9]\d*$/.test(String(id))) variants.set(String(id), mode) }
+  for (const candidate of candidates) add(candidate.id, candidate.mode)
+  if (source) { add(source.normalId, 'Normal'); add(source.heroicId, 'Heroisch') }
+  if (!variants.size && mapped) add(mapped.id, mapped.variant)
+  if (!variants.size) { controls.textContent = 'Keine eindeutige Item-ID'; return controls }
+  for (const [id, mode] of variants) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    const suffix = mode ? ' · ' + mode : ''
+    button.disabled = wished.has(id) || saving.has(id)
+    button.textContent = (wished.has(id) ? 'Auf der Wunschliste' : 'Zur Wunschliste') + suffix
+    button.onclick = async event => {
+      event.preventDefault(); event.stopPropagation()
+      if (saving.has(id) || wished.has(id)) return
+      saving.add(id); button.disabled = true
+      try { await setup.addWish(id, name); wished.add(id); byId('wish-status').textContent = name + ' steht auf der Wunschliste von ' + setup.character.name + '.' }
+      catch { byId('wish-status').textContent = 'Wunsch konnte nicht gespeichert werden. Bitte erneut versuchen.' }
+      finally { saving.delete(id); render() }
+    }
+    controls.append(button)
+  }
+  return controls
+}

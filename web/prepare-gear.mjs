@@ -19,18 +19,28 @@ const start = html.indexOf('<script>')
 const end = html.indexOf('</script>', start)
 if (start < 0 || end < 0) throw Error('V17-Anwendungsskript fehlt.')
 const script = html.slice(start + '<script>'.length, end)
-const js = script.replace('"wotlk_bis_manager_v1"', '"wotlk_bis_manager_v1:" + document.documentElement.dataset.player')
+const adapter = await readFile(resolve(web,'gear-adapter.js'), 'utf8')
+const js = script.replace('"wotlk_bis_manager_v1"', '"wotlk_bis_profile:" + document.documentElement.dataset.player + ":" + setup.character.id')
+  .replace('const byId=', 'const wished = new Set(setup.wishes), saving = new Set(); const byId=')
+  .replace(/refreshCharacters\(\);render\(\);\s*$/, () => adapter)
   .replaceAll("location.origin+'/data/", "location.origin+'/api/v1/gear-manager/data/")
   .replace('https://esm.sh/wotlk-model-viewer@1.1.8', './viewer.js')
   .replace('Viewer-Bibliothek laden (esm.sh)', 'Viewer-Bibliothek laden')
   // The optional WarcraftDB lookup and external icon overrides aren't part of
   // the offline workflow. Keep the original local icon mapping and RG links.
-  .replace(/const idButton=document\.createElement\("button"\);[^\n]+/, 'const idButton=document.createElement("span");')
+  .replace(/const idButton=document\.createElement\("button"\);[^\n]+/, 'const idButton=checked ? document.createElement("span") : wishControls(name,candidates,source,mapped);')
   .replace(/function iconUrl\(icon\)\{[\s\S]*?\n\}/, 'function iconUrl(){return "";}')
 html = html.replace(/<link rel="stylesheet"[\s\S]*?<style>/, '<script src="jquery.js"></script><style>')
   .replace('<html lang="de">', '<html lang="de" data-player="PLAYER_ID">')
   .replace(`<script>${script}</script>`, '<script src="planner.js"></script>')
-  .replace('<header>', '<header><a href="/" style="color:inherit">← Zur Raid-Website</a>')
+  .replace('<header>', '<p id="wish-status" role="status"></p><header>')
+  .replace('</style>', `
+    :root{--bg:#080f1c;--panel:#101d2e;--panel2:#16273b;--line:#2a4057;--gold:#86d9f2;--text:#dce6f0;--muted:#9eafc3;color-scheme:dark}
+    body{background:#0f1a2b;color:var(--text)} header,footer,.toolbar>div:has(#charSelect),.toolbar>div:has(#newchar){display:none}
+    main{padding:12px}.toolbar,.filterbar,.summary,.card,.doll-panel,.info-box{background:#101d2e;border-color:#2a4057;border-radius:4px}
+    button,select,input{border-color:#5989a3;color:#dce6f0;background:#16273b} h2,h3,.slot,.stat strong{color:#86d9f2}
+    .toolbar{position:static;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}#wish-status:not(:empty){padding:8px 16px;color:#c7efff;background:#0c2a3c}
+    </style>`)
   .replace('Viewer-Bibliothek wird online geladen', 'Viewer und Modelldaten vom Gildenserver')
 const jq = await fetch('https://code.jquery.com/jquery-3.7.1.min.js')
 if (!jq.ok) throw Error('jQuery konnte nicht geladen werden.')
@@ -41,5 +51,5 @@ await build({configFile:false, root:web, publicDir:false, build:{outDir:out, emp
   lib:{entry:resolve(web,'node_modules/wotlk-model-viewer/index.js'), formats:['es'], fileName:()=>'viewer.js'},
   rolldownOptions:{output:{codeSplitting:false}}}})
 await writeFile(resolve(out,'jquery.js'),bytes)
-await writeFile(resolve(out,'planner.js'),js)
+await writeFile(resolve(out,'planner.js'), `if (window === window.top) location.replace('/#/gear-manager');\nwindow.startGearPlanner = function(setup){\n${js}\n};`)
 await writeFile(resolve(out,'index.html'),html)

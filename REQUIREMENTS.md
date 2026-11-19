@@ -20,6 +20,7 @@ implemented yet when it differs from the code.
 ## Functional Requirements
 
 - **FR-GEAR-1** A signed-in player of any role can use the V17 BiS planner to manage browser-local character/spec checklists, import/export backups and preview checked equipment on a 3.3.5 character. Every planner and model request requires a session. No game data is bundled.
+- **FR-GEAR-2** The planner offers only the account's active website characters (main first), with a shortcut from the owner's character profile. A member may add an outstanding item with a known item ID to that character's existing wishlist under FR-19.1. Normal and heroic IDs must remain distinguishable. Already wished items must not be added again.
 
 ### 1. Access and roles
 

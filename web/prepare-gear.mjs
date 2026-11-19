@@ -52,7 +52,7 @@ const js = script.replace('"wotlk_bis_manager_v1"', '"wotlk_bis_profile:" + docu
 const filters = html.match(/<section class="filterbar">[\s\S]*?<\/section>/)[0]
 html = html.replace(filters, '').replace('<div class="layout">', () => filters + '\n<div class="layout">')
   .replace(/^ *<button class="subtle" id="(?:import|export)">.*\n/gm, '')
-  .replace(' Nutze regelmäßig „Backup exportieren“.', '')
+  .replace(/<details class="info-box">[\s\S]*?<\/details>/, '')
   .replace(/<link rel="stylesheet"[\s\S]*?<style>/, '<script src="jquery.js"></script><style>')
   .replace(/<div [^>]*><button [^>]*id="newchar"[^>]*>[^\n]*?<\/div>/, '')
   .replace('<html lang="de">', '<html lang="de" data-player="PLAYER_ID">')

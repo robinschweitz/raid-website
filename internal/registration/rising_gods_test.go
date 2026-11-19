@@ -248,6 +248,15 @@ func TestGearScoreIgnoresTransmogItems(t *testing.T) {
 	}
 }
 
+func TestGearScoreUsesBothEquippedHandsForTitansGrip(t *testing.T) {
+	body := `g_items.add(123, {"quality":4,"jsonequip":{"slot":17,"level":264}});` +
+		`var profile = {"inventory":{"16":[123],"17":[123]}};`
+	expected := gearScoreItemScore(264, 4, "INVTYPE_2HWEAPON")
+	if got := calculateGearScoreFromProfileBody(body, "Krieger"); got == nil || *got != expected {
+		t.Fatalf("expected %d for two half-weight two-handers, got %v", expected, got)
+	}
+}
+
 func TestGearScoreCalculationAppliesHunterWeaponWeights(t *testing.T) {
 	body := `g_items.add(51406, {"quality":4,"jsonequip":{"id":51406,"classs":2,"subclass":15,"slot":21,"level":264}});` +
 		`g_items.add(51531, {"quality":4,"jsonequip":{"id":51531,"classs":2,"subclass":19,"slot":15,"level":264}});`

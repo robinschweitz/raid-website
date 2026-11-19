@@ -1,8 +1,13 @@
-export const appVersion = '1.0.95'
+export const appVersion = '1.0.96'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'GearScore bei zwei Zweihandwaffen korrigiert',
+    changes: ['Beim Neuladen eines Profils zählt der GearScore zwei gleichzeitig getragene Zweihandwaffen mit der korrekten Gewichtung.'],
+  },
+  {
+    version: '1.0.95',
     title: 'Private Hinweise bei Raidanmeldungen',
     changes: ['Die Notiz zu „Abgesagt“ oder „Unsicher“ sehen nur Raidassistenten, Raidleiter und Admins.'],
   },

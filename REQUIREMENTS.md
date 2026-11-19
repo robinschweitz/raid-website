@@ -122,6 +122,7 @@ implemented yet when it differs from the code.
 - **FR-7.2** The lookup MUST accept a character name or a Rising-Gods profile URL. (ADR 044)
 - **FR-7.3** The system MUST query Rising-Gods only for a user request. It MUST NOT warm a cache in the background. (ADR 049)
 - **FR-7.4** The system MUST load the selected profile again before it stores a character. (ADR 044)
+- The GearScore calculation MUST use the occupied inventory positions for main-hand and off-hand weighting, including when both weapons are two-handed.
 - **FR-7.5** When Rising-Gods is unavailable, the system MUST answer with HTTP 502 `rising_gods_unavailable` (error content: SC-023). (ADR 049, 053)
 - **FR-7.6** The system MUST limit how many Rising-Gods searches a visitor without a session can start per time period. Registration requests count toward the same limit. Logged-in users MUST NOT be limited. The limit value is owned by `SECURITY.md` (SC-028). (Owner 2026-10-22, review)
 

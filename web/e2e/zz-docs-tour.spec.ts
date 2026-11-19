@@ -240,6 +240,21 @@ test('Mitglied', async ({ page, context }, testInfo) => {
   await shot(page, testInfo, '22-umfragen')
 })
 
+test('Berechtigungsmanager', async ({ page }, testInfo) => {
+  await signIn(page, admin)
+  await page.goto(`/#/raids/${futureRaid}`)
+  await page.getByRole('button', { name: 'Planung & Details' }).click()
+  await page.getByText('Berechtigungen und Vertretung', { exact: true }).click()
+  await page.getByLabel('Teammitglied').selectOption({label:'Mira'})
+  const scope = page.getByLabel('Geltungsbereich')
+  await scope.selectOption('assigned')
+  await page.getByRole('button', {name:'Kontorechte speichern'}).click()
+  await expect(page.getByRole('status').filter({hasText:'Berechtigungen gespeichert.'})).toBeVisible()
+  await shot(page,testInfo,'33b-berechtigungen','Berechtigungen und Vertretung')
+  await scope.selectOption('all')
+  await page.getByRole('button', {name:'Kontorechte speichern'}).click()
+})
+
 test('Raidleitung', async ({ page }, testInfo) => {
   await signInAs(page, 'Thorgrim')
   await page.goto('/#/raids')

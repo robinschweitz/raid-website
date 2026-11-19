@@ -184,7 +184,9 @@ function RaidDetail({ raidID, initialView }: Props) {
   const [catalogDifficulty, setCatalogDifficulty] = useState('')
   const [catalogStatus, setCatalogStatus] = useState('')
 
-  const canManage = me ? atLeast(me.role, 'RAIDASSISTENT') : false
+  const staff = !!me && atLeast(me.role, 'RAIDASSISTENT')
+  const mask = staff ? (raid?.staff_actions ?? 15) : 0
+  const canManage = !!(mask & 8)
   // Members come to a raid to sign up, so their first tab is "Anmeldungen" (ADR 081).
   useEffect(() => {
     if (viewDefaulted.current || !raid) return
@@ -192,7 +194,10 @@ function RaidDetail({ raidID, initialView }: Props) {
     if (!canManage && !raid.archived_at && (raid.status === 'PLANNED' || raid.status === 'OPEN')) setView('signups')
   }, [raid, canManage])
   const isActiveRaid = !!raid && !raid.archived_at && (raid.status === 'PLANNED' || raid.status === 'OPEN')
-  const canWrite = canManage && !!raid && (isActiveRaid || raid.status === 'COMPLETED')
+  const editable = !!raid && (isActiveRaid || raid.status === 'COMPLETED')
+  const canRoster = !!(mask & 1) && editable
+  const canLoot = !!(mask & 4) && editable
+  const canWrite = view === 'roster' ? canRoster : view === 'loot' ? canLoot : canRoster || canLoot
   const attNeedsReason = !!raid?.archived_at
   const lootNeedsReason = !!raid?.archived_at
   const renderedCharacterVersion = characterVersion.current
@@ -890,6 +895,7 @@ function RaidDetail({ raidID, initialView }: Props) {
       {isActiveRaid && canManage && <section id="raid-recruitment" hidden={view !== 'recruitment'} className="raid-recruitment" aria-label="Raidgesuchtext">{view === 'recruitment' && <RaidRecruitment raidID={raidID} seriesID={raid.series_id} attendance={attendance} />}</section>}
       <section id="raid-planning" hidden={view !== 'planning'} className="card raid-summary" aria-label="Raidübersicht">
       <h2>Planung & Details</h2>
+      {staff && view === 'planning' && <RaidPermissionPanel key={raidID} raidID={raidID} admin={me?.role === 'ADMIN'} onRefresh={load} />}
       {canManage && raid.status !== 'CANCELLED' && (!raid.archived_at || raid.status === 'COMPLETED') && leaderIDs.length > 0 && <RaidLeadersEditor key={leaderIDs.join(',')} raidID={raidID} leaderIDs={leaderIDs} players={players} requiresReason={!!raid.archived_at} onSaved={(saved) => { setLeaderIDs(saved); setMessage('Raidleitung gespeichert.') }} />}
       {raid.archived_at && <p className="muted">Archivierte Historie: Änderungen erfordern eine Begründung und werden protokolliert.</p>}
       {raid.previous_raid_id && <p><Link to={`/raids/${raid.previous_raid_id}`}>Vorheriger Raid</Link></p>}
@@ -1132,8 +1138,9 @@ function RaidDetail({ raidID, initialView }: Props) {
         </RaidLootList>
         <RaidKills version={`${loot.length}:${unclaimedVersion}`} raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} bosses={catalogBosses} catalog={catalog} raidSize={raid.raid_size ?? null} />
         <UnclaimedLootList raidID={raidID} canWrite={canWrite} needsReason={lootNeedsReason} version={unclaimedVersion} />
-        {canManage && isActiveRaid && associated && <AddonLootImport raidID={raidID} onImported={async () => { await load(); setUnclaimedVersion((value) => value + 1) }} />}
+        {canLoot && isActiveRaid && associated && <AddonLootImport raidID={raidID} onImported={async () => { await load(); setUnclaimedVersion((value) => value + 1) }} />}
       </section>
     </div>
   )
 }
+import { RaidPermissionPanel } from '../components/RaidPermissionPanel'

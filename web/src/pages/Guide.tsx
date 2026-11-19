@@ -315,6 +315,8 @@ export function GuidePage() {
       </ul>
       <Shot name="32-raid-anmeldungen-leitung" caption="Anmeldungen aus Sicht der Raidleitung" />
       <h3>In die Aufstellung übernehmen</h3>
+      <p>Unter <strong>Planung &amp; Details → Berechtigungen und Vertretung</strong> siehst du deine Aufgaben für den Termin. Als eingetragener Raidleiter kannst du einen aktiven Raidassistenten oder Raidleiter als Vertretung für genau diesen Raid einteilen. Admins stellen dort auch die Kontorechte ein. Bei „Nur eigene Termine und Vertretungen“ zählt die Leiterliste des konkreten Raids. Im Spielerprofil unter „Konto“ sehen Admins die Rechte des Spielers nach Raid.</p>
+      <Shot name="33b-berechtigungen" caption="Aufgaben und Zuständigkeit eines Teammitglieds festlegen" />
       <p>In der <strong>Anmeldeliste</strong> steht jeder Spieler in einer Zeile, offene Anmeldungen zuerst. Bei <em>Ausstehend</em> wählst du <strong>In Aufstellung übernehmen</strong> oder <strong>Spieler absagen</strong>. Die Absage gilt für alle angemeldeten Charaktere des Spielers in diesem Raid. Mit <strong>Absage zurücknehmen</strong> machst du sie rückgängig. Hat der Spieler mehrere Specs angekreuzt, wählst du vor der Übernahme den Spec. Mit <strong>Auf diesen Charakter wechseln</strong> tauschst du den Charakter. Pro Spieler kommt nur ein Charakter in den Raid.</p>
       <Shot name="33-anmeldungen-uebernehmen" caption="Anmeldeliste nach Status" />
       <h3>Die Aufstellung</h3>

@@ -5,11 +5,13 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"time"
 
 	"raid-website/internal/push"
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcompletion"
+	rp "raid-website/internal/raidpermission"
 	"raid-website/internal/validation"
 )
 
@@ -77,6 +79,39 @@ func (a *API) createRaid(w http.ResponseWriter, r *http.Request) {
 	if req.RaidLeaderID <= 0 && len(req.LeaderIDs) == 0 {
 		BadRequest(w, "raid_leader_id is required")
 		return
+	}
+	p, _ := CurrentPlayer(r)
+	if p.Role != validation.RoleAdmin {
+		var series int64
+		if req.SeriesID != nil {
+			series = *req.SeriesID
+		}
+		repo := rp.Repo{DB: a.DB}
+		if !requireSeries(w, r, repo, actor, series) {
+			return
+		}
+		// Once assignments affect authorization, a new occurrence can inherit
+		// its series' approved leaders but may not introduce a new assignment.
+		scoped, err := repo.HasAssignedPolicies(r.Context())
+		if err != nil {
+			permissionError(w, err)
+			return
+		}
+		if scoped {
+			if series == 0 {
+				permissionError(w, rp.ErrForbidden)
+				return
+			}
+			s, err := a.RaidSeries.Get(r.Context(), series)
+			if err != nil {
+				permissionError(w, err)
+				return
+			}
+			if req.RaidLeaderID != 0 && req.RaidLeaderID != s.RaidLeaderID || len(req.LeaderIDs) > 0 && !slices.Equal(req.LeaderIDs, s.LeaderIDs) {
+				permissionError(w, rp.ErrForbidden)
+				return
+			}
+		}
 	}
 	status := validation.RaidStatusPlanned
 	if req.Status != "" {
@@ -150,7 +185,16 @@ func (a *API) getRaid(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not load raid")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"data": rd})
+	p, _ := CurrentPlayer(r)
+	rights, err := (rp.Repo{DB: a.DB}).Effective(r.Context(), p.ID, id, p.Role)
+	if err != nil {
+		permissionError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": struct {
+		*raid.Raid
+		Actions rp.Actions `json:"staff_actions"`
+	}{rd, rights.Allowed}})
 }
 
 func (a *API) cancelRaid(w http.ResponseWriter, r *http.Request) {
@@ -276,6 +320,10 @@ func (a *API) configureRaidSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	changes := raid.ScheduleChanges{Name: req.Name, SeriesID: req.SeriesID, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize}
+	p, _ := CurrentPlayer(r)
+	if req.SeriesID != nil && p.Role != validation.RoleAdmin && !requireSeries(w, r, rp.Repo{DB: a.DB}, actor, *req.SeriesID) {
+		return
+	}
 	if req.ScheduledStart != nil {
 		var raw string
 		if err := json.Unmarshal(req.ScheduledStart, &raw); err != nil {

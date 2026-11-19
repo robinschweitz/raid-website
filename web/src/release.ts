@@ -1,8 +1,13 @@
-export const appVersion = '1.0.95'
+export const appVersion = '1.0.96'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Berechtigungen pro Raid und Vertretungen',
+    changes: ['Unter Planung & Details siehst du die Berechtigungen für den Termin. Admins begrenzen Aufgaben und Zuständigkeit. Raidleiter können aktive Raidassistenten oder Raidleiter für einen einzelnen eigenen Termin als Vertretung einteilen.'],
+  },
+  {
+    version: '1.0.95',
     title: 'Private Hinweise bei Raidanmeldungen',
     changes: ['Die Notiz zu „Abgesagt“ oder „Unsicher“ sehen nur Raidassistenten, Raidleiter und Admins.'],
   },

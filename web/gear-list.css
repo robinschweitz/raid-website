@@ -34,6 +34,7 @@
   cursor: default;
 }
 .gear-grid .item-choice .item-name { color: #e4eef7; font-size: 14px; }
+.gear-grid .item-choice:not(.selected):hover { background: transparent; border-color: #2a4057; }
 .gear-grid .item-name a { color: inherit; text-decoration: none; }
 .gear-grid .item-name a:hover { color: #86d9f2; text-decoration: underline; }
 .gear-grid .item-choice .item-meta { color: #9eafc3; font-size: 12px; }

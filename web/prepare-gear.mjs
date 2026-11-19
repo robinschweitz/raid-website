@@ -31,6 +31,7 @@ const js = script.replace('"wotlk_bis_manager_v1"', '"wotlk_bis_profile:" + docu
   .replace(/byId\("newchar"\)\.addEventListener[\s\S]*?(?=byId\("phase"\)\.addEventListener)/, '')
   .replace('const byId=', 'const wished = new Set(setup.wishes), saving = new Set(); const byId=')
   .replace('const label=document.createElement("label");label.className="item-choice"', 'const label=document.createElement("div");label.className="item-choice"')
+  .replace('label.title=name+" · Slot: "+g.slot+" · Quelle: BIS-Orientierung deiner Original-Excel";', '')
   .replace('actions.append(idButton,box);', 'const toggle=document.createElement("label");toggle.className="owned-toggle";toggle.append(box,"Vorhanden");actions.append(idButton,toggle);')
   .replace('hasAny?"TEIL VORHANDEN":"FEHLT"', 'hasAny?"Vorhanden":"Offen"')
   .replace(/meta\.textContent=\(mapped\?[^\n]+?copy\.append\(meta\);/, 'meta.textContent=[source?.boss || source?.sourceLabel || source?.raid,source?.size ? source.size+"er" : ""].filter(Boolean).join(" · ");if(meta.textContent)copy.append(meta);')

@@ -1,8 +1,13 @@
-export const appVersion = '1.0.93'
+export const appVersion = '1.0.94'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Raidanmeldungen direkt absagen',
+    changes: ['Die Raidleitung kann einem Spieler direkt in der Anmeldeliste neben „In Aufstellung übernehmen“ absagen.'],
+  },
+  {
+    version: '1.0.93',
     title: 'BiS-Gear-Manager mit 3D-Anprobe',
     changes: ['Im Gear-Manager wählst du einen deiner Charaktere, probierst Ausrüstung in 3D an und kannst Items auf seine Wunschliste setzen oder wieder entfernen. Dein Sammelfortschritt bleibt in diesem Browser.'],
   },

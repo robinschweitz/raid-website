@@ -202,7 +202,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
     pending: <span className="badge info">Ausstehend</span>,
     accepted: <span className="badge ok">In der Aufstellung</span>,
     tentative: <span className="badge warn">Unsicher</span>,
-    declined: <span className="badge bad">Hat abgesagt</span>,
+    declined: <span className="badge bad">Abgesagt</span>,
   }
 
   const signupBoard = overview && <section className="signup-board" aria-label="Anmeldeliste">
@@ -236,6 +236,9 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
               if (entry.attendance_id) setSwitchEntry(entry)
               else accept(entry)
             }}>{entry.attendance_id ? 'Auf diesen Charakter wechseln' : 'In Aufstellung übernehmen'}</button>}
+            {canManage && isActiveRaid && row.state === 'pending' && entry === row.entries[0] && <button type="button" disabled={pending} onClick={() => {
+              void mutate(() => api.put(`${absenceBase}/${row.playerID}`, { reason: 'Von der Raidleitung abgesagt', status: 'DECLINED' }), `Die Anmeldung von ${row.playerName} wurde abgesagt.`, true)
+            }}>Spieler absagen</button>}
           </span>
           {switchEntry?.id === entry.id && <div className="signup-switch">
             <p>Den bisherigen Charakter dieses Spielers in der Aufstellung durch {entry.character_name} ({acceptSpecs[entry.id] ?? entrySpecs(entry)[0]}) ersetzen?</p>

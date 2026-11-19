@@ -32,6 +32,13 @@ const js = script.replace('"wotlk_bis_manager_v1"', '"wotlk_bis_profile:" + docu
   .replace('const label=document.createElement("label");label.className="item-choice"', 'const label=document.createElement("div");label.className="item-choice"')
   .replace('actions.append(idButton,box);', 'const toggle=document.createElement("label");toggle.className="owned-toggle";toggle.append(box,"Vorhanden");actions.append(idButton,toggle);')
   .replace('hasAny?"TEIL VORHANDEN":"FEHLT"', 'hasAny?"Vorhanden":"Offen"')
+  .replace(/meta\.textContent=\(mapped\?[^\n]+?copy\.append\(meta\);/, 'meta.textContent=[source?.boss || source?.sourceLabel || source?.raid,source?.size ? source.size+"er" : ""].filter(Boolean).join(" · ");if(meta.textContent)copy.append(meta);')
+  .replace(/const makeRgLink=[\s\S]*?(?=const idButton=)/, `const link=document.createElement('a');link.textContent=name;link.target='_blank';link.rel='noreferrer';
+    const rgID=mapped?.id || (candidates.length===1 && candidates[0].id);
+    link.href='https://db.rising-gods.de/?'+(rgID?'item='+encodeURIComponent(rgID):'search='+encodeURIComponent(name));link.title='In der Rising-Gods-Datenbank öffnen';copy.firstChild.replaceWith(link);
+    `)
+  .replace('rgLinks.forEach(a=>actions.append(a));', '')
+  .replace(/const foot=document\.createElement\("div"\);foot\.className="source-note";[^\n]+/, '')
   .replace(/refreshCharacters\(\);render\(\);\s*$/, () => adapter)
   .replaceAll("location.origin+'/data/", "location.origin+'/api/v1/gear-manager/data/")
   .replace('https://esm.sh/wotlk-model-viewer@1.1.8', './viewer.js')

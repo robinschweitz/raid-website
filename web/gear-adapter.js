@@ -41,7 +41,7 @@ function wishControls(name, candidates, source, mapped) {
   for (const candidate of candidates) add(candidate.id, candidate.mode)
   if (source) { add(source.normalId, 'Normal'); add(source.heroicId, 'Heroisch') }
   if (!variants.size && mapped) add(mapped.id, mapped.variant)
-  if (!variants.size) { controls.textContent = 'Keine eindeutige Item-ID'; return controls }
+  if (!variants.size) return controls
   for (const [id, mode] of variants) {
     const button = document.createElement('button')
     button.type = 'button'

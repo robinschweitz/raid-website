@@ -379,6 +379,7 @@ Depth comes from glass, not from stacked shadows.
 The Gear-Manager stays inside the signed-in site layout with its own active navigation entry. The profile picker precedes the themed inventory and 3D preview. Each identifiable missing item offers a wishlist action beside its checkbox.
 The item search and filters sit immediately above the item list, below the 3D preview.
 In the item list, each equipment slot has a heading and a small written status. Give item names the available width, keep ownership and wishlist controls distinct, and render database references as secondary links. Cards stack on narrow screens.
+Equipment cards share the height of the tallest visible card. Use the site's system font and body, control, heading and small-text sizes. Show a source only once per item and link the item name instead of repeating database links and numeric IDs.
 The planner fits its content height, including after filtering, so that only the surrounding raid page scrolls vertically.
 Scrolling over the character keeps its camera distance fixed and scrolls the page. Dragging still rotates the model.
 

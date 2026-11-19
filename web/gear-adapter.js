@@ -1,5 +1,13 @@
 // Inserted into the private planner's startGearPlanner(setup) scope.
 // V17 supplies render(), SPECS, SPEC_CLASS, byId(), and its local store.
+// Measure the content, not the viewport: a short filtered list must also shrink.
+const frame = window.frameElement
+if (frame) {
+  const fit = () => { frame.style.height = `${Math.ceil(document.body.getBoundingClientRect().height)}px` }
+  const observer = new ResizeObserver(fit)
+  observer.observe(document.body)
+  fit()
+}
 const classKey = {Todesritter:'DK', Krieger:'Warrior', Druide:'Druid', Schurke:'Rogue', Jäger:'Hunter', Hexer:'Warlock', Hexenmeister:'Warlock', Priester:'Priest', Schamane:'Shaman', Paladin:'Paladin', Magier:'Mage'}[setup.character.class]
 const options = SPECS.filter(s => SPEC_CLASS[s.name] === classKey)
 const selectSpec = byId('spec')

@@ -46,7 +46,7 @@ html = html.replace(filters, '').replace('<div class="layout">', () => filters +
   .replace('<header>', '<p id="wish-status" role="status"></p><header>')
   .replace('</style>', `
     :root{--bg:#080f1c;--panel:#101d2e;--panel2:#16273b;--line:#2a4057;--gold:#86d9f2;--text:#dce6f0;--muted:#9eafc3;color-scheme:dark}
-    body{background:#0f1a2b;color:var(--text)} header,footer,.toolbar>div:has(#charSelect){display:none}
+    html{overflow-y:hidden}body{display:flow-root;background:#0f1a2b;color:var(--text)} header,footer,.toolbar>div:has(#charSelect){display:none}
     main{padding:12px}.toolbar,.filterbar,.summary,.card,.doll-panel,.info-box{background:#101d2e;border-color:#2a4057;border-radius:4px}
     button,select,input{border-color:#5989a3;color:#dce6f0;background:#16273b} h2,h3,.slot,.stat strong{color:#86d9f2}
     .toolbar{position:static;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}#wish-status:not(:empty){padding:8px 16px;color:#c7efff;background:#0c2a3c}

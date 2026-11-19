@@ -1,5 +1,10 @@
 // Inserted into the private planner's startGearPlanner(setup) scope.
 // V17 supplies render(), SPECS, SPEC_CLASS, byId(), and its local store.
+// Intercept the renderer's wheel handlers before they reach its replaceable
+// canvas. Leave the browser default alone so scrolling continues on the page.
+for (const type of ['wheel', 'mousewheel', 'DOMMouseScroll']) {
+  byId('model_3d').addEventListener(type, event => event.stopPropagation(), {capture:true, passive:true})
+}
 // Measure the content, not the viewport: a short filtered list must also shrink.
 const frame = window.frameElement
 if (frame) {

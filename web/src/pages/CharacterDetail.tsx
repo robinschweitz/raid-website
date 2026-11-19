@@ -142,6 +142,7 @@ function CharacterDetail({ characterID }: Props) {
   }
 
   return <div className="character-profile-page">
+    {isOwner && character.active && <Link to={`/gear-manager/${character.id}`}>Im BiS-Gear-Manager öffnen</Link>}
     <p><Link to={owner ? `/players/${owner.id}` : '/players'}>← {owner ? owner.name : 'Spieler'}</Link></p>
     <header className={`card character-hero ${characterClassName(character.class)}`}>
       <div className="profile-sigil" aria-hidden="true">{character.name.slice(0, 1)}</div>

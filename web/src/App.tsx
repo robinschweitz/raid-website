@@ -23,6 +23,7 @@ import { RegistrationRequestsPage } from './pages/RegistrationRequests'
 import { ChangelogPage } from './pages/Changelog'
 import { AuditLogPage } from './pages/AuditLog'
 import { WishlistPage } from './pages/Wishlist'
+import { GearManagerPage } from './pages/GearManager'
 import { PrivacyPage } from './pages/Privacy'
 import { GuidePage } from './pages/Guide'
 import { ShadowmournePage } from './pages/Shadowmourne'
@@ -49,6 +50,7 @@ function Routes() {
   }
   if (parts[0] === 'login') return <RedirectHome />
   if (parts[0] === 'wishlist') return <WishlistPage />
+  if (parts[0] === 'gear-manager' && player) return <GearManagerPage key={`${player.id}:${path}`} initialID={Number(parts[1])} />
   if (parts[0] === 'raids' && parts[1] === 'current') return <CurrentRaidPage />
   if (parts[0] === 'raids' && parts[1]) {
     return <RaidDetailPage raidID={Number(parts[1])} initialView={parts[2] === 'anmeldungen' ? 'signups' : undefined} />
@@ -121,6 +123,7 @@ function Layout() {
           {player && <Link className={path === '/loot-catalog' ? 'nav-link active' : 'nav-link'} to="/loot-catalog"><NavIcon name="loot" />Beute</Link>}
           {player && <Link className={path === '/schattengram' ? 'nav-link active' : 'nav-link'} to="/schattengram"><NavIcon name="sword" />Schattengram</Link>}
           {player && atLeast(player.role, 'MEMBER') && <Link className={path === '/wishlist' ? 'nav-link active' : 'nav-link'} to="/wishlist"><NavIcon name="heart" />Meine Wunschliste</Link>}
+          {player && <Link className={path.startsWith('/gear-manager') ? 'nav-link active' : 'nav-link'} to="/gear-manager"><NavIcon name="loot" />BiS-Gear-Manager</Link>}
           <Link className={path.startsWith('/addons') ? 'nav-link active' : 'nav-link'} to="/addons"><NavIcon name="download" />Addons</Link>
           <Link className={path === '/anleitung' ? 'nav-link active' : 'nav-link'} to="/anleitung"><NavIcon name="info" />Anleitung</Link>
           {player && atLeast(player.role, 'RAIDASSISTENT') && <>

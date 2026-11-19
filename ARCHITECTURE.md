@@ -23,6 +23,8 @@ the owner made on 2026-10-22 and that the code does not follow yet are marked
 
 ## Architecture and Decisions
 
+- **Optional Gear-Manager (ADR 117, 118).** The SPA supplies an own character and the existing wishlist API to a same-origin embedded planner document. This isolates viewer globals and transport hooks from the site. All viewer resources require a session. Checklists are browser-local per account and character ID; wishlist entries retain their existing server-side ownership and audit checks.
+
 - **Modular monolith (ADR 001).** One Go module, one process, one database. Each business
   capability is a package under `internal/<domain>`; there are no network calls between
   components.

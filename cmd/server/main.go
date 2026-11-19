@@ -92,6 +92,7 @@ func run() (err error) {
 		CookieSecure:          cfg.CookieSecure,
 		TrustProxyHeaders:     cfg.TrustProxyHeaders,
 		PublicOrigin:          cfg.PublicOrigin,
+		GearManagerDir:        cfg.GearManagerDir,
 		AdminUsername:         cfg.AdminUsername,
 		AdminPassword:         cfg.AdminPassword,
 		RegistrationFeed:      risingGods,

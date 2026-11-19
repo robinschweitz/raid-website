@@ -39,6 +39,7 @@ import (
 
 // Options controls optional runtime behaviour of the HTTP layer.
 type Options struct {
+	GearManagerDir        string
 	TOTPEncryption        *auth.TOTPEncryption
 	PrivacyContactName    string
 	PrivacyContactAddress string
@@ -131,6 +132,7 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 
 	mux := http.NewServeMux()
 	api.Register(mux)
+	v1.RegisterGearManager(mux, opts.GearManagerDir)
 	v1.CatalogHandlers{Catalog: catalog}.Register(mux)
 	v1.AddonHandlers{Addons: bundledAddons}.Register(mux)
 	v1.StatisticsHandlers{Statistics: statistics.NewService(statistics.NewRepo(db))}.Register(mux)

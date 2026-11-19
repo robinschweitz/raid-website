@@ -1,8 +1,13 @@
-export const appVersion = '1.0.92'
+export const appVersion = '1.0.93'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'BiS-Gear-Manager mit 3D-Anprobe',
+    changes: ['Im Gear-Manager wählst du einen deiner Charaktere, probierst Ausrüstung in 3D an und kannst Items auf seine Wunschliste setzen oder wieder entfernen. Dein Sammelfortschritt bleibt in diesem Browser.'],
+  },
+  {
+    version: '1.0.92',
     title: 'Charaktere selbst übernehmen',
     changes: [
       'Mit Login übernimmst du einen weiteren Rising-Gods-Charakter im eigenen Profil sofort, ohne Code, wenn es ihn auf der Seite noch nicht gibt. Nur die erste Anmeldung braucht einen Code.',

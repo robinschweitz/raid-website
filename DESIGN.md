@@ -376,6 +376,18 @@ Depth comes from glass, not from stacked shadows.
 
 ## Components
 
+The Gear-Manager stays inside the signed-in site layout with its own active navigation entry. The profile picker precedes the themed inventory and 3D preview. Each identifiable missing item offers a wishlist action beside its checkbox.
+Directly below the page title, thank Beseliania (Dennis) for creating the original Gear-Manager.
+The item search and filters sit immediately above the item list, below the 3D preview.
+The list ends without the standalone planner's expandable data notes.
+Hovering over an open item does not signal an error or repeat the item name, slot and spreadsheet provenance in a tooltip.
+In the item list, each equipment slot has a heading and a small written status. Give item names the available width, keep ownership and wishlist controls distinct, and render database references as secondary links. Cards stack on narrow screens.
+Group visible equipment cards by item count, smallest groups of alternatives first, preserving slot order within each count. Start a new row for each count. Only cards on the same row share a height (ADR 120). Use the site's system font and body, control, heading and small-text sizes. Show a source only once per item and link the item name instead of repeating database links and numeric IDs.
+A wished variant has a highlighted star and a visible remove action. Pending removal and a brief success confirmation replace the action in the same variant slot. Show the add action again after confirmation, never alongside it. Leave the wished indicator in place if the request fails.
+The planner fits its content height, including after filtering, so that only the surrounding raid page scrolls vertically.
+Its outer frame uses the same border and corner radius as a site card.
+Scrolling over the character keeps its camera distance fixed and scrolls the page. Dragging still rotates the model.
+
 All controls are native HTML elements (`button`, `input`, `select`, `textarea`, `table`,
 `dialog`-free confirmation). No UI or component library is used (ADR 026, ADR 068).
 

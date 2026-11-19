@@ -10,6 +10,7 @@ import (
 )
 
 type Config struct {
+	GearManagerDir             string
 	TOTPEncryptionKeysPrevious [][]byte
 	TOTPEncryptionKey          []byte
 	PrivacyContactName         string
@@ -42,6 +43,7 @@ func Load() (*Config, error) {
 		}
 	}
 	c := &Config{
+		GearManagerDir:        strings.TrimSpace(os.Getenv("GEAR_MANAGER_DIR")),
 		PrivacyContactName:    strings.TrimSpace(os.Getenv("PRIVACY_CONTACT_NAME")),
 		PrivacyContactAddress: strings.TrimSpace(os.Getenv("PRIVACY_CONTACT_ADDRESS")),
 		Port:                  port,

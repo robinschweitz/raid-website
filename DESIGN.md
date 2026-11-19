@@ -377,6 +377,7 @@ Depth comes from glass, not from stacked shadows.
 ## Components
 
 The Gear-Manager stays inside the signed-in site layout with its own active navigation entry. The profile picker precedes the themed inventory and 3D preview. Each identifiable missing item offers a wishlist action beside its checkbox.
+Directly below the page title, thank Beseliania (Dennis) for creating the original Gear-Manager.
 The item search and filters sit immediately above the item list, below the 3D preview.
 The list ends without the standalone planner's expandable data notes.
 Hovering over an open item does not signal an error or repeat the item name, slot and spreadsheet provenance in a tooltip.

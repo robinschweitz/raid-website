@@ -61,7 +61,8 @@ export function GearManagerPage({initialID}: {initialID: number}) {
     return () => {active = false}
   }, [player, initialID])
   const char = chars?.find(c => c.id === selected)
-  return <><div className="page-heading"><div><p className="eyebrow">Ausrüstung</p><h1>BiS-Gear-Manager</h1></div></div>
+  return <><div className="page-heading"><div><p className="eyebrow">Ausrüstung</p><h1>BiS-Gear-Manager</h1>
+    <p>Danke an <strong>Beseliania (Dennis)</strong> für den ursprünglichen Gear-Manager!</p></div></div>
     {error && <ErrorMessage>{error}</ErrorMessage>}
     {!error && !chars && <p>Lade deine Charaktere…</p>}
     {chars?.length === 0 && <p className="card">Noch keine aktiven Charaktere. <Link to={`/players/${player?.id}`}>Zum Spielerprofil</Link></p>}

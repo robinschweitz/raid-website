@@ -184,7 +184,7 @@ implemented yet when it differs from the code.
 - **FR-12.7** Staff MUST be able to accept choices of an active raid after signups close. Cancelled, completed, and archived raids MUST reject acceptance. (ADR 033)
 - **FR-12.8** The accepted state MUST come from the roster. A removed roster row MUST show its signup as pending again. (ADR 033, 076)
 - **FR-12.9** A player MUST be able to set the own absence to DECLINED or TENTATIVE, with an optional note of at most 200 characters, until the scheduled start. After the start, the answer MUST be HTTP 409 `raid_started`. (ADR 069, 082)
-- **FR-12.10** Staff MUST be able to set or clear an absence for any player while the raid is active. (ADR 069, 082)
+- **FR-12.10** Staff MUST be able to set or clear an absence for any player while the raid is active. For a pending player the signup list MUST offer the staff decline action directly beside roster acceptance. (ADR 069, 082; Owner 2026-11-19)
 - **FR-12.11** An absence MUST NOT change the roster, signups, or bench. (ADR 069)
 - **FR-12.12** A TENTATIVE absence MUST NOT change the EP rule. (ADR 082)
 - **FR-12.13** For members, a planned or open raid page MUST open on "Anmeldungen". For staff, it MUST open on "Aufstellung". (ADR 081)

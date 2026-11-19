@@ -3466,13 +3466,33 @@ test('a member can say they are unsure and later confirm with "Sicher dabei"', a
   assert.equal(writes(unsure)[1].method, 'del')
 })
 
+test('only staff can decline a pending player directly, once for both characters; a failed save can be retried', async () => {
+  for (const role of ['MEMBER', 'RAIDASSISTENT']) {
+    const s = setup({ id: 1, role })
+    const view = s.mount(s.load('components/RaidSignups.tsx').RaidSignups, { raid: raid(8), attendance: [], players: [], onRosterChange: async () => {} })
+    resolveIf(s, '/api/v1/raids/8/signups', { class_specs: {}, entries: ['Main', 'Twink'].map((name, id) => ({ id, player_id: 2, character_name: name, class: 'Magier', spec: 'Feuer' })) })
+    resolveIf(s, '/api/v1/players/1/characters', [])
+    await flush(view)
+    const actions = nodes(view.tree, (n) => n.type === 'button' && text(n) === 'Spieler absagen')
+    assert.equal(actions.length, role === 'MEMBER' ? 0 : 1)
+    if (actions.length) {
+      actions[0].props.onClick()
+      assert.equal(writes(s)[0].url, '/api/v1/raids/8/absences/2')
+      assert.equal(writes(s)[0].body.status, 'DECLINED')
+      writes(s)[0].reject(new Error('offline'))
+      await flush(view)
+      assert.equal(button(view, 'Spieler absagen').props.disabled, false)
+    }
+  }
+})
+
 test('staff can mark a player as unsure; unsure is listed apart from declined', async () => {
   const s = setup({ id: 1, role: 'RAIDASSISTENT' })
   const view = s.mount(s.load('components/RaidSignups.tsx').RaidSignups, { raid: { ...raid(8), scheduled_start: '2099-01-01T20:00:00Z' }, attendance: [], players: [{ id: 1, name: 'Leitung', active: true }, { id: 2, name: 'Wackler', active: true }, { id: 3, name: 'Krank', active: true }], onRosterChange: async () => {} })
   resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: true, is_open: true, class_specs: {}, entries: [], absences: [{ player_id: 3, reason: '', status: 'DECLINED', created_at: '2030-01-01T00:00:00Z' }] })
   resolveIf(s, '/api/v1/players/1/characters', [])
   await flush(view)
-  assert.match(text(view.tree), /1\s*abgesagt.*Krank.*Hat abgesagt/s)
+  assert.match(text(view.tree), /1\s*abgesagt.*Krank.*Abgesagt/s)
   select(view, 'Spieler markieren').props.onChange(change('2'))
   view.render()
   button(view, 'Als unsicher markieren').props.onClick()
@@ -3509,7 +3529,7 @@ test('no absence form once the raid has started; staff can still manage absences
   resolveIf(s, '/api/v1/raids/8/signups', { is_enabled: false, is_open: false, class_specs: {}, entries: [], absences: [{ player_id: 3, reason: 'Telefonisch', created_at: '2030-01-01T00:00:00Z' }] })
   resolveIf(s, '/api/v1/players/9/characters', [])
   await flush(staffView)
-  assert.match(text(staffView.tree), /Tom.*Hat abgesagt.*Telefonisch/s)
+  assert.match(text(staffView.tree), /Tom.*Abgesagt.*Telefonisch/s)
   button(staffView, 'Absage zurücknehmen').props.onClick()
   assert.equal(writes(s)[0].url, '/api/v1/raids/8/absences/3')
   const options = nodes(staffView.tree, (n) => n.type === 'option').map((n) => text(n))

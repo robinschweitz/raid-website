@@ -377,6 +377,7 @@ Depth comes from glass, not from stacked shadows.
 ## Components
 
 The Gear-Manager stays inside the signed-in site layout with its own active navigation entry. The profile picker precedes the themed inventory and 3D preview. Each identifiable missing item offers a wishlist action beside its checkbox.
+The item search and filters sit immediately above the item list, below the 3D preview.
 
 All controls are native HTML elements (`button`, `input`, `select`, `textarea`, `table`,
 `dialog`-free confirmation). No UI or component library is used (ADR 026, ADR 068).

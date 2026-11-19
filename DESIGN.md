@@ -383,6 +383,7 @@ In the item list, each equipment slot has a heading and a small written status. 
 Group visible equipment cards by item count, smallest groups of alternatives first, preserving slot order within each count. Start a new row for each count. Only cards on the same row share a height (ADR 120). Use the site's system font and body, control, heading and small-text sizes. Show a source only once per item and link the item name instead of repeating database links and numeric IDs.
 A wished variant has a highlighted star and a visible remove action. Pending removal and a brief success confirmation replace the action in the same variant slot. Show the add action again after confirmation, never alongside it. Leave the wished indicator in place if the request fails.
 The planner fits its content height, including after filtering, so that only the surrounding raid page scrolls vertically.
+Its outer frame uses the same border and corner radius as a site card.
 Scrolling over the character keeps its camera distance fixed and scrolls the page. Dragging still rotates the model.
 
 All controls are native HTML elements (`button`, `input`, `select`, `textarea`, `table`,

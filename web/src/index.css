@@ -2066,4 +2066,14 @@ input[type='checkbox'] {
   .raid-news-actions { grid-column: 1; justify-content: stretch; }
   .raid-news-actions button { width: 100%; }
 }
-.gear-planner-frame { width: 100%; height: 80vh; border: 0; margin-top: 1rem; color-scheme: dark; }
+.gear-planner-frame {
+  display: block;
+  /* The viewer sets its content height; reserve the two border pixels separately. */
+  box-sizing: content-box;
+  width: calc(100% - 2px);
+  height: 80vh;
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  margin-top: 1rem;
+  color-scheme: dark;
+}

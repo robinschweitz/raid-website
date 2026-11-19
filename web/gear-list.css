@@ -1,0 +1,40 @@
+/* Scoped to the item list in the private planner document. */
+.gear-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 370px), 1fr));
+  align-items: start;
+  gap: 16px;
+}
+.gear-grid .card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #2a4057;
+  border-radius: 6px;
+  background: #101d2e;
+  box-shadow: none;
+}
+.gear-grid .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gear-grid .card .slot { color: #e4eef7; font-size: 16px; font-weight: 650; letter-spacing: normal; text-transform: none; }
+.gear-grid .card .status { color: #b9c9d9; background: #16273b; border: 1px solid #40566b; font-size: 12px; letter-spacing: normal; text-transform: none; }
+.gear-grid .card.owned .status { color: #8bd4b0; border-color: #476d60; }
+.gear-grid .item-choice {
+  display: grid;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid #2a4057;
+  border-radius: 0;
+  background: transparent;
+  cursor: default;
+}
+.gear-grid .item-choice .item-name { color: #e4eef7; font-size: 15px; }
+.gear-grid .item-choice .item-meta { color: #9eafc3; font-size: 12px; }
+.gear-grid .item-choice .item-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.gear-grid .item-actions > span { display: inline-flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: #9eafc3; }
+.gear-grid .item-actions > span:empty { display: none; }
+.gear-grid .item-choice .item-actions button { min-height: 36px; font-size: 12px !important; padding: 5px 10px !important; border: 1px solid #5989a3; border-radius: 4px !important; color: #dce6f0; background: #16273b; opacity: 1; }
+.gear-grid .item-choice .item-actions button:disabled { color: #8bd4b0; border-color: #476d60; }
+.gear-grid .owned-toggle { order: -1; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; font-size: 13px; color: #dce6f0; cursor: pointer; }
+.gear-grid .owned-toggle input { margin: 0; }
+.gear-grid .item-choice .item-search-link { display: inline-flex; align-items: center; order: 1; font-size: 12px !important; padding: 0 !important; border: 0; background: none; color: #86d9f2; opacity: 1; }
+.gear-grid .source-note { margin: 0; color: #9eafc3; font-size: 12px; }

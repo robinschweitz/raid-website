@@ -20,6 +20,7 @@ const end = html.indexOf('</script>', start)
 if (start < 0 || end < 0) throw Error('V17-Anwendungsskript fehlt.')
 const script = html.slice(start + '<script>'.length, end)
 const adapter = await readFile(resolve(web,'gear-adapter.js'), 'utf8')
+const listStyles = await readFile(resolve(web,'gear-list.css'), 'utf8')
 const js = script.replace('"wotlk_bis_manager_v1"', '"wotlk_bis_profile:" + document.documentElement.dataset.player + ":" + setup.character.id')
   .replace('return store._characterLooks[activeChar]||{race:1,gender:1};', 'const look=store._characterLooks[activeChar]||{race:1,gender:1}; return {...look,race:raceID||look.race};')
   .replace(/function createCharacter\(\)\{[\s\S]*?\n\}/, '')
@@ -28,6 +29,9 @@ const js = script.replace('"wotlk_bis_manager_v1"', '"wotlk_bis_profile:" + docu
   .replace(' Bitte exportiere jetzt ein Backup und öffne die Datei möglichst über denselben Browser-Speicherort.', '')
   .replace(/byId\("newchar"\)\.addEventListener[\s\S]*?(?=byId\("phase"\)\.addEventListener)/, '')
   .replace('const byId=', 'const wished = new Set(setup.wishes), saving = new Set(); const byId=')
+  .replace('const label=document.createElement("label");label.className="item-choice"', 'const label=document.createElement("div");label.className="item-choice"')
+  .replace('actions.append(idButton,box);', 'const toggle=document.createElement("label");toggle.className="owned-toggle";toggle.append(box,"Vorhanden");actions.append(idButton,toggle);')
+  .replace('hasAny?"TEIL VORHANDEN":"FEHLT"', 'hasAny?"Vorhanden":"Offen"')
   .replace(/refreshCharacters\(\);render\(\);\s*$/, () => adapter)
   .replaceAll("location.origin+'/data/", "location.origin+'/api/v1/gear-manager/data/")
   .replace('https://esm.sh/wotlk-model-viewer@1.1.8', './viewer.js')
@@ -51,7 +55,7 @@ html = html.replace(filters, '').replace('<div class="layout">', () => filters +
     main{padding:12px}.toolbar,.filterbar,.summary,.card,.doll-panel,.info-box{background:#101d2e;border-color:#2a4057;border-radius:4px}
     button,select,input{border-color:#5989a3;color:#dce6f0;background:#16273b} h2,h3,.slot,.stat strong{color:#86d9f2}
     .toolbar{position:static;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}#wish-status:not(:empty){padding:8px 16px;color:#c7efff;background:#0c2a3c}
-    </style>`)
+    ${listStyles}</style>`)
   .replace('Viewer-Bibliothek wird online geladen', 'Viewer und Modelldaten vom Gildenserver')
 const jq = await fetch('https://code.jquery.com/jquery-3.7.1.min.js')
 if (!jq.ok) throw Error('jQuery konnte nicht geladen werden.')

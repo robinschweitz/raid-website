@@ -6,7 +6,7 @@ import { Link } from '../router'
 import { atLeast, type Character, type ExternalCharacter, type WishlistWish } from '../types'
 import { ErrorMessage } from '../components/ErrorMessage'
 
-type Setup = { character: Character; profileRace: string; wishes: string[]; addWish?: (id: string, name: string) => Promise<void> }
+type Setup = { character: Character; profileRace: string; wishes: string[]; addWish?: (id: string, name: string) => Promise<void>; removeWish: (id: string) => Promise<void> }
 type PlannerWindow = Window & { startGearPlanner?: (setup: Setup) => void }
 
 function Planner({character, canWish}: {character: Character; canWish: boolean}) {
@@ -40,7 +40,8 @@ function Planner({character, canWish}: {character: Character; canWish: boolean})
     const frame = e.currentTarget
     const win = frame.contentWindow as PlannerWindow | null
     if (!win?.startGearPlanner) { setError('Der Gear-Manager ist nicht verfügbar. Bitte die Seite neu laden oder die Gildenleitung informieren.'); return }
-    win.startGearPlanner({character: {...character, class: canonicalClass(character.class)}, profileRace: race, wishes, addWish: canWish && !error ? addWish : undefined})
+    win.startGearPlanner({character: {...character, class: canonicalClass(character.class)}, profileRace: race, wishes, addWish: canWish && !error ? addWish : undefined,
+      removeWish: (id) => api.del<void>(`/api/v1/characters/${character.id}/wishlist/items/${encodeURIComponent(id)}`)})
   }} />}</>
 }
 

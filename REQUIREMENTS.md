@@ -21,6 +21,7 @@ implemented yet when it differs from the code.
 
 - **FR-GEAR-1** A signed-in player of any role can use the V17 BiS planner to manage browser-local character/spec checklists and preview checked equipment on a 3.3.5 character. The website planner does not offer backup import or export. Every planner and model request requires a session. No game data is bundled.
 - **FR-GEAR-2** The planner offers only the account's active website characters (main first), with a shortcut from the owner's character profile. A member may add an outstanding item with a known item ID to that character's existing wishlist under FR-19.1. Normal and heroic IDs must remain distinguishable. Already wished items must not be added again.
+  A member may also remove the specific wished variant directly in the planner, including after marking it owned; removing a wish does not change ownership or another variant.
 - **FR-GEAR-3** When opening a linked character, the preview uses the race from that Rising-Gods profile in preference to any local preview setting. Without a usable profile race the planner remains available with manual race selection.
 
 ### 1. Access and roles

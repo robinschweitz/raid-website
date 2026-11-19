@@ -4,7 +4,7 @@ export const changelog = [
   {
     version: appVersion,
     title: 'BiS-Gear-Manager mit 3D-Anprobe',
-    changes: ['Im Gear-Manager wählst du einen deiner Charaktere, probierst Ausrüstung in 3D an und setzt fehlende Items direkt auf seine Wunschliste. Dein Sammelfortschritt bleibt in diesem Browser.'],
+    changes: ['Im Gear-Manager wählst du einen deiner Charaktere, probierst Ausrüstung in 3D an und kannst Items auf seine Wunschliste setzen oder wieder entfernen. Dein Sammelfortschritt bleibt in diesem Browser.'],
   },
   {
     version: '1.0.92',

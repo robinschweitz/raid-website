@@ -33,7 +33,7 @@ if (!options.length) {
   refreshCharacters(); render()
 }
 
-function wishControls(name, candidates, source, mapped) {
+function wishControls(name, candidates, source, mapped, owned) {
   const controls = document.createElement('span')
   if (!setup.addWish) return controls
   const variants = new Map()
@@ -43,17 +43,23 @@ function wishControls(name, candidates, source, mapped) {
   if (!variants.size && mapped) add(mapped.id, mapped.variant)
   if (!variants.size) return controls
   for (const [id, mode] of variants) {
+    const remove = wished.has(id)
+    if (owned && !remove) continue
     const button = document.createElement('button')
     button.type = 'button'
     const suffix = mode ? ' · ' + mode : ''
-    button.disabled = wished.has(id) || saving.has(id)
-    button.textContent = (wished.has(id) ? 'Auf der Wunschliste' : 'Zur Wunschliste') + suffix
+    button.disabled = saving.has(id)
+    button.textContent = (remove ? 'Von Wunschliste entfernen' : 'Zur Wunschliste') + suffix
     button.onclick = async event => {
       event.preventDefault(); event.stopPropagation()
-      if (saving.has(id) || wished.has(id)) return
+      if (saving.has(id) || wished.has(id) !== remove) return
       saving.add(id); button.disabled = true
-      try { await setup.addWish(id, name); wished.add(id); byId('wish-status').textContent = name + ' steht auf der Wunschliste von ' + setup.character.name + '.' }
-      catch { byId('wish-status').textContent = 'Wunsch konnte nicht gespeichert werden. Bitte erneut versuchen.' }
+      try {
+        if (remove) { await setup.removeWish(id); wished.delete(id) }
+        else { await setup.addWish(id, name); wished.add(id) }
+        byId('wish-status').textContent = name + suffix + (remove ? ' wurde von der Wunschliste entfernt.' : ' steht auf der Wunschliste von ' + setup.character.name + '.')
+      }
+      catch { byId('wish-status').textContent = remove ? 'Wunsch konnte nicht entfernt werden. Bitte erneut versuchen.' : 'Wunsch konnte nicht gespeichert werden. Bitte erneut versuchen.' }
       finally { saving.delete(id); render() }
     }
     controls.append(button)

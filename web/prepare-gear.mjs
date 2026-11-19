@@ -45,7 +45,7 @@ const js = script.replace('"wotlk_bis_manager_v1"', '"wotlk_bis_profile:" + docu
   .replace('Viewer-Bibliothek laden (esm.sh)', 'Viewer-Bibliothek laden')
   // The optional WarcraftDB lookup and external icon overrides aren't part of
   // the offline workflow. Keep the original local icon mapping and RG links.
-  .replace(/const idButton=document\.createElement\("button"\);[^\n]+/, 'const idButton=checked ? document.createElement("span") : wishControls(name,candidates,source,mapped);')
+  .replace(/const idButton=document\.createElement\("button"\);[^\n]+/, 'const idButton=wishControls(name,candidates,source,mapped,checked);')
   .replace(/function iconUrl\(icon\)\{[\s\S]*?\n\}/, 'function iconUrl(){return "";}')
 const filters = html.match(/<section class="filterbar">[\s\S]*?<\/section>/)[0]
 html = html.replace(filters, '').replace('<div class="layout">', () => filters + '\n<div class="layout">')

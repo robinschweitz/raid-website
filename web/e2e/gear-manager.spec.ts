@@ -23,7 +23,7 @@ test('V17 lädt Figur und Helm vom eigenen Server', async ({page}) => {
   await page.goto('/#/gear-manager')
   await expect(page.getByLabel('Mein Charakter')).toHaveValue(String(characterID))
   const planner = page.frameLocator('iframe[title="BiS-Ausrüstung und 3D-Anprobe"]')
-  await expect(planner.locator('#newchar')).not.toBeVisible()
+  await expect(planner.locator('#newchar, #deletechar')).toHaveCount(0)
   await expect(planner.locator('#model_3d canvas')).toBeVisible()
   const wish = planner.getByRole('button', {name:/^Zur Wunschliste/}).first()
   const result = page.waitForResponse(r => r.url().endsWith(`/characters/${characterID}/wishlist/items`) && r.request().method() === 'POST')

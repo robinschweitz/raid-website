@@ -15,7 +15,7 @@ if (frame) {
 }
 const classKey = {Todesritter:'DK', Krieger:'Warrior', Druide:'Druid', Schurke:'Rogue', Jäger:'Hunter', Hexer:'Warlock', Hexenmeister:'Warlock', Priester:'Priest', Schamane:'Shaman', Paladin:'Paladin', Magier:'Mage'}[setup.character.class]
 const options = SPECS.filter(s => SPEC_CLASS[s.name] === classKey)
-let lastRemovedWish = null
+const recentlyRemoved = new Set()
 const raceID = {Mensch:1, Orc:2, Zwerg:3, Nachtelf:4, Untoter:5, Taure:6, Gnom:7, Troll:8, Blutelf:10, Draenei:11}[setup.profileRace]
 const selectSpec = byId('spec')
 selectSpec.replaceChildren(...options.map(s => new Option(s.name, s.name)))
@@ -36,6 +36,7 @@ if (!options.length) {
 
 function wishControls(name, candidates, source, mapped, owned) {
   const controls = document.createElement('span')
+  controls.className = 'wish-variants'
   if (!setup.addWish) return controls
   const variants = new Map()
   const add = (id, mode) => { if (/^[1-9]\d*$/.test(String(id))) variants.set(String(id), mode) }
@@ -46,16 +47,16 @@ function wishControls(name, candidates, source, mapped, owned) {
   for (const [id, mode] of variants) {
     const remove = wished.has(id)
     const suffix = mode ? ' · ' + mode : ''
-    if (!remove && id === lastRemovedWish) {
-      const note = document.createElement('small')
-      note.className = 'wish-removed'
-      note.textContent = '✓ Entfernt' + suffix
-      controls.append(note)
-    }
-    if (owned && !remove) continue
+    const confirmed = !remove && recentlyRemoved.has(id)
+    if (owned && !remove && !confirmed) continue
     const button = document.createElement('button')
     button.type = 'button'
-    button.disabled = saving.has(id)
+    button.disabled = saving.has(id) || confirmed
+    if (confirmed) {
+      button.textContent = '✓ Entfernt' + suffix
+      controls.append(button)
+      continue
+    }
     button.classList.toggle('wish-active', remove)
     button.setAttribute('aria-label', (remove ? 'Von Wunschliste entfernen' : 'Zur Wunschliste') + suffix + ': ' + name)
     button.textContent = remove ? '★ Gewünscht' + suffix + ' · Entfernen' : 'Zur Wunschliste' + suffix
@@ -65,8 +66,10 @@ function wishControls(name, candidates, source, mapped, owned) {
       saving.add(id); button.disabled = true
       button.textContent = (remove ? 'Wird entfernt…' : 'Wird hinzugefügt…') + suffix
       try {
-        if (remove) { await setup.removeWish(id); wished.delete(id); lastRemovedWish = id }
-        else { await setup.addWish(id, name); wished.add(id); lastRemovedWish = null }
+        if (remove) {
+          await setup.removeWish(id); wished.delete(id); recentlyRemoved.add(id)
+          setTimeout(() => { recentlyRemoved.delete(id); render() }, 1600)
+        } else { await setup.addWish(id, name); wished.add(id) }
         byId('wish-status').textContent = name + suffix + (remove ? ' wurde von der Wunschliste entfernt.' : ' steht auf der Wunschliste von ' + setup.character.name + '.')
       }
       catch { byId('wish-status').textContent = remove ? 'Wunsch konnte nicht entfernt werden. Bitte erneut versuchen.' : 'Wunsch konnte nicht gespeichert werden. Bitte erneut versuchen.' }

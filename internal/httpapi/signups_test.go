@@ -135,14 +135,19 @@ func TestAbsenceDeclareRevokeAndPermissions(t *testing.T) {
 	// Others cannot decline for someone else; staff can.
 	check(http.MethodPut, url(open, member), otherToken, map[string]any{"reason": "x"}, 403)
 	check(http.MethodPut, url(open, member), memberToken, map[string]any{"reason": strings.Repeat("ä", 201)}, 400)
-	check(http.MethodPut, url(open, member), memberToken, map[string]any{"reason": "  Krank  "}, 200)
-	got := absences(otherToken, open)
-	if len(got) != 1 || got[0].PlayerID != member || got[0].Reason != "Krank" {
-		t.Fatalf("absences = %+v", got)
+	body := check(http.MethodPut, url(open, member), memberToken, map[string]any{"reason": "  Krank  "}, 200)
+	if strings.Contains(string(body), "Krank") {
+		t.Fatal("member write response exposed an absence note")
+	}
+	for _, token := range []string{memberToken, otherToken, guestToken} {
+		got := absences(token, open)
+		if len(got) != 1 || got[0].PlayerID != member || got[0].Status != raidsignup.AbsenceDeclined || got[0].Reason != "" {
+			t.Fatalf("non-staff absences = %+v", got)
+		}
 	}
 	// Updating the reason keeps a single row.
 	check(http.MethodPut, url(open, member), memberToken, map[string]any{"reason": "Urlaub"}, 200)
-	if got := absences(memberToken, open); len(got) != 1 || got[0].Reason != "Urlaub" {
+	if got := absences(staffToken, open); len(got) != 1 || got[0].Reason != "Urlaub" {
 		t.Fatalf("absences = %+v", got)
 	}
 	check(http.MethodDelete, url(open, member), otherToken, nil, 403)
@@ -162,7 +167,10 @@ func TestAbsenceDeclareRevokeAndPermissions(t *testing.T) {
 	// switch between the statuses without creating a second row.
 	check(http.MethodPut, url(open, member), memberToken, map[string]any{"status": "MAYBE"}, 400)
 	check(http.MethodPut, url(open, member), memberToken, map[string]any{"reason": "Spätschicht", "status": "TENTATIVE"}, 200)
-	if got := absences(memberToken, open); len(got) != 1 || got[0].Status != raidsignup.AbsenceTentative || got[0].Reason != "Spätschicht" {
+	if got := absences(otherToken, open); len(got) != 1 || got[0].Status != raidsignup.AbsenceTentative || got[0].Reason != "" {
+		t.Fatalf("non-staff tentative = %+v", got)
+	}
+	if got := absences(staffToken, open); len(got) != 1 || got[0].Status != raidsignup.AbsenceTentative || got[0].Reason != "Spätschicht" {
 		t.Fatalf("tentative = %+v", got)
 	}
 	check(http.MethodPut, url(open, member), memberToken, map[string]any{}, 200)

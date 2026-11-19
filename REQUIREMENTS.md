@@ -175,6 +175,8 @@ implemented yet when it differs from the code.
 
 ### 12. Signups and absences
 
+- **FR-12.15** Signup responses MUST expose absence reasons (DECLINED and TENTATIVE) only to RAIDASSISTENT, RAIDLEADER and ADMIN. Other signed-in users see the status without the note, including for their own absence. (Owner 2026-11-19; ADR 121)
+
 - **FR-12.1** Staff MUST be able to open and close signups of a raid. (ADR 033)
 - **FR-12.2** Signups MUST be open only when enabled, the raid is active and not archived, and the server time is before the scheduled start. (ADR 033)
 - **FR-12.3** MEMBER and higher MUST be able to sign up one or more own characters, each with one or more valid specs of its class; the form offers the character's main and second spec. A signup MUST NOT change the saved specs of the character. (ADR 033, 109)

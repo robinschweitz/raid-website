@@ -3,7 +3,9 @@ package v1
 import (
 	"errors"
 	"net/http"
+
 	"raid-website/internal/raidsignup"
+	"raid-website/internal/validation"
 )
 
 func writeSignupError(w http.ResponseWriter, err error) {
@@ -37,6 +39,12 @@ func (a *API) getSignups(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeSignupError(w, err)
 		return
+	}
+	p, authenticated := CurrentPlayer(r)
+	if !authenticated || !p.Role.AtLeast(validation.RoleRaidassistent) {
+		for i := range result.Absences {
+			result.Absences[i].Reason = ""
+		}
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": result})
 }

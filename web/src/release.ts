@@ -1,8 +1,13 @@
-export const appVersion = '1.0.94'
+export const appVersion = '1.0.95'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Private Hinweise bei Raidanmeldungen',
+    changes: ['Die Notiz zu „Abgesagt“ oder „Unsicher“ sehen nur Raidassistenten, Raidleiter und Admins.'],
+  },
+  {
+    version: '1.0.94',
     title: 'Raidanmeldungen direkt absagen',
     changes: ['Die Raidleitung kann einem Spieler direkt in der Anmeldeliste neben „In Aufstellung übernehmen“ absagen.'],
   },

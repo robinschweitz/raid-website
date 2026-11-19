@@ -187,7 +187,7 @@ export function GuidePage() {
       <h3>Absagen: „Kann nicht“</h3>
       <ol>
         <li>Klicke auf der Karte auf <strong>Kann nicht</strong>.</li>
-        <li>Schreib optional einen Grund dazu, z. B. <em>Familienfeier</em>.</li>
+        <li>Schreib optional einen Grund dazu, z. B. <em>Familienfeier</em>. Bei „Abgesagt“ und „Unsicher“ sehen nur Raidassistenten, Raidleiter und Admins den gespeicherten Text. Andere Spieler sehen den Status.</li>
         <li>Klicke auf <strong>Absage senden</strong>.</li>
       </ol>
       <Shot name="12-absage-mit-grund" caption="Absage mit Grund" />

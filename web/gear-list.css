@@ -38,5 +38,7 @@
 .gear-grid .item-actions > span:empty { display: none; }
 .gear-grid .item-choice .item-actions button { min-height: 36px; font-family: inherit; font-size: .9rem !important; font-weight: 400; padding: 5px 10px !important; border: 1px solid #5989a3; border-radius: 4px !important; color: #dce6f0; background: #16273b; opacity: 1; }
 .gear-grid .item-choice .item-actions button:disabled { color: #8bd4b0; border-color: #476d60; }
+.gear-grid .item-choice .item-actions button.wish-active { background: #123448; color: #b3eaff; border-color: #86d9f2; }
+.gear-grid .wish-removed { align-self: center; color: #8bd4b0; font-size: 12px; }
 .gear-grid .owned-toggle { order: -1; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; font-size: .85rem; font-weight: 400; letter-spacing: normal; text-transform: none; color: #dce6f0; cursor: pointer; }
 .gear-grid .owned-toggle input { margin: 0; }

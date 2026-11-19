@@ -15,6 +15,7 @@ if (frame) {
 }
 const classKey = {Todesritter:'DK', Krieger:'Warrior', Druide:'Druid', Schurke:'Rogue', Jäger:'Hunter', Hexer:'Warlock', Hexenmeister:'Warlock', Priester:'Priest', Schamane:'Shaman', Paladin:'Paladin', Magier:'Mage'}[setup.character.class]
 const options = SPECS.filter(s => SPEC_CLASS[s.name] === classKey)
+let lastRemovedWish = null
 const raceID = {Mensch:1, Orc:2, Zwerg:3, Nachtelf:4, Untoter:5, Taure:6, Gnom:7, Troll:8, Blutelf:10, Draenei:11}[setup.profileRace]
 const selectSpec = byId('spec')
 selectSpec.replaceChildren(...options.map(s => new Option(s.name, s.name)))
@@ -44,19 +45,28 @@ function wishControls(name, candidates, source, mapped, owned) {
   if (!variants.size) return controls
   for (const [id, mode] of variants) {
     const remove = wished.has(id)
+    const suffix = mode ? ' · ' + mode : ''
+    if (!remove && id === lastRemovedWish) {
+      const note = document.createElement('small')
+      note.className = 'wish-removed'
+      note.textContent = '✓ Entfernt' + suffix
+      controls.append(note)
+    }
     if (owned && !remove) continue
     const button = document.createElement('button')
     button.type = 'button'
-    const suffix = mode ? ' · ' + mode : ''
     button.disabled = saving.has(id)
-    button.textContent = (remove ? 'Von Wunschliste entfernen' : 'Zur Wunschliste') + suffix
+    button.classList.toggle('wish-active', remove)
+    button.setAttribute('aria-label', (remove ? 'Von Wunschliste entfernen' : 'Zur Wunschliste') + suffix + ': ' + name)
+    button.textContent = remove ? '★ Gewünscht' + suffix + ' · Entfernen' : 'Zur Wunschliste' + suffix
     button.onclick = async event => {
       event.preventDefault(); event.stopPropagation()
       if (saving.has(id) || wished.has(id) !== remove) return
       saving.add(id); button.disabled = true
+      button.textContent = (remove ? 'Wird entfernt…' : 'Wird hinzugefügt…') + suffix
       try {
-        if (remove) { await setup.removeWish(id); wished.delete(id) }
-        else { await setup.addWish(id, name); wished.add(id) }
+        if (remove) { await setup.removeWish(id); wished.delete(id); lastRemovedWish = id }
+        else { await setup.addWish(id, name); wished.add(id); lastRemovedWish = null }
         byId('wish-status').textContent = name + suffix + (remove ? ' wurde von der Wunschliste entfernt.' : ' steht auf der Wunschliste von ' + setup.character.name + '.')
       }
       catch { byId('wish-status').textContent = remove ? 'Wunsch konnte nicht entfernt werden. Bitte erneut versuchen.' : 'Wunsch konnte nicht gespeichert werden. Bitte erneut versuchen.' }

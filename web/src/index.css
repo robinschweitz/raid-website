@@ -2077,3 +2077,4 @@ input[type='checkbox'] {
   margin-top: 1rem;
   color-scheme: dark;
 }
+.support-banner { position: sticky; top: 0; z-index: 100; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .75rem; padding: .6rem; background: #302611; color: #ffeaba; border-bottom: 2px solid #d6a951; }

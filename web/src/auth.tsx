@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError } from './api'
+import { supportSession } from './supportSession'
 import { browserHasPushAPI, checkInPush, disablePushOnLogout } from './pushNotifications'
 import type { Player } from './types'
 import { getWebAuthnCredential, type WebAuthnBeginResponse } from './webauthn'
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const current = await api.get<Player>('/api/v1/auth/me')
       // The push check-in finishes before the player is shown as signed in (ADR 103).
-      await checkInPush()
+      if (!supportSession()) await checkInPush()
       if (requestVersion === version.current) setPlayer(current)
     } catch (err) {
       if (requestVersion !== version.current) return
@@ -97,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
+    if (supportSession()) throw new Error('Bitte zuerst die Spieleransicht beenden.')
     const requestVersion = ++version.current
     // Stop this device's notifications while the session can still delete them.
     if (browserHasPushAPI()) await disablePushOnLogout()

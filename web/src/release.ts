@@ -1,8 +1,13 @@
-export const appVersion = '1.0.97'
+export const appVersion = '1.0.98'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Spieleransicht für Admins',
+    changes: ['Admins können ein Spielerkonto lesend ansehen und für Spieleraktionen ausdrücklich in die Stellvertretung wechseln. Der Balken zeigt jederzeit, für wen sie handeln.'],
+  },
+  {
+    version: '1.0.97',
     title: 'GearScore bei zwei Zweihandwaffen korrigiert',
     changes: ['Beim Neuladen eines Profils zählt der GearScore zwei gleichzeitig getragene Zweihandwaffen mit der korrekten Gewichtung.'],
   },

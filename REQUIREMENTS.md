@@ -43,6 +43,8 @@ implemented yet when it differs from the code.
 
 ### 2. Authentication and sessions
 
+- **FR-2.15** An ADMIN with MFA may start a read-only player view and explicitly switch to ordinary player actions. The view must visibly identify the represented player and offer a return to the Admin. Voting, account security, permission management and staff actions must not be delegated. Changes must identify both participants in the audit trail. (Owner 2026-11-19; #247)
+
 - **FR-2.1** A user MUST log in with a username and a password. (ADR 010)
 - **FR-2.2** The system MUST reject a new or changed password that does not meet the password policy (SC-005). (ADR 046)
 - **FR-2.3** The system MUST temporarily block login for a username and client address after repeated failed attempts, and a client address after too many failed attempts for any usernames (limits: SC-008, SC-043). (ADR 046, 093; Owner 2026-10-23, OD-010)

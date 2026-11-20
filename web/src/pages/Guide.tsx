@@ -397,6 +397,7 @@ export function GuidePage() {
       <p>Ein alter Registrierungscode ist nicht wiederherstellbar. Unter „Details“ prüfst du Status und Gültigkeit. Stelle bei Verlust einen neuen Code aus, kopiere ihn zur Weitergabe und widerrufe den alten Code.</p>
       <Shot name="53-registrierung" caption="Verlauf: welcher Code welchem Spieler zugeordnet wurde" />
       <h3>Wer hat schon ein Konto?</h3>
+      <p>Für Support öffnest du im Spielerprofil den Reiter <strong>Konto</strong> und wählst <strong>Als Spieler ansehen</strong>. Der Balken zeigt das Zielkonto. Erst mit <strong>Als Spieler handeln</strong> kannst du Anmeldungen, Absagen, Wunschliste, Item-Locks oder die eigenen Charakterspecs bearbeiten. Abstimmungen, Kontosicherheit und Verwaltungsaktionen sind gesperrt. Mit <strong>Zurück zum Admin</strong> beendest du die Ansicht.</p>
       <p>Unter <strong>Spieler</strong> sehen Admins zu jedem Spieler seine <strong>Charaktere</strong>, das <strong>Konto</strong> und die <strong>Rolle</strong>. Oben steht, wie viele Spieler schon ein Konto haben. Wurde ein Charakter versehentlich dem falschen Spieler zugeordnet, öffne beim bisherigen Spieler den Reiter „Charaktere“, klicke beim Charakter auf <strong>Verschieben</strong> und wähle den richtigen Spieler. Die Raid-Aufstellungen zeigen danach den richtigen Spieler; Loot und EP bleiben unverändert.</p>
       <Shot name="52b-charakter-verschieben" caption="Charakter dem richtigen Spieler zuordnen" />
       <ul>
@@ -412,6 +413,7 @@ export function GuidePage() {
       <p>Unter <strong>Spieler</strong> auf den Namen klicken, Reiter <strong>Konto</strong>. Dort Rolle wählen (z. B. <code>MEMBER</code>), <strong>Speichern</strong>. Für ein vergessenes Passwort erstellst du darunter einen <strong>Reset-Code</strong> und sendest ihn ingame an den Main-Charakter. Der Code gilt 72 Stunden, wird nur einmal angezeigt und ersetzt ältere unbenutzte Codes.</p>
       <p><strong>Beispiel:</strong> Ein älteres Konto ist noch <code>GUEST</code>. Du stellst <code>MEMBER</code> ein und speicherst. Ab sofort kann er sich für Raids anmelden.</p>
       <Shot name="52-spieler-konto-admin" caption="Spielerkonto als Admin" />
+      <Shot name="52b-spieleransicht" caption="Aktive Stellvertretung mit Rückkehr zum Admin" />
       <p>Für Auskunftsanfragen über den Datenschutzkontakt öffnest du im Konto-Tab <strong>Persönliche Daten exportieren</strong> und wählst <strong>Daten als JSON herunterladen</strong>. Der Export enthält die gespeicherte Spielhistorie ohne Passwörter, MFA-Geheimnisse oder Sitzungsschlüssel; der Zugriff wird protokolliert.</p>
       <p>Hat jemand zwei Accounts, nutze <strong>Konto zusammenführen</strong> mit einem Grund. Unter <strong>Spieler</strong> → <strong>Neuer Spieler</strong> legst du jemanden ohne Login an.</p>
       <h3>Raidserien</h3>

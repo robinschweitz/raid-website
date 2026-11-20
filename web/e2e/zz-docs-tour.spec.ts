@@ -305,6 +305,23 @@ test('Raidleitung', async ({ page }, testInfo) => {
   await shot(page, testInfo, '39-archivierter-raid-loot')
 })
 
+test('Admin-Stellvertretung', async ({ page }, testInfo) => {
+  await signIn(page, admin)
+  await page.goto(`/#/players/${ids.Sternfall}`)
+  await page.getByRole('button', { name: 'Konto', exact: true }).click()
+  await page.getByRole('button', { name: 'Als Spieler ansehen' }).click()
+  const banner = page.getByRole('complementary', { name: 'Admin-Stellvertretung' })
+  await expect(banner).toContainText('Nur ansehen: Sternfall')
+  await expect(page.getByRole('heading', { name: 'Meine nächsten Raids' })).toBeVisible()
+  await page.getByRole('button', { name: 'Als Spieler handeln' }).click()
+  await expect(banner).toContainText('Du handelst für Sternfall')
+  await shot(page, testInfo, '52b-spieleransicht')
+  await page.getByRole('button', { name: 'Zurück zum Admin' }).click()
+  await expect(banner).toHaveCount(0)
+  await page.getByRole('button', { name: 'Konto', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Als Spieler ansehen' })).toBeVisible()
+})
+
 test('Admin', async ({ page }, testInfo) => {
   await signIn(page, admin)
   await page.goto('/#/raid-series')

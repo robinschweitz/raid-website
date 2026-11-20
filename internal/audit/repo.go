@@ -23,7 +23,18 @@ func (r *Repo) WithTx(tx bun.Tx) *Repo {
 	return &Repo{db: tx}
 }
 
+type delegation struct{ admin, target int64 }
+type delegationKey struct{}
+
+func WithDelegation(ctx context.Context, admin, target int64) context.Context {
+	return context.WithValue(ctx, delegationKey{}, delegation{admin, target})
+}
+
 func (r *Repo) Insert(ctx context.Context, l *Log) error {
+	if d, ok := ctx.Value(delegationKey{}).(delegation); ok {
+		l.ActorID = &d.admin
+		l.RepresentedPlayerID = &d.target
+	}
 	_, err := r.db.NewInsert().Model(l).Exec(ctx)
 	return err
 }
@@ -45,7 +56,8 @@ func (r *Repo) List(ctx context.Context) ([]Entry, error) {
 	var entries []Entry
 	err := r.db.NewSelect().
 		TableExpr("audit_log AS audit").
-		ColumnExpr("audit.id, audit.actor_id, CASE WHEN audit.actor_id IS NULL AND audit.action = 'reset_code_created' AND audit.reason = 'server operator' THEN 'server operator' ELSE players.name END AS actor_name, audit.entity_type, audit.entity_id, audit.action, audit.before_json, audit.after_json, audit.reason, audit.created_at").
+		ColumnExpr("audit.id, audit.actor_id, CASE WHEN audit.represented_player_id IS NOT NULL THEN players.name || ' für ' || COALESCE(represented.name, 'ehemaligen Spieler') WHEN audit.actor_id IS NULL AND audit.action = 'reset_code_created' AND audit.reason = 'server operator' THEN 'server operator' ELSE players.name END AS actor_name, audit.entity_type, audit.entity_id, audit.action, audit.before_json, audit.after_json, audit.reason, audit.created_at").
+		Join("LEFT JOIN players AS represented ON represented.id = audit.represented_player_id AND NOT EXISTS (SELECT 1 FROM audit_log erased WHERE erased.entity_type='player' AND erased.entity_id=CAST(represented.id AS TEXT) AND erased.action='player_anonymise')").
 		Join("LEFT JOIN players ON players.id = audit.actor_id").
 		OrderExpr("audit.created_at DESC, audit.id DESC").
 		Scan(ctx, &entries)

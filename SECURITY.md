@@ -338,6 +338,8 @@ chapter level only; requirement IDs are not cited until each is verified against
 - **Verification:** A direct push to `main` is rejected; a pull request with a failing test or a known vulnerable dependency cannot merge.
 
 **SC-040 - MFA required for Admins**
+
+For FR-2.15, a support-view identifier MUST only work with the initiating authenticated MFA Admin session. The server MUST check the live target and the allowed route and write mode, and record the real actor and represented player for delegated mutations. (ADR 123)
 - **Status:** ACTIVE
 - **Rule:** An ADMIN account without enabled TOTP or a security key MUST be sent to MFA setup after login, and every other Admin-only request MUST be rejected with HTTP 403 `mfa_setup_required` until MFA is enabled. This includes the bootstrap Admin and a player who is newly given the ADMIN role. Responses shared with other roles MUST NOT show such an Admin the Admin-only fields of other players (login name, role, account timestamps); the Admin sees them like a RAIDLEADER (ADR 103). Other roles stay optional (FR-3.1).
 - **Enforcement:** `auth` login flow; `RequireRole(ADMIN)` route guard.

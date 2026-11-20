@@ -146,5 +146,5 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		mux.Handle("/", spa)
 	}
 
-	return requestID(securityHeaders(opts.CookieSecure)(logging(csrfProtection(opts.TrustProxyHeaders)(authenticate(authSvc)(mux))))), nil
+	return requestID(securityHeaders(opts.CookieSecure)(logging(csrfProtection(opts.TrustProxyHeaders)(authenticate(authSvc)(api.SupportView(mux)))))), nil
 }

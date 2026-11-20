@@ -203,7 +203,9 @@ function Gate() {
 export default function App() {
   return (
     <AuthProvider>
-      <Gate />
+      {supportSession() ? <><SupportBanner /><Gate /></> : <Gate />}
     </AuthProvider>
   )
 }
+import { SupportBanner } from './components/SupportView'
+import { supportSession } from './supportSession'

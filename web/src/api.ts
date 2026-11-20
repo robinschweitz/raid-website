@@ -1,3 +1,5 @@
+import { supportSession } from './supportSession'
+
 // The authorization guards answer in English; the UI always shows German.
 function germanGuardMessage(code: string, message?: string): string | undefined {
   if (code === 'forbidden' && message === 'insufficient permissions') return 'Dafür fehlt dir die Berechtigung.'
@@ -36,6 +38,8 @@ export type RequestOptions = { signal?: AbortSignal }
 
 async function request<T>(method: string, path: string, body?: unknown, envelope = false, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = body !== undefined ? { 'Content-Type': 'application/json' } : {}
+  const support = supportSession()
+  if (support) headers['X-Player-View'] = support.id
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
     headers['X-CSRF-Token'] = await ensureCSRFToken()
   }

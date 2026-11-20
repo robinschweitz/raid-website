@@ -872,6 +872,7 @@ function PlayerDetail({ playerID, initialView }: Props) {
       {(isAdmin || isOwnProfile) && (
         <section id="profile-account" hidden={view !== 'account'} className="card">
           <h2>Konto</h2>
+          {isAdmin && view === 'account' && player.role && atLeast(player.role,'RAIDASSISTENT') && <PlayerRaidRights playerID={playerID} />}
           {isAdmin && <section className="subcard">
             <h3>Kontodaten</h3>
            <form className="inline-form" onSubmit={setAccount}>
@@ -983,3 +984,4 @@ function PlayerDetail({ playerID, initialView }: Props) {
     </div>
   )
 }
+import { PlayerRaidRights } from '../components/RaidPermissionPanel'

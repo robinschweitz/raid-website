@@ -70,6 +70,7 @@ func NewAPI(d Deps) *API {
 }
 
 func (a *API) Register(mux *http.ServeMux) {
+	a.registerRaidPermissions(mux)
 	mux.HandleFunc("GET /api/v1/health", Health)
 	mux.HandleFunc("GET /api/v1/auth/csrf", a.csrfToken)
 	mux.HandleFunc("POST /api/v1/auth/login", a.login)

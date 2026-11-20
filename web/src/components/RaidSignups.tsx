@@ -31,7 +31,7 @@ export function RaidSignups({ raid, attendance, players, onRosterChange }: Props
   const [absenceTarget, setAbsenceTarget] = useState('')
   const [clock, setClock] = useState(Date.now())
   const loadVersion = useRef(0)
-  const canManage = !!player && atLeast(player.role, 'RAIDASSISTENT')
+  const canManage = !!player && atLeast(player.role, 'RAIDASSISTENT') && ((raid.staff_actions ?? 15) & 1) !== 0
   const canSignup = !!player && atLeast(player.role, 'MEMBER')
   const isActiveRaid = !raid.archived_at && (raid.status === 'PLANNED' || raid.status === 'OPEN')
   const isFuture = !!raid.scheduled_start && Date.parse(raid.scheduled_start) > clock

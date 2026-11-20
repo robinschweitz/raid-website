@@ -421,8 +421,9 @@ func gearScoreItemsFromProfileBody(body string) []gearScoreItem {
 	}
 	// The page also lists each slot's transmog appearance; count only what is worn.
 	worn := make([]gearScoreItem, 0, len(equipped))
-	for _, id := range equipped {
+	for position, id := range equipped {
 		if item, ok := byID[id]; ok {
+			item.inventorySlot = position
 			worn = append(worn, item)
 		}
 	}
@@ -431,7 +432,7 @@ func gearScoreItemsFromProfileBody(body string) []gearScoreItem {
 
 // equippedItemIDs reads the worn item of each slot (the first field of every
 // inventory entry). It reports false when the profile has no inventory map.
-func equippedItemIDs(body string) ([]string, bool) {
+func equippedItemIDs(body string) (map[int]string, bool) {
 	match := risingGodsInventory.FindStringIndex(body)
 	if match == nil {
 		return nil, false
@@ -440,14 +441,14 @@ func equippedItemIDs(body string) ([]string, bool) {
 	if object == "" {
 		return nil, false
 	}
-	var inventory map[string][]int64
+	var inventory map[int][]int64
 	if err := json.Unmarshal([]byte(object), &inventory); err != nil {
 		return nil, false
 	}
-	ids := make([]string, 0, len(inventory))
-	for _, slot := range inventory {
+	ids := make(map[int]string, len(inventory))
+	for position, slot := range inventory {
 		if len(slot) > 0 && slot[0] > 0 {
-			ids = append(ids, strconv.FormatInt(slot[0], 10))
+			ids[position] = strconv.FormatInt(slot[0], 10)
 		}
 	}
 	return ids, true

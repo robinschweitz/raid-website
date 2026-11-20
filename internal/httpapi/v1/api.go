@@ -73,6 +73,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/support/start", RequireRole(validation.RoleAdmin, a.startSupport))
 	mux.HandleFunc("POST /api/v1/support/write", RequireRole(validation.RoleAdmin, a.changeSupport))
 	mux.HandleFunc("POST /api/v1/support/end", RequireRole(validation.RoleAdmin, a.changeSupport))
+	a.registerRaidPermissions(mux)
 	mux.HandleFunc("GET /api/v1/health", Health)
 	mux.HandleFunc("GET /api/v1/auth/csrf", a.csrfToken)
 	mux.HandleFunc("POST /api/v1/auth/login", a.login)

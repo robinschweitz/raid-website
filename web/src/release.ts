@@ -7,6 +7,16 @@ export const changelog = [
     changes: ['Admins können ein Spielerkonto lesend ansehen und für Spieleraktionen ausdrücklich in die Stellvertretung wechseln. Der Balken zeigt jederzeit, für wen sie handeln.'],
   },
   {
+    version: '1.0.97',
+    title: 'GearScore bei zwei Zweihandwaffen korrigiert',
+    changes: ['Beim Neuladen eines Profils zählt der GearScore zwei gleichzeitig getragene Zweihandwaffen mit der korrekten Gewichtung.'],
+  },
+  {
+    version: '1.0.96',
+    title: 'Berechtigungen pro Raid und Vertretungen',
+    changes: ['Unter Planung & Details siehst du die Berechtigungen für den Termin. Admins begrenzen Aufgaben und Zuständigkeit. Raidleiter können aktive Raidassistenten oder Raidleiter für einen einzelnen eigenen Termin als Vertretung einteilen.'],
+  },
+  {
     version: '1.0.95',
     title: 'Private Hinweise bei Raidanmeldungen',
     changes: ['Die Notiz zu „Abgesagt“ oder „Unsicher“ sehen nur Raidassistenten, Raidleiter und Admins.'],

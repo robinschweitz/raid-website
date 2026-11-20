@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"raid-website/internal/raidpermission"
 	"raid-website/internal/raidsignup"
 	"raid-website/internal/validation"
 )
@@ -41,7 +42,16 @@ func (a *API) getSignups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, authenticated := CurrentPlayer(r)
-	if !authenticated || !p.Role.AtLeast(validation.RoleRaidassistent) {
+	visible := authenticated && p.Role.AtLeast(validation.RoleRaidassistent)
+	if visible {
+		rights, err := (raidpermission.Repo{DB: a.DB}).Effective(r.Context(), p.ID, id, p.Role)
+		if err != nil {
+			permissionError(w, err)
+			return
+		}
+		visible = rights.Allowed&raidpermission.AbsenceNotes != 0
+	}
+	if !visible {
 		for i := range result.Absences {
 			result.Absences[i].Reason = ""
 		}
@@ -161,6 +171,9 @@ func (a *API) declineAbsence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor, _ := ActorID(r)
+	if target != actor && !requireOccurrence(w, r, id, raidpermission.Roster) {
+		return
+	}
 	if err := a.Signups.Decline(r.Context(), id, actor, target, req.Reason, req.Status); err != nil {
 		writeSignupError(w, err)
 		return
@@ -180,6 +193,9 @@ func (a *API) revokeAbsence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor, _ := ActorID(r)
+	if target != actor && !requireOccurrence(w, r, id, raidpermission.Roster) {
+		return
+	}
 	if err := a.Signups.Revoke(r.Context(), id, actor, target); err != nil {
 		writeSignupError(w, err)
 		return

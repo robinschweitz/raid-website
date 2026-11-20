@@ -37,6 +37,10 @@ implemented yet when it differs from the code.
 - **FR-1.9** The system MUST store the role of each player. Only an ADMIN can change a role. (ADR 010)
 - **FR-1.10** The player list page `/players` MUST be offered only to RAIDASSISTENT and higher, in the Administration section of the navigation; other roles get a note instead of the list. Player profiles MUST stay readable for every signed-in user, reached through `/punkte` and the own name. The API player list stays public (FR-1.2). (Owner 2026-11-03, ADR 111)
 
+- **FR-1.11** An ADMIN MUST be able to restrict individual RAIDASSISTENT and RAIDLEADER accounts by raid scope and action: signups and roster, reading absence notes, loot and EP, and planning and completion. Existing accounts MUST retain their current access until configured. The server MUST enforce the effective rights. (Owner 2026-11-19; #246, ADR 122)
+- **FR-1.12** The permission manager MUST show the effective rights and their source both by player and by raid. The raid's own leader list takes precedence over the series' inherited leaders for that occurrence. (Owner 2026-11-19; #246)
+- **FR-1.13** An ADMIN manages all assignments. A RAIDLEADER assigned to a raid MAY designate a substitute for that occurrence only and MUST NOT delegate permissions they do not hold there. (Owner 2026-11-19; #246; recipient eligibility: OQ-16)
+
 ### 2. Authentication and sessions
 
 - **FR-2.15** An ADMIN with MFA may start a read-only player view and explicitly switch to ordinary player actions. The view must visibly identify the represented player and offer a return to the Admin. Voting, account security, permission management and staff actions must not be delegated. Changes must identify both participants in the audit trail. (Owner 2026-11-19; #247)
@@ -124,6 +128,7 @@ implemented yet when it differs from the code.
 - **FR-7.2** The lookup MUST accept a character name or a Rising-Gods profile URL. (ADR 044)
 - **FR-7.3** The system MUST query Rising-Gods only for a user request. It MUST NOT warm a cache in the background. (ADR 049)
 - **FR-7.4** The system MUST load the selected profile again before it stores a character. (ADR 044)
+- The GearScore calculation MUST use the occupied inventory positions for main-hand and off-hand weighting, including when both weapons are two-handed.
 - **FR-7.5** When Rising-Gods is unavailable, the system MUST answer with HTTP 502 `rising_gods_unavailable` (error content: SC-023). (ADR 049, 053)
 - **FR-7.6** The system MUST limit how many Rising-Gods searches a visitor without a session can start per time period. Registration requests count toward the same limit. Logged-in users MUST NOT be limited. The limit value is owned by `SECURITY.md` (SC-028). (Owner 2026-10-22, review)
 
@@ -443,6 +448,7 @@ None open.
 - **OQ-12** Privacy details → FR-30.1–30.5.
 - **OQ-13** Anonymised name: oldest main, else oldest character → FR-30.2.
 - **OQ-15** Access to one's own data: on request, Admin download → FR-30.7 (2026-10-23).
+- **OQ-16** A substitute MUST be an active RAIDASSISTENT or RAIDLEADER (FR-1.13; Owner 2026-11-19). A delegation never changes an account role.
 - **OQ-14** Off-server backup: Hetzner Storage Box, passphrase on the server and with the owner, add-only uploads → NFR-2.3, ADR 099 (2026-10-24).
 - Owner review: EP stops at zero with a warning → FR-16.6, FR-16.8; visitor search limit → FR-7.6; pre-066 backup deleted (former NFR-2.4).
 

@@ -26,6 +26,7 @@ import (
 	"raid-website/internal/raid"
 	"raid-website/internal/raidcompletion"
 	"raid-website/internal/raidcorrection"
+	"raid-website/internal/raidpermission"
 	"raid-website/internal/raidseries"
 	"raid-website/internal/raidsignup"
 	"raid-website/internal/recruitment"
@@ -146,5 +147,6 @@ func New(db *bun.DB, opts Options) (http.Handler, error) {
 		mux.Handle("/", spa)
 	}
 
-	return requestID(securityHeaders(opts.CookieSecure)(logging(csrfProtection(opts.TrustProxyHeaders)(authenticate(authSvc)(api.SupportView(mux)))))), nil
+	scoped := v1.WithRaidPermissions(raidpermission.Repo{DB: db}, api.SupportView(mux))
+	return requestID(securityHeaders(opts.CookieSecure)(logging(csrfProtection(opts.TrustProxyHeaders)(authenticate(authSvc)(scoped))))), nil
 }

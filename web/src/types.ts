@@ -154,6 +154,7 @@ export interface NameHistory {
 export type RaidStatus = 'PLANNED' | 'OPEN' | 'COMPLETED' | 'CANCELLED'
 
 export interface Raid {
+  staff_actions?: number
   id: number
   name: string
   /** Copied from the series; null means no points and no ENHANCED or locks (ADR 113). */

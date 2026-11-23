@@ -249,6 +249,8 @@ export interface RaidSeries {
   /** EP pool of the series' raids; null means the raids give no points (ADR 113). */
   ep_pool_id?: number | null
   ep_award?: number
+  /** Open raids that kept their EP setting after a save, because they already have EP or locks (ADR 125). */
+  ep_unchanged_raids?: { id: number; name: string }[]
 }
 
 export interface CatalogSource {

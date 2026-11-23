@@ -1,8 +1,13 @@
-export const appVersion = '1.0.98'
+export const appVersion = '1.0.99'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'EP-Einstellung der Serie gilt auch für geplante Raids',
+    changes: ['Änderst du bei einer Raidserie den EP-Topf oder die EP, übernehmen jetzt auch die schon geplanten und offenen Raids der Serie die neue Einstellung. Nur Raids, in denen schon EP gebucht oder Locks gesetzt sind, behalten die alte; die Seite nennt sie dir.'],
+  },
+  {
+    version: '1.0.98',
     title: 'Spieleransicht für Admins',
     changes: ['Admins können ein Spielerkonto lesend ansehen und für Spieleraktionen ausdrücklich in die Stellvertretung wechseln. Der Balken zeigt jederzeit, für wen sie handeln.'],
   },

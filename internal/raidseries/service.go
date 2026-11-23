@@ -100,6 +100,19 @@ type Changes struct {
 func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Series, error) {
 	var result *Series
 	err := s.repo.InTransaction(ctx, func(repo *Repo) error {
+		var err error
+		result, err = ConfigureIn(ctx, repo, id, changes)
+		return err
+	})
+	return result, err
+}
+
+// ConfigureIn creates or patches a series with a repository bound to the
+// caller's transaction, so the raid package can update the series' open raids
+// in the same transaction (ADR 125).
+func ConfigureIn(ctx context.Context, repo *Repo, id int64, changes Changes) (*Series, error) {
+	var result *Series
+	err := func() error {
 		series := new(Series)
 		var before *Series
 		if id != 0 {
@@ -183,7 +196,7 @@ func (s *Service) Configure(ctx context.Context, id int64, changes Changes) (*Se
 		}
 		result = series
 		return nil
-	})
+	}()
 	return result, err
 }
 

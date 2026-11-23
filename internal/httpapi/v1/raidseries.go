@@ -55,7 +55,8 @@ func (a *API) saveRaidSeries(w http.ResponseWriter, r *http.Request, update bool
 		BadRequest(w, "malformed json body")
 		return
 	}
-	series, err := raidseries.NewService(a.RaidSeries).Configure(r.Context(), id, raidseries.Changes{ActorID: actor, Name: req.Name, NameTemplate: req.NameTemplate, NextRaidNumber: req.NextRaidNumber, RaidLeaderID: req.RaidLeaderID, LeaderIDs: req.LeaderIDs, Weekdays: req.Weekdays, IntervalWeeks: req.IntervalWeeks, StartTime: req.StartTime, Timezone: req.Timezone, PlanWeeksAhead: req.PlanWeeksAhead, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize, EPPoolID: req.EPPoolID, EPAward: req.EPAward})
+	// Changed EP settings reach the series' open raids in the same transaction (ADR 125).
+	series, epKept, err := raid.NewService(a.Raids).ConfigureSeries(r.Context(), id, raidseries.Changes{ActorID: actor, Name: req.Name, NameTemplate: req.NameTemplate, NextRaidNumber: req.NextRaidNumber, RaidLeaderID: req.RaidLeaderID, LeaderIDs: req.LeaderIDs, Weekdays: req.Weekdays, IntervalWeeks: req.IntervalWeeks, StartTime: req.StartTime, Timezone: req.Timezone, PlanWeeksAhead: req.PlanWeeksAhead, CatalogInstanceID: req.CatalogInstanceID, RaidSize: req.RaidSize, EPPoolID: req.EPPoolID, EPAward: req.EPAward})
 	if err != nil {
 		if !writeSeriesError(w, err) {
 			WriteError(w, http.StatusInternalServerError, "internal", "could not save series")
@@ -81,10 +82,17 @@ func (a *API) saveRaidSeries(w http.ResponseWriter, r *http.Request, update bool
 	if update {
 		status = http.StatusOK
 	}
-	WriteJSON(w, status, map[string]any{"data": series})
+	WriteJSON(w, status, map[string]any{"data": seriesResponse{Series: series, EPUnchangedRaids: epKept}})
 	if len(planned) > 0 {
 		a.notifyAll(w, r, push.KindRaid, actor)
 	}
+}
+
+// seriesResponse adds the open raids that kept their EP setting because they
+// already have EP transactions or item locks (ADR 125).
+type seriesResponse struct {
+	*raidseries.Series
+	EPUnchangedRaids []raid.RaidRef `json:"ep_unchanged_raids"`
 }
 
 type planSeriesRequest struct {

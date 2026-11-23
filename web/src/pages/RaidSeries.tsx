@@ -22,6 +22,7 @@ export function RaidSeriesPage() {
   const renderedEditVersion = editVersion.current
   const [schedule, setSchedule] = useState(emptySchedule)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [catalog, setCatalog] = useState<LootCatalog | null>(null)
   const [catalogError, setCatalogError] = useState('')
   const existing = series.find((row) => row.id === editingID)
@@ -83,6 +84,8 @@ export function RaidSeriesPage() {
         setSeries((rows) => editingID === null ? [...rows, saved] : rows.map((r) => r.id === editingID ? saved : r))
         setEditingID(null)
         setSchedule(emptySchedule)
+        const kept = saved.ep_unchanged_raids ?? []
+        setNotice(kept.length ? `Serie gespeichert. ${kept.map((raid) => raid.name).join(', ')} ${kept.length === 1 ? 'behält' : 'behalten'} die alte EP-Einstellung, weil dort schon EP gebucht oder Locks gesetzt sind.` : '')
       } catch (err) {
         if (isActive()) setError(err instanceof ApiError ? err.message : 'Speichern fehlgeschlagen')
       }
@@ -119,7 +122,7 @@ export function RaidSeriesPage() {
           <option value="0">Keine EP</option>
         </select></label>
         <label>EP beim Archivieren<input aria-label="EP beim Archivieren" required type="number" min="0" max="100" step="1" value={schedule.ep_award} onChange={(e) => setSchedule({ ...schedule, ep_award: e.target.value })} /></label>
-        <p className="muted">Jeder ohne Main-Spec-Loot bekommt diese EP beim Archivieren, im gewählten Topf; 0 gibt keine EP. Ohne EP-Topf gibt es weder EP noch Enhanced-Loot oder Locks. Bestehende Raids behalten ihre Einstellung.</p>
+        <p className="muted">Jeder ohne Main-Spec-Loot bekommt diese EP beim Archivieren, im gewählten Topf; 0 gibt keine EP. Ohne EP-Topf gibt es weder EP noch Enhanced-Loot oder Locks. Eine Änderung gilt auch für alle geplanten und offenen Raids der Serie, außer dort sind schon EP gebucht oder Locks gesetzt.</p>
       </fieldset>
       {catalogError && <ErrorMessage>{catalogError}</ErrorMessage>}
       <CatalogAssociationFields catalog={catalog} instanceID={schedule.catalog_instance_id} raidSize={schedule.raid_size} disabled={pending} existingInstanceID={existing?.catalog_instance_id ?? ''} existingRaidSize={existing?.raid_size == null ? '' : String(existing.raid_size)} onChange={(instance, size) => { if (!isPending() && isActive()) setSchedule({ ...schedule, catalog_instance_id: instance, raid_size: size }) }} />
@@ -133,6 +136,7 @@ export function RaidSeriesPage() {
     <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>Raidserien</h1></div></div>
     <p className="muted">Beim Archivieren entsteht der nächste zukünftige Termin nach dieser Konfiguration; abgesagte Termine werden übersprungen. Raids lassen sich auch auf der Raidseite im Voraus anlegen. Startzeiten sind Serverzeit (deutsche Zeit, mit Sommerzeit), nicht die Zeitzone des Browsers.</p>
     {error && <ErrorMessage>{error}</ErrorMessage>}
+    {notice && <p className="notice" role="status">{notice}</p>}
     {isAdmin && editingID === null && <details className="card editor-disclosure"><summary>Neue Raidserie</summary>{editorForm}</details>}
     <ul className="series-directory">{series.map((s) => <li className={`card${editingID === s.id ? ' is-editing' : ''}`} key={s.id}>
       <h2>{s.name}</h2>

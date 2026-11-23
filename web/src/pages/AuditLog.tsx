@@ -117,7 +117,7 @@ function actionLabel(entry: AuditLogEntry, before: AuditSnapshot): string {
     security_key_remove: 'Sicherheitsschlüssel entfernt', create_code: 'Code erstellt', reject: 'Abgelehnt', revoke: 'Widerrufen',
     mark_sent: 'Als versendet markiert', redeem: 'Code eingelöst',
     accept: 'Bestätigt', absence_declare: 'Abgesagt', absence_tentative: 'Als unsicher gemeldet', absence_revoke: 'Absage zurückgenommen',
-    archive_without_points: 'EP-Ausnahme festgelegt', availability: 'Anmeldungen geändert', award: 'Beute vergeben',
+    archive_without_points: 'EP-Ausnahme festgelegt', series_ep: 'EP-Einstellung der Serie übernommen', availability: 'Anmeldungen geändert', award: 'Beute vergeben',
     create_linked_character: 'Charakter angelegt', link_rising_gods_profile: 'Rising-Gods-Profil verknüpft',
     merge_duplicate_source: 'Duplikat zusammengeführt', merge_duplicate_target: 'Duplikat übernommen',
     reload_rising_gods_profile: 'Rising-Gods-Profil aktualisiert', rename: 'Umbenannt', transfer_owner: 'Spielerzuordnung geändert', character_owner_transfer: 'Spielerzuordnung geändert', remove: 'Aus dem Raid entfernt', save: 'Gespeichert',

@@ -224,3 +224,90 @@ func TestReqEP_RaidPoolLockedByExistingPoints(t *testing.T) {
 func jsonContains(body []byte, fragment string) bool {
 	return strings.Contains(string(body), fragment)
 }
+
+// FR-16.11, ADR 125: a changed series EP setting reaches its open raids, except
+// raids that already have EP; archived raids never change.
+func TestReqEP_SeriesChangeReachesOpenRaids(t *testing.T) {
+	srv, bdb := setupServer(t)
+	client := srv.Client()
+	ctx := context.Background()
+	adminID := seedAccount(t, bdb, "spreadadmin", "password", validation.RoleAdmin)
+	seedAccount(t, bdb, "spreadleader", "password", validation.RoleRaidleader)
+	admin := login(t, client, srv, "spreadadmin", "password")
+	leader := login(t, client, srv, "spreadleader", "password")
+	status, raw := do(t, client, http.MethodPost, srv.URL+"/api/v1/raid-series", admin, map[string]any{"name": "HC Trys", "raid_leader_id": adminID, "weekdays": []int{4}, "interval_weeks": 1, "start_time": "19:00", "timezone": "Europe/Berlin", "ep_pool_id": 1, "ep_award": 10})
+	if status != http.StatusCreated {
+		t.Fatalf("series: %d %s", status, raw)
+	}
+	var created struct {
+		Data struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &created); err != nil {
+		t.Fatal(err)
+	}
+	seriesID := created.Data.ID
+	raidIDs := make([]int64, 0, 3)
+	for day := 2; day <= 4; day++ {
+		start := time.Now().UTC().AddDate(0, 0, day).Format(time.RFC3339)
+		status, raw := do(t, client, http.MethodPost, srv.URL+"/api/v1/raids", admin, map[string]any{"raid_leader_id": adminID, "series_id": seriesID, "scheduled_start": start, "status": "PLANNED"})
+		if status != http.StatusCreated {
+			t.Fatalf("raid: %d %s", status, raw)
+		}
+		var out struct {
+			Data struct {
+				ID int64 `json:"id"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(raw, &out); err != nil {
+			t.Fatal(err)
+		}
+		raidIDs = append(raidIDs, out.Data.ID)
+	}
+	open, booked, archived := raidIDs[0], raidIDs[1], raidIDs[2]
+	if err := enhancepoints.NewRepo(bdb).InsertTransaction(ctx, &enhancepoints.Transaction{PlayerID: adminID, PoolID: 1, RaidID: &booked, Amount: -5, Type: "enhanced_loot", Reason: "test", ActorID: adminID, CreatedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bdb.ExecContext(ctx, "UPDATE raids SET status = 'COMPLETED', archived_at = CURRENT_TIMESTAMP WHERE id = ?", archived); err != nil {
+		t.Fatal(err)
+	}
+
+	url := fmt.Sprintf("%s/api/v1/raid-series/%d", srv.URL, seriesID)
+	if status, _ := do(t, client, http.MethodPatch, url, leader, map[string]any{"ep_pool_id": 0}); status != http.StatusForbidden {
+		t.Fatalf("raid leader changed series EP: %d", status)
+	}
+	status, raw = do(t, client, http.MethodPatch, url, admin, map[string]any{"ep_pool_id": 0, "ep_award": 0})
+	if status != http.StatusOK || !jsonContains(raw, fmt.Sprintf(`"ep_unchanged_raids":[{"id":%d,`, booked)) {
+		t.Fatalf("series EP change: %d %s", status, raw)
+	}
+	type ep struct {
+		pool  *int64
+		award int
+	}
+	read := func(id int64) ep {
+		t.Helper()
+		var got ep
+		if err := bdb.QueryRowContext(ctx, "SELECT ep_pool_id, ep_award FROM raids WHERE id = ?", id).Scan(&got.pool, &got.award); err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if got := read(open); got.pool != nil || got.award != 0 {
+		t.Fatalf("open raid kept old EP: %+v", got)
+	}
+	for _, id := range []int64{booked, archived} {
+		if got := read(id); got.pool == nil || *got.pool != 1 || got.award != 10 {
+			t.Fatalf("raid %d changed: %+v", id, got)
+		}
+	}
+	var audits int
+	if err := bdb.QueryRowContext(ctx, "SELECT COUNT(*) FROM audit_log WHERE entity_type = 'raid' AND action = 'series_ep' AND entity_id = ?", fmt.Sprint(open)).Scan(&audits); err != nil || audits != 1 {
+		t.Fatalf("series_ep audit: %d %v", audits, err)
+	}
+	// Saving again without an EP change touches no raid and lists none.
+	status, raw = do(t, client, http.MethodPatch, url, admin, map[string]any{"name": "HC Trys neu"})
+	if status != http.StatusOK || !jsonContains(raw, `"ep_unchanged_raids":[]`) {
+		t.Fatalf("unrelated series change: %d %s", status, raw)
+	}
+}

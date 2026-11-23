@@ -14,6 +14,7 @@ import (
 	"raid-website/internal/lootcatalog"
 	"raid-website/internal/player"
 	"raid-website/internal/raidseries"
+	"raid-website/internal/validation"
 )
 
 type Repo struct {
@@ -239,4 +240,14 @@ func (r *Repo) FindByName(ctx context.Context, name string) (*Raid, error) {
 		return nil, err
 	}
 	return rd, nil
+}
+
+// ListOpenBySeries lists the planned or open, unarchived raids of a series.
+func (r *Repo) ListOpenBySeries(ctx context.Context, seriesID int64) ([]Raid, error) {
+	rs := []Raid{}
+	err := r.db.NewSelect().Model(&rs).Where("series_id = ?", seriesID).
+		Where("archived_at IS NULL").
+		Where("status IN (?)", bun.List([]validation.RaidStatus{validation.RaidStatusPlanned, validation.RaidStatusOpen})).
+		Order("id ASC").Scan(ctx)
+	return rs, err
 }

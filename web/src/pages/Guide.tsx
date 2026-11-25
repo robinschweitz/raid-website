@@ -379,7 +379,7 @@ export function GuidePage() {
       </ol>
       <p><strong>Beispiel:</strong> Thorgrim hat 10 EP und bekommt kein Main-Spec-Item. Danach hat er 20 EP.</p>
       <Shot name="38b-archivieren-pruefen" caption="Prüfen vor dem Archivieren" />
-      <p>Auch archivierte Raids lassen sich korrigieren, z. B. mit <strong>Loot korrigieren</strong>. Dann ist immer eine Begründung nötig, und EP werden automatisch ausgeglichen.</p>
+      <p>Auch archivierte Raids lassen sich korrigieren, z. B. mit <strong>Loot korrigieren</strong>. Dann ist immer eine Begründung nötig, und EP werden automatisch ausgeglichen. Die Lootliste zeigt und zählt pro Boss nur aktive Vergaben. Zurückgezogene Vergaben bleiben im Protokoll erhalten.</p>
       <Shot name="39-archivierter-raid-loot" caption="Archivierter Raid: Loot korrigieren" />
     </Section>
 

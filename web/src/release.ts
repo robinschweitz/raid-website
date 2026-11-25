@@ -1,8 +1,13 @@
-export const appVersion = '1.0.99'
+export const appVersion = '1.0.100'
 
 export const changelog = [
   {
     version: appVersion,
+    title: 'Aktive Lootvergaben im Raid',
+    changes: ['Die Lootliste zeigt und zählt pro Boss nur aktive Vergaben. Zurückgezogene Vergaben bleiben im Protokoll erhalten.'],
+  },
+  {
+    version: '1.0.99',
     title: 'EP-Einstellung der Serie gilt auch für geplante Raids',
     changes: ['Änderst du bei einer Raidserie den EP-Topf oder die EP, übernehmen jetzt auch die schon geplanten und offenen Raids der Serie die neue Einstellung. Nur Raids, in denen schon EP gebucht oder Locks gesetzt sind, behalten die alte; die Seite nennt sie dir.'],
   },

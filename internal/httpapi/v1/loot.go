@@ -3,6 +3,7 @@ package v1
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"sort"
 	"time"
 
@@ -129,6 +130,7 @@ func (a *API) listLoot(w http.ResponseWriter, r *http.Request) {
 	}
 	// In the Admin-set boss order (ADR 088): the raid page groups loot by boss
 	// in the order the rows arrive. Loot without a catalog boss stays last.
+	awards = slices.DeleteFunc(awards, func(award loot.Award) bool { return award.WithdrawnAt != nil })
 	ranks, err := a.LootRepo.Catalog().BossRanks(r.Context())
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "could not list loot")

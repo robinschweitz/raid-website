@@ -40,6 +40,24 @@ func TestReqRaid011_AC01(t *testing.T) {
 	}
 }
 
+func TestRaidLootListsOnlyActiveReplacement(t *testing.T) {
+	f := newCorrectionFixture(t)
+	f.attend(f.first, f.firstChar)
+	create := func() int64 {
+		return correctionID(t, f.request(http.MethodPost, "/loot", f.selection(map[string]any{"awarded_to_player_id": f.first, "awarded_to_character_id": f.firstChar, "award_method": "SECOND"}, false), http.StatusCreated))
+	}
+	old := create()
+	f.request(http.MethodPost, fmt.Sprintf("/loot/%d/withdraw", old), map[string]any{}, http.StatusOK)
+	replacement := create()
+	var list struct{ Data []loot.Award }
+	if err := json.Unmarshal(f.request(http.MethodGet, "/loot", nil, http.StatusOK), &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Data) != 1 || list.Data[0].ID != replacement {
+		t.Fatalf("expected only replacement %d, got %+v", replacement, list.Data)
+	}
+}
+
 func TestReqRaid011_AC02(t *testing.T) {
 	f := newCorrectionFixture(t)
 	ctx := context.Background()
